@@ -1,0 +1,4 @@
+- [x] Fix Payment Double Counting Issue <!-- id: 14 -->
+- [x] Implement "Pay Now" in Sales Create <!-- id: 15 -->
+- [x] Implement Auto-Allocation logic in SalesController <!-- id: 16 -->
+- [x] Verify & Document <!-- id: 17 -->

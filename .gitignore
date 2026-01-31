@@ -1,0 +1,60 @@
+# Laravel basics
+/node_modules
+/vendor
+.env
+.env.backup
+.env.production
+.phpactor.json
+Homestead.json
+Homestead.yaml
+auth.json
+/.phpunit.cache
+/.phpunit.result.cache
+
+# PHPUnit
+.phpunit.cache/
+.phpunit.result.cache
+
+# Storage
+/storage/*.key
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+/storage/pail
+!/storage/app/public/.gitignore
+!/storage/framework/.gitignore
+!/storage/logs/.gitignore
+
+# Public files
+/public/hot
+/public/storage
+/public/build
+
+# Vite/Node
+npm-debug.log
+yarn-error.log
+package-lock.json.backup
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+
+# IDEs and Editors
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+.DS_Store
+Thumbs.db
+
+# Deployment and Temporary files
+/bootstrap/ssr
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+app.zip
+.temp_ag_kit/
+accounts_schema.json
+componentstrtert.json
+fix_categories.php
