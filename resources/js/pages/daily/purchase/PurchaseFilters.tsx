@@ -30,6 +30,17 @@ interface FilterProps {
     }[];
 }
 
+const FieldWrapper = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
+    <div className={`relative ${className}`}>
+        <label className="absolute -top-2 left-3 px-2 bg-white dark:bg-[#0a0a0a] text-[11px] font-medium text-gray-600 z-10 leading-none">
+            {label}
+        </label>
+        <div>
+            {children}
+        </div>
+    </div>
+);
+
 export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
     const [date, setDate] = useState<DateRange | undefined>({
         from: filters.start_date ? new Date(filters.start_date) : undefined,
@@ -68,18 +79,18 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
         <div className=" p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
 
             {/* Date Range Picker */}
-            <div className="flex-1 min-w-[200px]">
+            <FieldWrapper label="Date Range" className="flex-1 min-w-[200px]">
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button
                             id="date"
                             variant={"outline"}
                             className={cn(
-                                "w-full justify-start text-left font-normal",
+                                "w-full justify-start text-left font-normal h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors",
                                 !date && "text-muted-foreground"
                             )}
                         >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-2 h-4 w-4 text-sky-600" />
                             {date?.from ? (
                                 date.to ? (
                                     <>
@@ -105,13 +116,13 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                         />
                     </PopoverContent>
                 </Popover>
-            </div>
+            </FieldWrapper>
 
 
             {/* Supplier Filter */}
-            <div className="flex-1 min-w-[180px]">
+            <FieldWrapper label="Filter by Supplier" className="flex-1 min-w-[180px]">
                 <Select value={supplierId} onValueChange={setSupplierId}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
                         <SelectValue placeholder="Select Supplier" />
                     </SelectTrigger>
                     <SelectContent>
@@ -123,12 +134,12 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
+            </FieldWrapper>
 
             {/* Status Filter */}
-            <div className="flex-1 min-w-[150px]">
+            <FieldWrapper label="Status" className="flex-1 min-w-[150px]">
                 <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
                         <SelectValue placeholder="Select Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -138,26 +149,28 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                         <SelectItem value="Returned">Returned</SelectItem>
                     </SelectContent>
                 </Select>
-            </div>
+            </FieldWrapper>
 
             {/* Search Input */}
-            <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder="Search invoice..."
-                    className="pl-8"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-            </div>
+            <FieldWrapper label="Search Invoice" className="flex-1 min-w-[200px]">
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-sky-600 z-10" />
+                    <Input
+                        type="text"
+                        placeholder="Type to search..."
+                        className="pl-8 h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+            </FieldWrapper>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
-                <Button onClick={applyFilters} className="bg-primary hover:bg-primary/90">
+            <div className="flex items-center gap-2 h-10 mt-auto">
+                <Button onClick={applyFilters} className="bg-sky-600 hover:bg-sky-700 h-10">
                     <Filter className="mr-2 h-4 w-4" /> Apply
                 </Button>
-                <Button variant="outline" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                <Button variant="outline" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 border-slate-200">
                     <X className="mr-2 h-4 w-4" /> Clear
                 </Button>
             </div>

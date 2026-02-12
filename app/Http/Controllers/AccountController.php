@@ -254,9 +254,57 @@ class AccountController extends Controller
     }
     public function show(Account $account)
     {
-        $account->load(['country', 'province', 'city', 'area', 'subarea', 'saleman', 'booker']);
-        return Inertia::render("setup/account/show", [
+        $account->load(['accountType', 'country', 'province', 'city', 'area', 'subarea', 'saleman', 'booker']);
+
+        $summary = [];
+        $type = $account->accountType->name ?? '';
+
+        if ($type === 'Customers') {
+            $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
+            $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
+            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->sum('amount');
+            $unpaidInvoices = \App\Models\Sales::where('customer_id', $account->id)->where('remaining_amount', '>', 0)->count();
+
+            $summary = [
+                'total_sales' => $totalSales,
+                'total_returns' => $totalReturns,
+                'total_receipts' => $totalReceipts,
+                'unpaid_invoices' => $unpaidInvoices,
+            ];
+        } elseif ($type === 'Supplier') {
+            $totalPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->sum('net_total');
+            $totalReturns = \App\Models\PurchaseReturn::where('supplier_id', $account->id)->sum('net_total');
+            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->sum('amount');
+            $unpaidBills = \App\Models\Purchase::where('supplier_id', $account->id)->where('remaining_amount', '>', 0)->count();
+
+            $summary = [
+                'total_purchases' => $totalPurchases,
+                'total_returns' => $totalReturns,
+                'total_payments' => $totalPayments,
+                'unpaid_bills' => $unpaidBills,
+            ];
+        } elseif ($type === 'Bank' || $type === 'Cash') {
+            $totalIn = \App\Models\Payment::where('payment_account_id', $account->id)->where('type', 'RECEIPT')->sum('amount');
+            $totalOut = \App\Models\Payment::where('payment_account_id', $account->id)->where('type', 'PAYMENT')->sum('amount');
+
+            $summary = [
+                'total_in' => $totalIn,
+                'total_out' => $totalOut,
+                'current_balance' => $account->opening_balance + $totalIn - $totalOut,
+            ];
+
+            if ($type === 'Bank') {
+                $totalCheques = \App\Models\Chequebook::where('bank_id', $account->id)->count();
+                $issuedCheques = \App\Models\Chequebook::where('bank_id', $account->id)->where('status', 'issued')->count();
+                $summary['total_cheques'] = $totalCheques;
+                $summary['issued_cheques'] = $issuedCheques;
+                $summary['available_cheques'] = $totalCheques - $issuedCheques;
+            }
+        }
+
+        return Inertia::render("setup/account/view", [
             'account' => $account,
+            'financial_summary' => $summary,
         ]);
     }
     public function destroy(Account $account)
@@ -282,5 +330,33 @@ class AccountController extends Controller
             + ($purchasesUnpaid - $purchaseReturnsUnpaid);
 
         return response()->json(['balance' => $total]);
+    }
+
+    public function getNextCode(Request $request)
+    {
+        $typeId = $request->query('type');
+        if (!$typeId) {
+            return response()->json(['code' => '']);
+        }
+
+        // Find the latest account of this type
+        $latestAccount = Account::where('type', $typeId)
+            ->latest('id')
+            ->first();
+
+        if (!$latestAccount) {
+            return response()->json(['code' => '000001']);
+        }
+
+        // Extract numeric part
+        // Assuming code is numeric or alphanumeric. If it's pure number string:
+        if (preg_match('/(\d+)$/', $latestAccount->code, $matches)) {
+            $number = intval($matches[1]);
+            $nextCode = str_pad($number + 1, strlen($matches[1]), '0', STR_PAD_LEFT);
+            return response()->json(['code' => $nextCode]);
+        }
+
+        // Fallback if regex fails (e.g. empty code)
+        return response()->json(['code' => '000001']);
     }
 }

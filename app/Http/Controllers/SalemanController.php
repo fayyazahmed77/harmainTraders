@@ -50,6 +50,8 @@ class SalemanController extends Controller
             'shortname' => 'required|string|max:100',
             'code' => 'required|string|max:50|unique:salemen,code',
             'date' => 'required|date',
+            'status' => 'nullable|boolean',
+            'defult' => 'nullable|boolean',
         ]);
 
         $saleman = Saleman::create([
@@ -57,8 +59,8 @@ class SalemanController extends Controller
             'shortname' => $request->shortname,
             'code' => $request->code,
             'date' => $request->date,
-            'status' => $request->status ?? '0',
-            'defult' => $request->defult ?? '0',
+            'status' => $request->status ? 1 : 0,
+            'defult' => $request->defult ? 1 : 0,
             'created_by' => Auth::id(),
         ]);
 
@@ -75,6 +77,8 @@ class SalemanController extends Controller
             'shortname' => 'required|string|max:100',
             'code' => 'required|string|max:50|unique:salemen,code,' . $saleman->id,
             'date' => 'required|date',
+            'status' => 'nullable|boolean',
+            'defult' => 'nullable|boolean',
         ]);
 
         $saleman->update([
@@ -82,6 +86,8 @@ class SalemanController extends Controller
             'shortname' => $request->shortname,
             'code' => $request->code,
             'date' => $request->date,
+            'status' => $request->status ? 1 : 0,
+            'defult' => $request->defult ? 1 : 0,
         ]);
 
         return redirect()->back()->with('success', 'Saleman updated successfully.');
@@ -94,5 +100,16 @@ class SalemanController extends Controller
     {
         $saleman->delete();
         return redirect()->back()->with('success', 'Saleman deleted successfully.');
+    }
+
+    public function getNextCode()
+    {
+        $latest = Saleman::latest('id')->first();
+        if (!$latest) {
+            return response()->json(['code' => '001']);
+        }
+
+        $code = (int)$latest->code + 1;
+        return response()->json(['code' => str_pad($code, 3, '0', STR_PAD_LEFT)]);
     }
 }

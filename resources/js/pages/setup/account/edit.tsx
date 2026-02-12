@@ -17,18 +17,13 @@ import { useForm } from "@inertiajs/react";
 import { CalendarIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import {
-  Select as Nselect,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { toast } from "sonner";
+import axios from "axios";
+import { route } from "ziggy-js";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Account", href: "/account" },
-  { title: "Edit", href: "#" },
+  { title: "Edit", href: "/account" }, // or specify edit link if needed
 ];
 
 interface Option {
@@ -153,6 +148,75 @@ export default function Edit({
   const [saleman, setSaleman] = useState<Option | null>(getMappedOption(account.saleman_id, salemans));
   const [booker, setBooker] = useState<Option | null>(getMappedOption(account.booker_id, bookers));
   const [accountType, setAccountType] = useState<Option | null>(getMappedOption(account.type, accountTypes));
+
+  // Define custom styles for react-select to match Shadcn UI
+  const customStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      borderColor: state.isFocused ? "var(--ring)" : "var(--border)",
+      borderRadius: "var(--radius)",
+      boxShadow: state.isFocused ? "0 0 0 1px var(--ring)" : "none",
+      "&:hover": {
+        borderColor: state.isFocused ? "var(--ring)" : "var(--border)",
+      },
+      minHeight: "40px", // h-10
+      backgroundColor: "var(--background)",
+      color: "var(--foreground)",
+      opacity: state.isDisabled ? 0.5 : 1,
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: "var(--foreground)",
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: "var(--muted-foreground)",
+      fontSize: "0.875rem",
+    }),
+    menu: (base: any) => ({
+      ...base,
+      borderRadius: "var(--radius)",
+      border: "1px solid var(--border)",
+      backgroundColor: "var(--popover)",
+      color: "var(--popover-foreground)",
+      zIndex: 50,
+      padding: "4px",
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      borderRadius: "calc(var(--radius) - 2px)",
+      backgroundColor: state.isSelected
+        ? "var(--primary)"
+        : state.isFocused
+          ? "var(--accent)"
+          : "transparent",
+      color: state.isSelected
+        ? "var(--primary-foreground)"
+        : state.isFocused
+          ? "var(--accent-foreground)"
+          : "var(--foreground)",
+      cursor: "pointer",
+      "&:active": {
+        backgroundColor: "var(--accent)",
+      },
+      fontSize: "0.875rem",
+      padding: "8px 12px",
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: "var(--foreground)",
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: "var(--muted-foreground)",
+      "&:hover": {
+        color: "var(--foreground)",
+      },
+    }),
+    indicatorSeparator: () => ({
+      display: "none",
+    }),
+  };
 
   // ---------- Inertia Form (Moved Up) ----------
   const { data, setData, put, processing, errors, transform } = useForm<AccountForm>({
@@ -340,510 +404,523 @@ export default function Edit({
           <div className="flex flex-1 flex-col gap-6 p-4">
             <Card className="mx-auto w-full shadow-md border">
               <CardContent className="pt-4">
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-8">
-                  {/* LEFT COLUMN */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Code</Label>
-                        <Input
-                          value={data.code}
-                          onChange={(e) => onInputChange("code", e.target.value)}
-                          placeholder="000001"
-                        />
-                        {errors.code && <p className="text-xs text-red-500 mt-1">{errors.code}</p>}
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* LEFT COLUMN: Basic Info & Contact */}
+                    <div className="space-y-6">
+                      <div className="border-b pb-2 mb-4">
+                        <h3 className="text-lg font-semibold">Basic Info & Contact</h3>
+                        <p className="text-sm text-muted-foreground">General identity and contact details</p>
                       </div>
 
-                      <div>
-                        <Label className="mb-1 block">Title</Label>
-                        <Input
-                          value={data.title}
-                          onChange={(e) => onInputChange("title", e.target.value)}
-                          placeholder="Enter title"
-                        />
-                        {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
-                      </div>
-                    </div>
+                      {/* Code & Title */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Code</Label>
+                          <Input
+                            value={data.code}
+                            onChange={(e) => onInputChange("code", e.target.value)}
+                            placeholder="000001"
+                          />
+                          {errors.code && <p className="text-xs text-red-500 mt-1">{errors.code}</p>}
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="mb-2 block">Title</Label>
+                          <Input
+                            value={data.title}
+                            onChange={(e) => onInputChange("title", e.target.value)}
+                            placeholder="Enter title"
+                          />
+                          {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
+                        </div>
+                      </div>
+
+                      {/* Account Type */}
                       <div>
-                        <Label className="mb-1 block">Account Type</Label>
-                        <Nselect
-                          value={accountType?.value?.toString() ?? ""}
-                          onValueChange={(value) => {
-                            const selected = accountTypeOptions.find((s) => s.value.toString() === value);
-                            setAccountType(selected || null);
-                            setData("type", selected ? String(selected.value) : "");
+                        <Label className="mb-2 block">Account Type</Label>
+                        <Select
+                          value={accountType}
+                          onChange={(opt) => {
+                            setAccountType(opt);
+                            setData("type", opt ? String(opt.value) : "");
                           }}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select account type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {accountTypeOptions.map((s) => (
-                              <SelectItem key={s.value} value={s.value.toString()}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Nselect>
+                          options={accountTypeOptions}
+                          placeholder="Select account type"
+                          isSearchable
+                          className="text-sm"
+                          styles={customStyles}
+                        />
+                        {errors.type && <p className="text-xs text-red-500 mt-1">{errors.type}</p>}
                       </div>
 
-                      <div>
-                        <Label className="mb-3 block">Check Option</Label>
-                        <div className="flex items-center flex-wrap gap-4">
+                      {/* Checkboxes */}
+                      <div className="border rounded-md p-4 bg-muted/20">
+                        <Label className="mb-3 block font-semibold text-sm">Account Options</Label>
+                        <div className="flex items-center flex-wrap gap-6">
                           <div className="flex items-center gap-2">
                             <Checkbox
                               id="purchase"
                               checked={data.purchase}
                               onCheckedChange={(v) => onInputChange("purchase", !!v)}
                             />
-                            <Label htmlFor="purchase" className="mb-1 block">Purchase</Label>
+                            <Label htmlFor="purchase" className="cursor-pointer">Purchase</Label>
                           </div>
-
                           <div className="flex items-center gap-2">
                             <Checkbox
                               id="cashbank"
                               checked={data.cashbank}
                               onCheckedChange={(v) => onInputChange("cashbank", !!v)}
                             />
-                            <Label htmlFor="cashbank" className="mb-1 block">Cash / Bank</Label>
+                            <Label htmlFor="cashbank" className="cursor-pointer">Cash / Bank</Label>
                           </div>
-
                           <div className="flex items-center gap-2">
                             <Checkbox
                               id="sale"
                               checked={data.sale}
                               onCheckedChange={(v) => onInputChange("sale", !!v)}
                             />
-                            <Label htmlFor="sale" className="mb-1 block">Sale</Label>
+                            <Label htmlFor="sale" className="cursor-pointer">Sale</Label>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="date" className="mb-1 block">Opening Date</Label>
-                        <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className={cn("w-full justify-between text-left font-normal", !openingDate && "text-muted-foreground")}
-                            >
-                              {openingDate
-                                ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                                : "Select date"}
-                              <CalendarIcon className="h-4 w-4 opacity-60" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={openingDate}
-                              onSelect={(value) => {
-                                setOpeningDate(value);
-                                setOpeningOpen(false);
-                                onInputChange("opening_date", value ? value.toISOString().split("T")[0] : "");
-                              }}
+                      {/* Opening Balance */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Opening Date</Label>
+                          <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className={cn("w-full justify-between text-left font-normal", !openingDate && "text-muted-foreground")}
+                              >
+                                {openingDate
+                                  ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                                  : "Select date"}
+                                <CalendarIcon className="h-4 w-4 opacity-60" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={openingDate}
+                                onSelect={(value) => {
+                                  setOpeningDate(value);
+                                  setOpeningOpen(false);
+                                  onInputChange("opening_date", value ? value.toISOString().split("T")[0] : "");
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Opening Balance</Label>
+                          <Input
+                            value={data.opening_balance}
+                            type="number"
+                            placeholder="0.00"
+                            onChange={(e) => onInputChange("opening_balance", e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Address & Contact */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <Label className="mb-2 block">Address 1</Label>
+                            <Input
+                              value={data.address1}
+                              onChange={(e) => onInputChange("address1", e.target.value)}
+                              placeholder="Complete address line 1"
                             />
-                          </PopoverContent>
-                        </Popover>
+                          </div>
+                          <div>
+                            <Label className="mb-2 block">Address 2</Label>
+                            <Input
+                              value={data.address2}
+                              onChange={(e) => onInputChange("address2", e.target.value)}
+                              placeholder="Complete address line 2"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="mb-2 block">Mobile (Primary)</Label>
+                            <Input
+                              value={data.mobile}
+                              onChange={(e) => onInputChange("mobile", e.target.value)}
+                              placeholder="0300-1234567"
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-2 block">Telephone 1</Label>
+                            <Input
+                              value={data.telephone1}
+                              onChange={(e) => onInputChange("telephone1", e.target.value)}
+                              placeholder="Phone number"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="mb-2 block">Telephone 2</Label>
+                            <Input
+                              value={data.telephone2}
+                              onChange={(e) => onInputChange("telephone2", e.target.value)}
+                              placeholder="Alt phone number"
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-2 block">Fax</Label>
+                            <Input
+                              value={data.fax}
+                              onChange={(e) => onInputChange("fax", e.target.value)}
+                              placeholder="Fax number"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="mb-2 block">Remarks</Label>
+                            <Input
+                              value={data.remarks}
+                              onChange={(e) => onInputChange("remarks", e.target.value)}
+                              placeholder="Additional remarks"
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-2 block">Regards</Label>
+                            <Input
+                              value={data.regards}
+                              onChange={(e) => onInputChange("regards", e.target.value)}
+                              placeholder="Details..."
+                            />
+                          </div>
+                        </div>
                       </div>
 
-                      <div>
-                        <Label className="mb-1 block">Opening Balance</Label>
-                        <Input
-                          value={data.opening_balance}
-                          placeholder="Enter opening balance"
-                          onChange={(e) => onInputChange("opening_balance", e.target.value)}
-                        />
-                      </div>
                     </div>
 
-                    <div>
-                      <Label className="mb-1 block">Address 1</Label>
-                      <Input
-                        value={data.address1}
-                        placeholder="Enter address 1"
-                        onChange={(e) => onInputChange("address1", e.target.value)}
-                      />
-                    </div>
+                    {/* RIGHT COLUMN: Location & Details */}
+                    <div className="space-y-6">
+                      <div className="border-b pb-2 mb-4">
+                        <h3 className="text-lg font-semibold">Location & Details</h3>
+                        <p className="text-sm text-muted-foreground">Geographic and categorization data</p>
+                      </div>
 
-                    <div>
-                      <Label className="mb-1 block">Address 2</Label>
-                      <Input
-                        value={data.address2}
-                        placeholder="Enter address 2"
-                        onChange={(e) => onInputChange("address2", e.target.value)}
-                      />
-                    </div>
+                      {/* Location Hierarchy */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label>Country</Label>
+                          <Select
+                            options={countryOptions}
+                            value={country}
+                            onChange={(opt) => handleCountryChange(opt as Option)}
+                            placeholder="Select country..."
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                            formatOptionLabel={(opt: any) => (
+                              <div className="flex items-center gap-2">
+                                {opt.code && <img src={`https://flagcdn.com/w40/${opt.code?.toLowerCase()}.png`} alt={opt.label} className="w-5 h-4 rounded object-cover" />}
+                                <span>{opt.label}</span>
+                              </div>
+                            )}
+                          />
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Telephone 1</Label>
-                        <Input
-                          value={data.telephone1}
-                          placeholder="Enter telephone 1"
-                          onChange={(e) => onInputChange("telephone1", e.target.value)}
+                        <div className="grid gap-2">
+                          <Label>Province</Label>
+                          <Select
+                            options={provinceOptions}
+                            value={province}
+                            onChange={(opt) => handleProvinceChange(opt as Option)}
+                            placeholder={country ? "Select province..." : "Select country first..."}
+                            isDisabled={!country}
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label>City</Label>
+                          <Select
+                            options={cityOptions}
+                            value={city}
+                            onChange={(opt) => handleCityChange(opt as Option)}
+                            placeholder={province ? "Select city..." : "Select province first..."}
+                            isDisabled={!province}
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Area</Label>
+                          <Select
+                            options={areaOptions}
+                            value={area}
+                            onChange={(opt) => handleAreaChange(opt as Option)}
+                            placeholder={city ? "Select area..." : "Select city first..."}
+                            isDisabled={!city}
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Sub Area</Label>
+                        <Select
+                          options={subareaOptions}
+                          value={subarea}
+                          onChange={(opt) => {
+                            setSubarea(opt as Option | null);
+                            setData("subarea_id", opt ? String((opt as Option).value) : "");
+                          }}
+                          placeholder={area ? "Select subarea..." : "Select area first..."}
+                          isDisabled={!area}
+                          isSearchable
+                          className="text-sm"
+                          styles={customStyles}
                         />
                       </div>
 
-                      <div>
-                        <Label className="mb-1 block">Telephone 2</Label>
-                        <Input
-                          value={data.telephone2}
-                          placeholder="Enter telephone 2"
-                          onChange={(e) => onInputChange("telephone2", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Fax</Label>
-                        <Input
-                          value={data.fax}
-                          placeholder="Enter fax"
-                          onChange={(e) => onInputChange("fax", e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="mb-1 block">Mobile</Label>
-                        <Input
-                          value={data.mobile}
-                          placeholder="Enter mobile"
-                          onChange={(e) => onInputChange("mobile", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">GST #</Label>
-                        <Input
-                          value={data.gst}
-                          placeholder="Enter GST #"
-                          onChange={(e) => onInputChange("gst", e.target.value)}
-                        />
+                      {/* Salesman & Booker */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Salesman</Label>
+                          <Select
+                            value={saleman}
+                            onChange={(opt) => {
+                              setSaleman(opt as Option);
+                              setData("saleman_id", opt ? String((opt as Option).value) : "");
+                            }}
+                            options={salemanOptions}
+                            placeholder="Select salesman"
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Booker</Label>
+                          <Select
+                            value={booker}
+                            onChange={(opt) => {
+                              setBooker(opt as Option);
+                              setData("booker_id", opt ? String((opt as Option).value) : "");
+                            }}
+                            options={bookerOptions}
+                            placeholder="Select booker"
+                            isSearchable
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <Label className="mb-1 block">NTN #</Label>
-                        <Input
-                          value={data.ntn}
-                          placeholder="Enter NTN #"
-                          onChange={(e) => onInputChange("ntn", e.target.value)}
-                        />
+                      {/* Financial Details */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Credit Limit</Label>
+                          <Input
+                            value={data.credit_limit}
+                            type="number"
+                            onChange={(e) => onInputChange("credit_limit", e.target.value)}
+                            placeholder="Amount..."
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Aging Days</Label>
+                          <Input
+                            value={data.aging_days}
+                            type="number"
+                            onChange={(e) => onInputChange("aging_days", e.target.value)}
+                            placeholder="Days..."
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Remarks</Label>
-                        <Input
-                          value={data.remarks}
-                          onChange={(e) => onInputChange("remarks", e.target.value)}
-                        />
+                      {/* Tax & Identifiers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">GST #</Label>
+                          <Input
+                            value={data.gst}
+                            onChange={(e) => onInputChange("gst", e.target.value)}
+                            placeholder="GST Number"
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">NTN #</Label>
+                          <Input
+                            value={data.ntn}
+                            onChange={(e) => onInputChange("ntn", e.target.value)}
+                            placeholder="NTN Number"
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <Label className="mb-1 block">Regards</Label>
-                        <Input
-                          value={data.regards}
-                          onChange={(e) => onInputChange("regards", e.target.value)}
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">CNIC #</Label>
+                          <Input value={data.cnic} onChange={(e) => onInputChange("cnic", e.target.value)} placeholder="CNIC Number" />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">FBR Date</Label>
+                          <Popover open={fbrOpen} onOpenChange={setFbrOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className={cn("w-full justify-between text-left font-normal", !fbrDate && "text-muted-foreground")}
+                              >
+                                {fbrDate
+                                  ? fbrDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                                  : "Select date"}
+                                <CalendarIcon className="h-4 w-4 opacity-60" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={fbrDate}
+                                onSelect={(value) => {
+                                  setFbrDate(value);
+                                  setFbrOpen(false);
+                                  onInputChange("fbr_date", value ? value.toISOString().split("T")[0] : "");
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
+
+                      {/* Misc */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Note Head</Label>
+                          <Select
+                            options={[
+                              { value: "Legal Expenses", label: "Legal Expenses" },
+                              { value: "Bank Charges", label: "Bank Charges" },
+                              { value: "Depreciation", label: "Depreciation" },
+                              { value: "N/A", label: "N/A" },
+                              { value: "Promotional & Marketing", label: "Promotional & Marketing" },
+                              { value: "Daily Customer", label: "Daily Customer" },
+                              { value: "Zakat", label: "Zakat" },
+                              { value: "Home Expenses", label: "Home Expenses" },
+                              { value: "Office Expenses", label: "Office Expenses" },
+                            ]}
+                            value={data.note_head ? { value: data.note_head, label: data.note_head } : null}
+                            onChange={(opt: any) => onInputChange("note_head", opt ? opt.value : "")}
+                            placeholder="Select Note Head"
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">Category</Label>
+                          <Select
+                            options={[
+                              { value: "OTHER'S", label: "OTHER'S" },
+                              { value: "A", label: "A" },
+                              { value: "B", label: "B" },
+                              { value: "C", label: "C" },
+                              { value: "D", label: "D" },
+                              { value: "Monthly", label: "Monthly" },
+                              { value: "Yearly", label: "Yearly" },
+                              { value: "Distributor", label: "Distributor" },
+                              { value: "Wholesaler", label: "Wholesaler" },
+                              { value: "Retailer", label: "Retailer" },
+                            ]}
+                            value={data.category ? { value: data.category, label: data.category } : null}
+                            onChange={(opt: any) => onInputChange("category", opt ? opt.value : "")}
+                            placeholder="Select Category"
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="mb-2 block">Item Category</Label>
+                          <Select
+                            options={[
+                              { value: "1", label: "1" },
+                              { value: "2", label: "2" },
+                              { value: "3", label: "3" },
+                              { value: "4", label: "4" },
+                              { value: "5", label: "5" },
+                            ]}
+                            value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
+                            onChange={(opt: any) => onInputChange("item_category", opt ? opt.value : "")}
+                            placeholder="Select Item Category"
+                            className="text-sm"
+                            styles={customStyles}
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-2 block">A.T.S Info</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={data.ats_percentage}
+                              onChange={(e) => onInputChange("ats_percentage", e.target.value)}
+                              placeholder="%"
+                              className="w-20"
+                            />
+                            <Select
+                              options={[
+                                { value: "Filer", label: "Filer" },
+                                { value: "No-Filer", label: "No-Filer" },
+                                { value: "Exempt", label: "Exempt" },
+                                { value: "Manufacturer", label: "Manufacturer" },
+                                { value: "Included", label: "Included" },
+                                { value: "Excluded", label: "Excluded" },
+                              ]}
+                              value={data.ats_type ? { value: data.ats_type, label: data.ats_type } : null}
+                              onChange={(opt: any) => onInputChange("ats_type", opt ? opt.value : "")}
+                              placeholder="Type"
+                              className="w-full text-sm"
+                              styles={customStyles}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+
+                      <div className="flex items-center gap-2 pt-4 border-t">
+                        <Checkbox
+                          id="status"
+                          checked={!!data.status}
+                          onCheckedChange={(v) => onInputChange("status", !!v)}
+                        />
+                        <Label htmlFor="status" className="cursor-pointer">Active Account</Label>
+                      </div>
+
                     </div>
                   </div>
 
-                  <Separator orientation="vertical" className="mx-auto hidden md:block h-full" />
+                  <Separator className="my-6" />
 
-                  {/* RIGHT COLUMN */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="grid gap-2">
-                        <Label>Country</Label>
-                        <Select
-                          options={countryOptions}
-                          value={country}
-                          onChange={(opt) => handleCountryChange(opt as Option)}
-                          placeholder="Select country..."
-                          isSearchable
-                          formatOptionLabel={(opt: any) => (
-                            <div className="flex items-center gap-2">
-                              {opt.code && <img src={`https://flagcdn.com/w40/${opt.code?.toLowerCase()}.png`} alt={opt.label} className="w-5 h-4 rounded" />}
-                              <span>{opt.label}</span>
-                            </div>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label>Province</Label>
-                        <Select
-                          options={provinceOptions}
-                          value={province}
-                          onChange={(opt) => handleProvinceChange(opt as Option)}
-                          placeholder={country ? "Select province..." : "Select country first..."}
-                          isDisabled={!country}
-                          isSearchable
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="grid gap-2">
-                        <Label>City</Label>
-                        <Select
-                          options={cityOptions}
-                          value={city}
-                          onChange={(opt) => handleCityChange(opt as Option)}
-                          placeholder={province ? "Select city..." : "Select province first..."}
-                          isDisabled={!province}
-                          isSearchable
-                        />
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label>Area</Label>
-                        <Select
-                          options={areaOptions}
-                          value={area}
-                          onChange={(opt) => handleAreaChange(opt as Option)}
-                          placeholder={city ? "Select area..." : "Select city first..."}
-                          isDisabled={!city}
-                          isSearchable
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label>Sub Area</Label>
-                      <Select
-                        options={subareaOptions}
-                        value={subarea}
-                        onChange={(opt) => {
-                          setSubarea(opt as Option | null);
-                          setData("subarea_id", opt ? String((opt as Option).value) : "");
-                        }}
-                        placeholder={area ? "Select subarea..." : "Select area first..."}
-                        isDisabled={!area}
-                        isSearchable
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="mb-1 block">Note Head</Label>
-                      <Nselect
-                        value={data.note_head}
-                        onValueChange={(v) => onInputChange("note_head", v)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select Note Head" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Legal Expenses">Legal Expenses</SelectItem>
-                          <SelectItem value="Bank Charges">Bank Charges</SelectItem>
-                          <SelectItem value="Depreciation">Depreciation</SelectItem>
-                          <SelectItem value="N/A">N/A</SelectItem>
-                          <SelectItem value="Promotional & Marketing">Promotional & Marketing</SelectItem>
-                          <SelectItem value="Daily Customer">Daily Customer</SelectItem>
-                          <SelectItem value="Zakat">Zakat</SelectItem>
-                          <SelectItem value="Home Expenses">Home Expenses</SelectItem>
-                          <SelectItem value="Office Expenses">Office Expenses</SelectItem>
-                        </SelectContent>
-                      </Nselect>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Salesman</Label>
-                        <Nselect
-                          value={saleman?.value?.toString() ?? ""}
-                          onValueChange={(value) => {
-                            const selected = salemanOptions.find((s) => s.value.toString() === value);
-                            setSaleman(selected || null);
-                            setData("saleman_id", selected ? String(selected.value) : "");
-                          }}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select salesman" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {salemanOptions.map((s) => (
-                              <SelectItem key={s.value} value={s.value.toString()}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Nselect>
-                      </div>
-
-                      <div>
-                        <Label className="mb-1 block">Booker</Label>
-                        <Nselect
-                          value={booker?.value?.toString() ?? ""}
-                          onValueChange={(value) => {
-                            const selected = bookerOptions.find((b) => b.value.toString() === value);
-                            setBooker(selected || null);
-                            setData("booker_id", selected ? String(selected.value) : "");
-                          }}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select booker" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {bookerOptions.map((b) => (
-                              <SelectItem key={b.value} value={b.value.toString()}>
-                                {b.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Nselect>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">Credit Limit</Label>
-                        <Input
-                          value={data.credit_limit}
-                          onChange={(e) => onInputChange("credit_limit", e.target.value)}
-                          placeholder="Enter credit limit"
-                        />
-                      </div>
-                      <div>
-                        <Label className="mb-1 block">Aging Days</Label>
-                        <Input
-                          value={data.aging_days}
-                          onChange={(e) => onInputChange("aging_days", e.target.value)}
-                          placeholder="Enter aging days"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="grid gap-2">
-                        <Label>Item Category</Label>
-                        <Nselect
-                          value={String(data.item_category ?? "")}
-                          onValueChange={(val) => setData("item_category", val)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Item Category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">1</SelectItem>
-                            <SelectItem value="2">2</SelectItem>
-                            <SelectItem value="3">3</SelectItem>
-                            <SelectItem value="4">4</SelectItem>
-                            <SelectItem value="5">5</SelectItem>
-                          </SelectContent>
-                        </Nselect>
-                      </div>
-
-                      <div>
-                        <Label className="mb-1 block">Category</Label>
-                        <Nselect
-                          value={data.category}
-                          onValueChange={(v) => onInputChange("category", v)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Distributor">Distributor</SelectItem>
-                            <SelectItem value="Wholesaler">Wholesaler</SelectItem>
-                            <SelectItem value="Retailer">Retailer</SelectItem>
-                          </SelectContent>
-                        </Nselect>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">ATS Percentage</Label>
-                        <Input
-                          value={data.ats_percentage}
-                          onChange={(e) => onInputChange("ats_percentage", e.target.value)}
-                          placeholder="%"
-                        />
-                      </div>
-                      <div>
-                        <Label className="mb-1 block">ATS Type</Label>
-                        <Nselect
-                          value={data.ats_type}
-                          onValueChange={(v) => onInputChange("ats_type", v)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Included">Included</SelectItem>
-                            <SelectItem value="Excluded">Excluded</SelectItem>
-                          </SelectContent>
-                        </Nselect>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="mb-1 block">CNIC</Label>
-                      <Input
-                        value={data.cnic}
-                        onChange={(e) => onInputChange("cnic", e.target.value)}
-                        placeholder="Enter CNIC"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label className="mb-1 block">FBR Date</Label>
-                        <Popover open={fbrOpen} onOpenChange={setFbrOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className={cn("w-full justify-between text-left font-normal", !fbrDate && "text-muted-foreground")}
-                            >
-                              {fbrDate ? fbrDate.toLocaleDateString("en-GB") : "Select date"}
-                              <CalendarIcon className="h-4 w-4 opacity-60" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={fbrDate}
-                              onSelect={(value) => {
-                                setFbrDate(value);
-                                setFbrOpen(false);
-                                onInputChange("fbr_date", value ? value.toISOString().split("T")[0] : "");
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <div>
-                        <Label className="mb-1 block">Status</Label>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Checkbox
-                            id="status"
-                            checked={data.status}
-                            onCheckedChange={(v) => onInputChange("status", !!v)}
-                          />
-                          <Label htmlFor="status">Active</Label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button type="submit" disabled={processing} className="w-full">
-                        {processing ? "Updating..." : "Update Account"}
-                      </Button>
-                    </div>
-
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3">
+                    <Button type="submit" disabled={processing} className="px-8">
+                      {processing ? "Updating..." : "Update Account"}
+                    </Button>
                   </div>
                 </form>
               </CardContent>

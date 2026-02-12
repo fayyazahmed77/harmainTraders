@@ -62,8 +62,8 @@ interface Booker {
     shortname: string;
     code: string;
     date?: string | null;
-    status?: string | null;
-    defult?: string | null;
+    status?: string | boolean | null;
+    defult?: string | boolean | null;
     created_by?: number;
     created_at: string;
     created_by_name?: string;
@@ -100,6 +100,8 @@ export function DataTable({ data }: DataTableProps) {
     const [shortname, setShortname] = useState("");
     const [code, setCode] = useState("");
     const [date, setDate] = useState("");
+    const [status, setStatus] = useState(true);
+    const [defult, setDefult] = useState(false);
 
     // update handler
     const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -108,7 +110,7 @@ export function DataTable({ data }: DataTableProps) {
 
         router.put(
             `/bookers/${editBooker.id}`,
-            { name, shortname, code, date },
+            { name, shortname, code, date, status, defult },
             {
                 onSuccess: () => {
                     toast.success("Booker updated successfully!");
@@ -217,8 +219,8 @@ export function DataTable({ data }: DataTableProps) {
                 return (
                     <span
                         className={`px-2 py-1 rounded text-xs font-medium ${isActive
-                                ? "bg-green-100 text-green-700 border border-green-300"
-                                : "bg-red-100 text-red-700 border border-red-300"
+                            ? "bg-green-100 text-green-700 border border-green-300"
+                            : "bg-red-100 text-red-700 border border-red-300"
                             }`}
                     >
                         {isActive ? "Active" : "Inactive"}
@@ -284,7 +286,9 @@ export function DataTable({ data }: DataTableProps) {
                                         setName(booker.name || "");
                                         setShortname(booker.shortname || "");
                                         setCode(booker.code || "");
-                                        setDate(booker.date || "");
+                                        setDate(booker.date ? booker.date.substring(0, 10) : "");
+                                        setStatus(booker.status === "1" || booker.status === "true" || booker.status === true);
+                                        setDefult(booker.defult === "1" || booker.defult === "true" || booker.defult === true);
                                     }}
                                 >
                                     Edit
@@ -325,35 +329,73 @@ export function DataTable({ data }: DataTableProps) {
         <div className="w-full">
             {/* Edit Dialog */}
             <Dialog open={!!editBooker} onOpenChange={() => setEditBooker(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle>Edit Booker</DialogTitle>
                         <DialogDescription>Update booker details.</DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={handleUpdate} className="space-y-4">
-                        <div>
+                        <div className="space-y-2">
                             <Label>Name</Label>
-                            <Input value={name} onChange={(e) => setName(e.target.value)} />
+                            <Input value={name} onChange={(e) => setName(e.target.value)} required />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                             <Label>Short Name</Label>
-                            <Input value={shortname} onChange={(e) => setShortname(e.target.value)} />
+                            <Input value={shortname} onChange={(e) => setShortname(e.target.value)} required />
                         </div>
 
-                        <div>
-                            <Label>Code</Label>
-                            <Input value={code} onChange={(e) => setCode(e.target.value)} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Code</Label>
+                                <Input value={code} onChange={(e) => setCode(e.target.value)} className="bg-muted font-mono" />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="font-mono text-sm" required />
+                            </div>
                         </div>
 
-                        <div>
-                            <Label>Date</Label>
-                            <Input value={date} onChange={(e) => setDate(e.target.value)} placeholder="YYYY-MM-DD" />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Status</Label>
+                                <ShadSelect
+                                    value={status ? "1" : "0"}
+                                    onValueChange={(val) => setStatus(val === "1")}
+                                >
+                                    <SelectTrigger className="w-full" size="sm">
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">Active</SelectItem>
+                                        <SelectItem value="0">Inactive</SelectItem>
+                                    </SelectContent>
+                                </ShadSelect>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Default</Label>
+                                <ShadSelect
+                                    value={defult ? "1" : "0"}
+                                    onValueChange={(val) => setDefult(val === "1")}
+                                >
+                                    <SelectTrigger className="w-full" size="sm">
+                                        <SelectValue placeholder="Is default?" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">Yes</SelectItem>
+                                        <SelectItem value="0">No</SelectItem>
+                                    </SelectContent>
+                                </ShadSelect>
+                            </div>
                         </div>
 
-                        <DialogFooter>
-                            <Button type="submit" variant="outline">Save Changes</Button>
+                        <DialogFooter className="mt-6">
+                            <Button type="submit" className="w-full bg-sky-500 hover:bg-sky-600 transition-colors">
+                                Save Changes
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

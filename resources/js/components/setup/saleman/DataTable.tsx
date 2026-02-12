@@ -5,7 +5,9 @@ import {
     ColumnDef,
     SortingState,
     VisibilityState,
+    ColumnFiltersState,
     getCoreRowModel,
+    getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
@@ -62,8 +64,8 @@ interface Saleman {
     shortname: string;
     code: string;
     date?: string | null;
-    status?: string | null;
-    defult?: string | null;
+    status?: string | boolean | null;
+    defult?: string | boolean | null;
     created_by?: number;
     created_at: string;
     created_by_name?: string;
@@ -87,6 +89,7 @@ export function DataTable({ data }: DataTableProps) {
 
     // table state
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
 
@@ -100,6 +103,8 @@ export function DataTable({ data }: DataTableProps) {
     const [shortname, setShortname] = useState("");
     const [code, setCode] = useState("");
     const [date, setDate] = useState("");
+    const [status, setStatus] = useState(true);
+    const [defult, setDefult] = useState(false);
 
     // update handler
     const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -108,7 +113,7 @@ export function DataTable({ data }: DataTableProps) {
 
         router.put(
             `/salemen/${editSaleman.id}`,
-            { name, shortname, code, date },
+            { name, shortname, code, date, status, defult },
             {
                 onSuccess: () => {
                     toast.success("Saleman updated successfully!");
@@ -217,8 +222,8 @@ export function DataTable({ data }: DataTableProps) {
                 return (
                     <span
                         className={`px-2 py-1 rounded text-xs font-medium ${isActive
-                                ? "bg-green-100 text-green-700 border border-green-300"
-                                : "bg-red-100 text-red-700 border border-red-300"
+                            ? "bg-green-100 text-green-700 border border-green-300"
+                            : "bg-red-100 text-red-700 border border-red-300"
                             }`}
                     >
                         {isActive ? "Active" : "Inactive"}
@@ -284,7 +289,9 @@ export function DataTable({ data }: DataTableProps) {
                                         setName(saleman.name || "");
                                         setShortname(saleman.shortname || "");
                                         setCode(saleman.code || "");
-                                        setDate(saleman.date || "");
+                                        setDate(saleman.date ? saleman.date.substring(0, 10) : "");
+                                        setStatus(saleman.status === "1" || saleman.status === "true" || saleman.status === true);
+                                        setDefult(saleman.defult === "1" || saleman.defult === "true" || saleman.defult === true);
                                     }}
                                 >
                                     Edit
@@ -313,47 +320,87 @@ export function DataTable({ data }: DataTableProps) {
         data,
         columns,
         onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
-        state: { sorting, columnVisibility, rowSelection },
+        state: { sorting, columnFilters, columnVisibility, rowSelection },
     });
 
     return (
         <div className="w-full">
             {/* Edit Dialog */}
             <Dialog open={!!editSaleman} onOpenChange={() => setEditSaleman(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle>Edit Saleman</DialogTitle>
                         <DialogDescription>Update saleman details.</DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={handleUpdate} className="space-y-4">
-                        <div>
+                        <div className="space-y-2">
                             <Label>Name</Label>
-                            <Input value={name} onChange={(e) => setName(e.target.value)} />
+                            <Input value={name} onChange={(e) => setName(e.target.value)} required />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                             <Label>Short Name</Label>
-                            <Input value={shortname} onChange={(e) => setShortname(e.target.value)} />
+                            <Input value={shortname} onChange={(e) => setShortname(e.target.value)} required />
                         </div>
 
-                        <div>
-                            <Label>Code</Label>
-                            <Input value={code} onChange={(e) => setCode(e.target.value)} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Code</Label>
+                                <Input value={code} onChange={(e) => setCode(e.target.value)} className="bg-muted font-mono" />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="font-mono text-sm" required />
+                            </div>
                         </div>
 
-                        <div>
-                            <Label>Date</Label>
-                            <Input value={date} onChange={(e) => setDate(e.target.value)} placeholder="YYYY-MM-DD" />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Status</Label>
+                                <ShadSelect
+                                    value={status ? "1" : "0"}
+                                    onValueChange={(val) => setStatus(val === "1")}
+                                >
+                                    <SelectTrigger className="w-full" size="sm">
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">Active</SelectItem>
+                                        <SelectItem value="0">Inactive</SelectItem>
+                                    </SelectContent>
+                                </ShadSelect>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Default</Label>
+                                <ShadSelect
+                                    value={defult ? "1" : "0"}
+                                    onValueChange={(val) => setDefult(val === "1")}
+                                >
+                                    <SelectTrigger className="w-full" size="sm">
+                                        <SelectValue placeholder="Is default?" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">Yes</SelectItem>
+                                        <SelectItem value="0">No</SelectItem>
+                                    </SelectContent>
+                                </ShadSelect>
+                            </div>
                         </div>
 
-                        <DialogFooter>
-                            <Button type="submit" variant="outline">Save Changes</Button>
+                        <DialogFooter className="mt-6">
+                            <Button type="submit" className="w-full  transition-colors">
+                                Save Changes
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -376,8 +423,37 @@ export function DataTable({ data }: DataTableProps) {
                 </DialogContent>
             </Dialog>
 
+            <div className="flex items-center justify-between gap-4 mb-4 mt-2">
+                <div className="flex-1 max-w-sm relative">
+                    <Input
+                        placeholder="Search saleman..."
+                        value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+                        onChange={(event) =>
+                            table.getColumn("name")?.setFilterValue(event.target.value)
+                        }
+                        className="pl-9 h-10 border-sky-100 focus-visible:ring-sky-500"
+                    />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.3-4.3" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
             {/* Table */}
-            <div className="rounded-md border mt-4">
+            <div className="rounded-xl border border-sky-100 shadow-sm transition-all hover:shadow-md bg-white overflow-hidden">
                 <Table>
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         {table.getHeaderGroups().map((headerGroup) => (

@@ -111,6 +111,17 @@ interface Option {
   label: string;
 }
 
+const FieldWrapper = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
+  <div className={`relative ${className}`}>
+    <label className="absolute -top-2 left-3 px-2 bg-white dark:bg-[#0a0a0a] text-[11px] font-medium text-gray-600 z-10 leading-none">
+      {label}
+    </label>
+    <div>
+      {children}
+    </div>
+  </div>
+);
+
 export default function SalesEditPage({ items, accounts, salemans, sale }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; sale: any }) {
   // Header / meta fields
   const [date, setDate] = useState<Date | undefined>(sale ? new Date(sale.date) : new Date());
@@ -446,18 +457,18 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
 
 
           {/* Header */}
-          <Card className="p-4 grid grid-cols-12 gap-3 items-center">
+          <Card className="p-4 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
             {/* Date Picker */}
-            <div className="col-span-1 flex flex-col gap-3">
+            <FieldWrapper label="Invoice Date" className="lg:col-span-1">
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     id="date-picker"
-                    className="w-full justify-between font-normal"
+                    className="w-full justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
                   >
-                    {date ? date.toLocaleDateString() : "Select date"}
-                    <CalendarIcon />
+                    <span className="truncate">{date ? date.toLocaleDateString() : "Select date"}</span>
+                    <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 text-sky-600" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto overflow-hidden p-0" align="start">
@@ -472,21 +483,21 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                   />
                 </PopoverContent>
               </Popover>
-            </div>
+            </FieldWrapper>
 
             {/* Time Picker */}
-            <div className="col-span-1 flex flex-col gap-3">
+            <FieldWrapper label="Invoice Time" className="lg:col-span-1">
               <Input
                 type="time"
                 id="time-picker"
                 step="1"
                 defaultValue={new Date().toLocaleTimeString('en-GB', { hour12: false })}
-                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
               />
-            </div>
+            </FieldWrapper>
 
             {/* Account Select */}
-            <div className="col-span-2">
+            <FieldWrapper label="Select Account" className="lg:col-span-2">
               <Select
                 value={accountType?.value?.toString() ?? ""}
                 onValueChange={(value) => {
@@ -514,7 +525,7 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                   }
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
                   <SelectValue placeholder="Select Account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -525,53 +536,63 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="col-span-1">
+            </FieldWrapper>
+            <FieldWrapper label="Account Code" className="lg:col-span-1">
               <Input
-                className="col-span-1"
                 placeholder="Code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                className="h-10 bg-slate-50/50 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
               />
-            </div>
+            </FieldWrapper>
+
             {/* Credit Days */}
-            <Input
-              className="col-span-1"
-              placeholder="Credit Days"
-              value={creditDays}
-              onChange={(e) => setCreditDays(Number(e.target.value))}
-            />
+            <FieldWrapper label="Credit Days" className="lg:col-span-1">
+              <Input
+                placeholder="Days"
+                value={creditDays}
+                onChange={(e) => setCreditDays(Number(e.target.value))}
+                className="h-10 text-center font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+              />
+            </FieldWrapper>
+
             {/* Credit Limit */}
-            <Input
-              className="col-span-1"
-              placeholder="Credit Limit"
-              value={creditLimit as any}
-              onChange={(e) =>
-                setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
-              }
-            />
+            <FieldWrapper label="Credit Limit" className="lg:col-span-1">
+              <Input
+                placeholder="Limit"
+                value={creditLimit as any}
+                onChange={(e) =>
+                  setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                className="h-10 text-right font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+              />
+            </FieldWrapper>
 
             {/* Invoice # */}
-            <Input
-              className="col-span-1"
-              placeholder="Invoice #"
-              value={invoiceNo}
-              onChange={(e) => setInvoiceNo(e.target.value)}
-            />
+            <FieldWrapper label="Invoice Bill #" className="lg:col-span-1">
+              <Input
+                placeholder="Invoice #"
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+                className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+              />
+            </FieldWrapper>
 
             {/* Salesman */}
-            <Input
-              className="col-span-1"
-              placeholder="Salesman"
-              value={salesman ? (salemanMap.get(salesman) || "") : ""}
-              readOnly
-            />
+            <FieldWrapper label="Salesman Name" className="lg:col-span-1">
+              <Input
+                placeholder="Salesman"
+                value={salesman ? (salemanMap.get(salesman) || "") : ""}
+                readOnly
+                className="h-10 bg-slate-50/50 italic text-slate-600 border-slate-200"
+              />
+            </FieldWrapper>
 
             {/* Cash/Credit Select */}
-            <div className="col-span-1">
+            <FieldWrapper label="Sale Type" className="lg:col-span-1">
               <Select value={cashCredit} onValueChange={setCashCredit}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Cash / Credit" />
+                <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
+                  <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -581,18 +602,22 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                   </SelectGroup>
                 </SelectContent>
               </Select>
-            </div>
+            </FieldWrapper>
 
             {/* Items # */}
-            <Input
-              className="col-span-1"
-              placeholder="Items #"
-              value={rowsWithComputed.length}
-            />
+            <FieldWrapper label="Items #" className="lg:col-span-1">
+              <Input
+                placeholder="Items #"
+                value={rowsWithComputed.length}
+                readOnly
+                className="h-10 bg-slate-50/50 font-bold border-slate-200"
+              />
+            </FieldWrapper>
+
             {/* Active Checkbox */}
-            <div className="flex items-center gap-3 border p-2.5  rounded-sm">
+            <div className="flex items-center gap-3 border border-slate-200 px-3 h-10 rounded-md lg:col-span-1 bg-white">
               <Checkbox id="terms" defaultChecked />
-              <Label htmlFor="terms">Active</Label>
+              <Label htmlFor="terms" className="text-[11px] font-medium text-slate-500 uppercase tracking-tight">Active</Label>
             </div>
           </Card>
 

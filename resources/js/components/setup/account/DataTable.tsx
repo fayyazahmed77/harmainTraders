@@ -71,9 +71,8 @@ export function DataTable({ data }: DataTableProps) {
 
     const handleDelete = () => {
         if (!selectedAccount) return;
-        router.delete(`/accounts/${selectedAccount.id}`, {
+        router.delete(`/account/${selectedAccount.id}`, {
             onSuccess: () => {
-                toast.success("Account deleted successfully!");
                 setOpenDeleteDialog(false);
             },
             onError: () => toast.error("Delete failed"),

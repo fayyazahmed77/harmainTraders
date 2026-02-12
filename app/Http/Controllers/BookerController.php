@@ -42,12 +42,13 @@ class BookerController extends Controller
      */
     public function store(Request $request)
     {
-        //dd($request->all());
         $request->validate([
             'name' => 'required|string|max:255',
             'shortname' => 'required|string|max:100',
             'code' => 'required|string|max:50|unique:bookers,code',
             'date' => 'required|date',
+            'status' => 'nullable|boolean',
+            'defult' => 'nullable|boolean',
         ]);
 
         $booker = Booker::create([
@@ -55,8 +56,8 @@ class BookerController extends Controller
             'shortname' => $request->shortname,
             'code' => $request->code,
             'date' => $request->date,
-            'status' => $request->status ?? '0',
-            'defult' => $request->defult ?? '0',
+            'status' => $request->status ? 1 : 0,
+            'defult' => $request->defult ? 1 : 0,
             'created_by' => Auth::id(),
         ]);
 
@@ -73,6 +74,8 @@ class BookerController extends Controller
             'shortname' => 'required|string|max:100',
             'code' => 'required|string|max:50|unique:bookers,code,' . $booker->id,
             'date' => 'required|date',
+            'status' => 'nullable|boolean',
+            'defult' => 'nullable|boolean',
         ]);
 
         $booker->update([
@@ -80,6 +83,8 @@ class BookerController extends Controller
             'shortname' => $request->shortname,
             'code' => $request->code,
             'date' => $request->date,
+            'status' => $request->status ? 1 : 0,
+            'defult' => $request->defult ? 1 : 0,
         ]);
 
         return redirect()->back()->with('success', 'Booker updated successfully.');

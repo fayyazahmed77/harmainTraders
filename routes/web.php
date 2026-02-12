@@ -87,6 +87,7 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{account}', [AccountController::class, 'update'])->name('account.update');
         Route::delete('/{account}', [AccountController::class, 'destroy'])->name('account.destroy');
         Route::get('/{id}/balance', [AccountController::class, 'getBalance'])->name('account.balance');
+        Route::get('/next-code', [AccountController::class, 'getNextCode'])->name('account.next-code');
     });
     Route::prefix('/firms')->group(function () {
         Route::get('/', [FirmController::class, 'index'])->name('firms.index');
@@ -118,16 +119,17 @@ Route::middleware(['auth'])->group(function () {
     //---------------------salemen------------------------------------------------------------------
     Route::prefix('/salemen')->group(function () {
         Route::get('/', [SalemanController::class, 'index'])->name('salemen.index');
+        Route::get('/next-code', [SalemanController::class, 'getNextCode'])->name('salemen.next-code');
         Route::post('/', [SalemanController::class, 'store'])->name('salemen.store');
-        Route::put('/{salemen}', [SalemanController::class, 'update'])->name('salemen.update');
-        Route::delete('/{id}', [SalemanController::class, 'destroy'])->name('salemen.destroy');
+        Route::put('/{saleman}', [SalemanController::class, 'update'])->name('salemen.update');
+        Route::delete('/{saleman}', [SalemanController::class, 'destroy'])->name('salemen.destroy');
     });
     //---------------------Booker------------------------------------------------------------------
     Route::prefix('/bookers')->group(function () {
         Route::get('/', [BookerController::class, 'index'])->name('bookers.index');
         Route::post('/', [BookerController::class, 'store'])->name('bookers.store');
         Route::put('/{booker}', [BookerController::class, 'update'])->name('bookers.update');
-        Route::delete('/{id}', [BookerController::class, 'destroy'])->name('bookers.destroy');
+        Route::delete('/{booker}', [BookerController::class, 'destroy'])->name('bookers.destroy');
     });
     //---------------------Country------------------------------------------------------------------
     Route::prefix('/countries')->group(function () {
