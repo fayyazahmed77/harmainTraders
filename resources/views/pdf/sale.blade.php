@@ -23,13 +23,13 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         @page {
-            margin: 0.4cm;
+            margin: 0.3cm;
         }
 
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
             color: #000;
-            font-size: 11px;
+            font-size: 10px;
             margin: 0;
             padding: 0;
         }
@@ -40,16 +40,16 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .top-section {
-            padding-top: 5px;
-            padding-bottom: 2px;
+            padding-top: 2px;
+            padding-bottom: 1px;
         }
 
         /* Logo Styles */
         .logo-icon {
             display: inline-block;
             vertical-align: middle;
-            width: 35px;
-            height: 35px;
+            width: 30px;
+            height: 30px;
             /* Dark Icon */
             border-radius: 8px;
             margin-right: 15px;
@@ -66,18 +66,18 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .brand-name {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             color: #444;
             line-height: 1;
         }
 
         .brand-tagline {
-            font-size: 8px;
+            font-size: 7px;
             color: #888;
             letter-spacing: 1px;
             text-transform: uppercase;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         /* Top Right Contact */
@@ -85,21 +85,22 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             float: right;
             text-align: right;
             vertical-align: middle;
-            padding-top: 5px;
+            padding-top: 2px;
         }
 
         .contact-item {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             color: #000;
             /* Was Brand Color */
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
 
         /* Banner Row */
         .banner-row {
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 3px;
+            margin-top: 2px;
             overflow: hidden;
             /* Clear floats */
         }
@@ -132,7 +133,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .invoice-text {
-            font-size: 22px;
+            font-size: 18px;
             color: #444;
             text-transform: uppercase;
             font-weight: 500;
@@ -151,7 +152,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 
         /* Info Section */
         .info-section {
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .invoice-to-wrapper {
@@ -166,23 +167,23 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .label-title {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             color: #555;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
 
         .customer-name {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             color: #222;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
 
         .customer-address {
             color: #555;
-            font-size: 11px;
-            line-height: 1.3;
+            font-size: 10px;
+            line-height: 1.2;
             max-width: 300px;
         }
 
@@ -193,23 +194,23 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .detail-label-cell {
-            padding-bottom: 2px;
+            padding-bottom: 1px;
             font-weight: bold;
             color: #444;
-            font-size: 11px;
+            font-size: 10px;
             padding-right: 15px;
         }
 
         .detail-value-cell {
-            padding-bottom: 2px;
+            padding-bottom: 1px;
             font-weight: bold;
             color: #222;
-            font-size: 11px;
+            font-size: 10px;
         }
 
         /* Items Section */
         .items-section {
-            margin-bottom: 5px;
+            margin-bottom: 2px;
             border: 1px dashed #000;
         }
 
@@ -222,11 +223,11 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             background-color: transparent;
             /* Removed Dark Header */
             color: #000;
-            padding: 3px 2px;
+            padding: 2px 2px;
             /* Further Reduced Padding */
             text-align: center;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 9px;
             text-transform: capitalize;
             border-bottom: 1px dashed #000;
             border-right: 1px dashed #000;
@@ -238,7 +239,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .items-table td {
-            padding: 4px 5px;
+            padding: 2px 3px;
             color: #000;
             font-size: 10px;
             border-right: 1px dashed #000;
@@ -264,21 +265,21 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 
         /* Footer Section */
         .footer-section {
-            margin-top: 2px;
+            margin-top: 1px;
             color: #000;
         }
 
         .footer-left {
             width: 30%;
             float: left;
-            padding-top: 10px;
+            padding-top: 3px;
         }
 
         .footer-center {
             width: 30%;
             float: left;
             text-align: center;
-            padding-top: 10px;
+            padding-top: 3px;
         }
 
         .footer-right {
@@ -293,8 +294,8 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .footer-totals-table td {
-            padding: 2px 0;
-            font-size: 11px;
+            padding: 1px 0;
+            font-size: 10px;
             font-weight: bold;
             color: #222;
         }
@@ -310,13 +311,13 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         }
 
         .auth-sign-line {
-            margin-top: 40px;
+            margin-top: 20px;
             border-top: 1px dashed #000;
             width: 200px;
             text-align: center;
-            padding-top: 5px;
+            padding-top: 3px;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 10px;
         }
 
         .bottom-bar {
@@ -457,6 +458,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                     <tr>
                         <th colspan="{{ $hasBonus ? 4 : 2 }}" style="border-bottom: 1px dashed #000;">Quantity</th>
                         <th rowspan="2" class="text-left" style="width: 35%; margin-left: 5px;">Description Of Goods</th>
+                        <th rowspan="2">Retail</th>
                         <th rowspan="2">Rate</th>
                         <th rowspan="2">Disc %</th>
                         <th rowspan="2">After Disc</th>
@@ -493,6 +495,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td>{{ $item->bonus_qty_pcs > 0 ? $item->bonus_qty_pcs : '-' }}</td>
                         @endif
                         <td class="text-left">{{ $item->item->title }}</td>
+                        <td>{{ number_format($item->item->retail ?? 0, 2) }}</td>
                         <td>{{ number_format($item->trade_price, 2) }}</td>
                         <td>{{ number_format($disc_percent > 0 ? $disc_percent : 0, 2) }}</td>
                         <td>{{ number_format($after_disc_rate, 2) }}</td>
@@ -507,7 +510,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         <div class="footer-section clearfix">
 
             <div class="footer-left">
-                <div style="font-weight: bold; margin-bottom: 40px;">
+                <div style="font-weight: bold; margin-bottom: 15px; font-size: 10px;">
                     Total # Of Items : &nbsp; {{ $sale->items->count() }}
                 </div>
 
@@ -517,7 +520,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             </div>
 
             <div class="footer-center">
-                <div style="font-weight: bold; margin-top: 0px;">
+                <div style="font-weight: bold; margin-top: 0px; font-size: 10px;">
                     Discount Amount : &nbsp; {{ number_format($sale->discount_total, 2) }}
                 </div>
             </div>

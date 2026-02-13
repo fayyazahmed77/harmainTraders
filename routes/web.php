@@ -31,6 +31,7 @@ use App\Http\Controllers\ClearingChequeController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\SalesMapReportController;
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -325,6 +326,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sales-return', [ReportsController::class, 'salesReturn'])->name('reports.sales-return');
         Route::get('/sales-return/export/pdf', [ReportsController::class, 'salesReturnExportPdf'])->name('reports.sales-return.export.pdf');
         Route::get('/sales-return/export/excel', [ReportsController::class, 'salesReturnExportExcel'])->name('reports.sales-return.export.excel');
+        Route::get('/sales-map', [SalesMapReportController::class, 'index'])->name('reports.sales-map');
+        Route::get('/sales-map/data', [SalesMapReportController::class, 'getData'])->name('reports.sales-map.data');
     });
 
     // Payment Routes (Additional)

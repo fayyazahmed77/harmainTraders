@@ -27,6 +27,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select as ShadSelect,
   SelectContent,
   SelectItem,
@@ -51,6 +57,8 @@ interface Area {
   country_id: number;
   province_id: number;
   city_id: number;
+  latitude?: string;
+  longitude?: string;
   status: string;
   created_by_name?: string;
   created_by_avatar?: string;
@@ -96,7 +104,7 @@ interface CityOption {
 }
 
 interface DataTableProps {
-   countries: Country[];
+  countries: Country[];
   provinces: Province[];
   cities: City[];
   areas: Area[];
@@ -119,6 +127,8 @@ export function DataTable({ areas, cities, countries, provinces }: DataTableProp
   // form states
   const [name, setName] = useState("");
   const [status, setStatus] = useState("active");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedProvince, setSelectedProvince] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<string>("");
@@ -136,6 +146,8 @@ export function DataTable({ areas, cities, countries, provinces }: DataTableProp
         country_id: selectedCountry,
         province_id: selectedProvince,
         city_id: selectedCity,
+        latitude,
+        longitude,
       },
       {
         onSuccess: () => {
@@ -201,17 +213,63 @@ export function DataTable({ areas, cities, countries, provinces }: DataTableProp
       header: "Status",
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            row.original.status === "active"
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-700"
-          }`}
+          className={`px-2 py-1 rounded-full text-xs ${row.original.status === "active"
+            ? "bg-green-100 text-green-700"
+            : "bg-red-100 text-red-700"
+            }`}
         >
           {row.original.status}
         </span>
       ),
     },
     { accessorKey: "created_by_name", header: "Created By" },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const area = row.original;
+        const canEdit = permissions.includes("edit areas");
+        const canDelete = permissions.includes("delete areas");
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditArea(area);
+                    setName(area.name);
+                    setLatitude(area.latitude || "");
+                    setLongitude(area.longitude || "");
+                    setStatus(area.status);
+                    setSelectedCountry(area.country_id.toString());
+                    setSelectedProvince(area.province_id.toString());
+                    setSelectedCity(area.city_id.toString());
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedArea(area);
+                    setOpenDeleteDialog(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
   ];
 
   const table = useReactTable({
@@ -296,7 +354,7 @@ export function DataTable({ areas, cities, countries, provinces }: DataTableProp
                   </SelectTrigger>
                   <SelectContent>
                     {cities
-                      .filter((c) => c.id === Number(selectedProvince))
+                      .filter((c) => c.province_id === Number(selectedProvince))
                       .map((c) => (
                         <SelectItem key={c.id} value={c.id.toString()}>
                           {c.name}
@@ -314,6 +372,23 @@ export function DataTable({ areas, cities, countries, provinces }: DataTableProp
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2">Latitude</Label>
+                  <Input
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2">Longitude</Label>
+                  <Input
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Status */}

@@ -60,6 +60,8 @@ interface Subarea {
   city_id: number;
   province_id: number;
   country_id: number;
+  latitude?: string;
+  longitude?: string;
   created_by_name?: string;
   created_by_avatar?: string;
   status: string;
@@ -102,6 +104,8 @@ export default function Index({
   // ========================== States ==========================
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [subareaName, setSubareaName] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [country, setCountry] = useState<Option | null>(null);
   const [province, setProvince] = useState<Option | null>(null);
   const [city, setCity] = useState<Option | null>(null);
@@ -200,12 +204,16 @@ export default function Index({
       province_id: province.value,
       city_id: city.value,
       area_id: area.value,
+      latitude,
+      longitude,
     };
 
     router.post("/subareas", payload, {
       onSuccess: () => {
         setOpenCreateDialog(false);
         setSubareaName("");
+        setLatitude("");
+        setLongitude("");
         setCountry(null);
         setProvince(null);
         setCity(null);
@@ -348,6 +356,25 @@ export default function Index({
                 onChange={(e) => setSubareaName(e.target.value)}
                 placeholder="Enter subarea name"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-2 mb-4">
+              <div className="grid gap-2">
+                <Label>Latitude</Label>
+                <Input
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  placeholder="e.g. Latitude"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Longitude</Label>
+                <Input
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  placeholder="e.g. Longitude"
+                />
+              </div>
             </div>
 
             <DialogFooter>

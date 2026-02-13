@@ -42,7 +42,7 @@ class ProvinceController extends Controller
     {
         return City::where('province_id', $id)->select('id', 'name', 'code')->get();
     }
-   
+
     //store
     public function store(Request $request)
     {
@@ -52,7 +52,8 @@ class ProvinceController extends Controller
             'country_id' => 'required|exists:countries,id',
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10',
-
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
         $validated['created_by'] = Auth::id();
         Province::create($validated);
@@ -67,6 +68,8 @@ class ProvinceController extends Controller
             'country_id' => 'required|exists:countries,id',
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:provinces,code,' . $province->id,
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         try {

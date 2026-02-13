@@ -1,12 +1,13 @@
 <?php
 
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Subarea extends Model
 {
-     use HasFactory;
+    use HasFactory;
 
     protected $fillable = [
         'country_id',
@@ -14,27 +15,29 @@ class Subarea extends Model
         'city_id',
         'area_id',
         'name',
+        'latitude',
+        'longitude',
         'status',
         'created_by',
     ];
-     public function creator()
-{
-    return $this->belongsTo(User::class, 'created_by');
-}
-     public function province()
-{
-    return $this->belongsTo(Province::class, 'province_id');
-}
-     public function country()
-{
-    return $this->belongsTo(Country::class, 'country_id');
-}
-public function city()
-{
-    return $this->belongsTo(City::class, 'city_id');
-}
-public function area()
-{
-    return $this->belongsTo(Areas::class, 'area_id');
-}
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+    public function province()
+    {
+        return $this->belongsTo(Province::class, 'province_id');
+    }
+    public function country()
+    {
+        return $this->belongsTo(Country::class, 'country_id');
+    }
+    public function city()
+    {
+        return $this->belongsTo(City::class, 'city_id');
+    }
+    public function area()
+    {
+        return $this->belongsTo(Areas::class, 'area_id');
+    }
 }

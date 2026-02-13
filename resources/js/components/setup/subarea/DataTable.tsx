@@ -11,7 +11,7 @@ import {
   useReactTable,
   flexRender,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
 import { router, usePage } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select as ShadSelect,
   SelectContent,
@@ -48,6 +54,8 @@ interface Subarea {
   city_id: number;
   province_id: number;
   country_id: number;
+  latitude?: string;
+  longitude?: string;
   created_by_name?: string;
   created_by_avatar?: string;
   status: string;
@@ -108,6 +116,8 @@ export function DataTable({
   // Form states
   const [name, setName] = useState("");
   const [status, setStatus] = useState("active");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedProvince, setSelectedProvince] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<string>("");
@@ -127,6 +137,8 @@ export function DataTable({
         province_id: selectedProvince,
         city_id: selectedCity,
         area_id: selectedArea,
+        latitude,
+        longitude,
       },
       {
         onSuccess: () => {
@@ -201,17 +213,64 @@ export function DataTable({
       header: "Status",
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            row.original.status === "active"
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-700"
-          }`}
+          className={`px-2 py-1 rounded-full text-xs ${row.original.status === "active"
+            ? "bg-green-100 text-green-700"
+            : "bg-red-100 text-red-700"
+            }`}
         >
           {row.original.status}
         </span>
       ),
     },
     { accessorKey: "created_by_name", header: "Created By" },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const item = row.original;
+        const canEdit = permissions.includes("edit subareas");
+        const canDelete = permissions.includes("delete subareas");
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canEdit && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditSubarea(item);
+                    setName(item.name);
+                    setLatitude(item.latitude || "");
+                    setLongitude(item.longitude || "");
+                    setStatus(item.status);
+                    setSelectedCountry(item.country_id.toString());
+                    setSelectedProvince(item.province_id.toString());
+                    setSelectedCity(item.city_id.toString());
+                    setSelectedArea(item.area_id.toString());
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedSubarea(item);
+                    setOpenDeleteDialog(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
   ];
 
   const table = useReactTable({
@@ -334,6 +393,23 @@ export function DataTable({
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2">Latitude</Label>
+                  <Input
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2">Longitude</Label>
+                  <Input
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Status */}

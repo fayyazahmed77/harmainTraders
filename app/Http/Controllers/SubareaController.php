@@ -46,6 +46,8 @@ class SubareaController extends Controller
             'city_id' => 'required|exists:cities,id',
             'area_id' => 'required|exists:areas,id',
             'name' => 'required|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         // ✅ Add created_by
@@ -55,5 +57,27 @@ class SubareaController extends Controller
         Subarea::create($validated);
 
         return back()->with('success', 'Subarea created successfully!');
+    }
+    public function update(Request $request, Subarea $subarea)
+    {
+        $validated = $request->validate([
+            'country_id' => 'required|exists:countries,id',
+            'province_id' => 'required|exists:provinces,id',
+            'city_id' => 'required|exists:cities,id',
+            'area_id' => 'required|exists:areas,id',
+            'name' => 'required|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+
+        $subarea->update($validated);
+
+        return back()->with('success', 'Subarea updated successfully!');
+    }
+
+    public function destroy(Subarea $subarea)
+    {
+        $subarea->delete();
+        return back()->with('success', 'Subarea deleted successfully!');
     }
 }

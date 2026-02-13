@@ -161,6 +161,10 @@ const data = {
           url: "/reports/sales-return",
         },
         {
+          title: "Sales Map Report",
+          url: "/reports/sales-map",
+        },
+        {
           title: "Stock Reports",
           url: "/reports/stock/status",
         },

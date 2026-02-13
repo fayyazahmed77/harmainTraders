@@ -30,6 +30,8 @@ interface Area {
   country_id: number;
   province_id: number;
   city_id: number;
+  latitude?: string;
+  longitude?: string;
   status: string;
   created_by_name?: string;
   created_by_avatar?: string;
@@ -95,6 +97,8 @@ export default function Index({ countries, provinces, cities, areas }: IndexProp
   // Dialog and form states
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [areaName, setAreaName] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [country, setCountry] = useState<CountryOption | null>(null);
   const [province, setProvince] = useState<ProvinceOption | null>(null);
   const [city, setCity] = useState<CityOption | null>(null);
@@ -168,12 +172,16 @@ export default function Index({ countries, provinces, cities, areas }: IndexProp
       country_id: country.value,
       province_id: province.value, // ✅ fixed spelling
       city_id: city.value,
+      latitude,
+      longitude,
     };
 
     router.post("/areas", payload, {
       onSuccess: () => {
         setOpenCreateDialog(false);
         setAreaName("");
+        setLatitude("");
+        setLongitude("");
         setCountry(null);
         setProvince(null);
         setCity(null);
@@ -302,6 +310,27 @@ export default function Index({ countries, provinces, cities, areas }: IndexProp
                 onChange={(e) => setAreaName(e.target.value)}
                 placeholder="Enter area name"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-2 mb-4">
+              <div className="grid gap-2">
+                <Label htmlFor="latitude">Latitude</Label>
+                <Input
+                  id="latitude"
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  placeholder="e.g. Latitude"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="longitude">Longitude</Label>
+                <Input
+                  id="longitude"
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  placeholder="e.g. Longitude"
+                />
+              </div>
             </div>
 
             <DialogFooter>

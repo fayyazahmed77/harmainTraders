@@ -16,9 +16,12 @@ class SalesItem extends Model
         'qty_pcs',
         'total_pcs',
         'trade_price',
+        'retail_price',
         'discount',
         'gst_amount',
         'subtotal',
+        'bonus_qty_carton',
+        'bonus_qty_pcs',
     ];
 
     public function sale()

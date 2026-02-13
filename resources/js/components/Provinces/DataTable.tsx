@@ -61,6 +61,8 @@ interface Province {
   country_id: number;
   name: string;
   code: string;
+  latitude?: string;
+  longitude?: string;
   is_active: boolean;
   created_at: string;
   created_by: number;
@@ -107,6 +109,8 @@ export function DataTable({ data, countries }: DataTableProps) {
   // Form states
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [editCountry, setEditCountry] = useState<CountryOption | null>(null);
 
   // ✅ Build options for country select
@@ -127,6 +131,8 @@ export function DataTable({ data, countries }: DataTableProps) {
         name,
         code,
         country_id: editCountry?.value,
+        latitude,
+        longitude,
       },
       {
         onSuccess: () => {
@@ -180,11 +186,10 @@ export function DataTable({ data, countries }: DataTableProps) {
       header: "Status",
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${
-            row.original.is_active
+          className={`px-2 py-1 rounded text-xs ${row.original.is_active
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
-          }`}
+            }`}
         >
           {row.original.is_active ? "Active" : "Inactive"}
         </span>
@@ -247,6 +252,8 @@ export function DataTable({ data, countries }: DataTableProps) {
                     setEditProvince(province);
                     setName(province.name);
                     setCode(province.code);
+                    setLatitude(province.latitude || "");
+                    setLongitude(province.longitude || "");
 
                     // ✅ Preselect country
                     const selectedCountry = countryOptions.find(
@@ -343,6 +350,25 @@ export function DataTable({ data, countries }: DataTableProps) {
                   onChange={(e) => setCode(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2">Latitude</Label>
+                  <Input
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="e.g. 30.3753"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2">Longitude</Label>
+                  <Input
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="e.g. 69.3451"
+                  />
+                </div>
               </div>
             </div>
 

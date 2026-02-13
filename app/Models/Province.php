@@ -14,11 +14,13 @@ class Province extends Model
         'country_id',
         'name',
         'code',
+        'latitude',
+        'longitude',
         'is_active',
         'created_by',
     ];
     public function creator()
-{
-    return $this->belongsTo(User::class, 'created_by');
-}
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

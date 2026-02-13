@@ -62,6 +62,8 @@ interface City {
   province_id: number;
   name: string;
   code: string;
+  latitude?: string;
+  longitude?: string;
   is_active: boolean;
   created_at: string;
   created_by: number;
@@ -106,6 +108,8 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
   // form states
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedProvince, setSelectedProvince] = useState<string>("");
 
@@ -121,6 +125,8 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
         code,
         country_id: selectedCountry,
         province_id: selectedProvince,
+        latitude,
+        longitude,
       },
       {
         onSuccess: () => {
@@ -172,11 +178,10 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
       header: "Status",
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${
-            row.original.is_active
+          className={`px-2 py-1 rounded text-xs ${row.original.is_active
               ? "bg-green-100 text-green-700"
               : "bg-red-100 text-red-700"
-          }`}
+            }`}
         >
           {row.original.is_active ? "Active" : "Inactive"}
         </span>
@@ -239,6 +244,8 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                     setEditCity(city);
                     setName(city.name);
                     setCode(city.code);
+                    setLatitude(city.latitude || "");
+                    setLongitude(city.longitude || "");
                     setSelectedCountry(city.country_id?.toString() || "");
                     setSelectedProvince(city.province_id?.toString() || "");
                   }}
@@ -363,6 +370,25 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                   onChange={(e) => setCode(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2">Latitude</Label>
+                  <Input
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="e.g. 30.3753"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2">Longitude</Label>
+                  <Input
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="e.g. 69.3451"
+                  />
+                </div>
               </div>
             </div>
 

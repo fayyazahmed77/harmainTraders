@@ -43,6 +43,8 @@ class AreasController extends Controller
             'province_id' => 'required|exists:provinces,id',
             'city_id' => 'required|exists:cities,id',
             'name' => 'required|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         $validated['created_by'] = Auth::id();
@@ -69,5 +71,26 @@ class AreasController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-     
+
+    public function update(Request $request, Areas $area)
+    {
+        $validated = $request->validate([
+            'country_id' => 'required|exists:countries,id',
+            'province_id' => 'required|exists:provinces,id',
+            'city_id' => 'required|exists:cities,id',
+            'name' => 'required|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+
+        $area->update($validated);
+
+        return back()->with('success', 'Area updated successfully!');
+    }
+
+    public function destroy(Areas $area)
+    {
+        $area->delete();
+        return back()->with('success', 'Area deleted successfully!');
+    }
 }

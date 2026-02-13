@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw } from "lucide-react";
+import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw, ChevronDown, ChevronUp, Save, Wallet } from "lucide-react";
 import { useAppearance } from '@/hooks/use-appearance';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -146,6 +146,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [previousBalance, setPreviousBalance] = useState<number>(0);
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [printOption, setPrintOption] = useState<"big" | "small">("big");
+  const [showMobileDetails, setShowMobileDetails] = useState(false);
 
   // Pay Now State
   const [isPayNow, setIsPayNow] = useState<boolean>(false);
@@ -456,196 +457,311 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
 
-        <div className="w-full p-4 space-y-4">
+        <div className="w-full p-4 space-y-4 pb-32 md:pb-4">
+
+
+
+          {/* Mobile Header Section */}
+          <div className="block md:hidden space-y-3">
+            <Card className="p-3 space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="font-bold text-lg text-sky-600">#{invoiceNo}</div>
+                <div className="text-xs text-muted-foreground border px-2 py-1 rounded bg-secondary/50">
+                  {date ? date.toLocaleDateString() : "No Date"}
+                </div>
+              </div>
+
+              <FieldWrapper label="Select Account" className="w-full">
+                <Select
+                  value={accountType?.value?.toString() ?? ""}
+                  onValueChange={(value) => {
+                    const id = Number(value);
+                    const selectedAccount = accounts.find((a) => a.id === id) ?? null;
+                    const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                    setAccountType(selectedOption);
+
+                    if (selectedAccount) {
+                      setCreditDays(selectedAccount.aging_days ?? 0);
+                      setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
+                      const salemanId = selectedAccount.saleman_id ?? null;
+                      setSalesman(salemanId);
+                      setCode(selectedAccount.code ?? "");
+                      axios.get(`/account/${id}/balance`).then(res => {
+                        setPreviousBalance(res.data.balance);
+                      }).catch(err => {
+                        console.error("Failed to fetch balance", err);
+                        setPreviousBalance(0);
+                      });
+                    } else {
+                      setCreditDays(0);
+                      setCreditLimit("");
+                      setSalesman(null);
+                      setPreviousBalance(0);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-11 shadow-sm border-slate-200 bg-background">
+                    <SelectValue placeholder="Select Customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accountTypeOptions.map((s) => (
+                      <SelectItem key={s.value} value={s.value.toString()}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldWrapper>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FieldWrapper label="Sale Type">
+                  <Select value={cashCredit} onValueChange={setCashCredit}>
+                    <SelectTrigger className="h-11 shadow-sm border-slate-200 bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CREDIT">CREDIT</SelectItem>
+                      <SelectItem value="CASH">CASH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldWrapper>
+                <FieldWrapper label="Status">
+                  <div className="flex items-center justify-center gap-2 h-11 px-2 border rounded-md bg-emerald-50/20 border-emerald-100 shadow-sm">
+                    <Checkbox id="terms-mobile" defaultChecked />
+                    <Label htmlFor="terms-mobile" className="text-emerald-700 font-medium text-xs">Active</Label>
+                  </div>
+                </FieldWrapper>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground flex items-center justify-center gap-1 h-6 hover:bg-transparent"
+                onClick={() => setShowMobileDetails(!showMobileDetails)}
+              >
+                {showMobileDetails ? "Hide Details" : "Show More Details"}
+                {showMobileDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              </Button>
+
+              {showMobileDetails && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t animate-in slide-in-from-top-2">
+                  <FieldWrapper label="Credit Days">
+                    <Input value={creditDays} onChange={(e) => setCreditDays(Number(e.target.value))} className="h-9 text-center" />
+                  </FieldWrapper>
+                  <FieldWrapper label="Limit">
+                    <Input value={creditLimit as any} onChange={(e) => setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))} className="h-9 text-right" />
+                  </FieldWrapper>
+                  <FieldWrapper label="Salesman">
+                    <Input value={salesman ? (salemanMap.get(salesman) || "") : ""} readOnly className="h-9 bg-muted" />
+                  </FieldWrapper>
+                  <FieldWrapper label="Code">
+                    <Input value={code} onChange={(e) => setCode(e.target.value)} className="h-9" />
+                  </FieldWrapper>
+                </div>
+              )}
+            </Card>
+          </div>
 
 
 
           {/* Header */}
-          <Card className="p-4 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
-            {/* Date Picker */}
-            <FieldWrapper label="Invoice Date" className="lg:col-span-1">
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    id="date-picker"
-                    className="w-full justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-                  >
-                    <span className="truncate">{date ? date.toLocaleDateString() : "Select date"}</span>
-                    <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 text-sky-600" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    captionLayout="dropdown"
-                    onSelect={(date) => {
-                      setDate(date);
-                      setOpen(false);
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </FieldWrapper>
+          <div className="hidden md:block">
+            <Card className="p-4 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
+              {/* Date Picker */}
+              <FieldWrapper label="Invoice Date" className="lg:col-span-1">
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      id="date-picker"
+                      className="w-full justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                    >
+                      <span className="truncate">{date ? date.toLocaleDateString() : "Select date"}</span>
+                      <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 text-sky-600" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      captionLayout="dropdown"
+                      onSelect={(date) => {
+                        setDate(date);
+                        setOpen(false);
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </FieldWrapper>
 
-            {/* Time Picker */}
-            <FieldWrapper label="Invoice Time" className="lg:col-span-1">
-              <Input
-                type="time"
-                id="time-picker"
-                step="1"
-                defaultValue={new Date().toLocaleTimeString('en-GB', { hour12: false })}
-                className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-              />
-            </FieldWrapper>
+              {/* Time Picker */}
+              <FieldWrapper label="Invoice Time" className="lg:col-span-1">
+                <Input
+                  type="time"
+                  id="time-picker"
+                  step="1"
+                  defaultValue={new Date().toLocaleTimeString('en-GB', { hour12: false })}
+                  className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                />
+              </FieldWrapper>
 
-            {/* Account Select */}
-            <FieldWrapper label="Select Account" className="lg:col-span-2">
-              <Select
-                value={accountType?.value?.toString() ?? ""}
-                onValueChange={(value) => {
-                  const id = Number(value);
-                  const selectedAccount = accounts.find((a) => a.id === id) ?? null;
+              {/* Account Select */}
+              <FieldWrapper label="Select Account" className="lg:col-span-2">
+                <Select
+                  value={accountType?.value?.toString() ?? ""}
+                  onValueChange={(value) => {
+                    const id = Number(value);
+                    const selectedAccount = accounts.find((a) => a.id === id) ?? null;
 
-                  // set the Option object as before (keeps UI state)
-                  const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
-                  setAccountType(selectedOption);
+                    // set the Option object as before (keeps UI state)
+                    const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                    setAccountType(selectedOption);
 
-                  // autofill credit days / credit limit / salesman from account
-                  if (selectedAccount) {
-                    setCreditDays(selectedAccount.aging_days ?? 0);
-                    setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
+                    // autofill credit days / credit limit / salesman from account
+                    if (selectedAccount) {
+                      setCreditDays(selectedAccount.aging_days ?? 0);
+                      setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
 
-                    // lookup salesman name by saleman_id (if available)
-                    const salemanId = selectedAccount.saleman_id ?? null;
-                    setSalesman(salemanId);
-                    setCode(selectedAccount.code ?? "");
+                      // lookup salesman name by saleman_id (if available)
+                      const salemanId = selectedAccount.saleman_id ?? null;
+                      setSalesman(salemanId);
+                      setCode(selectedAccount.code ?? "");
 
-                    // Fetch Previous Balance
-                    axios.get(`/account/${id}/balance`).then(res => {
-                      setPreviousBalance(res.data.balance);
-                    }).catch(err => {
-                      console.error("Failed to fetch balance", err);
+                      // Fetch Previous Balance
+                      axios.get(`/account/${id}/balance`).then(res => {
+                        setPreviousBalance(res.data.balance);
+                      }).catch(err => {
+                        console.error("Failed to fetch balance", err);
+                        setPreviousBalance(0);
+                      });
+                    } else {
+                      // clear if no account
+                      setCreditDays(0);
+                      setCreditLimit("");
+                      setSalesman(null);
                       setPreviousBalance(0);
-                    });
-                  } else {
-                    // clear if no account
-                    setCreditDays(0);
-                    setCreditLimit("");
-                    setSalesman(null);
-                    setPreviousBalance(0);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
+                    <SelectValue placeholder="Select Account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accountTypeOptions.map((s) => (
+                      <SelectItem key={s.value} value={s.value.toString()}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldWrapper>
+
+              {/* Area (Displaying Code as placeholder for Area/Subarea if not present, but usually Area is needed) */}
+              <FieldWrapper label="Account Code" className="lg:col-span-1">
+                <Input
+                  placeholder="Code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="h-10 bg-slate-50/50 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                />
+              </FieldWrapper>
+
+              {/* Credit Days */}
+              <FieldWrapper label="Credit Days" className="lg:col-span-1">
+                <Input
+                  placeholder="Days"
+                  value={creditDays}
+                  onChange={(e) => setCreditDays(Number(e.target.value))}
+                  className="h-10 text-center font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                />
+              </FieldWrapper>
+
+              {/* Credit Limit */}
+              <FieldWrapper label="Credit Limit" className="lg:col-span-1">
+                <Input
+                  placeholder="Limit"
+                  value={creditLimit as any}
+                  onChange={(e) =>
+                    setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
                   }
-                }}
-              >
-                <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                  <SelectValue placeholder="Select Account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accountTypeOptions.map((s) => (
-                    <SelectItem key={s.value} value={s.value.toString()}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldWrapper>
+                  className="h-10 text-right font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                />
+              </FieldWrapper>
 
-            {/* Area (Displaying Code as placeholder for Area/Subarea if not present, but usually Area is needed) */}
-            <FieldWrapper label="Account Code" className="lg:col-span-1">
-              <Input
-                placeholder="Code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="h-10 bg-slate-50/50 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-              />
-            </FieldWrapper>
+              {/* Invoice # */}
+              <FieldWrapper label="Bill No" className="lg:col-span-1 text-sky-600 font-bold">
+                <Input
+                  placeholder="Invoice #"
+                  value={invoiceNo}
+                  onChange={(e) => setInvoiceNo(e.target.value)}
+                  className="h-10 text-center font-bold border-sky-200 bg-sky-50/20 text-sky-700"
+                />
+              </FieldWrapper>
 
-            {/* Credit Days */}
-            <FieldWrapper label="Credit Days" className="lg:col-span-1">
-              <Input
-                placeholder="Days"
-                value={creditDays}
-                onChange={(e) => setCreditDays(Number(e.target.value))}
-                className="h-10 text-center font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-              />
-            </FieldWrapper>
+              {/* Salesman */}
+              <FieldWrapper label="Salesman Name" className="lg:col-span-1">
+                <Input
+                  placeholder="Salesman"
+                  value={salesman ? (salemanMap.get(salesman) || "") : ""}
+                  readOnly
+                  className="h-10 bg-slate-50/50 italic text-slate-600 border-slate-200"
+                />
+              </FieldWrapper>
 
-            {/* Credit Limit */}
-            <FieldWrapper label="Credit Limit" className="lg:col-span-1">
-              <Input
-                placeholder="Limit"
-                value={creditLimit as any}
-                onChange={(e) =>
-                  setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                className="h-10 text-right font-mono border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-              />
-            </FieldWrapper>
+              {/* Cash/Credit Select */}
+              <FieldWrapper label="Sale Type" className="lg:col-span-1">
+                <Select value={cashCredit} onValueChange={setCashCredit}>
+                  <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="CREDIT">CREDIT</SelectItem>
+                      <SelectItem value="CASH">CASH</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </FieldWrapper>
 
-            {/* Invoice # */}
-            <FieldWrapper label="Bill No" className="lg:col-span-1 text-sky-600 font-bold">
-              <Input
-                placeholder="Invoice #"
-                value={invoiceNo}
-                onChange={(e) => setInvoiceNo(e.target.value)}
-                className="h-10 text-center font-bold border-sky-200 bg-sky-50/20 text-sky-700"
-              />
-            </FieldWrapper>
+              {/* Items # */}
+              <FieldWrapper label="Items" className="lg:col-span-1">
+                <Input
+                  placeholder="Items #"
+                  value={rowsWithComputed.length}
+                  readOnly
+                  className="h-10 text-center bg-slate-50/50 font-mono"
+                />
+              </FieldWrapper>
 
-            {/* Salesman */}
-            <FieldWrapper label="Salesman Name" className="lg:col-span-1">
-              <Input
-                placeholder="Salesman"
-                value={salesman ? (salemanMap.get(salesman) || "") : ""}
-                readOnly
-                className="h-10 bg-slate-50/50 italic text-slate-600 border-slate-200"
-              />
-            </FieldWrapper>
+              {/* Active Checkbox */}
+              <FieldWrapper label="Status" className="lg:col-span-1">
+                <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-emerald-50/20 border-emerald-100">
+                  <Checkbox id="terms" defaultChecked className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600" />
+                  <Label htmlFor="terms" className="text-emerald-700 font-medium text-xs">Active</Label>
+                </div>
+              </FieldWrapper>
+            </Card>
+          </div>
 
-            {/* Cash/Credit Select */}
-            <FieldWrapper label="Sale Type" className="lg:col-span-1">
-              <Select value={cashCredit} onValueChange={setCashCredit}>
-                <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="CREDIT">CREDIT</SelectItem>
-                    <SelectItem value="CASH">CASH</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </FieldWrapper>
-
-            {/* Items # */}
-            <FieldWrapper label="Items" className="lg:col-span-1">
-              <Input
-                placeholder="Items #"
-                value={rowsWithComputed.length}
-                readOnly
-                className="h-10 text-center bg-slate-50/50 font-mono"
-              />
-            </FieldWrapper>
-
-            {/* Active Checkbox */}
-            <FieldWrapper label="Status" className="lg:col-span-1">
-              <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-emerald-50/20 border-emerald-100">
-                <Checkbox id="terms" defaultChecked className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600" />
-                <Label htmlFor="terms" className="text-emerald-700 font-medium text-xs">Active</Label>
-              </div>
-            </FieldWrapper>
-          </Card>
+          {/* Mobile "Add Item" Button */}
+          <div className="block md:hidden pb-2">
+            <div className="flex justify-between items-center mb-2 px-1">
+              <h3 className="font-semibold text-lg flex items-center gap-2"><ListRestart className="text-sky-600" size={18} /> Items List</h3>
+              <Button size="sm" onClick={addRow} className="bg-sky-600 hover:bg-sky-700 text-white h-8 shadow-sm">
+                <Plus size={16} className="mr-1" /> Add Item
+              </Button>
+            </div>
+          </div>
 
           {/* Items table + right summary */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Table area */}
             <div className="col-span-1 lg:col-span-9">
-              <Card className="p-0 overflow-hidden gap-0">
-                <div className="overflow-x-auto">
-                  <div className="min-w-[1200px]">
-                    {/* Table Header (sticky) */}
-                    <div className="grid grid-cols-12 p-2 text-xs font-semibold border-b sticky top-0 z-10 bg-secondary/50 backdrop-blur-sm">
+              <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card">
+                <div className="overflow-visible md:overflow-x-auto">
+                  <div className="w-full md:min-w-[1200px]">
+                    {/* Table Header (sticky) - Desktop Only */}
+                    <div className="hidden md:grid grid-cols-12 p-2 text-xs font-semibold border-b sticky top-0 z-10 bg-secondary/50 backdrop-blur-sm">
 
                       <div className="col-span-2">+ Item Selection</div>
                       <div className="col-span-1 text-center">Full</div>
@@ -692,132 +808,248 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     </div>
 
                     {/* Rows (scrollable) */}
-                    <div className="max-h-[360px] overflow-auto">
+                    <div className="max-h-none md:max-h-[360px] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm"> {/* Changed overflow and spacing for mobile cards */}
                       {rowsWithComputed.map((row) => (
-                        <div key={row.id} className={`grid grid-cols-12 gap-1 p-2 border-b items-center text-sm ${row.stockExceeded ? 'bg-red-100 dark:bg-red-950/30 border-red-300 dark:border-red-900' : ''}`}>
+                        <React.Fragment key={row.id}>
+                          {/* Mobile Card View */}
+                          <div
+                            className={`block md:hidden rounded-xl border border-slate-200 bg-white shadow-sm relative overflow-hidden transition-all mb-3 ${row.stockExceeded ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'hover:shadow-md'}`}
+                          >
+                            {/* Header Row: Item Name & Delete */}
+                            <div className="flex items-start justify-between p-3 pb-2 border-b border-slate-100 bg-slate-50/50">
+                              <div className="w-full pr-8">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="h-6 w-6 rounded bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                    <Wallet size={14} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 tracking-wider">ITEM</span>
+                                </div>
+                                <ReactSelect
+                                  menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                                  styles={{
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                    container: (base) => ({ ...base, width: '100%' }),
+                                    control: (base) => ({
+                                      ...base,
+                                      backgroundColor: 'transparent',
+                                      border: 'none',
+                                      boxShadow: 'none',
+                                      minHeight: 'auto',
+                                      height: 'auto',
+                                      padding: 0,
+                                      fontWeight: 600,
+                                      fontSize: '0.95rem'
+                                    }),
+                                    valueContainer: (base) => ({ ...base, padding: 0 }),
+                                    dropdownIndicator: (base) => ({ ...base, padding: 0, color: '#94a3b8' }),
+                                    indicatorSeparator: () => ({ display: 'none' }),
+                                    placeholder: (base) => ({ ...base, color: '#cbd5e1', fontWeight: 400 }),
+                                  }}
+                                  options={itemOptions}
+                                  value={itemOptions.find((opt) => opt.value === row.item_id) || null}
+                                  onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
+                                  placeholder="Select Item..."
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-2 right-2 h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                                onClick={() => removeRow(row.id)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
 
+                            <div className="p-3 space-y-4">
+                              {/* Quantity Section */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-center">Cartons</label>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Input
+                                      type="number"
+                                      className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                      value={row.full}
+                                      onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
+                                      onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                    />
+                                    {row.bonus_full > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_full}</span>}
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 text-center">Pieces</label>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Input
+                                      type="number"
+                                      className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                      value={row.pcs}
+                                      onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
+                                      onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                    />
+                                    {row.bonus_pcs > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_pcs}</span>}
+                                  </div>
+                                </div>
+                              </div>
 
-                          <div className="col-span-2 flex items-center justify-center">
-
-                            <ReactSelect
-                              menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                              styles={{
-                                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                container: (base) => ({ ...base, width: '100%' }),
-                                control: (base) => ({
-                                  ...base,
-                                  backgroundColor: 'transparent',
-                                  borderColor: 'var(--border)',
-                                  color: 'inherit',
-                                  minHeight: '2rem',
-                                  height: '2rem',
-                                  '&:hover': {
-                                    borderColor: 'var(--input)'
-                                  }
-                                }),
-                                valueContainer: (base) => ({ ...base, padding: '0 8px' }),
-                                dropdownIndicator: (base) => ({ ...base, padding: '4px' }),
-                                indicatorSeparator: () => ({ display: 'none' }),
-                                menu: (base) => ({
-                                  ...base,
-                                  backgroundColor: selectBg,
-                                  border: `1px solid ${selectBorder}`,
-                                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-                                  zIndex: 9999,
-                                }),
-                                menuList: (base) => ({
-                                  ...base,
-                                  backgroundColor: selectBg,
-                                  padding: 0,
-                                }),
-                                option: (base, state) => ({
-                                  ...base,
-                                  backgroundColor: state.isSelected
-                                    ? 'var(--primary)'
-                                    : state.isFocused
-                                      ? 'var(--accent)'
-                                      : selectBg,
-                                  color: state.isSelected
-                                    ? 'var(--primary-foreground)'
-                                    : 'inherit',
-                                  fontSize: '0.875rem',
-                                  cursor: 'pointer'
-                                }),
-                                singleValue: (base) => ({
-                                  ...base,
-                                  color: 'inherit',
-                                }),
-                                input: (base) => ({
-                                  ...base,
-                                  color: 'inherit',
-                                }),
-                              }}
-                              options={itemOptions}
-                              value={itemOptions.find((opt) => opt.value === row.item_id) || null}
-                              onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
-                            />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input value={row.full} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input value={row.pcs} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input value={row.bonus_full} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input value={row.bonus_pcs} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Tooltip open={row.isLoss}>
-                              <TooltipTrigger asChild>
-                                <div className="w-full">
+                              {/* Financials Section */}
+                              <div className="flex items-center justify-between gap-2 pt-2 border-t border-dashed border-slate-200">
+                                <div className="flex flex-col">
+                                  <label className="text-[10px] text-slate-400 font-medium">Rate</label>
                                   <Input
-                                    className={`text-right ${row.isLoss ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                                    className={`h-7 w-20 text-xs px-1 border-slate-200 text-center ${row.isLoss ? 'text-red-600 font-bold border-red-200 bg-red-50' : ''}`}
                                     value={row.rate}
                                     onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
                                     onClick={() => row.item_id && setSelectedItemId(row.item_id)}
                                   />
                                 </div>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="bottom"
-                                className="bg-red-600 text-white border-red-600 font-semibold"
-                                arrowClassName="fill-red-600 bg-red-600"
-                              >
-                                <p>Hi, you are selling in loss</p>
-                              </TooltipContent>
-                            </Tooltip>
+
+                                <div className="flex flex-col">
+                                  <label className="text-[10px] text-slate-400 font-medium">Disc%</label>
+                                  <Input
+                                    className="h-7 w-16 text-xs px-1 border-slate-200 text-center"
+                                    value={row.discPercent}
+                                    onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                  />
+                                </div>
+
+                                <div className="flex flex-col items-end flex-1 pl-2">
+                                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total</label>
+                                  <div className="text-xl font-black text-sky-600">
+                                    {(row.amount * (1 - row.discPercent / 100)).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="col-span-1">
-                            <Input className="text-right" value={row.taxPercent} onChange={(e) => updateRow(row.id, { taxPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input className="text-right" value={row.discPercent} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <Input className="text-right italic bg-secondary/20" value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
-                          <div className="col-span-1">
-                            <Input className="text-right font-bold bg-secondary/40" value={(row.amount * (1 - row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                          </div>
+                          {/* Desktop Row View */}
+                          <div className={`hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm ${row.stockExceeded ? 'bg-red-100 dark:bg-red-950/30 border-red-300 dark:border-red-900' : ''}`}>
 
 
-                          <div className="col-span-1 flex items-center gap-1 justify-center">
-                            <Button variant="outline" size="icon" className="h-7 w-7 p-1 bg-red-500 rounded-sm  text-white hover:bg-red-300 cursor-pointer" onClick={() => removeRow(row.id)}>
-                              <Trash2 />
-                            </Button>
+                            <div className="col-span-2 flex items-center justify-center">
+
+                              <ReactSelect
+                                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                                styles={{
+                                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                  container: (base) => ({ ...base, width: '100%' }),
+                                  control: (base) => ({
+                                    ...base,
+                                    backgroundColor: 'transparent',
+                                    borderColor: 'var(--border)',
+                                    color: 'inherit',
+                                    minHeight: '2rem',
+                                    height: '2rem',
+                                    '&:hover': {
+                                      borderColor: 'var(--input)'
+                                    }
+                                  }),
+                                  valueContainer: (base) => ({ ...base, padding: '0 8px' }),
+                                  dropdownIndicator: (base) => ({ ...base, padding: '4px' }),
+                                  indicatorSeparator: () => ({ display: 'none' }),
+                                  menu: (base) => ({
+                                    ...base,
+                                    backgroundColor: selectBg,
+                                    border: `1px solid ${selectBorder}`,
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                                    zIndex: 9999,
+                                  }),
+                                  menuList: (base) => ({
+                                    ...base,
+                                    backgroundColor: selectBg,
+                                    padding: 0,
+                                  }),
+                                  option: (base, state) => ({
+                                    ...base,
+                                    backgroundColor: state.isSelected
+                                      ? 'var(--primary)'
+                                      : state.isFocused
+                                        ? 'var(--accent)'
+                                        : selectBg,
+                                    color: state.isSelected
+                                      ? 'var(--primary-foreground)'
+                                      : 'inherit',
+                                    fontSize: '0.875rem',
+                                    cursor: 'pointer'
+                                  }),
+                                  singleValue: (base) => ({
+                                    ...base,
+                                    color: 'inherit',
+                                  }),
+                                  input: (base) => ({
+                                    ...base,
+                                    color: 'inherit',
+                                  }),
+                                }}
+                                options={itemOptions}
+                                value={itemOptions.find((opt) => opt.value === row.item_id) || null}
+                                onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
+                              />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input value={row.full} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input value={row.pcs} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input value={row.bonus_full} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input value={row.bonus_pcs} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Tooltip open={row.isLoss}>
+                                <TooltipTrigger asChild>
+                                  <div className="w-full">
+                                    <Input
+                                      className={`text-right ${row.isLoss ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                                      value={row.rate}
+                                      onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                      onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="bottom"
+                                  className="bg-red-600 text-white border-red-600 font-semibold"
+                                  arrowClassName="fill-red-600 bg-red-600"
+                                >
+                                  <p>Hi, you are selling in loss</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input className="text-right" value={row.taxPercent} onChange={(e) => updateRow(row.id, { taxPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input className="text-right" value={row.discPercent} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input className="text-right italic bg-secondary/20" value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+                            <div className="col-span-1">
+                              <Input className="text-right font-bold bg-secondary/40" value={(row.amount * (1 - row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
+                            </div>
+
+
+                            <div className="col-span-1 flex items-center gap-1 justify-center">
+                              <Button variant="outline" size="icon" className="h-7 w-7 p-1 bg-red-500 rounded-sm  text-white hover:bg-red-300 cursor-pointer" onClick={() => removeRow(row.id)}>
+                                <Trash2 />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
+                        </React.Fragment>
                       ))}
                     </div>
 
@@ -1088,6 +1320,38 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
               </Card>
             </div>
           </div>
+          {/* Mobile Sticky Footer */}
+          <div className="md:hidden fixed bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md border border-slate-200/60 rounded-2xl p-4 z-50 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <div className="flex flex-col">
+                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Net Total</div>
+                <div className="text-2xl font-black text-sky-600 leading-none">
+                  <span className="text-sm font-semibold mr-1">Rs</span>
+                  {totals.net.toFixed(2)}
+                </div>
+              </div>
+              <Button onClick={handleSave} disabled={processing} className="h-10 px-6 bg-sky-600 hover:bg-sky-700 text-white shadow-lg shadow-sky-200/50 rounded-xl font-bold transition-all active:scale-95">
+                {processing ? "Saving..." : <><Save className="mr-2" size={18} /> Save Invoice</>}
+              </Button>
+            </div>
+
+            {/* Mini Details */}
+            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] uppercase text-slate-400 font-bold">Gross</span>
+                <span className="text-xs font-semibold text-slate-700">{totals.gross.toFixed(0)}</span>
+              </div>
+              <div className="flex flex-col items-center border-l border-slate-100">
+                <span className="text-[9px] uppercase text-slate-400 font-bold">Tax</span>
+                <span className="text-xs font-semibold text-slate-700">{totals.taxTotal.toFixed(0)}</span>
+              </div>
+              <div className="flex flex-col items-center border-l border-slate-100">
+                <span className="text-[9px] uppercase text-slate-400 font-bold">Disc</span>
+                <span className="text-xs font-semibold text-slate-700">{totals.discTotal.toFixed(0)}</span>
+              </div>
+            </div>
+          </div>
+
         </div >
       </SidebarInset >
     </SidebarProvider >

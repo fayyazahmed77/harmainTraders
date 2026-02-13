@@ -34,6 +34,8 @@ interface Province {
   country_id: number;
   name: string;
   code: string;
+  latitude?: string;
+  longitude?: string;
   is_active: boolean;
   created_at: string;
   created_by: number;
@@ -75,6 +77,8 @@ export default function Index({ provinces, countries }: IndexProps) {
   // form states
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [country, setCountry] = useState<CountryOption | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,6 +90,8 @@ export default function Index({ provinces, countries }: IndexProps) {
       name,
       code,
       country_id: country.value,
+      latitude,
+      longitude,
     };
 
     router.post("/provinces", payload, {
@@ -93,6 +99,8 @@ export default function Index({ provinces, countries }: IndexProps) {
         setOpenCreateDialog(false);
         setName("");
         setCode("");
+        setLatitude("");
+        setLongitude("");
         setCountry(null);
       },
     });
@@ -109,14 +117,14 @@ export default function Index({ provinces, countries }: IndexProps) {
 
   return (
     <>
-      
+
       <Head title="Provinces" />
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
           <SiteHeader breadcrumbs={breadcrumbs} />
           <div className="mt-4 px-5">
-             <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl font-bold mb-1">All Provinces list </h1>
                 <p className="text-sm text-muted-foreground">
@@ -124,14 +132,14 @@ export default function Index({ provinces, countries }: IndexProps) {
                 </p>
               </div>
               <Button
-              className="bg-sky-500 mb-3"
-              onClick={() => setOpenCreateDialog(true)}
-              disabled={!canCreate}
-            >
-              <Plus className="mr-2" /> Add Province
-            </Button>
+                className="bg-sky-500 mb-3"
+                onClick={() => setOpenCreateDialog(true)}
+                disabled={!canCreate}
+              >
+                <Plus className="mr-2" /> Add Province
+              </Button>
             </div>
-            
+
 
             {provinces.length === 0 ? (
               <div>No provinces found.</div>
@@ -197,6 +205,27 @@ export default function Index({ provinces, countries }: IndexProps) {
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="Enter short province code"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-2 mb-2">
+              <div className="grid gap-2">
+                <Label htmlFor="latitude">Latitude</Label>
+                <Input
+                  id="latitude"
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  placeholder="e.g. 30.3753"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="longitude">Longitude</Label>
+                <Input
+                  id="longitude"
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  placeholder="e.g. 69.3451"
+                />
+              </div>
             </div>
 
             <DialogFooter>
