@@ -146,6 +146,7 @@ class SalesController extends Controller
             'items.*.bonus_qty_carton' => 'nullable|numeric',
             'items.*.bonus_qty_pcs'    => 'nullable|numeric',
             'print_format'             => 'nullable|in:big,small',
+            'allow_negative_stock'     => 'nullable|boolean', // Added flag
         ]);
 
         DB::beginTransaction();
@@ -280,7 +281,10 @@ class SalesController extends Controller
                 }
 
                 if (($item->stock_1 ?? 0) < $it['total_pcs']) {
-                    throw new \Exception("Insufficient stock for item: " . $item->title . ". Available: " . ($item->stock_1 ?? 0));
+                    // Check if negative stock is allowed for this request
+                    if (!$request->boolean('allow_negative_stock')) {
+                        throw new \Exception("Insufficient stock for item: " . $item->title . ". Available: " . ($item->stock_1 ?? 0));
+                    }
                 }
 
                 SalesItem::create([
