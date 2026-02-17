@@ -27,7 +27,13 @@ class Purchase extends Model
         'net_total',
         'paid_amount',
         'remaining_amount',
+        'message_line_id',
     ];
+
+    public function messageLine()
+    {
+        return $this->belongsTo(MessageLine::class);
+    }
 
     public function supplier()
     {

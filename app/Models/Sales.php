@@ -19,6 +19,8 @@ class Sales extends Model
         'code',
         'customer_id', // Assuming customer_id instead of supplier_id
         'salesman_id',
+        'firm_id',
+        'message_line_id',
         'no_of_items',
         'gross_total',
         'discount_total',
@@ -38,6 +40,11 @@ class Sales extends Model
     public function salesman()
     {
         return $this->belongsTo(Saleman::class);
+    }
+
+    public function messageLine()
+    {
+        return $this->belongsTo(MessageLine::class, 'message_line_id');
     }
 
     public function items()

@@ -22,6 +22,7 @@ class FirmController extends Controller
                 $item->created_by_avatar = $item->creator?->image
                     ? asset('storage/' . $item->creator->image)
                     : asset('images/default-avatar.png');
+                $item->created_by_name = $item->creator?->name ?? 'Unknown';
                 return $item;
             });
 

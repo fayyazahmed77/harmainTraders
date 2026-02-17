@@ -99,11 +99,17 @@ interface Account {
   aging_days?: number;
   credit_limit?: number | string;
   saleman_id?: number;
+  item_category?: string | null;
 }
 
 interface Saleman {
   id: number;
   name: string;
+}
+
+interface MessageLine {
+  id: number;
+  messageline: string;
 }
 
 interface Option {
@@ -122,7 +128,7 @@ const FieldWrapper = ({ label, children, className = "" }: { label: string; chil
   </div>
 );
 
-export default function SalesEditPage({ items, accounts, salemans, sale }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; sale: any }) {
+export default function SalesEditPage({ items, accounts, salemans, sale, messageLines = [] }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; sale: any; messageLines?: MessageLine[] }) {
   // Header / meta fields
   const [date, setDate] = useState<Date | undefined>(sale ? new Date(sale.date) : new Date());
   const [open, setOpen] = useState(false);
@@ -140,6 +146,10 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
   );
   const [courier, setCourier] = useState<number>(toNumber(sale?.courier_charges));
   const [printOption, setPrintOption] = useState<"big" | "small">("big");
+  const [customerCategory, setCustomerCategory] = useState<string | null>(
+    sale?.customer?.item_category ? String(sale.customer.item_category) : null
+  );
+  const [selectedMessageId, setSelectedMessageId] = useState<string>(sale?.message_line_id ? sale.message_line_id.toString() : "0");
 
   // Create account options
   const accountTypeOptions: Option[] = useMemo(() => {
@@ -267,7 +277,26 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
     const disc = toNumber(selected.discount ?? 0);
     const tradePrice = toNumber(selected.retail ?? selected.trade_price ?? baseRate); // Use retail for sales
 
-    updateRow(rowId, { item_id: itemId, rate: baseRate, taxPercent: tax, discPercent: disc, trade_price: tradePrice });
+    let finalRate = baseRate;
+    // Auto-calculate rate based on customer category (TP2-TP7)
+    const actualTradePrice = toNumber(selected.trade_price ?? 0);
+    if (customerCategory && actualTradePrice > 0) {
+      let percentage = 0;
+      switch (customerCategory) {
+        case "2": percentage = toNumber(selected.pt2); break;
+        case "3": percentage = toNumber(selected.pt3); break;
+        case "4": percentage = toNumber(selected.pt4); break;
+        case "5": percentage = toNumber(selected.pt5); break;
+        case "6": percentage = toNumber(selected.pt6); break;
+        case "7": percentage = toNumber(selected.pt7); break;
+      }
+
+      if (percentage > 0) {
+        finalRate = Math.round(actualTradePrice * (1 + percentage / 100));
+      }
+    }
+
+    updateRow(rowId, { item_id: itemId, rate: finalRate, taxPercent: tax, discPercent: disc, trade_price: tradePrice });
 
     // Set this item as the selected one to display info below
     setSelectedItemId(itemId);
@@ -402,6 +431,7 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
       tax_total: totals.taxTotal,
       courier_charges: totals.courier,
       net_total: totals.net,
+      message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
       paid_amount: sale?.paid_amount ?? 0,
       remaining_amount: totals.net - (sale?.paid_amount ?? 0),
 
@@ -416,7 +446,8 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
           qty_carton: r.full,
           qty_pcs: r.pcs,
           total_pcs: totalPCS,
-          trade_price: r.trade_price,
+          trade_price: r.rate,
+          retail_price: r.trade_price,
           discount: (r.discPercent / 100) * r.amount,
           gst_amount: (r.taxPercent / 100) * r.amount,
           subtotal: r.amount
@@ -517,11 +548,13 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                     const salemanId = selectedAccount.saleman_id ?? null;
                     setSalesman(salemanId);
                     setCode(selectedAccount.code ?? "");
+                    setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
                   } else {
                     // clear if no account
                     setCreditDays(0);
                     setCreditLimit("");
                     setSalesman(null);
+                    setCustomerCategory(null);
                   }
                 }}
               >
@@ -580,12 +613,21 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
 
             {/* Salesman */}
             <FieldWrapper label="Salesman Name" className="lg:col-span-1">
-              <Input
-                placeholder="Salesman"
-                value={salesman ? (salemanMap.get(salesman) || "") : ""}
-                readOnly
-                className="h-10 bg-slate-50/50 italic text-slate-600 border-slate-200"
-              />
+              <Select
+                value={salesman?.toString() || ""}
+                onValueChange={(val) => setSalesman(val ? Number(val) : null)}
+              >
+                <SelectTrigger className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background">
+                  <SelectValue placeholder="Select Salesman" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salemans.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FieldWrapper>
 
             {/* Cash/Credit Select */}
@@ -871,14 +913,18 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                     <div className="grid grid-cols-6 gap-2 mt-2">
                       {[2, 3, 4, 5, 6, 7].map((num) => {
                         const priceKey = `pt${num}` as keyof Item;
-                        const price = toNumber(selectedItem[priceKey]);
-                        if (price === 0) return null;
+                        const percentage = toNumber(selectedItem[priceKey]);
+                        if (percentage === 0) return null;
+
+                        const tradePrice = toNumber(selectedItem.trade_price);
+                        const calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                        const isActive = String(num) === customerCategory;
 
                         return (
-                          <div key={num} className="bg-white/60 backdrop-blur-sm rounded-md p-3 shadow-sm border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all group">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 group-hover:text-blue-600 transition-colors">Price Type {num}</div>
-                            <div className="text-lg font-bold text-slate-800">
-                              ₨ {price.toFixed(2)}
+                          <div key={num} className={`backdrop-blur-sm rounded-lg p-3 shadow-sm border transition-all group ${isActive ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500 ring-1 ring-orange-500 shadow-md' : 'bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 hover:border-orange-500/50 hover:shadow-md'}`}>
+                            <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 transition-colors ${isActive ? 'text-orange-700 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-500'}`}>Price Type {num} <span className={`text-[9px] normal-case ml-1 ${isActive ? 'text-orange-600/70' : 'text-gray-400'}`}>({percentage}%)</span></div>
+                            <div className={`text-lg font-bold ${isActive ? 'text-orange-700 dark:text-orange-300' : 'text-gray-900 dark:text-gray-100'}`}>
+                              ₨ {calculatedPrice.toFixed(2)}
                             </div>
                           </div>
                         );
@@ -982,6 +1028,23 @@ export default function SalesEditPage({ items, accounts, salemans, sale }: { ite
                     <SelectContent>
                       <SelectItem value="big">Big (A4)</SelectItem>
                       <SelectItem value="small">Small (Thermal)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-sky-600 dark:text-sky-400 mb-1">Select Message Line</div>
+                  <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                    <SelectTrigger className="w-full h-9 border-sky-200 dark:border-sky-900/50 bg-sky-50/30 dark:bg-sky-950/20">
+                      <SelectValue placeholder="No Message Line" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                      {messageLines && messageLines.map((msg) => (
+                        <SelectItem key={msg.id} value={msg.id.toString()}>
+                          {msg.messageline}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

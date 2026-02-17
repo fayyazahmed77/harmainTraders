@@ -11,6 +11,7 @@ class MessageLine extends Model
 
     protected $fillable = [
         'messageline',
+        'category',
         'status',
         'created_by',
     ];

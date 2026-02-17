@@ -46,12 +46,18 @@ interface Bill {
   bill_type_label: string;
 }
 
+interface MessageLine {
+  id: number;
+  messageline: string;
+}
+
 interface Props {
   accounts: Account[];
   paymentAccounts: PaymentAccount[];
+  messageLines?: MessageLine[];
 }
 
-export default function PaymentVoucher({ accounts, paymentAccounts }: Props) {
+export default function PaymentVoucher({ accounts, paymentAccounts, messageLines }: Props) {
   // State
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
@@ -73,6 +79,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts }: Props) {
   const [remarks, setRemarks] = useState<string>("");
   const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">("RECEIPT");
   const [paymentMethod, setPaymentMethod] = useState<string>(""); // Online Transfer, Card, Cheque
+  const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
 
   // Fetch unpaid bills when account changes
   useEffect(() => {
@@ -267,6 +274,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts }: Props) {
       clear_date: clearDate,
       remarks,
       payment_method: paymentMethod,
+      message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
       allocations: allocationPayload
     };
 
@@ -315,22 +323,37 @@ export default function PaymentVoucher({ accounts, paymentAccounts }: Props) {
               </Select>
             </div>
 
-            <div className="col-span-2">
-              <Label>Payment Type</Label>
+            <div className="col-span-1">
+              <Label>P-Type</Label>
               <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="RECEIPT">Receipt (IN)</SelectItem>
-                  <SelectItem value="PAYMENT">Payment (OUT)</SelectItem>
+                  <SelectItem value="RECEIPT">IN</SelectItem>
+                  <SelectItem value="PAYMENT">OUT</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="col-span-5">
+            <div className="col-span-3">
               <Label>Description</Label>
               <Input value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Remarks..." />
+            </div>
+
+            <div className="col-span-3">
+              <Label>Message Line</Label>
+              <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                <SelectTrigger className="w-full bg-sky-50/50">
+                  <SelectValue placeholder="Optional Message" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                  {messageLines?.map(msg => (
+                    <SelectItem key={msg.id} value={msg.id.toString()}>{msg.messageline}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </Card>
 

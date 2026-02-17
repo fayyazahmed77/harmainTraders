@@ -31,6 +31,8 @@ class SalemanController extends Controller
                     'created_by_avatar' => $item->creator?->image
                         ? asset('storage/' . $item->creator->image)
                         : asset('images/avatar-placeholder.png'),
+                    'wallet_balance' => $item->wallet_balance,
+                    'commission_percentage' => $item->commission_percentage,
                 ];
             });
 
@@ -52,6 +54,7 @@ class SalemanController extends Controller
             'date' => 'required|date',
             'status' => 'nullable|boolean',
             'defult' => 'nullable|boolean',
+            'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $saleman = Saleman::create([
@@ -61,6 +64,7 @@ class SalemanController extends Controller
             'date' => $request->date,
             'status' => $request->status ? 1 : 0,
             'defult' => $request->defult ? 1 : 0,
+            'commission_percentage' => $request->commission_percentage ?? 0,
             'created_by' => Auth::id(),
         ]);
 
@@ -79,6 +83,7 @@ class SalemanController extends Controller
             'date' => 'required|date',
             'status' => 'nullable|boolean',
             'defult' => 'nullable|boolean',
+            'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $saleman->update([
@@ -88,6 +93,7 @@ class SalemanController extends Controller
             'date' => $request->date,
             'status' => $request->status ? 1 : 0,
             'defult' => $request->defult ? 1 : 0,
+            'commission_percentage' => $request->commission_percentage ?? 0,
         ]);
 
         return redirect()->back()->with('success', 'Saleman updated successfully.');

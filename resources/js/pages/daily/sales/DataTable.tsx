@@ -50,6 +50,14 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 
 /* ------------------------------
@@ -93,6 +101,8 @@ export default function DataTable({ data }: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [saleToDelete, setSaleToDelete] = useState<Sales | null>(null);
 
     /* ------------------------------
        ✔️ Status Map (Type-Safe)
@@ -225,7 +235,14 @@ export default function DataTable({ data }: DataTableProps) {
                             <DropdownMenuItem onClick={() => router.visit(`/sales/${sale.id}/edit`)}>
                                 Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => router.visit(`/sales/${sale.id}/delete`)}>
+                            <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                    setSaleToDelete(sale);
+                                    setIsDeleteDialogOpen(true);
+                                }}
+                            >
                                 Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -375,6 +392,36 @@ export default function DataTable({ data }: DataTableProps) {
 
                 </div>
             </div>
+
+            {/* Deletion Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete invoice <span className="font-bold text-foreground">{saleToDelete?.invoice}</span>?
+                            This action will revert technical stock levels and cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (saleToDelete) {
+                                    router.delete(`/sales/${saleToDelete.id}/delete`, {
+                                        onSuccess: () => setIsDeleteDialogOpen(false)
+                                    });
+                                }
+                            }}
+                        >
+                            Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </TooltipProvider>
     );
 }

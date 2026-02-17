@@ -18,7 +18,7 @@ class PaymentController extends Controller
     // List payments and stats
     public function index(Request $request)
     {
-        $query = Payment::with(['account', 'paymentAccount']);
+        $query = Payment::with(['account', 'paymentAccount', 'messageLine']);
 
         // Filter by Date Range
         if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
@@ -98,7 +98,7 @@ class PaymentController extends Controller
             $salesQuery->whereBetween('date', [$request->start_date, $request->end_date]);
         }
         $salesData = clone $salesQuery;
-        
+
         $salesReturnQuery = \App\Models\SalesReturn::query();
         if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
             $salesReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
@@ -171,7 +171,7 @@ class PaymentController extends Controller
     // Show payment details
     public function show($id)
     {
-        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque'])->findOrFail($id);
+        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque', 'messageLine'])->findOrFail($id);
         return Inertia::render('daily/payment/view', ['payment' => $payment]);
     }
 
@@ -187,10 +187,15 @@ class PaymentController extends Controller
             })
             ->get();
 
+        $messageLines = \App\Models\MessageLine::whereIn('category', ['Payments', 'Receipt'])
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render('daily/payment/edit', [
             'payment' => $payment,
             'accounts' => $accounts,
             'paymentAccounts' => $paymentAccounts,
+            'messageLines' => $messageLines,
         ]);
     }
 
@@ -209,6 +214,7 @@ class PaymentController extends Controller
             'cheque_no' => 'nullable|string',
             'cheque_date' => 'nullable|date',
             'clear_date' => 'nullable|date',
+            'message_line_id' => 'nullable|integer',
         ]);
 
         $payment->update($request->only([
@@ -216,7 +222,8 @@ class PaymentController extends Controller
             'remarks',
             'cheque_no',
             'cheque_date',
-            'clear_date'
+            'clear_date',
+            'message_line_id'
         ]));
 
         return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
@@ -225,7 +232,7 @@ class PaymentController extends Controller
     // Generate PDF (Print View)
     public function pdf($id)
     {
-        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque'])->findOrFail($id);
+        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque', 'messageLine'])->findOrFail($id);
 
         $pdf = PDF::loadView('pdf.payment-voucher', compact('payment'));
 
@@ -253,9 +260,14 @@ class PaymentController extends Controller
 
 
 
+        $messageLines = \App\Models\MessageLine::whereIn('category', ['Payments', 'Receipt'])
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/payment/create", [
             'accounts' => $accounts,
             'paymentAccounts' => $paymentAccounts,
+            'messageLines' => $messageLines,
         ]);
     }
 
@@ -401,6 +413,7 @@ class PaymentController extends Controller
             'cheque_date' => 'nullable|date',
             'clear_date' => 'nullable|date',
             'payment_method' => 'nullable|string|in:Online Transfer,Card,Cheque',
+            'message_line_id' => 'nullable|integer',
         ]);
 
         DB::beginTransaction();
@@ -483,6 +496,7 @@ class PaymentController extends Controller
                 'remarks' => $request->remarks,
                 'payment_method' => $request->payment_method,
                 'cheque_id' => $chequeId,
+                'message_line_id' => $request->message_line_id,
             ]);
 
             // Process Allocations

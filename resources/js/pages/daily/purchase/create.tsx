@@ -100,6 +100,10 @@ interface Saleman {
     shortname?: string;
 
 }
+interface MessageLine {
+    id: number;
+    messageline: string;
+}
 interface Option {
     value: number;
     label: string;
@@ -110,6 +114,7 @@ interface PurchaseProps {
     accounts: Account[];
     salemans: Saleman[];
     nextInvoiceNo: string;
+    messageLines?: MessageLine[];
 }
 // ───────────────────────────────────────────
 // Util helpers
@@ -138,6 +143,7 @@ export default function Purchase({
     accounts,
     salemans,
     nextInvoiceNo,
+    messageLines,
 }: PurchaseProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -159,6 +165,7 @@ export default function Purchase({
     const [accountType, setAccountType] = useState<Option | null>(null);
     const [courier, setCourier] = useState<number>(0);
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
+    const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
     const accountTypeOptions: Option[] = accounts.map((a) => ({
         value: a.id,
         label: a.title,
@@ -377,6 +384,7 @@ export default function Purchase({
             paid_amount: 0,
             remaining_amount: totals.net,
             print_format: printOption,
+            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
             items: rowsWithComputed.map((r) => {
                 const item = items.find(i => i.id === r.item_id);
@@ -578,6 +586,8 @@ export default function Purchase({
                                 className="h-10 bg-slate-50/50 font-bold border-slate-200"
                             />
                         </FieldWrapper>
+
+
 
                         {/* Active Checkbox */}
                         <div className="flex items-center gap-3 border border-slate-200 px-3 h-10 rounded-md lg:col-span-1 bg-white">
@@ -1038,6 +1048,25 @@ export default function Purchase({
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {/* Message Line Select */}
+                                <div className="pt-2">
+<FieldWrapper label="Select Message Line" className="lg:col-span-2">
+                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                        <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-sky-50/30">
+                                            <SelectValue placeholder="No Message Line (Optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                                            {messageLines?.map((msg) => (
+                                                <SelectItem key={msg.id} value={msg.id.toString()}>
+                                                    {msg.messageline}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </FieldWrapper>
+                                </div>
+                                
 
                                 <div>
                                     <div className="text-xs font-semibold">Total Receivable</div>

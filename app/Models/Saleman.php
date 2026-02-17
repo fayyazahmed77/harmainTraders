@@ -20,7 +20,14 @@ class Saleman extends Model
         'status',
         'defult',
         'created_by',
+        'wallet_balance',
+        'commission_percentage',
     ];
+
+    public function transactions()
+    {
+        return $this->hasMany(WalletTransaction::class, 'salesman_id');
+    }
 
     protected $casts = [
         'status' => 'boolean',

@@ -56,6 +56,11 @@ interface Purchase {
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
+    message_line_id?: number | null;
+    message_line?: {
+        id: number;
+        messageline: string;
+    } | null;
     items: PurchaseItem[];
 }
 
@@ -200,6 +205,25 @@ export default function View({ purchase }: Props) {
                                             <p className="text-lg font-black tabular-nums">{totalPcs}</p>
                                         </div>
                                     </Card>
+
+                                    {/* MESSAGE LINE SECTION */}
+                                    {purchase.message_line && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="col-span-2 p-4 rounded-[0.5rem] border border-sky-100 bg-sky-50/30 flex items-center gap-3 shadow-sm group hover:bg-sky-50/50 transition-all"
+                                        >
+                                            <div className="h-8 w-8 rounded-lg bg-sky-500/10 flex items-center justify-center border border-sky-500/20 group-hover:scale-110 transition-transform">
+                                                <Info className="h-4 w-4 text-sky-600" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-[8px] font-black text-sky-600/60 uppercase tracking-widest block mb-0.5">Instruction / Message</span>
+                                                <p className="text-sm font-black text-sky-900 leading-tight break-words px-1 border-l-2 border-sky-200 ml-1 italic group-hover:translate-x-1 transition-transform">
+                                                    {purchase.message_line.messageline}
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    )}
                                 </div>
                             </motion.div>
 

@@ -18,7 +18,7 @@ class OfferListController extends Controller
     //index
     public function index()
     {
-        $offers = PriceOfferTo::with(['account', 'user'])->orderBy('id', 'desc')->get();
+        $offers = PriceOfferTo::with(['account', 'user', 'messageLine'])->orderBy('id', 'desc')->get();
         return inertia('daily/offerlist/index', [
             'offers' => $offers
         ]);
@@ -33,10 +33,15 @@ class OfferListController extends Controller
         })
             ->get();
 
+        $messageLines = \App\Models\MessageLine::where('category', 'Offer List')
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/offerlist/create", [
             'items' => $items,
             'categories' => $categories,
             'accounts' => $accounts,
+            'messageLines' => $messageLines,
         ]);
     }
 
@@ -50,6 +55,7 @@ class OfferListController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.price' => 'required|numeric',
+            'message_line_id' => 'nullable|integer',
         ]);
 
         DB::beginTransaction();
@@ -60,6 +66,7 @@ class OfferListController extends Controller
                 'date' => $request->date,
                 'offertype' => $request->price_type,
                 'created_by' => Auth::id() ?? 1, // default 1 if no auth
+                'message_line_id' => $request->message_line_id,
             ]);
 
             // Create offer items
@@ -89,7 +96,7 @@ class OfferListController extends Controller
 
     public function view($id)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
         return inertia('daily/offerlist/view', [
             'offer' => $offer
         ]);
@@ -97,14 +104,14 @@ class OfferListController extends Controller
 
     public function pdf($id)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
         $pdf = Pdf::loadView('pdf.offerlist', compact('offer'));
         return $pdf->stream('offer-list-' . $offer->id . '.pdf');
     }
 
     public function download($id)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
         $pdf = Pdf::loadView('pdf.offerlist', compact('offer'));
         return $pdf->download('offer-list-' . $offer->id . '.pdf');
     }

@@ -13,7 +13,13 @@ class PriceOfferTo extends Model
         "date",
         "offertype",
         "created_by",
+        "message_line_id",
     ];
+
+    public function messageLine()
+    {
+        return $this->belongsTo(MessageLine::class);
+    }
 
     public function account()
     {

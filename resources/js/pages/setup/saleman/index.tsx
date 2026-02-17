@@ -80,6 +80,7 @@ export default function SalemanIndex({ salemen }: IndexProps) {
   const [date, setDate] = useState("");
   const [status, setStatus] = useState(true);
   const [defult, setDefult] = useState(false);
+  const [commissionPercentage, setCommissionPercentage] = useState("");
 
   const totalSalemen = salemen.total || salemen.data.length;
   // This is a simple client-side count for the current page, 
@@ -114,12 +115,21 @@ export default function SalemanIndex({ salemen }: IndexProps) {
     fetchNextCode();
     setStatus(true);
     setDefult(false);
+    setCommissionPercentage("");
     setOpenCreateDialog(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.post("/salemen", { name, shortname, code, date, status, defult }, {
+    router.post("/salemen", {
+      name,
+      shortname,
+      code,
+      date,
+      status,
+      defult,
+      commission_percentage: commissionPercentage
+    }, {
       onSuccess: () => {
         setOpenCreateDialog(false);
         setName("");
@@ -128,6 +138,7 @@ export default function SalemanIndex({ salemen }: IndexProps) {
         setDate("");
         setStatus(true);
         setDefult(false);
+        setCommissionPercentage("");
       },
     });
   };
@@ -327,6 +338,20 @@ export default function SalemanIndex({ salemen }: IndexProps) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="commission">Commission (%)</Label>
+              <Input
+                id="commission"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={commissionPercentage}
+                onChange={(e) => setCommissionPercentage(e.target.value)}
+                placeholder="0.00"
+              />
             </div>
 
             <DialogFooter className="mt-6">

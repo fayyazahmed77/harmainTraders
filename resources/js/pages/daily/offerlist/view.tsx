@@ -37,6 +37,10 @@ interface Offer {
         title: string;
         address: string;
     };
+    message_line?: {
+        id: number;
+        messageline: string;
+    } | null;
     items: OfferItem[];
 }
 
@@ -93,6 +97,11 @@ export default function View({ offer }: Props) {
                                     <p className="capitalize">{offer.offertype}</p>
                                 </div>
                             </div>
+                            {offer.message_line && (
+                                <p className="text-sm text-sky-900 italic border-l-4 border-sky-400 pl-3">
+                                    {offer.message_line.messageline}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
 

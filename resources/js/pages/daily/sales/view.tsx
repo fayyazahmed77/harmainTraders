@@ -47,6 +47,14 @@ interface SaleItem {
         id: number;
         title: string;
         code?: string;
+        trade_price?: number;
+        retail?: number;
+        pt2?: number;
+        pt3?: number;
+        pt4?: number;
+        pt5?: number;
+        pt6?: number;
+        pt7?: number;
     };
 }
 
@@ -80,7 +88,7 @@ interface Sale {
     invoice: string;
     code: string;
     status: SaleStatus;
-    customer?: { id: number; title: string };
+    customer?: { id: number; title: string, item_category?: string | null };
     salesman?: { id: number; name: string };
     no_of_items: number;
     gross_total: number;
@@ -91,6 +99,11 @@ interface Sale {
     remaining_amount: number;
     items: SaleItem[];
     returns?: SalesReturn[];
+    message_line?: {
+        id: number;
+        messageline: string;
+    };
+    message_line_id?: number;
 }
 
 interface Props {
@@ -104,6 +117,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function View({ sale }: Props) {
+    const [selectedItemId, setSelectedItemId] = React.useState<number | null>(
+        sale.items.length > 0 ? sale.items[0].item.id : null
+    );
+
+    const selectedItem = React.useMemo(() => {
+        if (!selectedItemId) return null;
+        return sale.items.find(it => it.item.id === selectedItemId)?.item ?? null;
+    }, [selectedItemId, sale.items]);
+
+    const customerCategory = sale.customer?.item_category ? String(sale.customer.item_category) : null;
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
             style: "currency",
@@ -256,6 +280,20 @@ export default function View({ sale }: Props) {
                                             </div>
                                         </div>
                                     )}
+
+                                    {sale.message_line && (
+                                        <div className="p-4 flex items-center gap-3 bg-sky-500/5 hover:bg-sky-500/10 transition-colors border-l-2 border-sky-500/50">
+                                            <div className="h-8 w-8 rounded-lg bg-sky-500/10 flex items-center justify-center border border-sky-500/20">
+                                                <Info className="h-4 w-4 text-sky-500" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <span className="text-[8px] font-black text-sky-500 uppercase tracking-widest">Invoice Message</span>
+                                                <p className="text-sm font-black tracking-tight leading-relaxed mt-0.5 text-sky-700 dark:text-sky-300">
+                                                    {sale.message_line.messageline}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </Card>
 
                                 {/* STATS ROW: VOLUMES */}
@@ -338,7 +376,9 @@ export default function View({ sale }: Props) {
                                                 <th className="px-3 py-3 text-center">CTN</th>
                                                 <th className="px-3 py-3 text-center">PCS</th>
                                                 <th className="px-3 py-3 text-center">TOT</th>
-                                                <th className="px-4 py-3 text-right">TP @</th>
+                                                <th className="px-4 py-3 text-right">RATE</th>
+                                                <th className="px-4 py-3 text-right">Disc</th>
+                                                <th className="px-4 py-3 text-right">After Disc</th>
                                                 <th className="px-6 py-3 text-right">Line Total</th>
                                             </tr>
                                         </thead>
@@ -351,7 +391,13 @@ export default function View({ sale }: Props) {
                                                         animate={{ opacity: 1, y: 0 }}
                                                         exit={{ opacity: 0 }}
                                                         transition={{ delay: 0.1 + idx * 0.03 }}
-                                                        className="group hover:bg-muted/30 transition-all cursor-default"
+                                                        onClick={() => setSelectedItemId(it.item.id)}
+                                                        className={cn(
+                                                            "group transition-all cursor-pointer border-l-2",
+                                                            selectedItemId === it.item.id
+                                                                ? "bg-primary/5 border-primary shadow-sm"
+                                                                : "hover:bg-muted/30 border-transparent"
+                                                        )}
                                                     >
                                                         <td className="px-6 py-3.5">
                                                             <div className="flex items-center gap-3">
@@ -374,23 +420,26 @@ export default function View({ sale }: Props) {
                                                         <td className="px-4 py-3 text-right text-[10px] font-black text-muted-foreground font-mono">
                                                             {formatCurrency(it.trade_price).replace('PKR', '').trim()}
                                                         </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <div className="text-[10px] font-black text-rose-500 font-mono">
+                                                                {it.discount > 0 ? `-${formatCurrency(it.discount).replace('PKR', '').trim()}` : "0.00"}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <div className="text-[10px] font-black text-emerald-600 font-mono">
+                                                                {formatCurrency((it.subtotal - it.discount) / it.total_pcs).replace('PKR', '').trim()}
+                                                            </div>
+                                                        </td>
                                                         <td className="px-6 py-3 text-right">
                                                             <div className="text-[13px] font-black text-foreground font-mono tracking-tighter">
-                                                                {formatCurrency(it.subtotal).replace('PKR', '').trim()}
+                                                                {formatCurrency(it.subtotal - it.discount).replace('PKR', '').trim()}
                                                                 <span className="text-[8px] font-bold opacity-30 ml-1">PKR</span>
                                                             </div>
-                                                            {(it.discount > 0 || it.gst_amount > 0) && (
+                                                            {it.gst_amount > 0 && (
                                                                 <div className="flex flex-col items-end gap-0.5 mt-1">
-                                                                    {it.discount > 0 && (
-                                                                        <p className="text-[8px] font-bold text-rose-500 flex items-center gap-1">
-                                                                            -{formatCurrency(it.discount)} Disc
-                                                                        </p>
-                                                                    )}
-                                                                    {it.gst_amount > 0 && (
-                                                                        <p className="text-[8px] font-bold text-blue-500 flex items-center gap-1">
-                                                                            +{formatCurrency(it.gst_amount)} GST
-                                                                        </p>
-                                                                    )}
+                                                                    <p className="text-[8px] font-bold text-blue-500 flex items-center gap-1">
+                                                                        +{formatCurrency(it.gst_amount)} GST
+                                                                    </p>
                                                                 </div>
                                                             )}
                                                         </td>
@@ -400,6 +449,54 @@ export default function View({ sale }: Props) {
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {selectedItem && (
+                                    <div className="p-6 bg-muted/5 border-t border-border space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Pricing Analysis: {selectedItem.title}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                            {[2, 3, 4, 5, 6, 7].map((num) => {
+                                                const priceKey = `pt${num}` as keyof typeof selectedItem;
+                                                const percentage = Number(selectedItem[priceKey] || 0);
+                                                if (percentage === 0) return null;
+
+                                                const tradePrice = Number(selectedItem.trade_price || 0);
+                                                const calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                                                const isActive = String(num) === customerCategory;
+
+                                                return (
+                                                    <div
+                                                        key={num}
+                                                        className={cn(
+                                                            "p-3 rounded-xl border transition-all",
+                                                            isActive
+                                                                ? "bg-orange-500/10 border-orange-500 shadow-md ring-1 ring-orange-500/20"
+                                                                : "bg-background border-border"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className={cn(
+                                                                "text-[8px] font-black uppercase tracking-widest",
+                                                                isActive ? "text-orange-500" : "text-muted-foreground"
+                                                            )}>
+                                                                Type {num}
+                                                            </span>
+                                                            <span className="text-[8px] font-bold opacity-40">({percentage}%)</span>
+                                                        </div>
+                                                        <p className={cn(
+                                                            "text-sm font-black font-mono tracking-tighter",
+                                                            isActive ? "text-orange-600" : "text-foreground"
+                                                        )}>
+                                                            {formatCurrency(calculatedPrice).replace('PKR', '').trim()}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </Card>
 
                             {/* COMPACT FINANCIAL HUD (FOOTER) */}

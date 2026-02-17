@@ -32,6 +32,7 @@ use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SalesMapReportController;
+use App\Http\Controllers\WalletController;
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -124,6 +125,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [SalemanController::class, 'store'])->name('salemen.store');
         Route::put('/{saleman}', [SalemanController::class, 'update'])->name('salemen.update');
         Route::delete('/{saleman}', [SalemanController::class, 'destroy'])->name('salemen.destroy');
+
+        // Wallet Routes
+        Route::get('/{id}/wallet', [WalletController::class, 'index'])->name('salemen.wallet');
+        Route::post('/{id}/wallet/transaction', [WalletController::class, 'store'])->name('salemen.wallet.store');
+        Route::put('/wallet/transactions/{id}/pay', [WalletController::class, 'markPaid'])->name('salemen.wallet.pay');
     });
     //---------------------Booker------------------------------------------------------------------
     Route::prefix('/bookers')->group(function () {
@@ -245,7 +251,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{sale}/pdf', [SalesController::class, 'pdf'])->name('sale.pdf');
         Route::get('/{sale}/download', [SalesController::class, 'download'])->name('sale.download');
         Route::put('/{sale}', [SalesController::class, 'update'])->name('sale.update');
-        Route::delete('/{id}', [SalesController::class, 'destroy'])->name('sale.destroy');
+        Route::delete('/{id}/delete', [SalesController::class, 'destroy'])->name('sale.destroy');
     });
 
     //--------------------------------------------Sales Return-----------------------------------------------

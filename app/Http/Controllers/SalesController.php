@@ -20,7 +20,7 @@ class SalesController extends Controller
     //index
     public function index(Request $request)
     {
-        $query = Sales::with('customer', 'salesman');
+        $query = Sales::with('customer', 'salesman', 'messageLine');
 
         // Filter by Date Range
         if ($request->has('start_date') && $request->has('end_date') && $request->start_date && $request->end_date) {
@@ -106,12 +106,22 @@ class SalesController extends Controller
             $q->whereIn('name', ['Cash', 'Bank']);
         })->get();
 
+        // Fetch Firms for invoice branding
+        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
+
+        // Fetch Message Lines (Category: Sales, Status: active)
+        $messageLines = \App\Models\MessageLine::where('category', 'Sales')
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/sales/create", [
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'paymentAccounts' => $paymentAccounts,
             'nextInvoiceNo' => $nextInvoiceNo,
+            'firms' => $firms,
+            'messageLines' => $messageLines,
         ]);
     }
 
@@ -145,6 +155,7 @@ class SalesController extends Controller
             'items.*.subtotal'        => 'required|numeric',
             'items.*.bonus_qty_carton' => 'nullable|numeric',
             'items.*.bonus_qty_pcs'    => 'nullable|numeric',
+            'message_line_id'          => 'nullable|integer|exists:message_lines,id',
             'print_format'             => 'nullable|in:big,small',
             'allow_negative_stock'     => 'nullable|boolean', // Added flag
         ]);
@@ -180,6 +191,8 @@ class SalesController extends Controller
                 'code'            => $request->code,
                 'customer_id'     => $request->customer_id ?? 0,
                 'salesman_id'     => $request->salesman_id ?? 0,
+                'firm_id'         => $request->firm_id ?? null,
+                'message_line_id' => $request->message_line_id ?? null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -189,6 +202,31 @@ class SalesController extends Controller
                 'paid_amount'     => $actualPaidOnThisBill,
                 'remaining_amount' => $remainingAmount,
             ]);
+
+            // --- Wallet & Commission Logic ---
+            if ($sale->salesman_id) {
+                $salesman = Saleman::find($sale->salesman_id);
+                if ($salesman && $salesman->commission_percentage > 0) {
+                    $commissionAmount = round(($sale->net_total * $salesman->commission_percentage) / 100);
+
+                    if ($commissionAmount > 0) {
+                        // Create Credit Transaction
+                        \App\Models\WalletTransaction::create([
+                            'salesman_id' => $salesman->id,
+                            'sale_id'     => $sale->id,
+                            'type'        => 'credit',
+                            'amount'      => $commissionAmount,
+                            'description' => 'Commission for Sale Invoice: ' . $sale->invoice,
+                            'status'      => 'unpaid',
+                        ]);
+
+                        // Update Salesman Wallet Balance
+                        $salesman->wallet_balance += $commissionAmount;
+                        $salesman->save();
+                    }
+                }
+            }
+            // ---------------------------------
 
             // If is_pay_now is true, create a Payment record
             if ($request->is_pay_now && $paidAmount > 0 && $request->payment_account_id) {
@@ -336,11 +374,17 @@ class SalesController extends Controller
         $salemans = Saleman::get();
         $items = Items::get();
 
+        // Fetch Message Lines (Category: Sales, Status: active)
+        $messageLines = \App\Models\MessageLine::where('category', 'Sales')
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/sales/edit", [
             'sale' => $sale,
             'accounts' => $accounts,
             'items' => $items,
             'salemans' => $salemans,
+            'messageLines' => $messageLines,
         ]);
     }
 
@@ -366,6 +410,7 @@ class SalesController extends Controller
             'items.*.discount'        => 'required|numeric',
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
+            'message_line_id'          => 'nullable|integer|exists:message_lines,id',
         ]);
 
         DB::beginTransaction();
@@ -378,6 +423,8 @@ class SalesController extends Controller
                 'code'            => $request->code,
                 'customer_id'     => $request->customer_id ?? $sale->customer_id,
                 'salesman_id'     => $request->salesman_id ?? $sale->salesman_id,
+                'firm_id'         => $request->firm_id ?? $sale->firm_id,
+                'message_line_id' => $request->message_line_id ?? $sale->message_line_id,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -435,7 +482,8 @@ class SalesController extends Controller
     //view
     public function view($id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items.item')->find($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->find($id);
+       
 
         // Get all returns for this sale
         $returns = \App\Models\SalesReturn::with(['items.item'])
@@ -452,7 +500,7 @@ class SalesController extends Controller
 
     public function pdf(Request $request, $id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items.item')->findOrFail($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->findOrFail($id);
 
         // Get all returns for this sale
         $returns = \App\Models\SalesReturn::with(['items.item'])
@@ -478,7 +526,7 @@ class SalesController extends Controller
 
     public function download(Request $request, $id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items.item')->findOrFail($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->findOrFail($id);
 
         // Get all returns for this sale
         $returns = \App\Models\SalesReturn::with(['items.item'])
@@ -499,5 +547,33 @@ class SalesController extends Controller
         }
 
         return $pdf->download("Sale-Invoice-$id.pdf");
+    }
+    //destroy
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+        try {
+            $sale = Sales::with('items')->findOrFail($id);
+
+            // Revert Stock (Increase back)
+            foreach ($sale->items as $item) {
+                $product = Items::find($item->item_id);
+                if ($product) {
+                    $product->stock_1 = ($product->stock_1 ?? 0) + $item->total_pcs;
+                    $product->save();
+                }
+            }
+
+            // Delete Sale (Cascades to items if configured, or manual delete)
+            // Assuming manual delete for safety if cascade isn't set in DB
+            SalesItem::where('sale_id', $id)->delete();
+            $sale->delete();
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Sale deleted and stock reverted successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error deleting sale: ' . $e->getMessage());
+        }
     }
 }

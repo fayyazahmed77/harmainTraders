@@ -114,7 +114,7 @@ export default function Create({
   const [areaOptions, setAreaOptions] = useState<Option[]>([]);
   const [subareaOptions, setSubareaOptions] = useState<Option[]>([]);
 
-  const [openingDate, setOpeningDate] = useState<Date | undefined>();
+  const [openingDate, setOpeningDate] = useState<Date | undefined>(new Date());
   const [openingOpen, setOpeningOpen] = useState(false);
 
   const [fbrDate, setFbrDate] = useState<Date | undefined>();
@@ -414,7 +414,7 @@ export default function Create({
     post(getSubmitUrl(), {
       preserveState: false,
       onSuccess: () => {
-        
+
         reset();
         // clear local selects/dates
         setCountry(null);
@@ -906,11 +906,12 @@ export default function Create({
                           <Label className="mb-2 block">Item Category</Label>
                           <Select
                             options={[
-                              { value: "1", label: "1" },
-                              { value: "2", label: "2" },
-                              { value: "3", label: "3" },
-                              { value: "4", label: "4" },
-                              { value: "5", label: "5" },
+                              { value: "2", label: "2 (T.P 2)" },
+                              { value: "3", label: "3 (T.P 3)" },
+                              { value: "4", label: "4 (T.P 4)" },
+                              { value: "5", label: "5 (T.P 5)" },
+                              { value: "6", label: "6 (T.P 6)" },
+                              { value: "7", label: "7 (T.P 7)" },
                             ]}
                             value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
                             onChange={(opt: any) => onInputChange("item_category", opt ? opt.value : "")}

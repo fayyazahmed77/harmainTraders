@@ -77,6 +77,14 @@ export default function PaymentView({ payment, mode }: Props) {
                         <p className="mt-1 text-gray-700">{payment.remarks}</p>
                     </div>
                 )}
+                {payment.message_line && (
+                    <div className="mt-4 pt-4 border-t border-sky-100 bg-sky-50/20 p-3 rounded-lg border">
+                        <span className="text-sm font-semibold text-sky-600 uppercase tracking-wider block mb-1">Message Line / Instruction:</span>
+                        <p className="text-base font-bold text-sky-900 italic border-l-4 border-sky-400 pl-3">
+                            "{payment.message_line.messageline}"
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Allocations */}

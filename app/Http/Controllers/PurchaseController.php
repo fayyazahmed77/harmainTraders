@@ -17,7 +17,7 @@ class PurchaseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Purchase::with('supplier', 'salesman');
+        $query = Purchase::with('supplier', 'salesman', 'messageLine');
 
         // Filter by Date Range
         if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
@@ -102,11 +102,16 @@ class PurchaseController extends Controller
             $nextInvoiceNo = 'PUR-' . str_pad($number + 1, 6, '0', STR_PAD_LEFT);
         }
 
+        $messageLines = \App\Models\MessageLine::where('category', 'Purchase')
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/purchase/create", [
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'nextInvoiceNo' => $nextInvoiceNo,
+            'messageLines' => $messageLines,
         ]);
     }
     //store
@@ -138,6 +143,7 @@ class PurchaseController extends Controller
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
             'print_format'            => 'nullable|in:big,small',
+            'message_line_id'         => 'nullable|integer',
         ]);
 
         DB::beginTransaction();
@@ -160,6 +166,7 @@ class PurchaseController extends Controller
                 'paid_amount'     => $request->paid_amount,
                 'remaining_amount' => $request->remaining_amount,
                 'status'          => 'Completed',
+                'message_line_id' => $request->message_line_id,
             ]);
 
             // Insert items and update stock
@@ -205,11 +212,16 @@ class PurchaseController extends Controller
         $items = Items::get();
         $accounts = Account::get();
         $salemans = Saleman::get();
+        $messageLines = \App\Models\MessageLine::where('category', 'Purchase')
+            ->where('status', 'active')
+            ->get();
+
         return Inertia::render("daily/purchase/edit", [
             'purchase' => $purchase,
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
+            'messageLines' => $messageLines,
         ]);
     }
     //update
@@ -240,6 +252,7 @@ class PurchaseController extends Controller
             'items.*.discount'        => 'required|numeric',
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
+            'message_line_id'         => 'nullable|integer',
         ]);
 
         DB::beginTransaction();
@@ -261,6 +274,7 @@ class PurchaseController extends Controller
                 'paid_amount'     => $request->paid_amount,
                 'remaining_amount' => $request->remaining_amount,
                 'status'          => $request->status ?? $purchase->status,
+                'message_line_id' => $request->message_line_id,
             ]);
 
             // Revert Stock for old items
@@ -308,7 +322,7 @@ class PurchaseController extends Controller
     //view
     public function view($id)
     {
-        $purchase = Purchase::with('supplier', 'salesman', 'items.item')->find($id);
+        $purchase = Purchase::with('supplier', 'salesman', 'items.item', 'messageLine')->find($id);
         // dd($purchase->toArray());
         return Inertia::render("daily/purchase/view", [
             'purchase' => $purchase,
@@ -317,7 +331,7 @@ class PurchaseController extends Controller
     public function pdf(Request $request, $id)
     {
         $purchase = Purchase::with('supplier', 'salesman', 'items.item')->findOrFail($id);
-       
+
 
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.purchasehalf' : 'pdf.purchase';

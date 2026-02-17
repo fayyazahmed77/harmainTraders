@@ -222,9 +222,10 @@ export default function Edit({
   const { data, setData, put, processing, errors, transform } = useForm<AccountForm>({
     ...account,
     // ensure boolean types
-    purchase: Boolean(account.purchase),
-    cashbank: Boolean(account.cashbank),
-    sale: Boolean(account.sale),
+    purchase: Number(account.purchase) === 1,
+    cashbank: Number(account.cashbank) === 1,
+    sale: Number(account.sale) === 1,
+    status: Number(account.status) === 1,
     gst: account.gst ?? "",
     ntn: account.ntn ?? "",
     remarks: account.remarks ?? "",

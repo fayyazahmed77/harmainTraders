@@ -72,10 +72,16 @@ interface RowData {
     mrp: number;
 }
 
-export default function OfferListing({ items, categories, accounts }: { items: Item[]; categories: Category[]; accounts: Account[] }) {
+interface MessageLine {
+    id: number;
+    messageline: string;
+}
+
+export default function OfferListing({ items, categories, accounts, messageLines }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[] }) {
     const [date, setDate] = useState(new Date().toLocaleDateString('en-GB'));
     const [selectedAccount, setSelectedAccount] = useState<string>("");
     const [priceType, setPriceType] = useState<"trade" | "retail" | "both">("trade");
+    const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
 
     // ─────────────────────────────
     // Initialize rows with one empty row
@@ -209,6 +215,7 @@ export default function OfferListing({ items, categories, accounts }: { items: I
             account_id: selectedAccount,
             date: formattedDate,
             price_type: priceType,
+            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
             items: itemsData,
         }, {
             onSuccess: () => {
@@ -278,8 +285,22 @@ export default function OfferListing({ items, categories, accounts }: { items: I
                                 </Select>
                             </div>
 
-                            <div className="col-span-3 flex items-left justify-start">
-                                <Button className="bg-green-600 hover:bg-green-700 mt-3 " onClick={storeOffer}>
+                            <div className="col-span-3 flex items-left justify-start gap-2">
+                                <div className="flex-1">
+                                    <Label>Message Line</Label>
+                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                        <SelectTrigger className="w-full h-9 bg-sky-50/50">
+                                            <SelectValue placeholder="Optional Message" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                                            {messageLines?.map(msg => (
+                                                <SelectItem key={msg.id} value={msg.id.toString()}>{msg.messageline}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button className="bg-green-600 hover:bg-green-700 mt-5 h-9 shrink-0" onClick={storeOffer}>
                                     <FileText className="mr-2 h-4 w-4" />
                                     Save Offer List
                                 </Button>

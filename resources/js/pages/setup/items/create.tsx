@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "@inertiajs/react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
@@ -156,6 +156,28 @@ export default function Page({ categories, compaines }: { categories: any, compa
   // small helper typed setter
   const onInputChange = <K extends keyof typeof data>(key: K, value: typeof data[K]) =>
     setData(key, value as any)
+
+  // UseEffect to calculating Retail and Trade Price difference
+  useEffect(() => {
+    const tradePrice = parseFloat(data.trade_price);
+    const retailPrice = parseFloat(data.retail);
+
+    if (!isNaN(tradePrice) && !isNaN(retailPrice) && tradePrice !== 0) {
+      const diff = ((retailPrice - tradePrice) / tradePrice) * 100;
+      // Update only if difference significantly changed to avoid loops/unnecessary updates
+      // Using toFixed(2) for display
+      const diffStr = diff.toFixed(2);
+      if (data.retail_tp_diff !== diffStr) {
+        setData("retail_tp_diff", diffStr);
+      }
+    } else {
+      // Clear if inputs invalid/cleared? Or keep last valid?
+      // Usually better to clear if inputs are cleared to avoid stale data
+      if ((data.trade_price === "" || data.retail === "") && data.retail_tp_diff !== "") {
+        setData("retail_tp_diff", "");
+      }
+    }
+  }, [data.trade_price, data.retail]);
 
   // submit handler
   const handleSubmit = (e: React.FormEvent) => {
@@ -482,36 +504,66 @@ export default function Page({ categories, compaines }: { categories: any, compa
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <Label className="mb-1 block">Loose (T.P.2)</Label>
-                        <Input placeholder="Loose (T.P.2)" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} />
+                        {data.trade_price && data.pt2 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt2) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} />
                       </div>
                       <div></div>
                       <div>
                         <Label className="mb-1 block">Retail (T.P.3)</Label>
-                        <Input placeholder="Retail (T.P.3)" value={data.pt3} onChange={(e) => onInputChange("pt3", e.target.value)} />
+                        {data.trade_price && data.pt3 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt3) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt3} onChange={(e) => onInputChange("pt3", e.target.value)} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <Label className="mb-1 block">Agent (T.P.4)</Label>
-                        <Input placeholder="Agent (T.P.4)" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} />
+                        {data.trade_price && data.pt4 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt4) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} />
                       </div>
                       <div></div>
                       <div>
                         <Label className="mb-1 block">T.P.5</Label>
-                        <Input placeholder="T.P.5" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} />
+                        {data.trade_price && data.pt5 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt5) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <Label className="mb-1 block">T.P.6</Label>
-                        <Input placeholder="T.P.6" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} />
+                        {data.trade_price && data.pt6 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt6) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} />
                       </div>
                       <div></div>
                       <div>
                         <Label className="mb-1 block">T.P.7</Label>
-                        <Input placeholder="T.P.7" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} />
+                        {data.trade_price && data.pt7 && (
+                          <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                            Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}
+                          </div>
+                        )}
+                        <Input placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} />
                       </div>
                     </div>
                   </div>

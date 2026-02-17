@@ -176,6 +176,15 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         </tbody>
     </table>
     @endforeach
+
+    @if($offer->messageLine)
+    <div style="margin-top: 20px; padding: 10px; border: 1px solid #e2e8f0; background-color: #f8fafc; border-radius: 5px;">
+        <div style="font-size: 10px; font-weight: bold; color: #0284c7; text-transform: uppercase; margin-bottom: 5px;">Message Line / Instruction:</div>
+        <div style="font-size: 12px; font-weight: bold; color: #0f172a; border-left: 3px solid #38bdf8; padding-left: 10px; font-style: italic;">
+            "{{ $offer->messageLine->messageline }}"
+        </div>
+    </div>
+    @endif
 </body>
 
 </html>

@@ -70,6 +70,8 @@ interface Saleman {
     created_at: string;
     created_by_name?: string;
     created_by_avatar?: string;
+    wallet_balance?: number;
+    commission_percentage?: number;
 }
 
 interface DataTableProps {
@@ -105,6 +107,7 @@ export function DataTable({ data }: DataTableProps) {
     const [date, setDate] = useState("");
     const [status, setStatus] = useState(true);
     const [defult, setDefult] = useState(false);
+    const [commissionPercentage, setCommissionPercentage] = useState("");
 
     // update handler
     const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
@@ -113,7 +116,15 @@ export function DataTable({ data }: DataTableProps) {
 
         router.put(
             `/salemen/${editSaleman.id}`,
-            { name, shortname, code, date, status, defult },
+            {
+                name,
+                shortname,
+                code,
+                date,
+                status,
+                defult,
+                commission_percentage: commissionPercentage
+            },
             {
                 onSuccess: () => {
                     toast.success("Saleman updated successfully!");
@@ -239,6 +250,24 @@ export function DataTable({ data }: DataTableProps) {
             cell: ({ row }) => (row.original.defult === "1" || row.original.defult === "true" ? "Yes" : "No"),
         },
         {
+            accessorKey: "wallet_balance",
+            header: "Wallet",
+            cell: ({ row }) => {
+                const amount = parseFloat(row.getValue("wallet_balance") as string || "0");
+                const bal = row.original.wallet_balance || 0;
+                return (
+                    <span className={`font-semibold ${bal < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)}
+                    </span>
+                );
+            },
+        },
+        {
+            accessorKey: "commission_percentage",
+            header: "Comm. %",
+            cell: ({ row }) => (row.original.commission_percentage || 0) + "%",
+        },
+        {
             accessorKey: "created_at",
             header: "Created At",
             cell: ({ row }) => {
@@ -292,11 +321,16 @@ export function DataTable({ data }: DataTableProps) {
                                         setDate(saleman.date ? saleman.date.substring(0, 10) : "");
                                         setStatus(saleman.status === "1" || saleman.status === "true" || saleman.status === true);
                                         setDefult(saleman.defult === "1" || saleman.defult === "true" || saleman.defult === true);
+                                        setCommissionPercentage(saleman.commission_percentage?.toString() || "");
                                     }}
                                 >
                                     Edit
                                 </DropdownMenuItem>
                             )}
+
+                            <DropdownMenuItem onClick={() => router.get(`/salemen/${saleman.id}/wallet`)}>
+                                Wallet History
+                            </DropdownMenuItem>
 
                             {canDelete && (
                                 <DropdownMenuItem
@@ -395,6 +429,19 @@ export function DataTable({ data }: DataTableProps) {
                                     </SelectContent>
                                 </ShadSelect>
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Commission (%)</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={commissionPercentage}
+                                onChange={(e) => setCommissionPercentage(e.target.value)}
+                                placeholder="0.00"
+                            />
                         </div>
 
                         <DialogFooter className="mt-6">

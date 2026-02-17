@@ -98,6 +98,10 @@ interface Saleman {
     shortname?: string;
 
 }
+interface MessageLine {
+    id: number;
+    messageline: string;
+}
 interface Option {
     value: number;
     label: string;
@@ -132,6 +136,8 @@ interface PurchaseData {
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
+    message_line_id?: number | null;
+    message_line?: MessageLine | null;
     items: PurchaseItem[];
     supplier?: Account;
     salesman?: Saleman;
@@ -142,6 +148,7 @@ interface PurchaseProps {
     accounts: Account[];
     salemans: Saleman[];
     purchase: PurchaseData;
+    messageLines?: MessageLine[];
 }
 
 const FieldWrapper = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
@@ -170,7 +177,8 @@ export default function PurchaseEdit({
     items,
     accounts,
     salemans,
-    purchase
+    purchase,
+    messageLines,
 }: PurchaseProps) {
     // Header / meta fields
     const [open, setOpen] = React.useState(false)
@@ -186,6 +194,7 @@ export default function PurchaseEdit({
     const [itemsCount, setItemsCount] = useState<number>(purchase.no_of_items);
     const [courier, setCourier] = useState<number>(toNumber(purchase.courier_charges));
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
+    const [selectedMessageId, setSelectedMessageId] = useState<string>(purchase.message_line_id?.toString() ?? "0");
 
     // Initialize account type based on purchase.supplier_id
     const initialAccount = accounts.find(a => a.id === purchase.supplier_id);
@@ -433,6 +442,7 @@ export default function PurchaseEdit({
             salesman_id: salesman,
             no_of_items: rowsWithComputed.length,
             print_format: printOption,
+            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
             gross_total: totals.gross,
             discount_total: totals.discTotal,
@@ -639,6 +649,23 @@ export default function PurchaseEdit({
                                 readOnly
                                 className="h-10 bg-slate-50/50 font-bold border-slate-200"
                             />
+                        </FieldWrapper>
+
+                        {/* Message Line Select */}
+                        <FieldWrapper label="Select Message Line" className="lg:col-span-2">
+                            <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-sky-50/30">
+                                    <SelectValue placeholder="No Message Line (Optional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                                    {messageLines?.map((msg) => (
+                                        <SelectItem key={msg.id} value={msg.id.toString()}>
+                                            {msg.messageline}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </FieldWrapper>
 
                         {/* Active Checkbox */}

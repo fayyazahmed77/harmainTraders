@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 import { router } from "@inertiajs/react";
 import { route } from "ziggy-js";
@@ -22,15 +29,18 @@ interface PaymentProps {
         clear_date?: string;
         voucher_no: string;
         payment_method: string;
+        message_line_id?: number | null;
     };
+    messageLines?: { id: number; messageline: string }[];
 }
 
-export default function PaymentEdit({ payment }: PaymentProps) {
+export default function PaymentEdit({ payment, messageLines }: PaymentProps) {
     const [date, setDate] = useState(payment.date);
     const [remarks, setRemarks] = useState(payment.remarks || "");
     const [chequeNo, setChequeNo] = useState(payment.cheque_no || "");
     const [chequeDate, setChequeDate] = useState(payment.cheque_date || "");
     const [clearDate, setClearDate] = useState(payment.clear_date || "");
+    const [selectedMessageId, setSelectedMessageId] = useState<string>(payment.message_line_id?.toString() ?? "0");
 
     const handleUpdate = () => {
         router.put(route("payment.update", payment.id), {
@@ -39,6 +49,7 @@ export default function PaymentEdit({ payment }: PaymentProps) {
             cheque_no: chequeNo,
             cheque_date: chequeDate,
             clear_date: clearDate,
+            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
         });
     };
 
@@ -89,6 +100,23 @@ export default function PaymentEdit({ payment }: PaymentProps) {
                                 value={remarks}
                                 onChange={(e) => setRemarks(e.target.value)}
                             />
+                        </div>
+
+                        <div>
+                            <Label>Message Line (Selection)</Label>
+                            <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                <SelectTrigger className="w-full bg-sky-50/50">
+                                    <SelectValue placeholder="Optional Message Line" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                                    {messageLines?.map((msg) => (
+                                        <SelectItem key={msg.id} value={msg.id.toString()}>
+                                            {msg.messageline}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {/* Cheque Fields */}

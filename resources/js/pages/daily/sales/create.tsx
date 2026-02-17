@@ -110,11 +110,18 @@ interface Account {
   aging_days?: number;
   credit_limit?: number | string;
   saleman_id?: number;
+  item_category?: string | null;
 }
 
 interface Saleman {
   id: number;
   name: string;
+}
+
+interface MessageLine {
+  id: number;
+  messageline: string;
+  category: string;
 }
 
 interface Option {
@@ -133,7 +140,7 @@ const FieldWrapper = ({ label, children, className = "" }: { label: string; chil
   </div>
 );
 
-export default function SalesPage({ items, accounts, salemans, paymentAccounts = [], nextInvoiceNo }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; paymentAccounts: Account[]; nextInvoiceNo: string }) {
+export default function SalesPage({ items, accounts, salemans, paymentAccounts = [], nextInvoiceNo, firms = [], messageLines = [] }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; paymentAccounts: Account[]; nextInvoiceNo: string; firms: { id: number; name: string; defult: boolean }[]; messageLines: MessageLine[] }) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
@@ -148,6 +155,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [active, setActive] = useState<boolean>(true);
   const [invoiceNo, setInvoiceNo] = useState<string>(nextInvoiceNo);
   const [salesman, setSalesman] = useState<number | null>(null);
+  const [customerCategory, setCustomerCategory] = useState<string | null>(null);
   const [cashCredit, setCashCredit] = useState<string>("CREDIT");
   const [itemsCount, setItemsCount] = useState<number>(items.length);
   const [accountType, setAccountType] = useState<Option | null>(null);
@@ -159,6 +167,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [showInfoPanel, setShowInfoPanel] = useState(false); // New state for bottom item info panel
   const [showStickyFooter, setShowStickyFooter] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+
+  // Firm selection state - default to firm marked as default
+  const defaultFirm = firms.find(f => f.defult);
+  const [selectedFirmId, setSelectedFirmId] = useState<string>(defaultFirm ? defaultFirm.id.toString() : "0");
+  const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
   // Track expanded mobile rows for item details
   // expandedRows state removed
 
@@ -292,10 +305,31 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     const selected = items.find((it) => it.id === itemId);
     if (!selected) return;
 
-    const baseRate = toNumber(selected.retail ?? selected.trade_price ?? 0); // Use retail price first for sales
+    let baseRate = toNumber(selected.retail ?? selected.trade_price ?? 0); // Use retail price first for sales
     const tax = toNumber(selected.gst_percent ?? 0);
     const disc = toNumber(selected.discount ?? 0);
     const tradePrice = toNumber(selected.retail ?? selected.trade_price ?? baseRate); // Use retail for sales
+
+    // Auto-calculate rate based on customer category (TP2-TP7)
+    // Formula: Trade Price * (1 + Percentage / 100)
+    // Only apply if we have a valid Trade Price to base it on.
+    const actualTradePrice = toNumber(selected.trade_price ?? 0);
+    if (customerCategory && actualTradePrice > 0) {
+      let percentage = 0;
+      switch (customerCategory) {
+        case "2": percentage = toNumber(selected.pt2); break;
+        case "3": percentage = toNumber(selected.pt3); break;
+        case "4": percentage = toNumber(selected.pt4); break;
+        case "5": percentage = toNumber(selected.pt5); break;
+        case "6": percentage = toNumber(selected.pt6); break;
+        case "7": percentage = toNumber(selected.pt7); break;
+      }
+
+      if (percentage > 0) {
+        // Calculate rate: Trade Price + (Trade Price * Percentage / 100)
+        baseRate = Math.round(actualTradePrice * (1 + percentage / 100));
+      }
+    }
 
     updateRow(rowId, { item_id: itemId, rate: baseRate, taxPercent: tax, discPercent: disc, trade_price: tradePrice });
 
@@ -428,6 +462,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       code: code,
       customer_id: accountType?.value,
       salesman_id: salesman,
+      firm_id: selectedFirmId && selectedFirmId !== "0" ? Number(selectedFirmId) : null,
       no_of_items: rowsWithComputed.length,
       print_format: printOption,
       allow_negative_stock: forceSave, // New flag
@@ -436,6 +471,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       is_pay_now: isPayNow,
       payment_account_id: paymentAccountId,
       payment_method: paymentMethod,
+      message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
       gross_total: totals.gross,
       discount_total: totals.discTotal,
@@ -458,7 +494,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           bonus_qty_carton: r.bonus_full,
           bonus_qty_pcs: r.bonus_pcs,
           total_pcs: totalPCS,
-          trade_price: r.trade_price,
+          trade_price: r.rate,
+          retail_price: r.trade_price,
 
           discount: (r.discPercent / 100) * r.amount,
           gst_amount: (r.taxPercent / 100) * r.amount,
@@ -534,11 +571,14 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         console.error("Failed to fetch balance", err);
                         setPreviousBalance(0);
                       });
+                      setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
                     } else {
                       setCreditDays(0);
+
                       setCreditLimit("");
                       setSalesman(null);
                       setPreviousBalance(0);
+                      setCustomerCategory(null);
                     }
                   }}
                 >
@@ -596,7 +636,21 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       <Input value={creditLimit as any} onChange={(e) => setCreditLimit(e.target.value === "" ? "" : Number(e.target.value))} className="h-9 text-right" />
                     </FieldWrapper>
                     <FieldWrapper label="Salesman">
-                      <Input value={salesman ? (salemanMap.get(salesman) || "") : ""} readOnly className="h-9 bg-muted" />
+                      <Select
+                        value={salesman?.toString() || ""}
+                        onValueChange={(val) => setSalesman(val ? Number(val) : null)}
+                      >
+                        <SelectTrigger className="h-9 shadow-sm border-gray-200 bg-background text-left">
+                          <SelectValue placeholder="Select Salesman" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {salemans.map((s) => (
+                            <SelectItem key={s.id} value={s.id.toString()}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FieldWrapper>
                     <FieldWrapper label="Code">
                       <Input value={code} onChange={(e) => setCode(e.target.value)} className="h-9" />
@@ -679,12 +733,15 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         console.error("Failed to fetch balance", err);
                         setPreviousBalance(0);
                       });
+                      setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
                     } else {
                       // clear if no account
+
                       setCreditDays(0);
                       setCreditLimit("");
                       setSalesman(null);
                       setPreviousBalance(0);
+                      setCustomerCategory(null);
                     }
                   }}
                 >
@@ -745,12 +802,21 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
               {/* Salesman */}
               <FieldWrapper label="Salesman Name" className="lg:col-span-1">
-                <Input
-                  placeholder="Salesman"
-                  value={salesman ? (salemanMap.get(salesman) || "") : ""}
-                  readOnly
-                  className="h-10 bg-gray-50/50 italic text-gray-600 border-gray-200"
-                />
+                <Select
+                  value={salesman?.toString() || ""}
+                  onValueChange={(val) => setSalesman(val ? Number(val) : null)}
+                >
+                  <SelectTrigger className="h-10 border-gray-200 hover:border-orange-300 focus:border-orange-500 transition-colors bg-background">
+                    <SelectValue placeholder="Select Salesman" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salemans.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </FieldWrapper>
 
               {/* Cash/Credit Select */}
@@ -1191,9 +1257,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         {/* Info Grid */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                           {/* Packing Info */}
-                          <div className="rounded-lg p-3 border border-gray-800 dark:bg-gray-900/50 hover:border-orange-500/30 transition-colors">
+                          <div className="rounded-lg p-3 border  dark:bg-gray-900/50 hover:border-orange-500/30 transition-colors">
                             <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Packing Qty</div>
-                            <div className="text-xl font-bold text-white">
+                            <div className="text-xl font-bold   ">
                               {toNumber(selectedItem.packing_full || selectedItem.packing_qty)}
                               <span className="text-xs font-normal text-gray-400 ml-1">pcs/full</span>
                             </div>
@@ -1286,14 +1352,19 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-2 pb-2">
                           {[2, 3, 4, 5, 6, 7].map((num) => {
                             const priceKey = `pt${num}` as keyof Item;
-                            const price = toNumber(selectedItem[priceKey]);
-                            if (price === 0) return null;
+                            const percentage = toNumber(selectedItem[priceKey]);
+                            if (percentage === 0) return null;
+
+
+                            const tradePrice = toNumber(selectedItem.trade_price);
+                            const calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                            const isActive = String(num) === customerCategory;
 
                             return (
-                              <div key={num} className="bg-white dark:bg-gray-900/50 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-orange-500/50 hover:shadow-md transition-all group">
-                                <div className="text-[10px] font-bold uppercase tracking-wider mb-1 text-gray-500 dark:text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-500 transition-colors">Price Type {num}</div>
-                                <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                                  Rs {price.toFixed(2)}
+                              <div key={num} className={`backdrop-blur-sm rounded-lg p-3 shadow-sm border transition-all group ${isActive ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500 ring-1 ring-orange-500 shadow-md' : 'bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-800 hover:border-orange-500/50 hover:shadow-md'}`}>
+                                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 transition-colors ${isActive ? 'text-orange-700 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-500'}`}>Price Type {num} <span className={`text-[9px] normal-case ml-1 ${isActive ? 'text-orange-600/70' : 'text-gray-400'}`}>({percentage}%)</span></div>
+                                <div className={`text-lg font-bold ${isActive ? 'text-orange-700 dark:text-orange-300' : 'text-gray-900 dark:text-gray-100'}`}>
+                                  Rs {calculatedPrice.toFixed(2)}
                                 </div>
                               </div>
                             );
@@ -1406,6 +1477,40 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     <SelectContent>
                       <SelectItem value="big">Print (A4)</SelectItem>
                       <SelectItem value="small">Print (Thermal)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold">Select Firm</div>
+                  <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                    <SelectTrigger className="w-full h-8">
+                      <SelectValue placeholder="No Branding" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No Branding</SelectItem>
+                      {firms.map((firm) => (
+                        <SelectItem key={firm.id} value={firm.id.toString()}>
+                          {firm.name} {firm.defult && "(Default)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-sky-600 dark:text-sky-400 mb-1">Select Message Line</div>
+                  <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                    <SelectTrigger className="w-full h-9 border-sky-200 dark:border-sky-900/50 bg-sky-50/30 dark:bg-sky-950/20">
+                      <SelectValue placeholder="No Message Line" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No Message Line (Optional)</SelectItem>
+                      {messageLines.map((msg) => (
+                        <SelectItem key={msg.id} value={msg.id.toString()}>
+                          {msg.messageline}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

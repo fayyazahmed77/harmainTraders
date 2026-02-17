@@ -26,7 +26,13 @@ class Payment extends Model
         'payment_method',
         'cheque_id',
         'cheque_status',
+        'message_line_id',
     ];
+
+    public function messageLine()
+    {
+        return $this->belongsTo(MessageLine::class);
+    }
 
     public function account()
     {

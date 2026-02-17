@@ -9,12 +9,19 @@ use Illuminate\Support\Facades\Auth;
 
 class MessageLineController extends Controller
 {
-    //index
-    public function index()
+    public function index(Request $request)
     {
-      
-        $messagesline  = MessageLine::with(['creator'])
-            ->latest()
+        $query = MessageLine::with(['creator']);
+
+        if ($request->has('search') && $request->search) {
+            $query->where('messageline', 'like', '%' . $request->search . '%');
+        }
+
+        if ($request->has('category') && $request->category && $request->category !== 'all') {
+            $query->where('category', $request->category);
+        }
+
+        $messagesline = $query->latest()
             ->get()
             ->map(function ($item) {
                 $item->created_by_name = $item->creator?->name ?? 'Unknown';
@@ -23,9 +30,10 @@ class MessageLineController extends Controller
                     : null;
                 return $item;
             });
+
         return Inertia::render("setup/messageline/index", [
             'messagesline' => $messagesline,
-
+            'filters' => $request->all(['search', 'category']),
         ]);
     }
     /**
@@ -35,6 +43,7 @@ class MessageLineController extends Controller
     {
         $validated = $request->validate([
             'messageline' => 'required|string|max:255',
+            'category' => 'nullable|string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
         ]);
 
@@ -53,6 +62,7 @@ class MessageLineController extends Controller
     {
         $validated = $request->validate([
             'messageline' => 'required|string|max:255',
+            'category' => 'nullable|string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
         ]);
 
