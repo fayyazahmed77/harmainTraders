@@ -12,8 +12,10 @@ use App\Models\SalesReturnItem;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Models\Sales;
+use App\Models\SalesItem;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\MessageLine;
 
 class SalesReturnController extends Controller
 {
@@ -29,24 +31,24 @@ class SalesReturnController extends Controller
     //create
     public function create(Request $request)
     {
+        // Only accounts that have at least one sale
         $accounts = Account::with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers']);
-            })
-            ->get();
-        $salemans = Saleman::get();
-        $items = Items::get();
+            ->whereHas('sales')
+            ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
 
-        $sale = null;
-        if ($request->has('sale_id')) {
-            $sale = Sales::with(['items.item', 'customer', 'salesman'])->find($request->sale_id);
-        }
+        $salemans = Saleman::get();
+        $messageLines = MessageLine::get(['id', 'messageline']);
+
+        // Auto-generate next return invoice number
+        $lastReturn = SalesReturn::latest('id')->first();
+        $nextId = $lastReturn ? $lastReturn->id + 1 : 1;
+        $nextInvoiceNo = 'RET-' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
 
         return Inertia::render("daily/sales_return/create", [
-            'items' => $items,
-            'accounts' => $accounts,
-            'salemans' => $salemans,
-            'sale' => $sale,
+            'accounts'      => $accounts,
+            'salemans'      => $salemans,
+            'messageLines'  => $messageLines,
+            'nextInvoiceNo' => $nextInvoiceNo,
         ]);
     }
 
@@ -125,15 +127,12 @@ class SalesReturnController extends Controller
                 $sale = Sales::where('invoice', $request->original_invoice)->first();
                 if ($sale) {
                     // 1. Calculate Total Sold Qty
-                    $totalSoldQty = \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+                    $totalSoldQty = SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
 
                     // 2. Calculate Total Returned Qty (Previous + Current)
                     // Find all returns for this invoice
-                    $allReturns = SalesReturn::where('original_invoice', $sale->invoice)->get();
-                    $totalReturnedQty = 0;
-                    foreach ($allReturns as $ret) {
-                        $totalReturnedQty += $ret->items()->sum('total_pcs');
-                    }
+                    $allReturnIds = SalesReturn::where('original_invoice', $sale->invoice)->pluck('id');
+                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
 
                     // Determine Status
                     $status = 'Partial Return';
@@ -202,31 +201,87 @@ class SalesReturnController extends Controller
         }
     }
 
-    // Get customer's purchased items
+    // Get customer's sales invoices
+    public function getCustomerInvoices($customerId)
+    {
+        try {
+            $invoices = Sales::where('customer_id', $customerId)
+                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($sale) {
+                    return [
+                        'id'               => $sale->id,
+                        'invoice'          => $sale->invoice,
+                        'date'             => $sale->date,
+                        'net_total'        => $sale->net_total,
+                        'remaining_amount' => $sale->remaining_amount,
+                        'status'           => $sale->status ?? 'Active',
+                    ];
+                });
+
+            return response()->json($invoices);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get items for a specific invoice
+    public function getInvoiceItems($invoiceId)
+    {
+        try {
+            $sale = Sales::with('items.item')->find($invoiceId);
+            if (!$sale) {
+                return response()->json(['error' => 'Invoice not found'], 404);
+            }
+
+            $items = $sale->items->map(function ($saleItem) {
+                return [
+                    'item_id'     => $saleItem->item_id,
+                    'item'        => $saleItem->item,
+                    'qty_carton'  => $saleItem->qty_carton,
+                    'qty_pcs'     => $saleItem->qty_pcs,
+                    'total_pcs'   => $saleItem->total_pcs,
+                    'trade_price' => $saleItem->trade_price, // exact price from sale
+                    'discount'    => $saleItem->discount,
+                    'gst_amount'  => $saleItem->gst_amount,
+                    'subtotal'    => $saleItem->subtotal,
+                ];
+            });
+
+            return response()->json([
+                'invoice'  => $sale->invoice,
+                'date'     => $sale->date,
+                'net_total' => $sale->net_total,
+                'items'    => $items,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get customer's purchased items (for manual mode)
     public function getCustomerPurchasedItems($customerId)
     {
         try {
-            // Get all sales for this customer
-            $sales = \App\Models\Sales::where('customer_id', $customerId)->pluck('id');
+            $sales = Sales::where('customer_id', $customerId)->pluck('id');
 
-            // Get all items from those sales with aggregated quantities
-            $purchasedItems = \App\Models\SalesItem::whereIn('sale_id', $sales)
-                ->with('item')
+            $purchasedItems = SalesItem::whereIn('sale_id', $sales)
+                ->with(['item', 'sale:id,invoice,date'])
                 ->get()
-                ->groupBy('item_id')
-                ->map(function ($items) {
-                    $firstItem = $items->first();
+                ->map(function ($si) {
                     return [
-                        'item_id' => $firstItem->item_id,
-                        'item' => $firstItem->item,
-                        'total_qty_carton' => $items->sum('qty_carton'),
-                        'total_qty_pcs' => $items->sum('qty_pcs'),
-                        'total_pcs' => $items->sum('total_pcs'),
-                        'avg_trade_price' => $items->avg('trade_price'),
-                        'last_trade_price' => $items->last()->trade_price,
+                        'id'               => $si->id,
+                        'item_id'          => $si->item_id,
+                        'item'             => $si->item,
+                        'invoice_no'       => $si->sale->invoice ?? 'N/A',
+                        'date'             => $si->sale->date ?? 'N/A',
+                        'qty_carton'       => $si->qty_carton,
+                        'qty_pcs'          => $si->qty_pcs,
+                        'total_pcs'        => $si->total_pcs,
+                        'last_trade_price' => $si->trade_price,
                     ];
-                })
-                ->values();
+                });
 
             return response()->json($purchasedItems);
         } catch (\Exception $e) {

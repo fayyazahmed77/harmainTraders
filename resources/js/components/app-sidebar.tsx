@@ -57,6 +57,10 @@ const data = {
           url: "/account-types",
         },
         {
+          title: "Supplier Category",
+          url: "/account-category",
+        },
+        {
           title: "Areas",
           url: "/areas",
         },

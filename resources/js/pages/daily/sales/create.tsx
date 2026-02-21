@@ -520,6 +520,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
   return (
     <SidebarProvider
+      defaultOpen={false}
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 61)",
@@ -967,10 +968,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                       color: isDark ? '#e2e8f0' : '#0f172a',
                                     })
                                   }}
-                                  options={itemOptions}
+                                  options={itemOptions.filter(opt =>
+                                    !rows.some(r => r.item_id === opt.value && r.id !== row.id)
+                                  )}
+                                  isDisabled={!accountType}
                                   value={itemOptions.find((opt) => opt.value === row.item_id) || null}
                                   onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
-                                  placeholder="Select Item..."
+                                  placeholder={!accountType ? "Select Account First" : "Select Item..."}
                                 />
 
                                 {/* Details removed */}
@@ -1127,7 +1131,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                     color: 'inherit',
                                   }),
                                 }}
-                                options={itemOptions}
+                                options={itemOptions.filter(opt => !rows.some(r => r.item_id === opt.value && r.id !== row.id))}
+                                 isDisabled={!accountType}
+                                 placeholder={!accountType ? "Select Account First" : "Select item"}
                                 value={itemOptions.find((opt) => opt.value === row.item_id) || null}
                                 onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
                               />

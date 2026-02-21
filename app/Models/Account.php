@@ -44,7 +44,14 @@ class Account extends Model
         'ats_type',
         'cnic',
         'status',
+        'account_category_id',
     ];
+
+    public function accountCategory()
+    {
+        return $this->belongsTo(AccountCategory::class, 'category');
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -87,5 +94,10 @@ class Account extends Model
     public function province()
     {
         return $this->belongsTo(Province::class);
+    }
+
+    public function sales()
+    {
+        return $this->hasMany(Sales::class, 'customer_id');
     }
 }

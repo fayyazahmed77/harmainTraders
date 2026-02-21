@@ -86,7 +86,7 @@ class PurchaseController extends Controller
     public function create()
     {
         $items = Items::get();
-        $accounts = Account::with('accountType')
+        $accounts = Account::with(['accountType', 'accountCategory'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
             })
@@ -126,7 +126,7 @@ class PurchaseController extends Controller
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
-            'tax_total'       => 'required|numeric',
+            'tax_total'       => 'nullable|numeric',
             'courier_charges' => 'nullable|numeric',
             'net_total'       => 'required|numeric',
             'paid_amount'     => 'required|numeric',
@@ -144,6 +144,7 @@ class PurchaseController extends Controller
             'items.*.subtotal'        => 'required|numeric',
             'print_format'            => 'nullable|in:big,small',
             'message_line_id'         => 'nullable|integer',
+            'update_prices'           => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
@@ -169,6 +170,13 @@ class PurchaseController extends Controller
                 'message_line_id' => $request->message_line_id,
             ]);
 
+            // Fetch supplier category percentage
+            $supplier = Account::with('accountCategory')->find($request->supplier_id);
+            $percentage = 0;
+            if ($supplier && $supplier->accountCategory) {
+                $percentage = floatval($supplier->accountCategory->percentage);
+            }
+
             // Insert items and update stock
             foreach ($request->items as $it) {
                 PurchaseItem::create([
@@ -183,10 +191,17 @@ class PurchaseController extends Controller
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Increase Stock
+                // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
                     $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
+
+                    // Auto-update trade price based on supplier category percentage if enabled
+                    if ($request->update_prices && $percentage > 0) {
+                        $newTradePrice = $it['trade_price'] + ($it['trade_price'] * $percentage / 100);
+                        $item->trade_price = round($newTradePrice);
+                    }
+
                     $item->save();
                 }
             }
@@ -194,12 +209,13 @@ class PurchaseController extends Controller
             DB::commit();
 
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                return redirect()->route('purchase.index')
+                return redirect()->back()
                     ->with('success', 'Purchase saved successfully!')
+                    ->with('id', $purchase->id)
                     ->with('pdf_url', route('purchase.pdf', ['id' => $purchase->id, 'format' => $request->print_format]));
             }
 
-            return redirect()->route('purchase.index')->with('success', 'Purchase saved successfully!');
+            return redirect()->back()->with('success', 'Purchase saved successfully!')->with('id', $purchase->id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -210,7 +226,11 @@ class PurchaseController extends Controller
     {
         $purchase = Purchase::with('supplier', 'salesman', 'items')->find($id);
         $items = Items::get();
-        $accounts = Account::get();
+        $accounts = Account::with(['accountType', 'accountCategory'])
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Supplier']);
+            })
+            ->get();
         $salemans = Saleman::get();
         $messageLines = \App\Models\MessageLine::where('category', 'Purchase')
             ->where('status', 'active')
@@ -236,7 +256,7 @@ class PurchaseController extends Controller
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
-            'tax_total'       => 'required|numeric',
+            'tax_total'       => 'nullable|numeric',
             'courier_charges' => 'nullable|numeric',
             'net_total'       => 'required|numeric',
             'paid_amount'     => 'required|numeric',
@@ -253,6 +273,7 @@ class PurchaseController extends Controller
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
             'message_line_id'         => 'nullable|integer',
+            'update_prices'           => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
@@ -290,6 +311,13 @@ class PurchaseController extends Controller
             // Delete old items
             PurchaseItem::where('purchase_id', $id)->delete();
 
+            // Fetch supplier category percentage
+            $supplier = Account::with('accountCategory')->find($request->supplier_id);
+            $percentage = 0;
+            if ($supplier && $supplier->accountCategory) {
+                $percentage = floatval($supplier->accountCategory->percentage);
+            }
+
             // Insert new items and update stock
             foreach ($request->items as $it) {
                 PurchaseItem::create([
@@ -304,10 +332,17 @@ class PurchaseController extends Controller
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Increase Stock
+                // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
                     $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
+
+                    // Auto-update trade price based on supplier category percentage if enabled
+                    if ($request->update_prices && $percentage > 0) {
+                        $newTradePrice = $it['trade_price'] + ($it['trade_price'] * $percentage / 100);
+                        $item->trade_price = round($newTradePrice);
+                    }
+
                     $item->save();
                 }
             }

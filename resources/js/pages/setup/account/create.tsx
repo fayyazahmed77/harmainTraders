@@ -80,9 +80,11 @@ interface Subarea {
 }
 
 interface Option {
-  value: number;
+  id?: number;
+  value: number | string;
   label: string;
   code?: string;
+  percentage?: number;
 }
 
 interface IndexProps {
@@ -94,6 +96,7 @@ interface IndexProps {
   salemans: Saleman[];
   bookers: Booker[];
   accountTypes: AccountType[];
+  accountCategories: any[];
 }
 
 export default function Create({
@@ -101,6 +104,7 @@ export default function Create({
   salemans,
   bookers,
   accountTypes,
+  accountCategories,
 }: IndexProps) {
   // ---------- UI state ----------
   const [country, setCountry] = useState<Option | null>(null);
@@ -123,6 +127,7 @@ export default function Create({
   const [saleman, setSaleman] = useState<Option | null>(null);
   const [booker, setBooker] = useState<Option | null>(null);
   const [accountType, setAccountType] = useState<Option | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Option | null>(null);
 
   // ---------- convenience option lists ----------
   const salemanOptions: Option[] = salemans.map((s) => ({
@@ -142,6 +147,12 @@ export default function Create({
     value: c.id,
     label: c.name,
     code: c.code,
+  }));
+
+  const categoryOptions: Option[] = (accountCategories || []).map((cat) => ({
+    value: cat.id,
+    label: `${cat.name} (${cat.percentage}%)`,
+    percentage: cat.percentage,
   }));
 
   // Define custom styles for react-select to match Shadcn UI
@@ -270,7 +281,7 @@ export default function Create({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchProvinces(opt.value);
+      fetchProvinces(Number(opt.value));
       setData("country_id", String(opt.value));
     } else {
       setData("country_id", "");
@@ -286,7 +297,7 @@ export default function Create({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchCities(opt.value);
+      fetchCities(Number(opt.value));
       setData("province_id", String(opt.value));
     } else {
       setData("province_id", "");
@@ -300,7 +311,7 @@ export default function Create({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchAreas(opt.value);
+      fetchAreas(Number(opt.value));
       setData("city_id", String(opt.value));
     } else {
       setData("city_id", "");
@@ -312,7 +323,7 @@ export default function Create({
     setSubarea(null);
     setSubareaOptions([]);
     if (opt) {
-      fetchSubareas(opt.value);
+      fetchSubareas(Number(opt.value));
       setData("area_id", String(opt.value));
     } else {
       setData("area_id", "");
@@ -320,7 +331,7 @@ export default function Create({
   };
 
   // ---------- Inertia form ----------
-  const { data, setData, post, processing, errors, reset } = useForm({
+  const { data, setData, post, processing, errors, reset, transform } = useForm({
     code: "",
     title: "",
     type: "",
@@ -392,15 +403,11 @@ export default function Create({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ensure date strings in yyyy-mm-dd (ISO date portion)
-    const opening_date = openingDate ? openingDate.toISOString().split("T")[0] : "";
-    const fbr_date = fbrDate ? fbrDate.toISOString().split("T")[0] : "";
-
-    // ensure we keep selected IDs (some were already set on change, but ensure final)
-    const payload = {
+    // use transform to ensure payload is correctly mapped before post
+    transform((data) => ({
       ...data,
-      opening_date,
-      fbr_date,
+      opening_date: openingDate ? openingDate.toISOString().split("T")[0] : "",
+      fbr_date: fbrDate ? fbrDate.toISOString().split("T")[0] : "",
       country_id: country?.value ?? data.country_id,
       province_id: province?.value ?? data.province_id,
       city_id: city?.value ?? data.city_id,
@@ -409,7 +416,8 @@ export default function Create({
       saleman_id: saleman?.value ?? data.saleman_id,
       type: accountType?.value ?? data.type,
       booker_id: booker?.value ?? data.booker_id,
-    };
+      category: selectedCategory?.value ?? data.category,
+    }));
 
     post(getSubmitUrl(), {
       preserveState: false,
@@ -874,26 +882,21 @@ export default function Create({
                               { value: "Office Expenses", label: "Office Expenses" },
                             ]}
                             value={data.note_head ? { value: data.note_head, label: data.note_head } : null}
-                            onChange={(opt: any) => onInputChange("note_head", opt ? opt.value : "")}
+                            onChange={(opt: any) => onInputChange("note_head", opt ? String(opt.value) : "")}
                             placeholder="Select Note Head"
                             className="text-sm"
                             styles={customStyles}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">Category</Label>
+                          <Label className="mb-2 block">Category (Dynamic)</Label>
                           <Select
-                            options={[
-                              { value: "OTHER'S", label: "OTHER'S" },
-                              { value: "A", label: "A" },
-                              { value: "B", label: "B" },
-                              { value: "C", label: "C" },
-                              { value: "D", label: "D" },
-                              { value: "Monthly", label: "Monthly" },
-                              { value: "Yearly", label: "Yearly" },
-                            ]}
-                            value={data.category ? { value: data.category, label: data.category } : null}
-                            onChange={(opt: any) => onInputChange("category", opt ? opt.value : "")}
+                            options={categoryOptions}
+                            value={selectedCategory}
+                            onChange={(opt: any) => {
+                              setSelectedCategory(opt);
+                              onInputChange("category", opt ? String(opt.value) : "");
+                            }}
                             placeholder="Select Category"
                             className="text-sm"
                             styles={customStyles}
@@ -914,7 +917,7 @@ export default function Create({
                               { value: "7", label: "7 (T.P 7)" },
                             ]}
                             value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
-                            onChange={(opt: any) => onInputChange("item_category", opt ? opt.value : "")}
+                            onChange={(opt: any) => onInputChange("item_category", opt ? String(opt.value) : "")}
                             placeholder="Select Item Category"
                             className="text-sm"
                             styles={customStyles}
@@ -935,9 +938,11 @@ export default function Create({
                                 { value: "No-Filer", label: "No-Filer" },
                                 { value: "Exempt", label: "Exempt" },
                                 { value: "Manufacturer", label: "Manufacturer" },
+                                { value: "Included", label: "Included" },
+                                { value: "Excluded", label: "Excluded" },
                               ]}
                               value={data.ats_type ? { value: data.ats_type, label: data.ats_type } : null}
-                              onChange={(opt: any) => onInputChange("ats_type", opt ? opt.value : "")}
+                              onChange={(opt: any) => onInputChange("ats_type", opt ? String(opt.value) : "")}
                               placeholder="Type"
                               className="w-full text-sm"
                               styles={customStyles}

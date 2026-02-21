@@ -11,6 +11,7 @@ use App\Models\Account;
 use App\Models\Subarea;
 use App\Models\Saleman;
 use App\Models\AccountType;
+use App\Models\AccountCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -113,6 +114,7 @@ class AccountController extends Controller
         $salemans = Saleman::all();
         $bookers = Booker::all();
         $accountTypes = AccountType::all();
+        $accountCategories = AccountCategory::all();
         return Inertia::render("setup/account/create", [
             'countries' => $countries,
             'provinces' => $provinces,
@@ -122,6 +124,7 @@ class AccountController extends Controller
             'salemans' => $salemans,
             'bookers' => $bookers,
             'accountTypes' => $accountTypes,
+            'accountCategories' => $accountCategories,
         ]);
     }
     public function store(Request $request)
@@ -158,7 +161,7 @@ class AccountController extends Controller
             'aging_days' => 'nullable|integer',
             'note_head' => 'nullable|string|max:255',
             'item_category' => 'nullable|integer',
-            'category' => 'nullable|string|max:100',
+            'category' => 'nullable|numeric|exists:account_categories,id',
             'ats_percentage' => 'nullable|numeric',
             'ats_type' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
@@ -188,6 +191,7 @@ class AccountController extends Controller
         $salemans = Saleman::all();
         $bookers = Booker::all();
         $accountTypes = AccountType::all();
+        $accountCategories = AccountCategory::all();
         return Inertia::render("setup/account/edit", [
             'account' => $account,
             'countries' => $countries,
@@ -198,6 +202,7 @@ class AccountController extends Controller
             'salemans' => $salemans,
             'bookers' => $bookers,
             'accountTypes' => $accountTypes,
+            'accountCategories' => $accountCategories,
         ]);
     }
     public function update(Request $request, Account $account)
@@ -234,7 +239,7 @@ class AccountController extends Controller
             'aging_days' => 'nullable|integer',
             'note_head' => 'nullable|string|max:255',
             'item_category' => 'nullable|integer',
-            'category' => 'nullable|string|max:100',
+            'category' => 'nullable|numeric|exists:account_categories,id',
             'ats_percentage' => 'nullable|numeric',
             'ats_type' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',

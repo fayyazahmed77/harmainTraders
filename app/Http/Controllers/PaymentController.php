@@ -395,6 +395,41 @@ class PaymentController extends Controller
         return response()->json(null);
     }
 
+    // Get items for a specific bill
+    public function getBillItems(Request $request)
+    {
+        $billId = $request->input('bill_id');
+        $billType = $request->input('bill_type');
+
+        if ($billType === 'App\Models\Sales') {
+            $items = \App\Models\SalesItem::where('sale_id', $billId)
+                ->with('item')
+                ->get()
+                ->map(function ($si) {
+                    return [
+                        'title' => $si->item->title ?? 'N/A',
+                        'qty' => $si->total_pcs,
+                        'rate' => $si->trade_price,
+                        'subtotal' => $si->total_pcs * $si->trade_price
+                    ];
+                });
+        } else {
+            $items = \App\Models\PurchaseItem::where('purchase_id', $billId)
+                ->with('item')
+                ->get()
+                ->map(function ($pi) {
+                    return [
+                        'title' => $pi->item->title ?? 'N/A',
+                        'qty' => $pi->total_pcs,
+                        'rate' => $pi->trade_price,
+                        'subtotal' => $pi->total_pcs * $pi->trade_price
+                    ];
+                });
+        }
+
+        return response()->json($items);
+    }
+
     // Store payment
     public function store(Request $request)
     {

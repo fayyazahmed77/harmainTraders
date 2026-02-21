@@ -33,6 +33,7 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SalesMapReportController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\AccountCategoryController;
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -108,6 +109,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{accountType}', [AccountTypeController::class, 'update'])->name('account-types.update');
         Route::delete('/{id}', [AccountTypeController::class, 'destroy'])->name('account-types.destroy');
     });
+    //---------------------Account Category------------------------------------------------------------------
+    Route::prefix('/account-category')->group(function () {
+        Route::get('/', [AccountCategoryController::class, 'index'])->name('account-categories.index');
+        Route::post('/', [AccountCategoryController::class, 'store'])->name('account-categories.store');
+        Route::put('/{accountCategory}', [AccountCategoryController::class, 'update'])->name('account-categories.update');
+        Route::delete('/{accountCategory}', [AccountCategoryController::class, 'destroy'])->name('account-categories.destroy');
+    });
+
     //---------------------Staff Management--------------------------------------------------------------
     Route::prefix('/staff')->group(function () {
         Route::get('/', [StaffController::class, 'index'])->name('staff.index');
@@ -263,6 +272,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{salesReturn}', [SalesReturnController::class, 'update'])->name('sales_return.update');
         Route::delete('/{id}', [SalesReturnController::class, 'destroy'])->name('sales_return.destroy');
         Route::get('/customer/{customerId}/purchased-items', [SalesReturnController::class, 'getCustomerPurchasedItems'])->name('sales_return.customer_items');
+        Route::get('/customer/{customerId}/invoices', [SalesReturnController::class, 'getCustomerInvoices'])->name('sales_return.customer_invoices');
+        Route::get('/invoice/{invoiceId}/items', [SalesReturnController::class, 'getInvoiceItems'])->name('sales_return.invoice_items');
     });
     //--------------------------------------------Purchase-----------------------------------------------
     Route::prefix('/purchase')->group(function () {
@@ -342,6 +353,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/payment/store', [App\Http\Controllers\PaymentController::class, 'store'])->name('payment.store');
     Route::get('/payment/unpaid-bills', [App\Http\Controllers\PaymentController::class, 'getUnpaidBills'])->name('payment.unpaid-bills');
     Route::get('/payment/next-cheque', [App\Http\Controllers\PaymentController::class, 'getNextCheque'])->name('payment.next-cheque');
+    Route::get('/payment/bill-items', [App\Http\Controllers\PaymentController::class, 'getBillItems'])->name('payment.bill-items');
 });
 
 require __DIR__ . '/settings.php';

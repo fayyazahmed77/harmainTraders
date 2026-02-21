@@ -472,6 +472,7 @@ export default function SalesEditPage({ items, accounts, salemans, sale, message
 
   return (
     <SidebarProvider
+      defaultOpen={false}
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 61)",

@@ -27,9 +27,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface Option {
-  value: number;
+  id?: number;
+  value: number | string;
   label: string;
   code?: string;
+  percentage?: number;
 }
 
 interface AccountForm {
@@ -54,13 +56,13 @@ interface AccountForm {
   regards: string;
   opening_date: string;
   fbr_date: string;
-  country_id: string;
-  province_id: string;
-  city_id: string;
-  area_id: string;
-  subarea_id: string;
-  saleman_id: string;
-  booker_id: string;
+  country_id: string | number;
+  province_id: string | number;
+  city_id: string | number;
+  area_id: string | number;
+  subarea_id: string | number;
+  saleman_id: string | number;
+  booker_id: string | number;
   credit_limit: string | number;
   aging_days: string | number;
   note_head: string;
@@ -82,6 +84,7 @@ interface EditProps {
   salemans: any[];
   bookers: any[];
   accountTypes: any[];
+  accountCategories: any[];
 }
 
 export default function Edit({
@@ -94,6 +97,7 @@ export default function Edit({
   salemans,
   bookers,
   accountTypes,
+  accountCategories,
 }: EditProps) {
   // ---------- Option mapping ----------
   const salemanOptions = salemans.map((s) => ({
@@ -112,6 +116,12 @@ export default function Edit({
     value: c.id,
     label: c.name,
     code: c.code,
+  }));
+
+  const categoryOptions: Option[] = (accountCategories || []).map((cat) => ({
+    value: cat.id,
+    label: `${cat.name} (${cat.percentage}%)`,
+    percentage: cat.percentage,
   }));
 
   // Helper to map passed data to Option based on ID
@@ -148,6 +158,7 @@ export default function Edit({
   const [saleman, setSaleman] = useState<Option | null>(getMappedOption(account.saleman_id, salemans));
   const [booker, setBooker] = useState<Option | null>(getMappedOption(account.booker_id, bookers));
   const [accountType, setAccountType] = useState<Option | null>(getMappedOption(account.type, accountTypes));
+  const [selectedCategory, setSelectedCategory] = useState<Option | null>(getMappedOption(account.category, accountCategories));
 
   // Define custom styles for react-select to match Shadcn UI
   const customStyles = {
@@ -233,6 +244,7 @@ export default function Edit({
     note_head: account.note_head ?? "",
     category: account.category ?? "",
     cnic: account.cnic ?? "",
+    opening_balance: account.opening_balance ?? "",
     address1: account.address1 ?? "",
     address2: account.address2 ?? "",
     telephone1: account.telephone1 ?? "",
@@ -247,6 +259,9 @@ export default function Edit({
     saleman_id: account.saleman_id ? String(account.saleman_id) : "",
     booker_id: account.booker_id ? String(account.booker_id) : "",
     type: account.type ? String(account.type) : "",
+    item_category: account.item_category ? String(account.item_category) : "",
+    ats_percentage: account.ats_percentage ?? "",
+    ats_type: account.ats_type ?? "",
   } as AccountForm);
 
   // ---------- Cascading Fetchers ----------
@@ -306,7 +321,7 @@ export default function Edit({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchProvinces(opt.value);
+      fetchProvinces(Number(opt.value));
       setData("country_id", String(opt.value));
     } else {
       setData("country_id", "");
@@ -322,7 +337,7 @@ export default function Edit({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchCities(opt.value);
+      fetchCities(Number(opt.value));
       setData("province_id", String(opt.value));
     } else {
       setData("province_id", "");
@@ -336,7 +351,7 @@ export default function Edit({
     setAreaOptions([]);
     setSubareaOptions([]);
     if (opt) {
-      fetchAreas(opt.value);
+      fetchAreas(Number(opt.value));
       setData("city_id", String(opt.value));
     } else {
       setData("city_id", "");
@@ -348,7 +363,7 @@ export default function Edit({
     setSubarea(null);
     setSubareaOptions([]);
     if (opt) {
-      fetchSubareas(opt.value);
+      fetchSubareas(Number(opt.value));
       setData("area_id", String(opt.value));
     } else {
       setData("area_id", "");
@@ -372,6 +387,7 @@ export default function Edit({
       saleman_id: saleman?.value ? String(saleman.value) : "",
       type: accountType?.value ? String(accountType.value) : "",
       booker_id: booker?.value ? String(booker.value) : "",
+      category: selectedCategory?.value ? String(selectedCategory.value) : "",
     }));
 
     put(`/account/${account.id}`, {
@@ -826,29 +842,21 @@ export default function Edit({
                               { value: "Office Expenses", label: "Office Expenses" },
                             ]}
                             value={data.note_head ? { value: data.note_head, label: data.note_head } : null}
-                            onChange={(opt: any) => onInputChange("note_head", opt ? opt.value : "")}
+                            onChange={(opt: any) => onInputChange("note_head", opt ? String(opt.value) : "")}
                             placeholder="Select Note Head"
                             className="text-sm"
                             styles={customStyles}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">Category</Label>
+                          <Label className="mb-2 block">Category (Dynamic)</Label>
                           <Select
-                            options={[
-                              { value: "OTHER'S", label: "OTHER'S" },
-                              { value: "A", label: "A" },
-                              { value: "B", label: "B" },
-                              { value: "C", label: "C" },
-                              { value: "D", label: "D" },
-                              { value: "Monthly", label: "Monthly" },
-                              { value: "Yearly", label: "Yearly" },
-                              { value: "Distributor", label: "Distributor" },
-                              { value: "Wholesaler", label: "Wholesaler" },
-                              { value: "Retailer", label: "Retailer" },
-                            ]}
-                            value={data.category ? { value: data.category, label: data.category } : null}
-                            onChange={(opt: any) => onInputChange("category", opt ? opt.value : "")}
+                            options={categoryOptions}
+                            value={selectedCategory}
+                            onChange={(opt: any) => {
+                              setSelectedCategory(opt);
+                              onInputChange("category", opt ? String(opt.value) : "");
+                            }}
                             placeholder="Select Category"
                             className="text-sm"
                             styles={customStyles}
@@ -868,7 +876,7 @@ export default function Edit({
                               { value: "5", label: "5" },
                             ]}
                             value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
-                            onChange={(opt: any) => onInputChange("item_category", opt ? opt.value : "")}
+                            onChange={(opt: any) => onInputChange("item_category", opt ? String(opt.value) : "")}
                             placeholder="Select Item Category"
                             className="text-sm"
                             styles={customStyles}
@@ -893,7 +901,7 @@ export default function Edit({
                                 { value: "Excluded", label: "Excluded" },
                               ]}
                               value={data.ats_type ? { value: data.ats_type, label: data.ats_type } : null}
-                              onChange={(opt: any) => onInputChange("ats_type", opt ? opt.value : "")}
+                              onChange={(opt: any) => onInputChange("ats_type", opt ? String(opt.value) : "")}
                               placeholder="Type"
                               className="w-full text-sm"
                               styles={customStyles}
