@@ -200,7 +200,7 @@ class SalesReturnController extends Controller
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
-
+ 
     // Get customer's sales invoices
     public function getCustomerInvoices($customerId)
     {
@@ -287,5 +287,9 @@ class SalesReturnController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+    //Edit
+    public function edit($id){
+
     }
 }

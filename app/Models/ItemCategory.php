@@ -21,4 +21,9 @@ class ItemCategory extends Model
     {
         return $this->hasMany(Items::class, 'category');
     }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

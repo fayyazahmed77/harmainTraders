@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { ShoppingCart, Calendar, TrendingUp, RefreshCcw, ArrowUpRight, Activity } from "lucide-react";
+import { ShoppingCart, Calendar, TrendingUp, RefreshCcw, ArrowUpRight, Activity, Wallet, PieChart, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area } from 'recharts';
 import { format, subDays, isSameDay } from 'date-fns';
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface Purchase {
     id: number;
@@ -23,13 +25,15 @@ interface SummaryProps {
     purchases: Purchase[];
 }
 
+const PREMIUM_ROUNDING = "rounded-2xl";
+
 export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
             style: "currency",
             currency: "PKR",
             minimumFractionDigits: 0,
-        }).format(amount).replace('PKR', '').trim();
+        }).format(amount).replace('PKR', '₨').trim();
     };
 
     const netPurchase = summary.total_purchase - summary.total_returns;
@@ -43,7 +47,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
         const days = [];
         const today = new Date();
 
-        for (let i = 6; i >= 0; i--) {
+        for (let i = 11; i >= 0; i--) {
             const date = subDays(today, i);
             const label = format(date, 'MMM dd');
 
@@ -64,209 +68,250 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
         return days;
     }, [purchases]);
 
-    const getTheme = () => {
-        if (cappedPercentage < 50) {
-            return {
-                card: "bg-rose-500/5 border-rose-500/10",
-                ringTrack: "stroke-rose-500/10",
-                ringProgress: "stroke-rose-500",
-                icon: "bg-rose-500/10 text-rose-500",
-                textMuted: "text-rose-500/60",
-                border: "border-rose-500/10"
-            };
-        } else if (cappedPercentage < 100) {
-            return {
-                card: "bg-amber-500/5 border-amber-500/10",
-                ringTrack: "stroke-amber-500/10",
-                ringProgress: "stroke-amber-500",
-                icon: "bg-amber-500/10 text-amber-500",
-                textMuted: "text-amber-500/60",
-                border: "border-amber-500/10"
-            };
-        } else {
-            return {
-                card: "bg-emerald-500/5 border-emerald-500/10",
-                ringTrack: "stroke-emerald-500/10",
-                ringProgress: "stroke-emerald-500",
-                icon: "bg-emerald-500/10 text-emerald-500",
-                textMuted: "text-emerald-500/60",
-                border: "border-emerald-500/10"
-            };
-        }
+    const getRecoveryStatus = () => {
+        if (cappedPercentage < 40) return { label: "CRITICAL", color: "rose" };
+        if (cappedPercentage < 80) return { label: "STABLE", color: "orange" };
+        return { label: "OPTIMIZED", color: "emerald" };
     };
 
-    const theme = getTheme();
+    const status = getRecoveryStatus();
 
     return (
-        <div className="rounded-[0.5rem] border border-border shadow-sm p-4 md:p-6 mb-8 overflow-hidden bg-card text-card-foreground">
-
-            {/* 2. PRO-BAR (Theme Aware) */}
-            <div className="bg-muted/30 rounded-[0.5rem] p-4 flex flex-col lg:flex-row items-center justify-between gap-6 mb-6 border border-border px-6">
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className="h-10 w-10 rounded-xl bg-background border border-border flex items-center justify-center shadow-sm">
-                        <TrendingUp className="h-5 w-5 text-primary" />
+        <div className="space-y-6">
+            {/* 1. Tactical Intelligence Bar */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                    PREMIUM_ROUNDING,
+                    "bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-sm"
+                )}
+            >
+                <div className="flex items-center gap-4 shrink-0">
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                        <TrendingUp className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                        <p className="text-xs font-black uppercase tracking-tight">Market Forecast</p>
-                        <p className="text-[10px] text-primary font-black tracking-widest uppercase">STABLE</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Intelligence Node</p>
+                        <p className={cn(
+                            "text-xs font-black tracking-widest uppercase flex items-center gap-2",
+                            status.color === 'rose' ? "text-rose-500" : status.color === 'orange' ? "text-orange-500" : "text-emerald-500"
+                        )}>
+                            <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                            Procurement {status.label}
+                        </p>
                     </div>
                 </div>
 
-                <div className="flex-1 w-full lg:max-w-md">
-                    <div className="flex justify-between items-center mb-1.5 px-1">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Efficiency</span>
-                        <span className="text-[10px] font-black text-primary">{cappedPercentage}%</span>
+                <div className="flex-1 w-full lg:max-w-2xl px-4">
+                    <div className="flex justify-between items-center mb-2 px-1">
+                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Efficiency Benchmark</span>
+                        <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-100">{cappedPercentage}% RECOVERY</span>
                     </div>
-                    <div className="h-2 w-full bg-background rounded-full p-[1px]">
-                        <div
-                            className="h-full bg-primary rounded-full transition-all duration-1000"
-                            style={{ width: `${cappedPercentage}%` }}
-                        ></div>
+                    <div className="h-2.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full p-[2px] shadow-inner">
+                        <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${cappedPercentage}%` }}
+                            className={cn(
+                                "h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(249,115,22,0.5)]",
+                                status.color === 'rose' ? "bg-rose-500" : "bg-orange-500"
+                            )}
+                        />
                     </div>
                 </div>
 
-                <div className="hidden lg:flex items-center gap-1.5 text-muted-foreground border-l border-border pl-6 h-6">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span className="text-[10px] font-black tracking-tight uppercase">Period: 7-Day Window</span>
-                </div>
-            </div>
-
-            {/* 3. COCKPIT GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch min-h-[260px]">
-
-                {/* HERO BLOCK */}
-                <div className="flex flex-col bg-primary/5 rounded-[0.5rem] p-6 border border-primary/10 relative overflow-hidden group">
-                    <div className="absolute -top-10 -right-10 h-32 w-32 bg-primary/10 rounded-full blur-3xl opacity-60 group-hover:scale-150 transition-transform duration-1000"></div>
-                    <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md mb-4 relative z-10">
-                        <ShoppingCart className="h-4 w-4" />
+                <div className="hidden lg:flex items-center gap-6 border-l border-zinc-200 dark:border-zinc-800 pl-8 h-10">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Active Cycle</span>
+                        <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-100 uppercase">12-Day Window</span>
                     </div>
-                    <p className="text-[10px] font-black text-primary/70 uppercase tracking-[0.2em] mb-1">Total Purchases</p>
-                    <h3 className="text-4xl font-black text-foreground tracking-tight leading-none mb-4">
-                        {formatCurrency(summary.total_purchase)} <span className="text-sm font-bold opacity-30">PKR</span>
-                    </h3>
-                    <div className="mt-auto space-y-3 relative z-10">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Records Count</span>
-                            <span className="text-xs font-black text-foreground uppercase">{summary.count} Entries</span>
+                    <Calendar className="h-5 w-5 text-zinc-300" />
+                </div>
+            </motion.div>
+
+            {/* 2. Analytical Core Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                {/* PRIMARY METRIC: Cumulative Commitment */}
+                <motion.div
+                    whileHover={{ y: -4 }}
+                    className={cn(
+                        PREMIUM_ROUNDING,
+                        "p-6 bg-zinc-900 border border-zinc-800 relative overflow-hidden group shadow-2xl"
+                    )}
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <ShoppingCart className="h-32 w-32 text-orange-500" />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col h-full">
+                        <div className="h-10 w-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/40 mb-6 font-black italic">
+                            Σ
                         </div>
-                        <div className="flex items-center justify-between bg-background/50 backdrop-blur-sm p-3 rounded-xl border border-border/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Target Status</span>
-                            <span className="text-[10px] font-black text-primary flex items-center">
-                                <ArrowUpRight className="h-3 w-3 mr-1" /> OPTIMAL
-                            </span>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1 leading-none">Total Procurement Value</p>
+                        <h3 className="text-4xl font-black text-white tracking-tighter leading-none mb-6">
+                            {formatCurrency(summary.total_purchase)}
+                        </h3>
+
+                        <div className="mt-auto grid grid-cols-2 gap-3 pt-6 border-t border-zinc-800/50">
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest block">Ledger Count</span>
+                                <span className="text-sm font-black text-white uppercase tabular-nums">{summary.count} ENTRIES</span>
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest block">Health Index</span>
+                                <span className="text-sm font-black text-emerald-500 uppercase flex items-center">
+                                    <ShieldCheck className="h-3.5 w-3.5 mr-1" /> OPTIMAL
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </motion.div>
 
-                {/* STATS BLOCK */}
-                <div className={`flex flex-col rounded-[0.5rem] p-6 border transition-all duration-500 ${theme.card}`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme.textMuted}`}>Flow Recovery</p>
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shadow-sm ${theme.icon}`}>
-                            <RefreshCcw className="h-4 w-4" />
+                {/* SECONDARY METRIC: Recovery Index */}
+                <motion.div
+                    whileHover={{ y: -4 }}
+                    className={cn(
+                        PREMIUM_ROUNDING,
+                        "p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-sm"
+                    )}
+                >
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                            <RefreshCcw className="h-4 w-4 text-zinc-500" />
                         </div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 leading-none px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-full">Recovery Matrix</span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-8 my-auto p-2">
-                        <div className="relative h-28 w-28 shrink-0">
+                    <div className="flex items-center gap-8 flex-1">
+                        <div className="relative h-24 w-24 shrink-0">
                             <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
-                                <circle className={theme.ringTrack} cx="18" cy="18" r="15.9155" strokeWidth="3" fill="none" />
-                                <circle
-                                    className={`${theme.ringProgress} transition-all duration-1000 ease-out`}
+                                <circle className="stroke-zinc-100 dark:stroke-zinc-800" cx="18" cy="18" r="15.9155" strokeWidth="3" fill="none" />
+                                <motion.circle
+                                    initial={{ strokeDasharray: "0, 100" }}
+                                    animate={{ strokeDasharray: `${cappedPercentage}, 100` }}
+                                    transition={{ duration: 1.5, ease: "easeOut" }}
+                                    className="stroke-orange-500"
                                     cx="18" cy="18" r="15.9155"
                                     strokeWidth="3"
-                                    strokeDasharray={`${cappedPercentage}, 100`}
                                     strokeLinecap="round"
                                     fill="none"
                                 />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-2xl font-black leading-none">{cappedPercentage}%</span>
-                                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter mt-1 tabular-nums">Recovery</span>
+                                <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tighter tabular-nums">{cappedPercentage}%</span>
+                                <span className="text-[6px] font-black text-zinc-400 uppercase tracking-widest mt-0.5">Cleared</span>
                             </div>
                         </div>
-                        <div className="flex-1 w-full space-y-4">
-                            <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Settled</span>
-                                <span className="text-sm font-black font-mono tracking-tighter">{formatCurrency(summary.total_paid)}</span>
-                            </div>
-                            <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Returns</span>
-                                <span className="text-sm font-black font-mono tracking-tighter">{formatCurrency(summary.total_returns)}</span>
-                            </div>
-                            <div className="flex justify-between pt-1">
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Balance</span>
-                                <span className="text-lg font-black text-rose-500 font-mono tracking-tighter italic">{formatCurrency(summary.total_unpaid)}</span>
-                            </div>
+
+                        <div className="flex-1 space-y-4">
+                            {[
+                                { label: "Settled", value: summary.total_paid, color: "text-zinc-900 dark:text-zinc-100" },
+                                { label: "Returns", value: summary.total_returns, color: "text-zinc-500" },
+                                { label: "Outstanding", value: summary.total_unpaid, color: "text-rose-500", highlight: true }
+                            ].map((item) => (
+                                <div key={item.label} className="flex flex-col">
+                                    <div className="flex justify-between items-end mb-1">
+                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest leading-none">{item.label}</span>
+                                        <span className={cn("text-[11px] font-black tabular-nums tracking-tighter leading-none font-mono", item.color)}>
+                                            {formatCurrency(item.value)}
+                                        </span>
+                                    </div>
+                                    <div className="h-1 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ scaleX: 0 }}
+                                            animate={{ scaleX: Math.min(1, item.value / (summary.total_purchase || 1)) }}
+                                            className={cn("h-full origin-left", item.highlight ? "bg-rose-500" : "bg-zinc-300 dark:bg-zinc-700")}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                </div>
+                </motion.div>
 
-                {/* WEEKLY ANALYTICS (COMPOSED CHART) */}
-                <div className="hidden lg:flex flex-col bg-muted/20 border border-border rounded-[0.5rem] p-5 relative overflow-hidden group">
+                {/* TERTIARY METRIC: Performance Visualization */}
+                <motion.div
+                    whileHover={{ y: -4 }}
+                    className={cn(
+                        PREMIUM_ROUNDING,
+                        "p-5 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-sm relative overflow-hidden"
+                    )}
+                >
                     <div className="flex items-center justify-between mb-4 relative z-10">
                         <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center">
-                                <Activity className="h-3 w-3 mr-1 text-primary" /> Performance Log
+                            <p className="text-[10px] font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-[0.2em] flex items-center">
+                                <Activity className="h-3.5 w-3.5 mr-2 text-orange-500" /> Flux Logistics
                             </p>
-                            <p className="text-[8px] font-bold text-muted-foreground uppercase">Rolling 7-Day Matrix</p>
+                            <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">7-Cycle Flux Matrix</p>
                         </div>
-                        <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 rounded-full bg-primary mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">P.Volume</span>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                                <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Inflow</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 rounded-full bg-rose-500 mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Payments</span>
+                            <div className="flex items-center gap-1.5">
+                                <div className="h-1.5 w-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                                <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Outflow</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-[160px] relative z-10">
+                    <div className="flex-1 min-h-[160px] relative z-10 mt-2">
                         <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={weeklyData}>
+                            <ComposedChart data={weeklyData.slice(-7)}>
                                 <defs>
-                                    <linearGradient id="purchaseBar" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={1} />
-                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.1} />
+                                    <linearGradient id="fluxInflow" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(161, 161, 170, 0.1)" />
                                 <XAxis
                                     dataKey="date"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fontSize: 8, fontWeight: 700, fill: 'var(--muted-foreground)' }}
+                                    tick={{ fontSize: 8, fontWeight: 900, fill: '#71717a' }}
                                     dy={10}
                                 />
-                                <YAxis hide />
+                                <YAxis hide domain={['auto', 'auto']} />
                                 <Tooltip
-                                    cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-                                    contentStyle={{
-                                        backgroundColor: 'var(--card)',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid var(--border)',
-                                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                        fontSize: '10px'
+                                    cursor={{ stroke: '#f97316', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-lg shadow-xl backdrop-blur-md bg-opacity-90">
+                                                    <p className="text-[9px] font-black text-orange-500 uppercase tracking-widest mb-1.5">{payload[0].payload.date}</p>
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between gap-4">
+                                                            <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Purchase</span>
+                                                            <span className="text-[9px] font-black text-zinc-900 dark:text-zinc-100 font-mono tracking-tighter leading-none">{formatCurrency(payload[0].value as number)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between gap-4 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                                                            <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Payment</span>
+                                                            <span className="text-[9px] font-black text-orange-500 font-mono tracking-tighter leading-none">{formatCurrency(payload[1].value as number)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
                                     }}
-                                    itemStyle={{ fontWeight: 900, fontSize: '11px', color: 'var(--foreground)' }}
-                                    labelStyle={{ fontWeight: 900, color: 'var(--primary)', marginBottom: '4px' }}
-                                    formatter={(value: any) => [formatCurrency(value as number), '']}
                                 />
-                                <Bar dataKey="purchase" fill="url(#purchaseBar)" radius={[4, 4, 0, 0]} barSize={16} />
+                                <Area type="monotone" dataKey="purchase" stroke="none" fill="url(#fluxInflow)" />
+                                <Bar dataKey="purchase" fill="#f97316" radius={[4, 4, 0, 0]} barSize={14} opacity={0.6} />
                                 <Line
                                     type="monotone"
                                     dataKey="payment"
-                                    stroke="var(--destructive)"
+                                    stroke="#f97316"
                                     strokeWidth={3}
-                                    dot={{ r: 3, fill: 'var(--destructive)', strokeWidth: 1.5, stroke: 'var(--card)' }}
+                                    dot={{ r: 3, fill: '#f97316', strokeWidth: 2, stroke: 'white' }}
                                     activeDot={{ r: 5, strokeWidth: 0 }}
                                 />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
+                </motion.div>
 
             </div>
         </div>

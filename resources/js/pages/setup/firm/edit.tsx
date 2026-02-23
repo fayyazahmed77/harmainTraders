@@ -1,433 +1,564 @@
 "use client";
 
-import * as React from "react";
-import { useState, useEffect } from "react";
-import { router, usePage } from "@inertiajs/react";
-import { AppSidebar } from "@/components/app-sidebar";
+import React, { useState, useEffect, useRef } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSidebar } from "@/components/app-sidebar";
+import { type BreadcrumbItem } from "@/types";
+import {
+  Plus,
+  ArrowLeft,
+  Wand2,
+  Building2,
+  Phone,
+  Mail,
+  Globe,
+  MapPin,
+  ShieldCheck,
+  Image as ImageIcon,
+  Fingerprint,
+  Code,
+  Calendar as CalendarIcon,
+  Printer,
+  CheckCircle2,
+  Activity,
+  Briefcase,
+  Hash,
+  Receipt,
+  User,
+  Building,
+  Pencil,
+  Upload
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { CalendarIcon, Upload, X } from "lucide-react";
-import { BreadcrumbItem } from "@/types";
+import { motion, AnimatePresence } from "framer-motion";
+import { Heading } from "@/components/ui/Heading";
 import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
-const breadcrumbs: BreadcrumbItem[] = [
-  { title: "Firm", href: "/firm" },
-  { title: "Edit", href: "" },
-];
+const PREMIUM_ROUNDING = "rounded-2xl";
 
-export default function FirmEditPage() {
-  // ✅ Get firm data from Inertia props
-  const { props } = usePage() as any;
-  const firm = props.firm;
-  const errors = props.errors || {};
+interface Firm {
+  id: number;
+  name: string;
+  code: string;
+  date?: string;
+  business?: string;
+  address1?: string;
+  address2?: string;
+  address3?: string;
+  phone?: string;
+  fax?: string;
+  owner?: string;
+  email?: string;
+  website?: string;
+  saletax?: string;
+  ntn?: string;
+  printinvoice?: boolean;
+  defult?: boolean;
+  status?: boolean;
+  logo?: string;
+}
 
-  const [date, setDate] = useState<Date | undefined>(firm?.date ? new Date(firm.date) : new Date());
-  const [open, setOpen] = useState(false);
+interface PageProps {
+  firm: Firm;
+  errors: Record<string, string>;
+  auth: { user: any };
+  [key: string]: any;
+}
 
-  // ✅ Prefilled form state
-  const [formData, setFormData] = useState({
-    code: firm?.code || "",
-    name: firm?.name || "",
-    business: firm?.business || "",
-    address1: firm?.address1 || "",
-    address2: firm?.address2 || "",
-    address3: firm?.address3 || "",
-    phone: firm?.phone || "",
-    fax: firm?.fax || "",
-    owner: firm?.owner || "",
-    email: firm?.email || "",
-    website: firm?.website || "",
-    saletax: firm?.saletax || "",
-    ntn: firm?.ntn || "",
-    printinvoice: firm?.printinvoice || false,
-    defult: firm?.defult || false,
-    status: firm?.status ?? true,
+export default function FirmEdit({ firm }: { firm: Firm }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { auth, errors } = usePage<any>().props as unknown as PageProps;
+
+  const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Financials", href: "/firms" },
+    { title: "Modify Identity", href: `/firms/${firm.id}/edit` },
+  ];
+
+  const [date, setDate] = useState<Date | undefined>(firm.date ? new Date(firm.date) : new Date());
+  const [openCalendar, setOpenCalendar] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(firm.logo ? `/storage/${firm.logo}` : null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [form, setForm] = useState({
+    code: firm.code || "",
+    name: firm.name || "",
+    business: firm.business || "",
+    address1: firm.address1 || "",
+    address2: firm.address2 || "",
+    address3: firm.address3 || "",
+    phone: firm.phone || "",
+    fax: firm.fax || "",
+    owner: firm.owner || "",
+    email: firm.email || "",
+    website: firm.website || "",
+    saletax: firm.saletax || "",
+    ntn: firm.ntn || "",
+    printinvoice: !!firm.printinvoice,
+    defult: !!firm.defult,
+    status: !!firm.status,
     logo: null as File | null,
     _method: "PUT",
   });
 
-  // ✅ Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
+    setForm({
+      ...form,
       [name]: type === "checkbox" ? checked : value,
     });
   };
 
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      setFormData({ ...formData, logo: file });
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files?.[0] || null;
+    setForm({ ...form, logo: file });
     if (file) {
-      setFormData({ ...formData, logo: file });
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
   };
 
-  const removeLogo = () => {
-    setFormData({ ...formData, logo: null });
-  };
-
-  // ✅ Submit updated data
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Use router.post with _method: "PUT" because native PUT has issues with file uploads in Laravel
-    router.post(`/firms/${firm.id}`, {
-      ...formData,
-      date: date ? date.toISOString().split("T")[0] : null,
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== null) formData.append(key, value as any);
+    });
+
+    if (date) {
+      formData.append("date", date.toISOString().split("T")[0]);
+    }
+
+    router.post(`/firms/${firm.id}`, formData, {
+      forceFormData: true,
+      onSuccess: () => {
+        toast.success("Identity Module Updated", { description: "Commercial node parameters have been synchronized." });
+      },
+      onError: () => toast.error("Sync Failed"),
+      onFinish: () => setIsSubmitting(false),
     });
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader breadcrumbs={breadcrumbs} />
+    <>
+      <SidebarProvider>
+        <Head title={`Modify ${firm.name} | Finance Core`} />
+        <AppSidebar variant="inset" />
+        <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
+          <SiteHeader breadcrumbs={breadcrumbs} />
 
-        <div className="max-w-[1200px] mx-auto pt-8 pb-12 px-6 lg:px-10">
-          {/* Header Section */}
-          <div className="relative mb-10">
-            <div className="absolute inset-0 bg-orange-500/5 blur-3xl -z-10 rounded-full opacity-50" />
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-              <div className="space-y-4 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-orange-700">Identity Modification</span>
-                </div>
-                <div>
-                  <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-foreground leading-[0.9] mb-2">
-                    Edit <span className="text-orange-500">Firm</span>
-                  </h1>
-                  <p className="text-muted-foreground text-sm lg:text-base font-medium max-w-lg leading-relaxed">
-                    Refining commercial parameters for <span className="text-foreground font-bold italic">"{firm.name}"</span> within the central identity database.
-                  </p>
-                </div>
-              </div>
+          <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar text-zinc-900 dark:text-zinc-100 pb-20">
+            <div className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-10">
 
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  className="font-bold text-xs uppercase tracking-widest"
-                  onClick={() => router.visit("/firms")}
-                >
-                  Abort
-                </Button>
-                <div className="h-8 w-px bg-border" />
-                <Button
-                  onClick={handleSubmit}
-                  className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 transition-all active:scale-95 group"
-                >
-                  Update Identity
-                </Button>
-              </div>
+              {/* Back Action */}
+              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+                <Link href="/firms" className="inline-flex items-center gap-2 group text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                  <div className="h-8 w-8 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center group-hover:bg-zinc-100 dark:group-hover:bg-zinc-900 transition-all">
+                    <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Abort Modification</span>
+                </Link>
+              </motion.div>
+
+              {/* Header */}
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                <Heading
+                  title="Modify Commercial Identity"
+                  description={`Refining branding and fiscal parameters for ${firm.name}`}
+                />
+              </motion.div>
+
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+                {/* Left: Core & Fiscal */}
+                <div className="lg:col-span-7 space-y-8">
+                  {/* Part 1: Identity Core */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className={cn(PREMIUM_ROUNDING, "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl p-8 relative")}
+                  >
+                    <div className="flex items-center gap-4 mb-10">
+                      <div className="h-10 w-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900">
+                        <Pencil className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node_Segment_01</span>
+                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Identity Core</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="md:col-span-2 space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Institution Label</Label>
+                        <div className="relative group">
+                          <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder="e.g. HARMAIN TRADERS GLOBAL"
+                            className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 font-black focus:ring-orange-500/20 transition-all text-sm pl-12 uppercase"
+                            required
+                          />
+                        </div>
+                        {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tighter mt-1">{errors.name}</p>}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Registry Code</Label>
+                        <div className="relative group">
+                          <Code className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="code"
+                            value={form.code}
+                            onChange={handleChange}
+                            placeholder="[ID-ALPHA-4]"
+                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-xs pl-10 uppercase tracking-widest font-mono"
+                          />
+                        </div>
+                        {errors.code && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tighter mt-1">{errors.code}</p>}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Sync Date</Label>
+                        <Popover open={openCalendar} onOpenChange={setOpenCalendar}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold text-[10px] uppercase tracking-widest px-10 relative justify-start hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+                            >
+                              <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-500" />
+                              {date ? date.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }) : "Select Pulse Date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 rounded-2xl border-zinc-200 dark:border-zinc-800 shadow-2xl" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={date}
+                              onSelect={(val) => { setDate(val); setOpenCalendar(false); }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Business Directive</Label>
+                        <div className="relative group">
+                          <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="business"
+                            value={form.business}
+                            onChange={handleChange}
+                            placeholder="e.g. LOGISTICS & GLOBAL TRADING HUB"
+                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-xs pl-10 italic"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Operator Designation</Label>
+                        <div className="relative group">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="owner"
+                            value={form.owner}
+                            onChange={handleChange}
+                            placeholder="Director or Primary Stakeholder"
+                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-sm pl-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Part 2: Fiscal Parameters */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className={cn(PREMIUM_ROUNDING, "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl p-8 relative")}
+                  >
+                    <div className="flex items-center gap-4 mb-10">
+                      <div className="h-10 w-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                        <Receipt className="h-5 w-5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node_Segment_02</span>
+                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Fiscal Parameters</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Sales Tax ID (PSTR)</Label>
+                        <div className="relative group">
+                          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="saletax"
+                            value={form.saletax}
+                            onChange={handleChange}
+                            placeholder="TAX-0000000-0"
+                            className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 font-black focus:ring-orange-500/20 transition-all text-sm pl-12 tabular-nums tracking-widest font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">N.T.N Designation</Label>
+                        <div className="relative group">
+                          <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="ntn"
+                            value={form.ntn}
+                            onChange={handleChange}
+                            placeholder="NTN-0000000-0"
+                            className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 font-black focus:ring-orange-500/20 transition-all text-sm pl-12 tabular-nums tracking-widest font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Base Station (Address 1)</Label>
+                        <div className="relative group">
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
+                          <Input
+                            name="address1"
+                            value={form.address1}
+                            onChange={handleChange}
+                            placeholder="Primary headquarters location"
+                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-sm pl-10"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Satellite node (Address 2)</Label>
+                        <Input
+                          name="address2"
+                          value={form.address2}
+                          onChange={handleChange}
+                          placeholder="Secondary branch node"
+                          className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-xs pl-4"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Satellite node (Address 3)</Label>
+                        <Input
+                          name="address3"
+                          value={form.address3}
+                          onChange={handleChange}
+                          placeholder="Tertiary storage node"
+                          className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-xs pl-4"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Right: Assets & Connectivity */}
+                <div className="lg:col-span-5 space-y-8 lg:sticky lg:top-8">
+
+                  {/* Branding Asset */}
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className={cn(PREMIUM_ROUNDING, "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl p-8 flex flex-col items-center justify-center text-center space-y-6")}
+                  >
+                    <div className="w-full flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Identity Badge</span>
+                      <div className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
+                    </div>
+
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-orange-500 rounded-3xl blur-2xl opacity-0 group-hover:opacity-10 transition-opacity" />
+                      <div className="h-40 w-40 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center relative overflow-hidden transition-all group-hover:border-orange-500/50">
+                        {logoPreview ? (
+                          <img src={logoPreview} className="h-full w-full object-cover" alt="Preview" />
+                        ) : (
+                          <>
+                            <ImageIcon className="h-10 w-10 text-zinc-200 dark:text-zinc-800 mb-2" />
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-4">Awaiting Index</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          name="logo"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-900 dark:text-zinc-100">Synchronize Institution Brand</p>
+                      <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Only SVG, PNG or JPEG nodes accepted</p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="rounded-xl border border-zinc-100 dark:border-zinc-800 font-bold uppercase tracking-widest text-[9px] h-10 px-6 relative overflow-hidden group"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Browse File Segments
+                    </Button>
+                  </motion.div>
+
+                  {/* Connectivity & Logic */}
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className={cn(PREMIUM_ROUNDING, "border border-zinc-200 dark:border-zinc-800 bg-zinc-900 dark:bg-black p-8 space-y-8 shadow-2xl")}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Registry Communications</span>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 group">
+                          <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Phone</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-700 transition-colors group-focus-within:text-orange-500" />
+                            <Input
+                              name="phone"
+                              value={form.phone}
+                              onChange={handleChange}
+                              className="bg-transparent border-none border-b border-zinc-800 rounded-none pl-8 pr-0 text-white text-xs font-bold h-10 focus-visible:ring-0 focus-visible:border-orange-500 transition-all placeholder:text-zinc-800 tabular-nums"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2 group">
+                          <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Fax Node</Label>
+                          <Input
+                            name="fax"
+                            value={form.fax}
+                            onChange={handleChange}
+                            className="bg-transparent border-none border-b border-zinc-800 rounded-none pl-0 pr-0 text-white text-xs font-bold h-10 focus-visible:ring-0 focus-visible:border-orange-500 transition-all placeholder:text-zinc-800"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 group">
+                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Mailbox</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-700 transition-colors group-focus-within:text-orange-500" />
+                          <Input
+                            name="email"
+                            type="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            className="bg-transparent border-none border-b border-zinc-800 rounded-none pl-8 pr-0 text-white text-sm font-bold h-10 focus-visible:ring-0 focus-visible:border-orange-500 transition-all placeholder:text-zinc-800"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 group">
+                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500 transition-colors">Digital Portal</Label>
+                        <div className="relative">
+                          <Globe className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-700 transition-colors group-focus-within:text-orange-500" />
+                          <Input
+                            name="website"
+                            value={form.website}
+                            onChange={handleChange}
+                            className="bg-transparent border-none border-b border-zinc-800 rounded-none pl-8 pr-0 text-white text-xs font-bold h-10 focus-visible:ring-0 focus-visible:border-orange-500 transition-all placeholder:text-zinc-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5 pt-4 border-t border-zinc-800">
+                      <div className="flex items-center justify-between group">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Invoice Protocol</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Auto-generate hardcopies</span>
+                        </div>
+                        <Checkbox
+                          checked={form.printinvoice}
+                          onCheckedChange={(val) => setForm({ ...form, printinvoice: !!val })}
+                          className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between group">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Primary Terminal</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Set as main identity node</span>
+                        </div>
+                        <Checkbox
+                          checked={form.defult}
+                          onCheckedChange={(val) => setForm({ ...form, defult: !!val })}
+                          className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between group">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Active Pulse</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">System availability status</span>
+                        </div>
+                        <Checkbox
+                          checked={form.status}
+                          onCheckedChange={(val) => setForm({ ...form, status: !!val })}
+                          className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-6 flex flex-col gap-4">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full h-14 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-500/20 relative group overflow-hidden"
+                      >
+                        <span className="relative z-10 flex items-center justify-center gap-3">
+                          {isSubmitting ? "COMMITING..." : "UPDATE IDENTITY PARAMETERS"}
+                          {!isSubmitting && <Wand2 className="h-4 w-4 group-hover:rotate-12 transition-transform duration-500" />}
+                        </span>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                      </Button>
+
+                      <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600">
+                        <span>Auth: Verified</span>
+                        <span>Integrity: 100%</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              </form>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            {/* Left Column: Core Identity */}
-            <div className="lg:col-span-8 space-y-10">
-              <section className="p-8 bg-card border border-border/60 rounded-sm shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
-                <div className="flex items-center gap-2 mb-8">
-                  <div className="h-1 w-4 bg-orange-500 rounded-full" />
-                  <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Pulse Identity Fields</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Pulse Timestamp</Label>
-                    <Popover open={open} onOpenChange={setOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "w-full h-12 justify-between text-left font-mono italic tracking-tighter bg-muted/20 border-border/40 rounded-sm hover:border-orange-500/40 transition-colors",
-                            !date && "text-muted-foreground"
-                          )}
-                        >
-                          {date ? date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "EXEC-TIME"}
-                          <CalendarIcon className="h-4 w-4 opacity-40 text-orange-500" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 rounded-sm" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={date}
-                          onSelect={(value) => { if (value) setDate(value); setOpen(false); }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Firm Access Code</Label>
-                    <Input
-                      name="code"
-                      placeholder="[CODE-ALPHA-4]"
-                      value={formData.code}
-                      onChange={handleChange}
-                      className="h-12 bg-muted/20 border-border/40 font-mono italic tracking-tighter rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                    />
-                    {errors.code && <p className="text-[10px] font-bold text-rose-500 mt-1 uppercase tracking-widest italic animate-pulse">{errors.code}</p>}
-                  </div>
-
-                  <div className="md:col-span-2 space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Commercial Identity Title</Label>
-                    <Input
-                      name="name"
-                      placeholder="ENTER FULL LEGAL ENTITY NAME"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className="h-14 bg-muted/20 border-border/40 font-black tracking-tight text-lg rounded-sm focus:ring-1 focus:ring-orange-500/50 uppercase"
-                    />
-                    {errors.name && <p className="text-[10px] font-bold text-rose-500 mt-1 uppercase tracking-widest italic animate-pulse">{errors.name}</p>}
-                  </div>
-
-                  <div className="md:col-span-2 space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Business Core Directive</Label>
-                    <Input
-                      name="business"
-                      placeholder="e.g. TEXTILE LOGISTICS / GLOBAL TRADE"
-                      value={formData.business}
-                      onChange={handleChange}
-                      className="h-12 bg-muted/20 border-border/40 font-bold tracking-tight rounded-sm focus:ring-1 focus:ring-orange-500/50 italic opacity-80"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section className="p-8 bg-card border border-border/60 rounded-sm shadow-sm relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-8">
-                  <div className="h-1 w-4 bg-orange-500 rounded-full" />
-                  <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Geographic & Operator Auth</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  {["address1", "address2", "address3"].map((addr, i) => (
-                    <div key={addr} className="md:col-span-2 space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Location Vector {i + 1}</Label>
-                      <Input
-                        name={addr}
-                        placeholder={`VECTOR-COORDINATE-${i + 1}`}
-                        value={(formData as any)[addr]}
-                        onChange={handleChange}
-                        className="h-11 bg-muted/10 border-border/40 font-medium rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                      />
-                    </div>
-                  ))}
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Owner/Operator Pulse</Label>
-                    <Input
-                      name="owner"
-                      placeholder="HEAD PULSE NAME"
-                      value={formData.owner}
-                      onChange={handleChange}
-                      className="h-11 bg-muted/10 border-border/40 font-bold uppercase rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Pulse Telephone</Label>
-                    <Input
-                      name="phone"
-                      placeholder="+XX XXX XXXXXXX"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="h-11 bg-muted/10 border-border/40 font-mono tracking-tighter rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                    />
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            {/* Right Column: Meta & Assets */}
-            <div className="lg:col-span-4 space-y-8">
-              <section className="p-8 bg-muted/40 border border-border/60 rounded-sm shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="h-1 w-4 bg-orange-500 rounded-full" />
-                  <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Brand Identity Asset</h2>
-                </div>
-
-                <div
-                  className={cn(
-                    "relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-sm transition-all duration-300 bg-card",
-                    isDragging ? "border-orange-500 bg-orange-500/5 scale-[1.02]" : "border-border/60 hover:border-orange-500/40 shadow-inner",
-                    (formData.logo || firm?.logo) && "border-solid border-orange-500/20"
-                  )}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  {formData.logo ? (
-                    <div className="relative group w-32 h-32 overflow-hidden rounded-sm border-2 border-orange-500/20 shadow-2xl">
-                      <img
-                        src={URL.createObjectURL(formData.logo)}
-                        alt="Logo preview"
-                        className="w-full h-full object-contain bg-white p-2"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={removeLogo}
-                          className="rounded-sm font-black uppercase tracking-widest text-[10px]"
-                        >
-                          Purge Asset
-                        </Button>
-                      </div>
-                    </div>
-                  ) : firm?.logo ? (
-                    <div className="relative group w-32 h-32 overflow-hidden rounded-sm border-2 border-orange-500/20 shadow-2xl">
-                      <img
-                        src={`/storage/${firm.logo}`}
-                        alt="Current logo"
-                        className="w-full h-full object-contain bg-white p-2"
-                      />
-                      <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm cursor-pointer">
-                        <Upload className="w-6 h-6 text-white mb-2" />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Update Asset</span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                        />
-                      </label>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer p-6 text-center">
-                      <Upload className={cn("w-8 h-8 mb-4 transition-all", isDragging ? "text-orange-500 translate-y-[-4px]" : "text-muted-foreground/30")} />
-                      <p className="text-[11px] font-black text-foreground uppercase tracking-widest">
-                        Upload Identity Asset
-                      </p>
-                      <p className="text-[9px] text-muted-foreground/60 mt-2 uppercase tracking-tight leading-relaxed">
-                        Drag identity logo or click to select.<br />SVGs preferred for pulse precision.
-                      </p>
-                      <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                    </label>
-                  )}
-                </div>
-                {firm?.logo && !formData.logo && (
-                  <p className="text-[9px] text-muted-foreground mt-4 text-center italic uppercase font-bold tracking-widest opacity-60">
-                    Identity Link Verified: Image Override Active
-                  </p>
-                )}
-              </section>
-
-              <section className="p-8 bg-card border border-border/60 rounded-sm shadow-sm space-y-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-1 w-4 bg-orange-500 rounded-full" />
-                  <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Digital Parameters</h2>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Pulse Mailbox</Label>
-                    <Input
-                      type="email"
-                      name="email"
-                      placeholder="operator@firm.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="bg-muted/10 border-border/40 font-medium rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Global Web Node</Label>
-                    <Input
-                      name="website"
-                      placeholder="https://firm.com"
-                      value={formData.website}
-                      onChange={handleChange}
-                      className="bg-muted/10 border-border/40 font-medium rounded-sm focus:ring-1 focus:ring-orange-500/50"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">Sales Tax Pulse</Label>
-                      <Input
-                        name="saletax"
-                        placeholder="TAX-ID"
-                        value={formData.saletax}
-                        onChange={handleChange}
-                        className="h-10 bg-muted/10 border-border/40 font-mono text-xs rounded-sm focus:ring-1 focus:ring-orange-500/50 tracking-tighter"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/80">N.T.N Pulse</Label>
-                      <Input
-                        name="ntn"
-                        placeholder="NTN-ID"
-                        value={formData.ntn}
-                        onChange={handleChange}
-                        className="h-10 bg-muted/10 border-border/40 font-mono text-xs rounded-sm focus:ring-1 focus:ring-orange-500/50 tracking-tighter"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="p-8 bg-card border border-border/60 rounded-sm shadow-sm space-y-8">
-                <div className="space-y-6">
-                  {[
-                    { id: "invoice", name: "printinvoice", label: "Invoice Protocol", sub: "Auto-generate hardcopies" },
-                    { id: "default", name: "defult", label: "Primary Terminal", sub: "Set as main identity" },
-                    { id: "status", name: "status", label: "Active Pulse", sub: "System availability status" }
-                  ].map((item) => (
-                    <div key={item.id} className="flex items-start justify-between group">
-                      <div className="space-y-1">
-                        <Label htmlFor={item.id} className="text-xs font-black uppercase tracking-widest text-foreground/90 leading-none">
-                          {item.label}
-                        </Label>
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">{item.sub}</p>
-                      </div>
-                      <Checkbox
-                        id={item.id}
-                        name={item.name}
-                        checked={(formData as any)[item.name]}
-                        onCheckedChange={(checked) => setFormData({ ...formData, [item.name]: !!checked })}
-                        className="h-5 w-5 rounded-sm border-2 border-border/60 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 transition-colors"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </form>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+          <style dangerouslySetInnerHTML={{
+            __html: `
+            .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { 
+              background: #e4e4e7; 
+              border-radius: 10px;
+            }
+            .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d4d4d8; }
+          `}} />
+        </SidebarInset>
+      </SidebarProvider>
+    </>
   );
 }

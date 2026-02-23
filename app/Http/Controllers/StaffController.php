@@ -91,7 +91,7 @@ class StaffController extends Controller
     {
         $user = User::with('roles')->findOrFail($id);
         return Inertia::render('Staff/Show', [
-            'user' => $user,
+            'staff' => $user,
         ]);
     }
 
@@ -105,7 +105,7 @@ class StaffController extends Controller
         $userRoles = $user->roles->pluck('name')->toArray();
 
         return Inertia::render('Staff/Edit', [
-            'user' => $user,
+            'staff' => $user,
             'roles' => $roles,
             'userRoles' => $userRoles,
         ]);

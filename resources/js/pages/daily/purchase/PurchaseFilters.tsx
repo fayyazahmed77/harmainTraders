@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { router } from "@inertiajs/react";
-import { Search, Filter, X, Calendar as CalendarIcon } from "lucide-react";
+import { Search, Filter, X, Calendar as CalendarIcon, Hash, User, ShieldCheck, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Select,
@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FilterProps {
     filters: {
@@ -30,12 +31,17 @@ interface FilterProps {
     }[];
 }
 
-const FieldWrapper = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
-    <div className={`relative ${className}`}>
-        <label className="absolute -top-2 left-3 px-2 bg-white dark:bg-[#0a0a0a] text-[11px] font-medium text-gray-600 z-10 leading-none">
-            {label}
-        </label>
-        <div>
+const PREMIUM_ROUNDING = "rounded-xl";
+
+const FieldWrapper = ({ label, icon: Icon, children, className = "" }: { label: string; icon: any; children: React.ReactNode; className?: string }) => (
+    <div className={cn("relative group flex-1", className)}>
+        <div className="flex items-center gap-2 mb-1.5 px-1">
+            <Icon className="h-3 w-3 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
+            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none">
+                {label}
+            </label>
+        </div>
+        <div className="relative">
             {children}
         </div>
     </div>
@@ -76,104 +82,120 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
     };
 
     return (
-        <div className=" p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+                PREMIUM_ROUNDING,
+                "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm"
+            )}
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
 
-            {/* Date Range Picker */}
-            <FieldWrapper label="Date Range" className="flex-1 min-w-[200px]">
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            id="date"
-                            variant={"outline"}
-                            className={cn(
-                                "w-full justify-start text-left font-normal h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors",
-                                !date && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-sky-600" />
-                            {date?.from ? (
-                                date.to ? (
-                                    <>
-                                        {format(date.from, "LLL dd, y")} -{" "}
-                                        {format(date.to, "LLL dd, y")}
-                                    </>
+                {/* 1. Temporal Range */}
+                <FieldWrapper label="Temporal Range" icon={CalendarIcon}>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "w-full justify-start text-left font-bold h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs",
+                                    !date && "text-zinc-400"
+                                )}
+                            >
+                                {date?.from ? (
+                                    date.to ? (
+                                        <span className="tabular-nums">
+                                            {format(date.from, "MMM dd")} — {format(date.to, "MMM dd")}
+                                        </span>
+                                    ) : (
+                                        format(date.from, "MMM dd, y")
+                                    )
                                 ) : (
-                                    format(date.from, "LLL dd, y")
-                                )
-                            ) : (
-                                <span>Pick a date range</span>
-                            )}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            initialFocus
-                            mode="range"
-                            defaultMonth={date?.from}
-                            selected={date}
-                            onSelect={setDate}
-                            numberOfMonths={2}
+                                    "Select Date Window"
+                                )}
+                                <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-2xl overflow-hidden" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={date?.from}
+                                selected={date}
+                                onSelect={setDate}
+                                numberOfMonths={2}
+                                className="bg-white dark:bg-zinc-900"
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </FieldWrapper>
+
+                {/* 2. Provider Selection */}
+                <FieldWrapper label="Supplier Entity" icon={User}>
+                    <Select value={supplierId} onValueChange={setSupplierId}>
+                        <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
+                            <SelectValue placeholder="All Providers" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                            <SelectItem value="all" className="text-xs font-bold">All Providers</SelectItem>
+                            {suppliers.map((supplier) => (
+                                <SelectItem key={supplier.id} value={String(supplier.id)} className="text-xs font-bold">
+                                    {supplier.title}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </FieldWrapper>
+
+                {/* 3. Operational Status */}
+                <FieldWrapper label="Lifecycle Status" icon={ShieldCheck}>
+                    <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
+                            <SelectValue placeholder="All States" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                            <SelectItem value="all" className="text-xs font-bold lowercase italic opacity-50">Filter by Status</SelectItem>
+                            {["Completed", "Partial Return", "Returned"].map((s) => (
+                                <SelectItem key={s} value={s} className="text-xs font-bold">
+                                    {s}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </FieldWrapper>
+
+                {/* 4. Document Search */}
+                <FieldWrapper label="Reference Query" icon={Hash}>
+                    <div className="relative">
+                        <Input
+                            type="text"
+                            placeholder="Invoice # / ID"
+                            className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 focus:border-orange-500/50 focus-visible:ring-0 transition-all text-xs font-bold tabular-nums"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                         />
-                    </PopoverContent>
-                </Popover>
-            </FieldWrapper>
+                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                    </div>
+                </FieldWrapper>
 
-
-            {/* Supplier Filter */}
-            <FieldWrapper label="Filter by Supplier" className="flex-1 min-w-[180px]">
-                <Select value={supplierId} onValueChange={setSupplierId}>
-                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                        <SelectValue placeholder="Select Supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Suppliers</SelectItem>
-                        {suppliers.map((supplier) => (
-                            <SelectItem key={supplier.id} value={String(supplier.id)}>
-                                {supplier.title}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </FieldWrapper>
-
-            {/* Status Filter */}
-            <FieldWrapper label="Status" className="flex-1 min-w-[150px]">
-                <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                        <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                        <SelectItem value="Partial Return">Partial Return</SelectItem>
-                        <SelectItem value="Returned">Returned</SelectItem>
-                    </SelectContent>
-                </Select>
-            </FieldWrapper>
-
-            {/* Search Input */}
-            <FieldWrapper label="Search Invoice" className="flex-1 min-w-[200px]">
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-sky-600 z-10" />
-                    <Input
-                        type="text"
-                        placeholder="Type to search..."
-                        className="pl-8 h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+                {/* 5. Protocol Actions */}
+                <div className="flex items-end gap-3 lg:col-span-4 xl:col-span-1">
+                    <Button
+                        onClick={applyFilters}
+                        className="flex-1 bg-zinc-900 dark:bg-zinc-100 hover:bg-orange-600 dark:hover:bg-orange-500 text-white dark:text-zinc-900 h-11 rounded-xl shadow-lg shadow-zinc-200 dark:shadow-none font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                    >
+                        <Filter className="mr-2 h-3 w-3" /> Execute Filter
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        onClick={clearFilters}
+                        className="h-11 w-11 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
                 </div>
-            </FieldWrapper>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 h-10 mt-auto">
-                <Button onClick={applyFilters} className="bg-sky-600 hover:bg-sky-700 h-10">
-                    <Filter className="mr-2 h-4 w-4" /> Apply
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 h-10 border-slate-200">
-                    <X className="mr-2 h-4 w-4" /> Clear
-                </Button>
             </div>
-        </div>
+        </motion.div>
     );
 }

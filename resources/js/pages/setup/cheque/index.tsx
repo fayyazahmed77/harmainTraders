@@ -5,16 +5,20 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Search, Filter, Hash, CreditCard, Building2, Calendar as CalendarIcon } from "lucide-react";
 import { BreadcrumbItem } from "@/types";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, usePage, Head } from "@inertiajs/react";
 import useToastFromQuery from "@/hooks/useToastFromQuery";
 import { DataTable } from "@/components/setup/cheque/DataTable";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Heading } from "@/components/ui/Heading";
+import { Card } from "@/components/ui/card";
 
 // ✅ Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Setup", href: "#" },
-    { title: "Cheque Books", href: "/chequebook" },
+    { title: "Financials", href: "#" },
+    { title: "Cheque Assets", href: "/cheque" },
 ];
 
 // ✅ ChequeBook Interface
@@ -37,6 +41,8 @@ interface ChequeBook {
     created_at: string;
 }
 
+const PREMIUM_ROUNDING = "rounded-2xl";
+
 export default function ChequeBookPage() {
     // ✅ Inertia props
     const { chequebook } = usePage().props as unknown as {
@@ -55,70 +61,123 @@ export default function ChequeBookPage() {
         errors: Record<string, string>;
     };
 
-    const permissions = pageProps.auth.permissions;
-    const errors = pageProps.errors;
+    const permissions = pageProps.auth?.permissions || [];
+    const errors = pageProps.errors || {};
 
     // ✅ Permission: can user create new cheque books?
     const canCreate = permissions.includes("create chequebook");
 
-    // ✅ Route helper
-    function route(_name: string): string {
-        // Minimal route helper for development; replace with your real route helper (e.g. Ziggy) in production.
-        if (_name === "cheque.create") return "/cheque/create";
-        return "";
-    }
-
     return (
-        <SidebarProvider
-            style={
-                {
-                    "--sidebar-width": "calc(var(--spacing) * 61)",
-                    "--header-height": "calc(var(--spacing) * 12)",
-                } as React.CSSProperties
-            }
-        >
+        <SidebarProvider>
+            <Head title="Financial Assets | Cheque Registry" />
             <AppSidebar variant="inset" />
-            <SidebarInset>
+            <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="mt-6 px-6">
-                    {/* ===== Header Section ===== */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-1">Cheque Book Generation</h1>
-                            <p className="text-sm text-muted-foreground">
-                                Create and manage cheque books for different banks.
-                            </p>
-                        </div>
-
-                        {/* ===== Add Button (Permission Based) ===== */}
-                        {canCreate && (
-                            <Link href={route("cheque.create")}>
-                                <Button className="shadow-sm hover:shadow-md transition-all">
-                                    <Plus className="mr-2 h-4 w-4" /> Generate Cheque Book
+                <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar">
+                    <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
+                        {/* ===== Header Section ===== */}
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex flex-col md:flex-row md:items-end justify-between gap-4"
+                        >
+                            <Heading
+                                title="Cheque Assets"
+                                description="Secure registry of generated cheque books and financial instruments"
+                            />
+                            <div className="flex gap-3">
+                                <Button asChild className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95">
+                                    <Link href="/cheque/create">
+                                        <Plus className="mr-2 h-4 w-4" /> Provision Cheque Book
+                                    </Link>
                                 </Button>
-                            </Link>
-                        )}
-                    </div>
+                            </div>
+                        </motion.div>
 
-                    {/* ===== Validation Errors ===== */}
-                    {Object.keys(errors).length > 0 && (
-                        <div className="p-3 mb-4 text-red-600 bg-red-50 rounded-md border border-red-200">
-                            {Object.values(errors).map((err, idx) => (
-                                <p key={idx}>{err}</p>
+                        {/* ===== Stats / Overview Bar (Optional for Premium Feel) ===== */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                        >
+                            {[
+                                { label: "Total Asset Count", value: chequebook.length, icon: CreditCard, color: "text-orange-500" },
+                                { label: "Bank Entities", value: Array.from(new Set(chequebook.map(c => c.bank_id))).length, icon: Building2, color: "text-zinc-500" },
+                                { label: "Registry Protocols", value: "ACTIVE", icon: Hash, color: "text-green-500", suffix: "ONLINE" },
+                                { label: "Last Induction", value: chequebook.length > 0 ? new Date(chequebook[0].created_at).toLocaleDateString() : "VOID", icon: CalendarIcon, color: "text-blue-500" },
+                            ].map((stat, i) => (
+                                <Card key={i} className={cn(PREMIUM_ROUNDING, "p-4 border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl flex items-center justify-between")}>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] uppercase font-bold tracking-widest text-zinc-400 font-mono">{stat.label}</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl font-black tracking-tighter">{stat.value}</span>
+                                            {stat.suffix && <span className="text-[10px] font-bold text-green-500">{stat.suffix}</span>}
+                                        </div>
+                                    </div>
+                                    <stat.icon className={cn("h-8 w-8 opacity-20", stat.color)} />
+                                </Card>
                             ))}
-                        </div>
-                    )}
+                        </motion.div>
 
-                    {/* ===== Table Section ===== */}
-                    {chequebook.length === 0 ? (
-                        <div className="text-center text-muted-foreground py-10 border rounded-md">
-                            No cheque books found.
-                        </div>
-                    ) : (
-                        <DataTable data={chequebook} />
-                    )}
+                        {/* ===== Main Content ===== */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                        >
+                            <Card className={cn(PREMIUM_ROUNDING, "overflow-hidden border-zinc-200 dark:border-zinc-800 shadow-2xl shadow-zinc-200/50 dark:shadow-none bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl")}>
+                                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-50/50 dark:bg-zinc-800/30">
+                                    <div className="flex items-center gap-4 flex-1 max-w-md">
+                                        <div className="relative w-full">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Decrypt cheque serial or bank signature..."
+                                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
+                                            />
+                                        </div>
+                                        <Button variant="outline" size="icon" className="rounded-xl flex-shrink-0">
+                                            <Filter className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Master Financial Registry</span>
+                                    </div>
+                                </div>
+
+                                <div className="p-0">
+                                    {chequebook.length === 0 ? (
+                                        <div className="text-center py-20 flex flex-col items-center gap-4">
+                                            <div className="h-16 w-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                                                <CreditCard className="h-8 w-8 text-zinc-300" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h3 className="font-bold uppercase tracking-widest text-sm">No Assets Detected</h3>
+                                                <p className="text-xs text-zinc-400">Initialize a new cheque book to begin tracking</p>
+                                            </div>
+                                            <Button asChild variant="outline" className="mt-2 rounded-xl border-dashed">
+                                                <Link href="/cheque/create">Provision New Registry</Link>
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <DataTable data={chequebook} />
+                                    )}
+                                </div>
+                            </Card>
+                        </motion.div>
+                    </div>
                 </div>
+
+                <style>{`
+                    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+                    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; border: 1px solid transparent; background-clip: padding-box; }
+                    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
+                `}</style>
             </SidebarInset>
         </SidebarProvider>
     );

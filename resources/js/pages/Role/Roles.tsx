@@ -1,181 +1,238 @@
-import React, { useState } from 'react';
-import { Head, usePage, router } from '@inertiajs/react';
-
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import RolesLayout from '@/layouts/roles/layout';
-import HeadingSmall from '@/components/heading-small';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from "@/components/ui/checkbox";
-import { LucideIcon } from 'lucide-react';
-import * as Icons from 'lucide-react';
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs";
-
-import {
-    Users,
-    User,
-    ShieldCheck,
-    Settings,
-    MessageSquare,
-    FileText,
-    Briefcase,
-    Globe,
-    AppWindow,
-    LayoutDashboard,
-} from "lucide-react";
-
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type BreadcrumbItem } from '@/types';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from "framer-motion";
+import * as Icons from 'lucide-react';
+import { LucideIcon, Shield, ShieldCheck, Save, LayoutGrid, Info } from 'lucide-react';
 
-// Updated permission type
-interface PermissionAction {
+interface Permission {
     id: number;
     name: string;
 }
 
-interface PermissionCategory {
+interface Category {
     label: string;
     icon: string;
-    actions: PermissionAction[];
+    actions: Permission[];
 }
 
-interface PagePropsWithPermissions {
-    permissionCategories?: PermissionCategory[];
+interface RolesProps {
+    permissionCategories: Category[];
+    [key: string]: unknown;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Roles & Permission',
-        href: '/roles/permissions',
-    },
+    { title: 'Provision Role', href: '/roles/permissions' },
 ];
 
+const PREMIUM_ROUNDING = "rounded-xl";
+const PREMIUM_ROUNDING_MD = "rounded-md";
+const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
+const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
+
+const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode, icon?: any, label: string }) => (
+    <div className="space-y-1">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-1 font-mono">
+            {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+            {label}
+        </div>
+        {children}
+    </div>
+);
+
 export default function Roles() {
-    const iconMap: Record<string, any> = {
-        Users,
-        User,
-        ShieldCheck,
-        Settings,
-        MessageSquare,
-        FileText,
-        Briefcase,
-        Globe,
-        AppWindow,
-        LayoutDashboard,
+    const { permissionCategories = [] } = usePage<RolesProps>().props;
+
+    const { data, setData, post, processing, errors } = useForm({
+        roleName: '',
+        permissions: [] as number[],
+    });
+
+    const [activeTab, setActiveTab] = useState(permissionCategories[0]?.label || '');
+
+    const togglePermission = (id: number) => {
+        const newPermissions = data.permissions.includes(id)
+            ? data.permissions.filter((pId) => pId !== id)
+            : [...data.permissions, id];
+        setData('permissions', newPermissions);
     };
 
-    const { permissionCategories: rawPermissionCategories = [] } = usePage().props as PagePropsWithPermissions;
+    const handleSelectAll = (categoryPermissions: Permission[]) => {
+        const categoryIds = categoryPermissions.map(p => p.id);
+        const allSelected = categoryIds.every(id => data.permissions.includes(id));
 
-    const permissionCategories = rawPermissionCategories.map((cat) => ({
-        ...cat,
-        icon: cat.icon || "ShieldCheck", // keep as string
-    }));
-
-    const [roleName, setRoleName] = useState('');
-    const [checkedPermissions, setCheckedPermissions] = useState<number[]>([]); // use flat array of IDs
-
-    const isChecked = (id: number) => checkedPermissions.includes(id);
-
-    const handlePermissionToggle = (id: number, checked: boolean) => {
-        setCheckedPermissions(prev =>
-            checked ? [...prev, id] : prev.filter(pid => pid !== id)
-        );
+        if (allSelected) {
+            setData('permissions', data.permissions.filter(id => !categoryIds.includes(id)));
+        } else {
+            const otherPermissions = data.permissions.filter(id => !categoryIds.includes(id));
+            setData('permissions', [...otherPermissions, ...categoryIds]);
+        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        router.post('/roles/permissions', {
-            roleName,
-            permissions: checkedPermissions,
-        });
+        post('/roles/permissions');
     };
 
     return (
         <>
-            <Head title="Roles & Permissions" />
-            <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset>
+            <Head title="Provision Role" />
+            <SidebarProvider >
+                <AppSidebar variant="inset" />
+                <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 flex flex-col">
                     <SiteHeader breadcrumbs={breadcrumbs} />
+
                     <RolesLayout>
-                        <div className="p-6 rounded-xl shadow border w-full px-4 md:px-6 lg:px-8">
-                            <HeadingSmall title="Add new Role" description="Create a new role and assign permissions." />
-                            <form onSubmit={handleSubmit} className="mt-4 space-y-6 w-full">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="roleName">Role name</Label>
-                                    <Input
-                                        id="roleName"
-                                        value={roleName}
-                                        onChange={(e) => setRoleName(e.target.value)}
-                                        placeholder="e.g. Manager"
-                                        className="w-70"
-                                    />
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            {/* Header Section */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`p-6 ${CARD_BASE} ${PREMIUM_ROUNDING} ${PREMIUM_GRADIENT} relative overflow-hidden`}
+                            >
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
+                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+                                    <div className="space-y-4 flex-1 max-w-xl">
+                                        <div className="space-y-1">
+                                            <h2 className="text-2xl font-black uppercase tracking-tighter text-zinc-900 dark:text-white">Provision Role</h2>
+                                            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Architecting new security clearance levels</p>
+                                        </div>
+
+                                        <TechLabel label="Architectural Identity" icon={Shield}>
+                                            <Input
+                                                value={data.roleName}
+                                                onChange={(e) => setData('roleName', e.target.value)}
+                                                placeholder="e.g. EXECUTIVE_OFFICER"
+                                                className={`h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} font-black text-sm uppercase tracking-tighter focus-visible:ring-orange-500`}
+                                                required
+                                            />
+                                            {errors.roleName && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mt-1">{errors.roleName}</p>}
+                                        </TechLabel>
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        className={`h-12 px-8 bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20 ${PREMIUM_ROUNDING_MD} transition-all active:scale-95`}
+                                    >
+                                        <Save className="mr-2 h-4 w-4" /> Commit Protocol
+                                    </Button>
+                                </div>
+                            </motion.div>
+
+                            {/* Permissions Architecture */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className={`flex-1 min-h-0 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING} overflow-hidden`}
+                            >
+                                <div className="bg-zinc-50 dark:bg-zinc-900/50 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck size={14} className="text-orange-500" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Access Matrix</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Info size={12} className="text-zinc-400" />
+                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{data.permissions.length} Protocols Selected</span>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <Label className="mb-2">Permissions</Label>
-                                    <Tabs defaultValue={permissionCategories[0]?.label ?? ''} className="w-full mt-3">
-                                        <TabsList className="bg-transparent p-0 flex flex-wrap gap-2 h-auto justify-start w-full">
-                                            {permissionCategories.map((perm, i) => {
-                                                const IconComponent = Icons[perm.icon as keyof typeof Icons] as LucideIcon;
-                                                return (
-                                                    <TabsTrigger
-                                                        key={i}
-                                                        value={perm.label}
-                                                        className="flex items-center gap-2 px-2 py-1 border rounded-sm data-[state=active]:bg-[#F19D3B] data-[state=active]:text-white data-[state=active]:border-[#F19D3B] bg-white text-gray-600 hover:bg-gray-50 transition-all shadow-sm flex-initial h-auto cursor-pointer"
+                                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col md:flex-row min-h-[500px]">
+                                    <TabsList className="flex flex-row md:flex-col items-stretch justify-start bg-zinc-50 dark:bg-zinc-900/30 w-full md:w-64 h-auto p-2 md:p-4 gap-1 border-r border-zinc-200 dark:border-zinc-800 rounded-none overflow-x-auto md:overflow-x-visible">
+                                        {permissionCategories.map((category, idx) => {
+                                            const IconComponent = Icons[category.icon as keyof typeof Icons] as LucideIcon;
+                                            const isActive = activeTab === category.label;
+                                            return (
+                                                <TabsTrigger
+                                                    key={idx}
+                                                    value={category.label}
+                                                    className={`
+                                                        justify-start gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg
+                                                        ${isActive
+                                                            ? 'bg-white dark:bg-zinc-800 text-orange-600 dark:text-orange-400 shadow-sm border border-zinc-200 dark:border-zinc-700'
+                                                            : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                                                    `}
+                                                >
+                                                    {IconComponent ? <IconComponent size={14} /> : <LayoutGrid size={14} />}
+                                                    <span className="truncate">{category.label}</span>
+                                                </TabsTrigger>
+                                            );
+                                        })}
+                                    </TabsList>
+
+                                    <div className="flex-1 p-6 overflow-y-auto max-h-[600px]">
+                                        <AnimatePresence mode="wait">
+                                            {permissionCategories.map((category, catIdx) => (
+                                                <TabsContent key={catIdx} value={category.label} className="mt-0 focus-visible:outline-none">
+                                                    <motion.div
+                                                        initial={{ opacity: 0, x: 20 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, x: -20 }}
+                                                        className="space-y-6"
                                                     >
-                                                        {IconComponent && <IconComponent className="w-4 h-4" />}
-                                                        <span className="text-sm font-medium">{perm.label}</span>
-                                                    </TabsTrigger>
-                                                );
-                                            })}
-                                        </TabsList>
-
-                                        {permissionCategories.map((perm, i) => (
-                                            <TabsContent key={i} value={perm.label} className="mt-2">
-                                                <div className="border rounded-lg p-4 mt-2">
-                                                    <Label className="font-semibold flex items-center gap-2 mb-2">
-                                                        <span>{perm.label}</span>
-                                                    </Label>
-
-                                                    {perm.actions.length > 0 ? (
-                                                        perm.actions.map((action) => (
-                                                            <div key={action.id} className="flex items-center gap-3 mb-2">
-                                                                <Checkbox
-                                                                    id={`perm-${action.id}`}
-                                                                    checked={isChecked(action.id)}
-                                                                    onCheckedChange={(checked) =>
-                                                                        handlePermissionToggle(action.id, checked as boolean)
-                                                                    }
-                                                                    className="cursor-pointer"
-                                                                />
-                                                                <Label htmlFor={`perm-${action.id}`} className="text-sm">
-                                                                    {action.name}
-                                                                </Label>
+                                                        <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                                                            <div className="space-y-0.5">
+                                                                <h3 className="text-sm font-black uppercase tracking-tighter text-zinc-800 dark:text-zinc-200">{category.label} Permissions</h3>
+                                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Select relevant access protocols for this module</p>
                                                             </div>
-                                                        ))
-                                                    ) : (
-                                                        <p className="text-sm text-muted-foreground">No actions</p>
-                                                    )}
-                                                </div>
-                                            </TabsContent>
-                                        ))}
-                                    </Tabs>
-                                </div>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleSelectAll(category.actions)}
+                                                                className={`h-8 px-4 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400`}
+                                                            >
+                                                                Toggle Category
+                                                            </Button>
+                                                        </div>
 
-                                <div className="flex justify-end">
-                                    <Button type="submit">Save</Button>
-                                </div>
-                            </form>
-                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                            {category.actions.map((action, idx) => {
+                                                                const isSelected = data.permissions.includes(action.id);
+                                                                return (
+                                                                    <motion.div
+                                                                        key={action.id}
+                                                                        initial={{ opacity: 0, scale: 0.95 }}
+                                                                        animate={{ opacity: 1, scale: 1 }}
+                                                                        transition={{ delay: idx * 0.02 }}
+                                                                        onClick={() => togglePermission(action.id)}
+                                                                        className={`
+                                                                            group cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all
+                                                                            ${isSelected
+                                                                                ? 'bg-orange-500/5 border-orange-200 dark:border-orange-500/30 shadow-sm'
+                                                                                : 'bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}
+                                                                        `}
+                                                                    >
+                                                                        <div className={`
+                                                                            w-4 h-4 rounded-md border flex items-center justify-center transition-all
+                                                                            ${isSelected
+                                                                                ? 'bg-orange-500 border-orange-500 text-white'
+                                                                                : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}
+                                                                        `}>
+                                                                            {isSelected && <Icons.Check size={10} strokeWidth={4} />}
+                                                                        </div>
+                                                                        <span className={`text-[11px] font-bold uppercase tracking-tight transition-colors ${isSelected ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                                                            {action.name}
+                                                                        </span>
+                                                                    </motion.div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </motion.div>
+                                                </TabsContent>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                </Tabs>
+                            </motion.div>
+                        </form>
                     </RolesLayout>
                 </SidebarInset>
             </SidebarProvider>
