@@ -10,6 +10,17 @@ $logo_data = file_get_contents($logo_path);
 $logo_type = pathinfo($logo_path, PATHINFO_EXTENSION);
 $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_data);
 }
+
+// Firm Logo Base64
+$firm_logo_base64 = "";
+if (isset($firm) && $firm->logo) {
+$f_path = storage_path('app/public/' . $firm->logo);
+if (file_exists($f_path)) {
+$f_data = file_get_contents($f_path);
+$f_type = pathinfo($f_path, PATHINFO_EXTENSION);
+$firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data);
+}
+}
 @endphp
 <!DOCTYPE html>
 <html>
@@ -379,26 +390,44 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 </head>
 
 <body>
-
+    @if($firm)
+    @if($firm->name == 'Harmain Traders')
     <div class="watermark-container">
         <img src="{{ $logo_base64 }}" alt="watermark">
     </div>
+    @endif
 
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
+            @if($firm->name == 'Harmain Traders')
             <div class="logo-section">
-                <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"> </div>
+                <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"></div>
                 <div class="brand-text">
                     <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
                     <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
                 </div>
             </div>
+            @else
+            <div class="logo-section">
+                @if($firm_logo_base64)
+                <div class="logo-icon">
+                    <img src="{{ $firm_logo_base64 }}" style="max-height: 35px; width: auto; margin-left: 70px;">
+                </div>
+                @else
+                <div class="brand-text">
+                    <div class="brand-name">{{ $firm->name }}</div>
+                    <div class="brand-tagline">{{ $firm->business }}</div>
+                </div>
+                @endif
+            </div>
+            @endif
         </div>
         <div class="header-contact" style="width: 40%;">
-            <div class="contact-item">Phone : 0332-3228684</div>
-            <div class="contact-item">Fix no : 0343-8772357</div>
+            <div class="contact-item">Sales Teams : {{ $firm->phone }}</div>
+            <div class="contact-item">Complain No : {{ $firm->fax }}</div>
         </div>
     </div>
+    @endif
 
     <!-- Banner Row (Centered Title) -->
     <div class="banner-row">

@@ -90,7 +90,7 @@ export default function FirmIndex() {
                 className="flex flex-col md:flex-row md:items-center justify-between gap-6"
               >
                 <Heading
-                  title="Commercial Identity Registry"
+                  title="Firm Directory"
                   description="Govern institutional branding, fiscal parameters, and global commercial node signatures"
                 />
 

@@ -28,8 +28,8 @@ class OfferListController extends Controller
     {
         $items = Items::get();
         $categories = ItemCategory::where('status', 'active')->get();
-        $accounts = Account::select('id', 'title')->whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Customers', 'Supplier']);
+        $accounts = Account::select('id', 'title', 'item_category')->whereHas('accountType', function ($q) {
+            $q->where('name', 'Customers');
         })
             ->get();
 

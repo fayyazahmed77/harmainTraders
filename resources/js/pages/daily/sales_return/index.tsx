@@ -63,7 +63,7 @@ export default function Index({ returns }: Props) {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-6"
                         >
                             <Heading
-                                title="Credit Note Analytics Ledger"
+                                title="Sales Return"
                                 description="Comprehensive archive of customer returns and automated credit adjustments"
                             />
 

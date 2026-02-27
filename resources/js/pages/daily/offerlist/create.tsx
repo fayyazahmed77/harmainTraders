@@ -1,17 +1,33 @@
-// Offer Listing Layout with Item Auto-Fill on Select
-import React, { useState, useMemo } from "react";
+// Offer Provisioning Surface - Premium Redesign
+import React, { useState, useMemo, useEffect } from "react";
+import { Heading } from "@/components/ui/Heading";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, FileText, ListRestart, RotateCcw } from "lucide-react";
+import {
+    Trash2,
+    Plus,
+    FileText,
+    RotateCcw,
+    Sparkles,
+    Zap,
+    Workflow,
+    Save,
+    CalendarClock,
+    UserCircle2,
+    Tag,
+    ShieldCheck,
+    PackageSearch,
+    BadgeInfo,
+    LayoutGrid,
+    ListPlus,
+    History
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-
 import {
     Select,
     SelectContent,
@@ -22,13 +38,16 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { router } from '@inertiajs/react';
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 // ───────────────────────────────────────────
 // Breadcrumbs
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Offer", href: "/offer" },
-    { title: "Listing", href: "/offer/list" },
+    { title: "Material Control", href: "/offer" },
+    { title: "Negotiation Registry", href: "/offer/list" },
+    { title: "Node Initialization", href: "/offer-list/create" },
 ];
 
 // ───────────────────────────────────────────
@@ -42,10 +61,16 @@ interface Item {
     trade_price: number;
     retail: number;
     packing_qty: number;
-    category: string; // This might be ID or Name depending on backend
+    category: string;
     gst_percent: number;
     retail_tp_diff: number;
     discount: number;
+    pt2?: number;
+    pt3?: number;
+    pt4?: number;
+    pt5?: number;
+    pt6?: number;
+    pt7?: number;
 }
 
 interface Category {
@@ -56,6 +81,7 @@ interface Category {
 interface Account {
     id: number;
     title: string;
+    item_category?: string | null;
 }
 
 interface RowData {
@@ -78,14 +104,57 @@ interface MessageLine {
 }
 
 export default function OfferListing({ items, categories, accounts, messageLines }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[] }) {
-    const [date, setDate] = useState(new Date().toLocaleDateString('en-GB'));
+    const [date] = useState(new Date().toLocaleDateString('en-GB'));
     const [selectedAccount, setSelectedAccount] = useState<string>("");
+    const [customerCategory, setCustomerCategory] = useState<string | null>(null);
     const [priceType, setPriceType] = useState<"trade" | "retail" | "both">("trade");
     const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+    const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-    // ─────────────────────────────
-    // Initialize rows with one empty row
-    // ─────────────────────────────
+    // Get the currently selected item details for the info panel
+    const selectedItem = useMemo(() => {
+        if (!selectedItemId) return null;
+        return items.find((it) => it.id === selectedItemId) ?? null;
+    }, [selectedItemId, items]);
+
+    // Helper: Calculate Category-specific Trade Price
+    const calculatePrice = (item: Item, cat: string | number | null) => {
+        const actualTradePrice = Number(item.trade_price ?? 0);
+        const catStr = cat ? String(cat) : null;
+        if (!catStr || actualTradePrice <= 0) return actualTradePrice;
+
+        let percentage = 0;
+        switch (catStr) {
+            case "2": percentage = Number(item.pt2 ?? 0); break;
+            case "3": percentage = Number(item.pt3 ?? 0); break;
+            case "4": percentage = Number(item.pt4 ?? 0); break;
+            case "5": percentage = Number(item.pt5 ?? 0); break;
+            case "6": percentage = Number(item.pt6 ?? 0); break;
+            case "7": percentage = Number(item.pt7 ?? 0); break;
+        }
+
+        return percentage > 0 ? Math.round(actualTradePrice * (1 + percentage / 100)) : actualTradePrice;
+    };
+
+    // Smart Pricing Alignment: Auto-select Trade Price and Sync manifest when customer changes
+    useEffect(() => {
+        if (selectedAccount) {
+            setPriceType("trade");
+
+            // Bulk Synchronize manifests with new customer pricing protocol
+            setRows(prev => prev.map(row => {
+                if (!row.item_id) return row;
+                const item = items.find(i => i.id === row.item_id);
+                if (!item) return row;
+
+                return {
+                    ...row,
+                    trade_price: calculatePrice(item, customerCategory)
+                };
+            }));
+        }
+    }, [selectedAccount, customerCategory]);
+
     const getEmptyRow = (): RowData => ({
         id: Date.now() + Math.random(),
         item_id: null,
@@ -102,16 +171,10 @@ export default function OfferListing({ items, categories, accounts, messageLines
 
     const [rows, setRows] = useState<RowData[]>([getEmptyRow()]);
 
-    // ─────────────────────────────
-    // Add New Row
-    // ─────────────────────────────
     const addRow = () => {
         setRows((prev) => [getEmptyRow(), ...prev]);
     };
 
-    // ─────────────────────────────
-    // Load All Items
-    // ─────────────────────────────
     const loadAllItems = () => {
         const allItemRows: RowData[] = items.map((item) => {
             const cat = categories.find(c => String(c.id) === String(item.category));
@@ -123,34 +186,29 @@ export default function OfferListing({ items, categories, accounts, messageLines
                 title: item.title,
                 pack_ctn: item.packing_qty,
                 loos_ctn: item.retail_tp_diff,
-                trade_price: item.trade_price,
+                trade_price: calculatePrice(item, customerCategory),
                 retail: item.retail,
                 category_name: catName,
                 discount: item.discount?.toString() ?? "",
                 scheme: "",
-                mrp: item.retail, // Default MRP to retail price
+                mrp: item.retail,
             };
         });
         setRows(allItemRows);
     };
 
-    // ─────────────────────────────
-    // Reset Rows
-    // ─────────────────────────────
     const resetRows = () => {
         setRows([getEmptyRow()]);
     };
 
-    // ─────────────────────────────
-    // Remove Row
-    // ─────────────────────────────
     const removeRow = (id: number) => {
-        setRows((prev) => prev.filter((row) => row.id !== id));
+        if (rows.length > 1) {
+            setRows((prev) => prev.filter((row) => row.id !== id));
+        } else {
+            resetRows();
+        }
     };
 
-    // ─────────────────────────────
-    // Handle Item Selection — Auto-Fill Values
-    // ─────────────────────────────
     const handleSelectItem = (rowId: number, itemId: number) => {
         const selected = items.find((i) => i.id === itemId);
         if (!selected) return;
@@ -167,7 +225,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                         title: selected.title,
                         pack_ctn: selected.packing_qty,
                         loos_ctn: selected.retail_tp_diff,
-                        trade_price: selected.trade_price,
+                        trade_price: calculatePrice(selected, customerCategory),
                         retail: selected.retail,
                         category_name: catName,
                         discount: selected.discount?.toString() ?? "",
@@ -179,13 +237,9 @@ export default function OfferListing({ items, categories, accounts, messageLines
         );
     };
 
-    //store fun here 
-    // ─────────────────────────────
-    // Store Offer to Backend
-    // ─────────────────────────────
     const storeOffer = () => {
         if (!selectedAccount) {
-            alert("Please select an account first.");
+            alert("Please select a Negotiation Entity (Account) first.");
             return;
         }
 
@@ -203,11 +257,10 @@ export default function OfferListing({ items, categories, accounts, messageLines
             }));
 
         if (itemsData.length === 0) {
-            alert("Please add at least one item.");
+            alert("Provisioning failed: No item nodes detected in current manifest.");
             return;
         }
 
-        // Convert date from DD/MM/YYYY to YYYY-MM-DD
         const [day, month, year] = date.split('/');
         const formattedDate = `${year}-${month}-${day}`;
 
@@ -218,258 +271,407 @@ export default function OfferListing({ items, categories, accounts, messageLines
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
             items: itemsData,
         }, {
-            onSuccess: () => {
-                // alert('Offer saved successfully!'); // Inertia usually handles success messages via flash props, but we can keep alert or rely on redirect
-                resetRows();
-            },
-            onError: (errors) => {
-                console.error(errors);
-                alert('Failed to save offer. Please check the inputs.');
-            }
+            onSuccess: () => resetRows(),
+            onError: () => alert('Failed to synchronize offer. Please check data integrity.')
         });
     };
 
     return (
-        <SidebarProvider
-            style={
-                {
-                    "--sidebar-width": "calc(var(--spacing) * 61)",
-                    "--header-height": "calc(var(--spacing) * 12)",
-                } as React.CSSProperties
-            }
-        >
+        <SidebarProvider>
             <AppSidebar variant="inset" />
-            <SidebarInset>
+            <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/50">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="w-full p-4 space-y-2">
-                    {/* FIXED HEADER */}
-                    <Card className="p-3 border rounded-sm shadow-sm sticky top-[70px] z-20 bg-white">
-                        <div className="grid grid-cols-12 gap-4 items-center text-sm">
-                            <div className="col-span-2">
-                                <Label>Date</Label>
-                                <Input
-                                    value={date}
-                                    readOnly
-                                    className="bg-gray-50"
-                                />
+                <div className="p-6 lg:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="space-y-2"
+                        >
+                            <div className="flex items-center gap-2 text-orange-500 font-black text-[10px] uppercase tracking-[0.3em]">
+                                <Workflow className="h-3 w-3" />
+                                <span>Negotiation Protocol</span>
                             </div>
+                            <Heading
+                                title="Offer List Creation"
+                                description="Provisioning new material offers and negotiation dossiers for commercial entities."
+                            />
+                        </motion.div>
 
-                            <div className="col-span-4">
-                                <Label>Select Account (Customer/Supplier)</Label>
-                                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                                    <SelectTrigger className="w-full h-9">
-                                        <SelectValue placeholder="Select Account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accounts.map(acc => (
-                                            <SelectItem key={acc.id} value={acc.id.toString()}>
-                                                {acc.title}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="col-span-3">
-                                <Label>Price Type</Label>
-                                <Select value={priceType} onValueChange={(v: any) => setPriceType(v)}>
-                                    <SelectTrigger className="w-full h-9">
-                                        <SelectValue placeholder="Select Price Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="trade">Trade Price Only</SelectItem>
-                                        <SelectItem value="retail">Retail Price Only</SelectItem>
-                                        <SelectItem value="both">Both</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="col-span-3 flex items-left justify-start gap-2">
-                                <div className="flex-1">
-                                    <Label>Message Line</Label>
-                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
-                                        <SelectTrigger className="w-full h-9 bg-sky-50/50">
-                                            <SelectValue placeholder="Optional Message" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="0">No Message Line (Optional)</SelectItem>
-                                            {messageLines?.map(msg => (
-                                                <SelectItem key={msg.id} value={msg.id.toString()}>{msg.messageline}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <Button className="bg-green-600 hover:bg-green-700 mt-5 h-9 shrink-0" onClick={storeOffer}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Save Offer List
-                                </Button>
-                            </div>
-                        </div>
-                    </Card>
-
-                    {/* TABLE HEADER */}
-                    <div className="grid grid-cols-12 bg-gray-100 p-2 text-xs font-semibold border sticky top-[159px] z-10 items-center">
-                        <div className="col-span-2">Item Selection</div>
-                        <div className="col-span-2">Pack Ctn</div>
-                        <div className="col-span-2">Loose Ctn</div>
-                        <div className="col-span-2">M.R.P.</div>
-                        <div className="col-span-2">Scheme</div>
-                        <div className="col-span-1 text-right">Price</div>
-                        <div className="col-span-1 text-center flex items-center justify-center">
-                            <ButtonGroup>
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-7 w-7 p-1 bg-green-500 text-white hover:bg-green-600 border-green-600 cursor-pointer"
-                                    onClick={addRow}
-                                    title="Add New Row"
-                                >
-                                    <Plus size={14} />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-7 w-7 p-1 bg-blue-500 text-white hover:bg-blue-600 border-blue-600 cursor-pointer"
-                                    onClick={loadAllItems}
-                                    title="Load All Items"
-                                >
-                                    <ListRestart size={14} />
-                                </Button>
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-7 w-7 p-1 bg-orange-500 text-white hover:bg-orange-600 border-orange-600 cursor-pointer"
-                                    onClick={resetRows}
-                                    title="Reset"
-                                >
-                                    <RotateCcw size={14} />
-                                </Button>
-                            </ButtonGroup>
-                        </div>
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-3"
+                        >
+                            <Button
+                                variant="outline"
+                                onClick={() => router.visit('/offer-list')}
+                                className="rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-12 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+                            >
+                                <History className="mr-2 h-4 w-4" />
+                                Cancel & Return
+                            </Button>
+                            <Button
+                                onClick={storeOffer}
+                                className="bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-orange-600 dark:hover:bg-orange-500 hover:text-white transition-all duration-300 rounded-xl px-8 h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-zinc-200 dark:shadow-none bg-orange-500/100"
+                            >
+                                <Save className="mr-2 h-4 w-4" />
+                                Synchronize Offer
+                            </Button>
+                        </motion.div>
                     </div>
 
-                    {/* SCROLLABLE ROW LIST */}
-                    <div className="min-h-[610px] max-h-[600px] overflow-auto border pt-2">
-                        {rows.map((row) => (
-                            <div
-                                key={row.id}
-                                className="grid grid-cols-12 gap-3 px-2 py-1 border-b text-sm items-center hover:bg-gray-50 transition"
-                            >
-                                {/* Item Column (col-span-4) */}
-                                <div className="col-span-2 flex items-center gap-2">
-                                    <Select
-                                        value={row.item_id?.toString() ?? ""}
-                                        onValueChange={(val) => handleSelectItem(row.id, Number(val))}
-                                    >
-                                        <SelectTrigger className="w-full h-9">
-                                            <SelectValue placeholder="Select item" />
-                                        </SelectTrigger>
+                    {/* Control Surface */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                    >
+                        <Card className="p-8 border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <Sparkles className="h-24 w-24 text-orange-500" />
+                            </div>
 
-                                        <SelectContent>
+                            <div className="grid grid-cols-12 gap-8 items-start relative z-10">
+                                <div className="col-span-12 lg:col-span-2 space-y-2">
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                        <CalendarClock className="h-3 w-3" />
+                                        Temporal Node
+                                    </div>
+                                    <Input
+                                        value={date}
+                                        readOnly
+                                        className="bg-zinc-100/50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 h-11 rounded-sm font-bold tabular-nums text-zinc-500"
+                                    />
+                                </div>
+
+                                <div className="col-span-12 lg:col-span-4 space-y-2">
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                        <UserCircle2 className="h-3 w-3" />
+                                        Select Customer
+                                    </div>
+                                    <Select value={selectedAccount} onValueChange={(val) => {
+                                        setSelectedAccount(val);
+                                        const account = accounts.find(a => String(a.id) === val);
+                                        setCustomerCategory(account?.item_category ?? null);
+                                    }}>
+                                        <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold">
+                                            <SelectValue placeholder="Identify Commercial Profile" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                             <SelectGroup>
-                                                <SelectLabel>Items</SelectLabel>
-                                                {items.map((item) => (
-                                                    <SelectItem
-                                                        key={item.id}
-                                                        value={item.id.toString()}
-                                                    >
-                                                        {item.title} ({item.short_name})
+                                                <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-400 p-3">Verified Accounts</SelectLabel>
+                                                {accounts.map(acc => (
+                                                    <SelectItem key={acc.id} value={acc.id.toString()} className="rounded-sm m-1 text-xs font-bold">
+                                                        {acc.title}
                                                     </SelectItem>
                                                 ))}
                                             </SelectGroup>
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="col-span-2">
-                                    <Input
-                                        className="h-9"
-                                        placeholder="Pack Ctn"
-                                        value={row.pack_ctn}
-                                        onChange={(e) =>
-                                            setRows((prev) =>
-                                                prev.map((r) =>
-                                                    r.id === row.id
-                                                        ? { ...r, pack_ctn: Number(e.target.value) }
-                                                        : r
-                                                )
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <Input
-                                        className="h-9"
-                                        placeholder="Loose Ctn"
-                                        value={row.loos_ctn}
-                                        onChange={(e) =>
-                                            setRows((prev) =>
-                                                prev.map((r) =>
-                                                    r.id === row.id
-                                                        ? { ...r, loos_ctn: Number(e.target.value) }
-                                                        : r
-                                                )
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <Input
-                                        className=" h-9"
-                                        placeholder="M.R.P."
-                                        value={row.mrp}
-                                        onChange={(e) =>
-                                            setRows((prev) =>
-                                                prev.map((r) =>
-                                                    r.id === row.id
-                                                        ? { ...r, mrp: Number(e.target.value) }
-                                                        : r
-                                                )
-                                            )
-                                        }
-                                    />
-                                </div>
-                                {/* Remarks / Scheme */}
-                                <Input
-                                    className="col-span-2 h-9"
-                                    placeholder="Scheme..."
-                                    value={row.scheme}
-                                    onChange={(e) =>
-                                        setRows((prev) =>
-                                            prev.map((r) =>
-                                                r.id === row.id
-                                                    ? { ...r, scheme: e.target.value }
-                                                    : r
-                                            )
-                                        )
-                                    }
-                                />
 
-
-
-                                {/* Price */}
-                                <div className="col-span-1 text-right">
-                                    {priceType === 'trade' ? row.trade_price :
-                                        priceType === 'retail' ? row.retail :
-                                            `${row.trade_price} / ${row.retail}`}
+                                <div className="col-span-12 lg:col-span-3 space-y-2 text-orange-500">
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                        <Zap className="h-3 w-3" />
+                                        Pricing Logic
+                                    </div>
+                                    <Select value={priceType} onValueChange={(v: any) => setPriceType(v)}>
+                                        <SelectTrigger className={cn(
+                                            "w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all",
+                                            selectedAccount && "border-orange-500/50 ring-2 ring-orange-500/10 text-orange-600"
+                                        )}>
+                                            <SelectValue>
+                                                {selectedAccount && priceType === 'trade'
+                                                    ? `TP ${customerCategory ?? 'Base'} Protocol`
+                                                    : undefined}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
+                                            <SelectItem value="trade" className="text-xs font-bold">
+                                                {selectedAccount
+                                                    ? `Type ${customerCategory ?? 'Base'} Protocol (Aligned)`
+                                                    : "Trade Price Protocol (TP)"}
+                                            </SelectItem>
+                                            <SelectItem value="retail" className="text-xs font-bold">Retail Price Matrix (RP)</SelectItem>
+                                            <SelectItem value="both" className="text-xs font-bold">Dual Sync (TP + RP)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {selectedAccount && (
+                                        <div className="text-[9px] font-black uppercase tracking-widest animate-pulse flex items-center gap-1">
+                                            <ShieldCheck className="h-2 w-2" />
+                                            Active Alignment: Prioritizing TP
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Remove Button */}
-                                <div className="col-span-1 flex justify-center">
-                                    <Button
-                                        variant="destructive"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => removeRow(row.id)}
-                                    >
-                                        <Trash2 size={15} />
-                                    </Button>
+                                <div className="col-span-12 lg:col-span-3 space-y-2">
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                        <Tag className="h-3 w-3" />
+                                        Protocol Context
+                                    </div>
+                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                        <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold">
+                                            <SelectValue placeholder="Registry Message" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
+                                            <SelectItem value="0" className="text-xs font-bold">No Custom Header</SelectItem>
+                                            {messageLines?.map(msg => (
+                                                <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs font-bold truncate max-w-[200px]">
+                                                    {msg.messageline}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        </Card>
+                    </motion.div>
+
+                    {/* Manifest Surface */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="space-y-4"
+                    >
+                        <div className="flex items-center justify-between px-4">
+                            <div className="flex items-center gap-3">
+                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Negotiation Manifest Ledger</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    size="sm"
+                                    onClick={addRow}
+                                    className="h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
+                                >
+                                    <ListPlus className="mr-2 h-3.5 w-3.5" />
+                                    Insert Node
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={loadAllItems}
+                                    className="h-9 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
+                                >
+                                    <LayoutGrid className="mr-2 h-3.5 w-3.5" />
+                                    Provision Full Matrix
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={resetRows}
+                                    className="h-9 w-9 p-0 rounded-xl border-zinc-200 dark:border-zinc-800 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all group"
+                                >
+                                    <RotateCcw className="h-4 w-4 transition-transform group-active:rotate-180" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <Card className="border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
+                            <div className="overflow-x-auto min-h-[400px]">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">
+                                            <th className="px-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
+                                                <div className="flex items-center gap-2 italic">
+                                                    <PackageSearch className="h-3 w-3 text-orange-500" />
+                                                    Material Node
+                                                </div>
+                                            </th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Configuration</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Reference M.R.P</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme Logic</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Protocol Valuation</th>
+                                            <th className="px-6 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <AnimatePresence mode="popLayout">
+                                            {rows.map((row, idx) => (
+                                                <motion.tr
+                                                    key={row.id}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 10 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-orange-500/[0.02] dark:hover:bg-orange-500/[0.02] transition-colors h-16 cursor-pointer"
+                                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                >
+                                                    <td className="px-6 min-w-[300px]">
+                                                        <Select
+                                                            value={row.item_id?.toString() ?? ""}
+                                                            onValueChange={(val) => handleSelectItem(row.id, Number(val))}
+                                                        >
+                                                            <SelectTrigger className="h-10 rounded-sm w-full border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-[11px] font-black">
+                                                                <SelectValue placeholder="Identify Item Node..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                                                <SelectGroup>
+                                                                    <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-400 p-2">Item Matrix</SelectLabel>
+                                                                    {items.map((item) => (
+                                                                        <SelectItem key={item.id} value={item.id.toString()} className="rounded-lg m-1 text-xs font-bold">
+                                                                            {item.title} ({item.short_name})
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectGroup>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </td>
+                                                    <td className="px-4 min-w-[200px]">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="space-y-1 flex-1">
+                                                                <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Full</Label>
+                                                                <Input
+                                                                    className="h-8 text-[11px] font-bold tabular-nums rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30"
+                                                                    value={row.pack_ctn}
+                                                                    onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, pack_ctn: Number(e.target.value) } : r))}
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1 flex-1">
+                                                                <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Pieces</Label>
+                                                                <Input
+                                                                    className="h-8 text-[11px] font-bold tabular-nums rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30"
+                                                                    value={row.loos_ctn}
+                                                                    onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, loos_ctn: Number(e.target.value) } : r))}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 text-center">
+                                                        <div className="space-y-1 inline-block">
+                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Retail Price</Label>
+                                                            <Input
+                                                                className="h-8 text-[11px] font-black tabular-nums rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30 text-center w-24"
+                                                                value={row.mrp}
+                                                                onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, mrp: Number(e.target.value) } : r))}
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4">
+                                                        <div className="space-y-1">
+                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Negotiation Scheme</Label>
+                                                            <Input
+                                                                className="h-8 text-[10px] font-bold rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30 w-full"
+                                                                placeholder="e.g. 10+1 Promo..."
+                                                                value={row.scheme}
+                                                                onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, scheme: e.target.value } : r))}
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 text-right">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[12px] font-black tabular-nums text-zinc-900 dark:text-zinc-100">
+                                                                <span className="text-[10px] text-zinc-400 mr-1 italic">V:</span>
+                                                                {priceType === 'trade' ? row.trade_price.toLocaleString() :
+                                                                    priceType === 'retail' ? row.retail.toLocaleString() :
+                                                                        `${row.trade_price.toLocaleString()} | ${row.retail.toLocaleString()}`}
+                                                            </span>
+                                                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-orange-500 opacity-60 mt-0.5">
+                                                                {priceType === 'both' ? 'Dual Node' : priceType + ' Logic'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 rounded-lg hover:bg-rose-500/10 group overflow-hidden transition-colors"
+                                                            onClick={() => removeRow(row.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-zinc-300 group-hover:text-rose-500 group-active:scale-90" />
+                                                        </Button>
+                                                    </td>
+                                                </motion.tr>
+                                            ))}
+                                        </AnimatePresence>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Manifest Summary Footer */}
+                            <div className="bg-zinc-950/20 dark:bg-zinc-950/40 p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                                <div className="flex items-center gap-6">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Total Manifest Nodes</span>
+                                        <span className="text-sm font-black text-orange-500 tabular-nums">{rows.filter(r => r.item_id).length} Active</span>
+                                    </div>
+                                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Pricing Alignment</span>
+                                        <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase italic">
+                                            {priceType === 'trade' ? 'Trade Price Protocol' : priceType === 'retail' ? 'Retail Price Matrix' : 'Dual Synchronization'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-zinc-400 italic text-[10px]">
+                                    <BadgeInfo className="h-3 w-3" />
+                                    All values are normalized based on current server-side Commercial Intelligence.
+                                </div>
+                            </div>
+
+                            {/* Price Protocol Dashboard (TP2-TP7 Intelligence) */}
+                            {selectedItem && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="bg-zinc-50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-800 p-6"
+                                >
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Price Protocol Intelligence: {selectedItem.title}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                                        {[2, 3, 4, 5, 6, 7].map((num) => {
+                                            const priceKey = `pt${num}` as keyof Item;
+                                            const percentage = Number(selectedItem[priceKey] ?? 0);
+
+                                            // Formula: Trade Price * (1 + Percentage / 100)
+                                            const adjustedPrice = calculatePrice(selectedItem, num);
+                                            const isActive = String(num) === String(customerCategory);
+
+                                            return (
+                                                <div
+                                                    key={num}
+                                                    className={cn(
+                                                        "rounded-xl p-3 border transition-all relative overflow-hidden group",
+                                                        isActive
+                                                            ? "bg-orange-500/10 border-orange-500 ring-1 ring-orange-500 shadow-lg shadow-orange-500/10"
+                                                            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-orange-500/30"
+                                                    )}
+                                                >
+                                                    <div className={cn(
+                                                        "text-[9px] font-black uppercase tracking-wider mb-1",
+                                                        isActive ? "text-orange-600 dark:text-orange-400" : "text-zinc-400"
+                                                    )}>
+                                                        Price Type {num} <span className="opacity-60 lowercase font-bold">({percentage}%)</span>
+                                                    </div>
+                                                    <div className={cn(
+                                                        "text-sm font-black tabular-nums",
+                                                        isActive ? "text-orange-700 dark:text-orange-300" : "text-zinc-600 dark:text-zinc-300"
+                                                    )}>
+                                                        Rs {adjustedPrice.toLocaleString()}
+                                                    </div>
+                                                    {isActive && (
+                                                        <div className="absolute top-1 right-1">
+                                                            <ShieldCheck className="h-3 w-3 text-orange-500" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </Card>
+                    </motion.div>
                 </div>
             </SidebarInset>
         </SidebarProvider>
     );
 }
+

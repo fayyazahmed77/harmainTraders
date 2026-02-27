@@ -12,7 +12,8 @@ import { BreadcrumbItem } from "@/types";
 import {
     Trash2, Plus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
-    ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2
+    ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
+    ArrowDownToLine
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -59,6 +60,8 @@ interface RowData {
     rate: number;
     taxPercent: number;
     discPercent: number;
+    taxReadOnly?: boolean;
+    discReadOnly?: boolean;
     amount: number;
     packing: number;
 }
@@ -201,6 +204,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         rate: 0,
         taxPercent: 0,
         discPercent: 0,
+        taxReadOnly: false,
+        discReadOnly: false,
         amount: 0,
         packing: 1,
     });
@@ -252,20 +257,38 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             .then(r => r.json())
             .then(data => {
                 if (data.items && Array.isArray(data.items)) {
-                    const loadedRows = data.items.map((si: any) => ({
-                        id: Math.random(),
-                        item_id: si.item_id,
-                        item_title: si.item?.title ?? "",
-                        full: 0,
-                        pcs: 0,
-                        sold_full: toNum(si.qty_carton),
-                        sold_pcs: toNum(si.qty_pcs),
-                        rate: toNum(si.trade_price),
-                        taxPercent: toNum(si.item?.gst_percent ?? 0),
-                        discPercent: 0,
-                        amount: 0,
-                        packing: toNum(si.item?.packing_full ?? 1),
-                    }));
+                    const loadedRows = data.items.map((si: any) => {
+                        const s_full = toNum(si.qty_carton);
+                        const s_pcs = toNum(si.qty_pcs);
+                        const rate = toNum(si.trade_price);
+                        const packing = toNum(si.item?.packing_full ?? 1);
+                        const base = (s_full * packing + s_pcs) * rate;
+
+                        const taxAmt = toNum(si.gst_amount || 0);
+                        const discAmt = toNum(si.discount || 0);
+
+                        // Derived percentages - strictly from amounts
+                        const taxableBase = base - discAmt;
+                        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
+                        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+
+                        return {
+                            id: Math.random(),
+                            item_id: si.item_id,
+                            item_title: si.item?.title ?? "",
+                            full: s_full, // Auto-load qty
+                            pcs: s_pcs,   // Auto-load qty
+                            sold_full: s_full,
+                            sold_pcs: s_pcs,
+                            rate: rate,
+                            taxPercent: taxVal,
+                            discPercent: discVal,
+                            taxReadOnly: true,
+                            discReadOnly: true,
+                            amount: 0,
+                            packing: packing,
+                        };
+                    });
                     setRows(loadedRows.length > 0 ? loadedRows : [getEmptyRow()]);
                 }
             });
@@ -275,34 +298,73 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const handleManualItemSelect = (rowId: number, itemId: number) => {
         const found = customerItems.find((ci: any) => ci.item_id === itemId);
         if (!found) return;
+
         const it = found.item;
+        const s_full = toNum(found.qty_carton);
+        const s_pcs = toNum(found.qty_pcs);
+        const rate = toNum(found.last_trade_price ?? 0);
+        const packing = toNum(it?.packing_full ?? 1);
+        const base = (s_full * packing + s_pcs) * rate;
+
+        const taxAmt = toNum(found.gst_amount || 0);
+        const discAmt = toNum(found.discount || 0);
+
+        const taxableBase = base - discAmt;
+        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
+        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+
         setRows(prev => prev.map(r => r.id === rowId ? {
             ...r,
             item_id: itemId,
             item_title: it?.title ?? "",
-            rate: toNum(found.last_trade_price ?? it?.trade_price ?? 0),
-            taxPercent: toNum(it?.gst_percent ?? 0),
-            packing: toNum(it?.packing_full ?? 1),
+            full: 0,
+            pcs: 0,
+            sold_full: s_full,
+            sold_pcs: s_pcs,
+            rate: rate,
+            taxPercent: taxVal,
+            discPercent: discVal,
+            taxReadOnly: true,
+            discReadOnly: true,
+            packing: packing,
         } : r));
         setSelectedRowItemId(itemId);
     };
 
     const handleBulkAddItems = () => {
         const itemsToAdd = customerItems.filter(ci => selectedAssignIds.includes(ci.id));
-        const newRows = itemsToAdd.map(ci => ({
-            id: Math.random(),
-            item_id: ci.item_id,
-            item_title: ci.item?.title ?? "",
-            full: 0,
-            pcs: 0,
-            sold_full: toNum(ci.qty_carton),
-            sold_pcs: toNum(ci.qty_pcs),
-            rate: toNum(ci.last_trade_price ?? ci.item?.trade_price ?? 0),
-            taxPercent: toNum(ci.item?.gst_percent ?? 0),
-            discPercent: 0,
-            amount: 0,
-            packing: toNum(ci.item?.packing_full ?? 1),
-        }));
+        const newRows = itemsToAdd.map(ci => {
+            const s_full = toNum(ci.qty_carton);
+            const s_pcs = toNum(ci.qty_pcs);
+            const rate = toNum(ci.last_trade_price ?? 0);
+            const it = ci.item;
+            const packing = toNum(it?.packing_full ?? 1);
+            const base = (s_full * packing + s_pcs) * rate;
+
+            const taxAmt = toNum(ci.gst_amount || 0);
+            const discAmt = toNum(ci.discount || 0);
+
+            const taxableBase = base - discAmt;
+            const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
+            const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+
+            return {
+                id: Math.random(),
+                item_id: ci.item_id,
+                item_title: it?.title ?? "",
+                full: 0,
+                pcs: 0,
+                sold_full: s_full,
+                sold_pcs: s_pcs,
+                rate: rate,
+                taxPercent: taxVal,
+                discPercent: discVal,
+                taxReadOnly: true,
+                discReadOnly: true,
+                amount: 0,
+                packing: packing,
+            };
+        });
 
         setRows(prev => {
             const existing = prev.filter(r => r.item_id !== null);
@@ -318,20 +380,30 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
             const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            return { ...r, amount: +(units * toNum(r.rate)).toFixed(2) };
+            const baseAmount = units * toNum(r.rate);
+            const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
+            const taxableAmount = baseAmount - discAmount;
+            const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
+            return { ...r, amount: +(taxableAmount + taxAmount).toFixed(2) };
         });
     }, [rows]);
 
     const totals = useMemo(() => {
-        let gross = 0, tax = 0;
+        let gross = 0, tax = 0, disc = 0;
         rowsWithAmount.forEach(r => {
-            gross += r.amount;
-            tax += (r.taxPercent / 100) * r.amount;
+            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
+            const base = units * toNum(r.rate);
+            const d = (toNum(r.discPercent) / 100) * base;
+            const t = (toNum(r.taxPercent) / 100) * (base - d);
+            gross += base;
+            disc += d;
+            tax += t;
         });
         return {
             gross: +gross.toFixed(2),
+            disc: +disc.toFixed(2),
             tax: +tax.toFixed(2),
-            net: +(gross + tax).toFixed(2),
+            net: +(gross - disc + tax).toFixed(2),
         };
     }, [rowsWithAmount]);
 
@@ -363,21 +435,26 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             salesman_id: selectedAccount.saleman_id ?? null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
-            discount_total: 0,
+            discount_total: totals.disc,
             tax_total: totals.tax,
             net_total: totals.net,
             paid_amount: refundAmount,
             remaining_amount: totals.net - refundAmount,
-            items: validRows.map(r => ({
-                item_id: r.item_id,
-                qty_carton: r.full,
-                qty_pcs: r.pcs,
-                total_pcs: r.full * r.packing + r.pcs,
-                trade_price: r.rate,
-                discount: 0,
-                gst_amount: (r.taxPercent / 100) * r.amount,
-                subtotal: r.amount,
-            })),
+            items: validRows.map(r => {
+                const base = (r.full * r.packing + r.pcs) * r.rate;
+                const d = (toNum(r.discPercent) / 100) * base;
+                const t = (toNum(r.taxPercent) / 100) * (base - d);
+                return {
+                    item_id: r.item_id,
+                    qty_carton: r.full,
+                    qty_pcs: r.pcs,
+                    total_pcs: r.full * r.packing + r.pcs,
+                    trade_price: r.rate,
+                    discount: +d.toFixed(2),
+                    gst_amount: +t.toFixed(2),
+                    subtotal: r.amount,
+                };
+            }),
         };
 
         router.post("/sales-return", payload, {
@@ -552,8 +629,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                 <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Inventory Identification</div>
                                 <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100/30 dark:bg-zinc-950/50 -mx-1 py-1">Manifest Qty</div>
                                 <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-500/5 dark:bg-orange-500/10 -mx-1 py-1">Return Qty</div>
-                                <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
+                                <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
+                                <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
                                 <div className="col-span-2 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
                             </div>
 
@@ -580,7 +658,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                         {/* Manifest Qty (Sold) */}
                                         <div className="col-span-1">
-                                            <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800">{row.sold_full}<span className="text-[8px] ml-0.5 opacity-50 font-normal">ctn</span></div>
+                                            <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800">{row.sold_full}<span className="text-[8px] ml-0.5 opacity-50 font-normal">full</span></div>
                                         </div>
                                         <div className="col-span-1">
                                             <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800">{row.sold_pcs}<span className="text-[8px] ml-0.5 opacity-50 font-normal">pcs</span></div>
@@ -589,7 +667,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         {/* Return Qty */}
                                         <div className="col-span-1">
                                             <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="CTN" />
+                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
                                         </div>
                                         <div className="col-span-1">
                                             <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
@@ -597,7 +675,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         </div>
 
                                         {/* Rate */}
-                                        <div className="col-span-2">
+                                        <div className="col-span-1">
                                             <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
                                                 className={`h-8 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
                                         </div>
@@ -605,7 +683,15 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         {/* Duty / Tax % */}
                                         <div className="col-span-1">
                                             <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
+                                                readOnly={row.taxReadOnly} tabIndex={row.taxReadOnly ? -1 : 0}
+                                                className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                        </div>
+
+                                        {/* Dec % (Discount) */}
+                                        <div className="col-span-1">
+                                            <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                readOnly={row.discReadOnly} tabIndex={row.discReadOnly ? -1 : 0}
+                                                className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
                                         </div>
 
                                         {/* Total Position */}
@@ -696,6 +782,19 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-2 gap-3 pb-1">
+                                        <div className="space-y-1">
+                                            <div className="text-[9px] font-black uppercase text-zinc-400">Duty %</div>
+                                            <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
+                                                readOnly={row.taxReadOnly} className={`h-9 text-xs font-bold text-center ${row.taxReadOnly ? 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 opacity-70' : ''}`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-[9px] font-black uppercase text-zinc-400">Dec %</div>
+                                            <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                readOnly={row.discReadOnly} className={`h-9 text-xs font-bold text-center ${row.discReadOnly ? 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 opacity-70' : ''}`} />
+                                        </div>
+                                    </div>
+
                                     <div className="flex justify-between items-center pt-1 border-t border-zinc-50 dark:border-zinc-800/50">
                                         <div className="text-[9px] font-black uppercase text-zinc-400">Position Net</div>
                                         <div className="text-sm font-black text-zinc-800 dark:text-zinc-100 italic">Rs {row.amount.toLocaleString()}</div>
@@ -783,11 +882,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 </div>
                                             </div>
                                             <div className="space-y-1 text-right">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest pt-1">
-                                                    Line Items
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5 pt-1">
+                                                    <ArrowDownToLine size={10} className="text-rose-500" />
+                                                    Disc. Total
                                                 </div>
-                                                <div className="text-base font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    {rows.filter(r => r.item_id).length.toString().padStart(2, '0')}
+                                                <div className="text-base font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
+                                                    - {totals.disc.toLocaleString()}
                                                 </div>
                                             </div>
                                         </div>
@@ -931,7 +1031,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             <div className="max-h-[450px] overflow-auto p-4 custom-scrollbar relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {customerItems.filter(ci => !assignSearch || ci.item?.title.toLowerCase().includes(assignSearch.toLowerCase()) || ci.invoice_no?.toLowerCase().includes(assignSearch.toLowerCase())).map((ci, idx) => (
                                     <motion.div key={ci.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}
-                                        className={`flex items-center gap-4 p-3 border ${selectedAssignIds.includes(ci.id) ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5'} ${PREMIUM_ROUNDING_MD} transition-all cursor-pointer group`}
+                                        className={`flex items-center gap-4 p-3 border ${selectedAssignIds.includes(ci.id) ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5'} ${PREMIUM_ROUNDING_MD} transition-all cursor-pointer group`}
                                         onClick={() => toggleAssignSelection(ci.id)}>
                                         <Checkbox checked={selectedAssignIds.includes(ci.id)} onCheckedChange={() => toggleAssignSelection(ci.id)} className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500" />
                                         <div className="flex-1 min-w-0">
@@ -939,12 +1039,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 <div className="text-[11px] font-black text-zinc-900 dark:text-white uppercase truncate tracking-tighter">{ci.item?.title}</div>
                                                 <div className="text-[9px] font-mono font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">{ci.invoice_no}</div>
                                             </div>
-                                            <div className="flex items-center gap-3 text-[9px] font-mono font-bold text-zinc-400">
+                                            <div className="flex items-center gap-3 text-[11px] font-mono font-bold text-zinc-600">
                                                 <span>Sold: Rs {toNum(ci.last_trade_price).toLocaleString()}</span>
                                                 <span className="w-px h-2 bg-zinc-200 dark:bg-zinc-800" />
                                                 <span>Qty: {toNum(ci.qty_carton)}ctn {toNum(ci.qty_pcs)}pcs</span>
                                             </div>
-                                            <div className="text-[8px] font-mono text-zinc-400/80 mt-1 uppercase">Purchased: <span className="text-zinc-600 dark:text-zinc-300 font-bold">{fmtDate(ci.date)}</span></div>
+                                            <div className="text-[10px] font-mono text-zinc-600/100 mt-1 uppercase">Purchased: <span className="text-zinc-600 dark:text-zinc-300 font-bold">{fmtDate(ci.date)}</span></div>
                                         </div>
                                     </motion.div>
                                 ))}

@@ -32,10 +32,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Provision Role', href: '/roles/permissions' },
 ];
 
-const PREMIUM_ROUNDING = "rounded-xl";
-const PREMIUM_ROUNDING_MD = "rounded-md";
-const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
-const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
+const PREMIUM_ROUNDING = "rounded-sm";
+const PREMIUM_ROUNDING_MD = "rounded-sm";
+const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-100 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
+const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none";
 
 const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode, icon?: any, label: string }) => (
     <div className="space-y-1">
@@ -49,6 +49,13 @@ const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode,
 
 export default function Roles() {
     const { permissionCategories = [] } = usePage<RolesProps>().props;
+    const [isScrolled, setIsScrolled] = useState(false);
+
+    React.useEffect(() => {
+        const handleScroll = () => setIsScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const { data, setData, post, processing, errors } = useForm({
         roleName: '',
@@ -90,148 +97,204 @@ export default function Roles() {
                     <SiteHeader breadcrumbs={breadcrumbs} />
 
                     <RolesLayout>
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Header Section */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className={`p-6 ${CARD_BASE} ${PREMIUM_ROUNDING} ${PREMIUM_GRADIENT} relative overflow-hidden`}
-                            >
-                                <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
-                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
-                                    <div className="space-y-4 flex-1 max-w-xl">
-                                        <div className="space-y-1">
-                                            <h2 className="text-2xl font-black uppercase tracking-tighter text-zinc-900 dark:text-white">Provision Role</h2>
-                                            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Architecting new security clearance levels</p>
+                        <form onSubmit={handleSubmit} className="relative h-full flex flex-col overflow-hidden">
+                            {/* Pro-Level Sticky Header */}
+                            <div className={`sticky top-0 z-50 transition-all duration-300 ${isScrolled ? 'py-3' : 'py-6'} -mx-4 px-4 md:-mx-8 md:px-8`}>
+                                <div className={`
+                                    flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 
+                                    ${CARD_BASE} ${PREMIUM_ROUNDING} backdrop-blur-md bg-white/90 dark:bg-zinc-900/90
+                                    border-b-2 border-orange-500 shadow-xl shadow-orange-500/5
+                                    transition-all duration-500
+                                `}>
+                                    <div className="flex items-center gap-4 flex-1">
+                                        <div className="p-2.5 rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/20">
+                                            <Icons.ShieldPlus size={18} />
+                                        </div>
+                                        <div className="flex-1 min-w-0 max-w-md">
+                                            <TechLabel label="Architectural Identity" icon={Icons.Shield}>
+                                                <div className="relative group">
+                                                    <Input
+                                                        value={data.roleName}
+                                                        onChange={(e) => setData('roleName', e.target.value)}
+                                                        placeholder="Create Role Identifier"
+                                                        className={`
+                                                            h-11 bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 
+                                                            rounded-sm font-mono font-black text-sm uppercase tracking-widest 
+                                                            focus-visible:ring-0 focus-visible:border-orange-500
+                                                            placeholder:text-zinc-300 dark:placeholder:text-zinc-700
+                                                            ${errors.roleName ? 'border-rose-500 text-rose-500' : ''}
+                                                            transition-all duration-300
+                                                        `}
+                                                        required
+                                                    />
+                                                    <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-500 group-focus-within:w-full rounded-full" />
+                                                </div>
+                                            </TechLabel>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <div className="hidden lg:flex flex-col items-end mr-4">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Matrix Load</span>
+                                            <span className="text-xs font-mono font-bold text-orange-500 uppercase">{data.permissions.length} Protocols Selected</span>
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            disabled={processing}
+                                            className={`
+                                                h-11 px-8 bg-orange-500 hover:bg-orange-600
+                                                text-white font-black text-[10px] uppercase tracking-[0.2em] 
+                                                rounded-sm shadow-lg shadow-orange-500/20 transition-all 
+                                                hover:translate-y-[-2px] active:translate-y-[1px]
+                                                flex items-center gap-3 active:scale-95 disabled:opacity-50
+                                            `}
+                                        >
+                                            {processing ? (
+                                                <Icons.Loader2 size={16} className="animate-spin" />
+                                            ) : (
+                                                <Icons.Database size={16} className="text-orange-400 dark:text-orange-200" />
+                                            )}
+                                            {processing ? 'Provisioning...' : 'Provision Role'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
+                                {/* Navigation Sidebar */}
+                                <div className="lg:col-span-3 space-y-6 lg:sticky lg:top-28 self-start">
+                                    <div className={`p-4 ${CARD_BASE} rounded-sm border-l-4 min-h-[550px] border-zinc-900 dark:border-zinc-100 bg-zinc-50/50 dark:bg-zinc-900/30`}>
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 mb-6 flex items-center gap-2 px-1">
+                                            <Icons.Layers size={12} className="text-orange-500" />
+                                            Module Sub-Systems
+                                        </h3>
+                                        <div className="space-y-1 max-h-[530px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {permissionCategories.map((category) => {
+                                                const IconComponent = Icons[category.icon as keyof typeof Icons] as LucideIcon;
+                                                const isActive = activeTab === category.label;
+                                                return (
+                                                    <button
+                                                        key={`nav-${category.label}`}
+                                                        type="button"
+                                                        onClick={() => setActiveTab(category.label)}
+                                                        className={`
+                                                            w-full flex items-center gap-3 px-4 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-sm
+                                                            ${isActive
+                                                                ? 'bg-orange-500 text-white dark:bg-orange-500 dark:text-white shadow-lg shadow-orange-500/20 translate-x-1'
+                                                                : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                                                        `}
+                                                    >
+                                                        {IconComponent ? <IconComponent size={14} className={isActive ? 'text-white' : ''} /> : <Icons.LayoutGrid size={14} />}
+                                                        <span className="truncate">{category.label}</span>
+                                                        {isActive && <div className="ml-auto w-1 h-4 bg-white/50" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Matrix Area */}
+                                <div className="lg:col-span-9 h-full flex flex-col min-h-0">
+                                    <div className={`${CARD_BASE} rounded-sm flex-1 flex flex-col overflow-hidden border-2`}>
+                                        <div className="bg-zinc-50 dark:bg-zinc-900/80 px-8 py-6 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <Icons.Activity size={14} className="text-orange-500" />
+                                                        <h3 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-white">
+                                                            {activeTab} Module Matrix
+                                                        </h3>
+                                                    </div>
+                                                    <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em]">
+                                                        Assign functional protocols to the new organizational layer
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const currentCategory = permissionCategories.find(c => c.label === activeTab);
+                                                        if (currentCategory) handleSelectAll(currentCategory.actions);
+                                                    }}
+                                                    className="h-9 px-6 text-[9px] font-black uppercase tracking-[0.2em] rounded-sm border-2 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-900 hover:text-white dark:hover:bg-orange-500 transition-all active:scale-95"
+                                                >
+                                                    Map Category Protocols
+                                                </Button>
+                                            </div>
                                         </div>
 
-                                        <TechLabel label="Architectural Identity" icon={Shield}>
-                                            <Input
-                                                value={data.roleName}
-                                                onChange={(e) => setData('roleName', e.target.value)}
-                                                placeholder="e.g. EXECUTIVE_OFFICER"
-                                                className={`h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} font-black text-sm uppercase tracking-tighter focus-visible:ring-orange-500`}
-                                                required
-                                            />
-                                            {errors.roleName && <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mt-1">{errors.roleName}</p>}
-                                        </TechLabel>
-                                    </div>
-                                    <Button
-                                        type="submit"
-                                        disabled={processing}
-                                        className={`h-12 px-8 bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20 ${PREMIUM_ROUNDING_MD} transition-all active:scale-95`}
-                                    >
-                                        <Save className="mr-2 h-4 w-4" /> Commit Protocol
-                                    </Button>
-                                </div>
-                            </motion.div>
-
-                            {/* Permissions Architecture */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 }}
-                                className={`flex-1 min-h-0 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING} overflow-hidden`}
-                            >
-                                <div className="bg-zinc-50 dark:bg-zinc-900/50 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ShieldCheck size={14} className="text-orange-500" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Access Matrix</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Info size={12} className="text-zinc-400" />
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{data.permissions.length} Protocols Selected</span>
-                                    </div>
-                                </div>
-
-                                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col md:flex-row min-h-[500px]">
-                                    <TabsList className="flex flex-row md:flex-col items-stretch justify-start bg-zinc-50 dark:bg-zinc-900/30 w-full md:w-64 h-auto p-2 md:p-4 gap-1 border-r border-zinc-200 dark:border-zinc-800 rounded-none overflow-x-auto md:overflow-x-visible">
-                                        {permissionCategories.map((category, idx) => {
-                                            const IconComponent = Icons[category.icon as keyof typeof Icons] as LucideIcon;
-                                            const isActive = activeTab === category.label;
-                                            return (
-                                                <TabsTrigger
-                                                    key={idx}
-                                                    value={category.label}
-                                                    className={`
-                                                        justify-start gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg
-                                                        ${isActive
-                                                            ? 'bg-white dark:bg-zinc-800 text-orange-600 dark:text-orange-400 shadow-sm border border-zinc-200 dark:border-zinc-700'
-                                                            : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                                                    `}
-                                                >
-                                                    {IconComponent ? <IconComponent size={14} /> : <LayoutGrid size={14} />}
-                                                    <span className="truncate">{category.label}</span>
-                                                </TabsTrigger>
-                                            );
-                                        })}
-                                    </TabsList>
-
-                                    <div className="flex-1 p-6 overflow-y-auto max-h-[600px]">
-                                        <AnimatePresence mode="wait">
-                                            {permissionCategories.map((category, catIdx) => (
-                                                <TabsContent key={catIdx} value={category.label} className="mt-0 focus-visible:outline-none">
+                                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                            <AnimatePresence mode="wait">
+                                                {permissionCategories.filter(cat => cat.label === activeTab).map((category) => (
                                                     <motion.div
-                                                        initial={{ opacity: 0, x: 20 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        exit={{ opacity: 0, x: -20 }}
-                                                        className="space-y-6"
+                                                        key={`matrix-${category.label}`}
+                                                        initial={{ opacity: 0, scale: 0.99, transformOrigin: 'top' }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        exit={{ opacity: 0, scale: 0.99 }}
+                                                        transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
+                                                        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
                                                     >
-                                                        <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                                                            <div className="space-y-0.5">
-                                                                <h3 className="text-sm font-black uppercase tracking-tighter text-zinc-800 dark:text-zinc-200">{category.label} Permissions</h3>
-                                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Select relevant access protocols for this module</p>
-                                                            </div>
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleSelectAll(category.actions)}
-                                                                className={`h-8 px-4 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400`}
-                                                            >
-                                                                Toggle Category
-                                                            </Button>
-                                                        </div>
+                                                        {category.actions.map((action, idx) => {
+                                                            const isSelected = data.permissions.includes(action.id);
+                                                            return (
+                                                                <motion.div
+                                                                    key={`permission-${action.id}`}
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: idx * 0.03 }}
+                                                                    onClick={() => togglePermission(action.id)}
+                                                                    className={`
+                                                                        group cursor-pointer relative p-5 transition-all duration-300
+                                                                        ${isSelected
+                                                                            ? 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/50 shadow-sm'
+                                                                            : 'bg-white dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-orange-500/30'}
+                                                                        border-2 rounded-sm overflow-hidden
+                                                                    `}
+                                                                >
+                                                                    {isSelected && (
+                                                                        <motion.div
+                                                                            layoutId="glow-new"
+                                                                            className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent pointer-events-none"
+                                                                        />
+                                                                    )}
 
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                            {category.actions.map((action, idx) => {
-                                                                const isSelected = data.permissions.includes(action.id);
-                                                                return (
-                                                                    <motion.div
-                                                                        key={action.id}
-                                                                        initial={{ opacity: 0, scale: 0.95 }}
-                                                                        animate={{ opacity: 1, scale: 1 }}
-                                                                        transition={{ delay: idx * 0.02 }}
-                                                                        onClick={() => togglePermission(action.id)}
-                                                                        className={`
-                                                                            group cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all
-                                                                            ${isSelected
-                                                                                ? 'bg-orange-500/5 border-orange-200 dark:border-orange-500/30 shadow-sm'
-                                                                                : 'bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}
-                                                                        `}
-                                                                    >
-                                                                        <div className={`
-                                                                            w-4 h-4 rounded-md border flex items-center justify-center transition-all
-                                                                            ${isSelected
-                                                                                ? 'bg-orange-500 border-orange-500 text-white'
-                                                                                : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}
-                                                                        `}>
-                                                                            {isSelected && <Icons.Check size={10} strokeWidth={4} />}
+                                                                    <div className="flex flex-col gap-4 relative z-10">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className={`
+                                                                                w-6 h-6 rounded-none border-2 flex items-center justify-center transition-all duration-500
+                                                                                ${isSelected
+                                                                                    ? 'bg-orange-500 border-orange-500 text-white rotate-90 scale-110'
+                                                                                    : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 group-hover:border-orange-500/50'}
+                                                                            `}>
+                                                                                {isSelected ? <Icons.Check size={12} strokeWidth={3} /> : <Icons.Lock size={12} className="text-zinc-400" />}
+                                                                            </div>
+                                                                            <span className={`text-[8px] font-black tracking-widest ${isSelected ? 'text-orange-400' : 'text-zinc-300 dark:text-zinc-600'}`}>
+                                                                                {isSelected ? 'MAPPED' : 'STANDBY'}
+                                                                            </span>
                                                                         </div>
-                                                                        <span className={`text-[11px] font-bold uppercase tracking-tight transition-colors ${isSelected ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                                                                            {action.name}
-                                                                        </span>
-                                                                    </motion.div>
-                                                                );
-                                                            })}
-                                                        </div>
+
+                                                                        <div className="space-y-1">
+                                                                            <span className={`
+                                                                                block text-[11px] font-black uppercase tracking-tighter transition-colors
+                                                                                ${isSelected ? 'text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300 group-hover:text-orange-500'}
+                                                                            `}>
+                                                                                {action.name.replace(/_/g, ' ')}
+                                                                            </span>
+                                                                            <div className={`h-0.5 w-8 transition-all duration-500 ${isSelected ? 'bg-orange-500 w-full' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
+                                                                        </div>
+                                                                    </div>
+                                                                </motion.div>
+                                                            );
+                                                        })}
                                                     </motion.div>
-                                                </TabsContent>
-                                            ))}
-                                        </AnimatePresence>
+                                                ))}
+                                            </AnimatePresence>
+                                        </div>
                                     </div>
-                                </Tabs>
-                            </motion.div>
+                                </div>
+                            </div>
                         </form>
                     </RolesLayout>
                 </SidebarInset>

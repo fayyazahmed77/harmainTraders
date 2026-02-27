@@ -169,13 +169,15 @@
 <body>
 
     <div class="receipt-wrapper">
+        @if($firm)
         <!-- Header -->
         <div class="header text-center">
-            <div class="brand-name">HARMAIN TRADERS</div>
+            <div class="brand-name">{{ strtoupper($firm->name) }}</div>
             <div class="contact-info">
-                Phone No. : 0332 3218684 &nbsp; Fax No. : 0332 3218684
+                Phone No. : {{ $firm->phone }} &nbsp; Fax No. : {{ $firm->fax }}
             </div>
         </div>
+        @endif
 
         <!-- Invoice Bar -->
         <div class="invoice-bar">ESTIMATE</div>

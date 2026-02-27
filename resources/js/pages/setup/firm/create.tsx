@@ -108,7 +108,13 @@ export default function FirmCreate() {
 
     const formData = new FormData();
     Object.entries(form).forEach(([key, value]) => {
-      if (value !== null) formData.append(key, value as any);
+      if (value !== null) {
+        if (typeof value === "boolean") {
+          formData.append(key, value ? "1" : "0");
+        } else {
+          formData.append(key, value as any);
+        }
+      }
     });
 
     if (date) {

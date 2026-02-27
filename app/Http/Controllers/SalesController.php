@@ -9,6 +9,8 @@ use App\Models\Account;
 use App\Models\Saleman;
 use App\Models\SalesItem;
 use App\Models\Purchase;
+use App\Models\Firm;
+use App\Models\MessageLine;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
@@ -107,10 +109,10 @@ class SalesController extends Controller
         })->get();
 
         // Fetch Firms for invoice branding
-        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
+        $firms = Firm::select('id', 'name', 'defult')->get();
 
         // Fetch Message Lines (Category: Sales, Status: active)
-        $messageLines = \App\Models\MessageLine::where('category', 'Sales')
+        $messageLines = MessageLine::where('category', 'Sales')
             ->where('status', 'active')
             ->get();
 
@@ -374,8 +376,16 @@ class SalesController extends Controller
         $salemans = Saleman::get();
         $items = Items::get();
 
+        // Fetch Payment Accounts (Cash/Bank)
+        $paymentAccounts = Account::whereHas('accountType', function ($q) {
+            $q->whereIn('name', ['Cash', 'Bank']);
+        })->get();
+
+        // Fetch Firms for invoice branding
+        $firms = Firm::select('id', 'name', 'defult')->get();
+
         // Fetch Message Lines (Category: Sales, Status: active)
-        $messageLines = \App\Models\MessageLine::where('category', 'Sales')
+        $messageLines = MessageLine::where('category', 'Sales')
             ->where('status', 'active')
             ->get();
 
@@ -384,6 +394,8 @@ class SalesController extends Controller
             'accounts' => $accounts,
             'items' => $items,
             'salemans' => $salemans,
+            'paymentAccounts' => $paymentAccounts,
+            'firms' => $firms,
             'messageLines' => $messageLines,
         ]);
     }
@@ -483,7 +495,7 @@ class SalesController extends Controller
     public function view($id)
     {
         $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->find($id);
-       
+
 
         // Get all returns for this sale
         $returns = \App\Models\SalesReturn::with(['items.item'])
@@ -502,6 +514,9 @@ class SalesController extends Controller
     {
         $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->findOrFail($id);
 
+        // Get the assigned firm
+        $firm = Firm::find($sale->firm_id);
+
         // Get all returns for this sale
         $returns = \App\Models\SalesReturn::with(['items.item'])
             ->where('original_invoice', $sale->invoice)
@@ -512,7 +527,7 @@ class SalesController extends Controller
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.saleshalf' : 'pdf.sale';
 
-        $pdf = Pdf::loadView($view, compact('sale'));
+        $pdf = Pdf::loadView($view, compact('sale', 'firm'));
 
         if ($format === 'small') {
             // Receipt size for thermal printers

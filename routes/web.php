@@ -268,9 +268,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [SalesReturnController::class, 'index'])->name('sales_return.index');
         Route::get('/create', [SalesReturnController::class, 'create'])->name('sales_return.create');
         Route::post('/', [SalesReturnController::class, 'store'])->name('sales_return.store');
+        Route::get('/{salesReturn}/show', [SalesReturnController::class, 'show'])->name('sales_return.show');
         Route::get('/{salesReturn}/edit', [SalesReturnController::class, 'edit'])->name('sales_return.edit');
         Route::put('/{salesReturn}', [SalesReturnController::class, 'update'])->name('sales_return.update');
         Route::delete('/{id}', [SalesReturnController::class, 'destroy'])->name('sales_return.destroy');
+        Route::get('/{id}/pdf', [SalesReturnController::class, 'pdf'])->name('sales_return.pdf');
         Route::get('/customer/{customerId}/purchased-items', [SalesReturnController::class, 'getCustomerPurchasedItems'])->name('sales_return.customer_items');
         Route::get('/customer/{customerId}/invoices', [SalesReturnController::class, 'getCustomerInvoices'])->name('sales_return.customer_invoices');
         Route::get('/invoice/{invoiceId}/items', [SalesReturnController::class, 'getInvoiceItems'])->name('sales_return.invoice_items');

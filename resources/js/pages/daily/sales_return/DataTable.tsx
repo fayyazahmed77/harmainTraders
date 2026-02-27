@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
     Edit,
     Trash2,
@@ -40,7 +41,8 @@ import {
     Filter,
     Package,
     ShieldAlert,
-    History as HistoryIcon
+    History as HistoryIcon,
+    Printer
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -57,10 +59,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { router } from "@inertiajs/react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 interface SalesReturn {
     id: number;
@@ -96,6 +105,8 @@ export default function DataTable({ data }: DataTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [returnToDelete, setReturnToDelete] = useState<SalesReturn | null>(null);
 
     const columns: ColumnDef<SalesReturn>[] = [
         {
@@ -222,22 +233,31 @@ export default function DataTable({ data }: DataTableProps) {
                             <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-3 py-2">Credit Protocols</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
                             <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
+                                onClick={() => window.open(`/sales-return/${doc.id}/pdf`, '_blank')}
+                            >
+                                <Printer className="h-3.5 w-3.5 text-zinc-400 group-focus:text-white transition-colors" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Print Return</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
+                                onClick={() => router.visit(`/sales-return/${doc.id}/show`)}
+                            >
+                                <Eye className="h-3.5 w-3.5 text-zinc-400 group-focus:text-white transition-colors" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">View Details</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
                                 onClick={() => router.visit(`/sales-return/${doc.id}/edit`)}
                             >
                                 <Edit className="h-3.5 w-3.5 text-zinc-400 group-focus:text-white transition-colors" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Adjust Ledger</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Edit Return</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-rose-500/10 focus:text-rose-600 group"
                                 onClick={() => {
-                                    if (confirm("Are you sure you want to delete this return?")) {
-                                        router.delete(`/sales-return/${doc.id}`, {
-                                            onSuccess: () => toast.success("Credit Entry Purged"),
-                                        });
-                                    }
+                                    setReturnToDelete(doc);
+                                    setIsDeleteDialogOpen(true);
                                 }}
                             >
                                 <Trash2 className="h-3.5 w-3.5 text-zinc-400 group-hover:text-rose-500 transition-colors" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Purge Protocol</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Delete</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -306,7 +326,7 @@ export default function DataTable({ data }: DataTableProps) {
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 overflow-hidden shadow-sm overflow-x-auto custom-scrollbar">
+            <div className="rounded-sml border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 overflow-hidden shadow-sm overflow-x-auto custom-scrollbar">
                 <Table>
                     <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -373,6 +393,43 @@ export default function DataTable({ data }: DataTableProps) {
                     </Button>
                 </div>
             </div>
+
+            {/* Deletion Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <ShieldAlert className="h-4 w-4 text-rose-500" />
+                            Purge Registry Entry
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-bold text-zinc-500 uppercase tracking-widest leading-relaxed pt-2">
+                            Are you absolutely sure you want to delete return protocol <span className="text-rose-500 font-black tracking-tighter text-sm italic">{returnToDelete?.invoice}</span>?
+                            <br /><br />
+                            This action will <span className="text-zinc-900 dark:text-zinc-100 font-black">REVERT STOCK LEVELS</span> and <span className="text-zinc-900 dark:text-zinc-100 font-black">RESTORE INVOICE BALANCE</span>. This process cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0 pt-4">
+                        <Button variant="ghost" className="rounded-lg h-10 px-6 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" onClick={() => setIsDeleteDialogOpen(false)}>
+                            Cancel Session
+                        </Button>
+                        <Button
+                            className="rounded-lg h-10 px-6 bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            onClick={() => {
+                                if (returnToDelete) {
+                                    router.delete(`/sales-return/${returnToDelete.id}`, {
+                                        onSuccess: () => {
+                                            setIsDeleteDialogOpen(false);
+                                            toast.success("Registry Entry Purged Successfully");
+                                        }
+                                    });
+                                }
+                            }}
+                        >
+                            Execute Purge
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

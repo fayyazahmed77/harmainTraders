@@ -200,7 +200,7 @@ class SalesReturnController extends Controller
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
- 
+
     // Get customer's sales invoices
     public function getCustomerInvoices($customerId)
     {
@@ -280,6 +280,8 @@ class SalesReturnController extends Controller
                         'qty_pcs'          => $si->qty_pcs,
                         'total_pcs'        => $si->total_pcs,
                         'last_trade_price' => $si->trade_price,
+                        'gst_amount'       => $si->gst_amount,
+                        'discount'         => $si->discount,
                     ];
                 });
 
@@ -288,8 +290,201 @@ class SalesReturnController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
-    //Edit
-    public function edit($id){
+    //show
+    public function show($id)
+    {
+        $return = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
+        return Inertia::render("daily/sales_return/view", [
+            'returnData' => $return,
+        ]);
+    }
 
+    //edit
+    public function edit($id)
+    {
+        $return = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
+
+        $accounts = Account::with('accountType')
+            ->whereHas('sales')
+            ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
+
+        $salemans = Saleman::get();
+        $messageLines = MessageLine::get(['id', 'messageline']);
+
+        return Inertia::render("daily/sales_return/edit", [
+            'returnData'    => $return,
+            'accounts'      => $accounts,
+            'salemans'      => $salemans,
+            'messageLines'  => $messageLines,
+        ]);
+    }
+
+    //update
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'date'            => 'required|date',
+            'invoice'         => 'required|string',
+            'customer_id'     => 'required|integer',
+            'no_of_items'     => 'required|integer',
+            'gross_total'     => 'required|numeric',
+            'discount_total'  => 'required|numeric',
+            'tax_total'       => 'required|numeric',
+            'net_total'       => 'required|numeric',
+            'items'           => 'required|array',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $return = SalesReturn::findOrFail($id);
+            $oldNetTotal = $return->net_total;
+            $oldOriginalInvoice = $return->original_invoice;
+
+            // 1. Revert Stock for Old Items
+            $oldItems = SalesReturnItem::where('sales_return_id', $id)->get();
+            foreach ($oldItems as $oldItem) {
+                $item = Items::find($oldItem->item_id);
+                if ($item) {
+                    $item->stock_1 = ($item->stock_1 ?? 0) - $oldItem->total_pcs;
+                    $item->save();
+                }
+            }
+
+            // 2. Revert Original Invoice Balance
+            if ($oldOriginalInvoice) {
+                $oldSale = Sales::where('invoice', $oldOriginalInvoice)->first();
+                if ($oldSale) {
+                    $oldSale->remaining_amount += $oldNetTotal;
+                    $oldSale->save();
+                }
+            }
+
+            // 3. Update Return Record
+            $return->update([
+                'date'            => $request->date,
+                'invoice'         => $request->invoice,
+                'original_invoice' => $request->original_invoice,
+                'customer_id'     => $request->customer_id,
+                'salesman_id'     => $request->salesman_id ?? 0,
+                'no_of_items'     => $request->no_of_items,
+                'gross_total'     => $request->gross_total,
+                'discount_total'  => $request->discount_total,
+                'tax_total'       => $request->tax_total,
+                'net_total'       => $request->net_total,
+                'remarks'         => $request->remarks,
+            ]);
+
+            // 4. Delete Old Items & Insert New Ones
+            SalesReturnItem::where('sales_return_id', $id)->delete();
+
+            foreach ($request->items as $it) {
+                SalesReturnItem::create([
+                    'sales_return_id' => $return->id,
+                    'item_id'     => $it['item_id'],
+                    'qty_carton'  => $it['qty_carton'],
+                    'qty_pcs'     => $it['qty_pcs'],
+                    'total_pcs'   => $it['total_pcs'],
+                    'trade_price' => $it['trade_price'],
+                    'discount'    => $it['discount'] ?? 0,
+                    'gst_amount'  => $it['gst_amount'] ?? 0,
+                    'subtotal'    => $it['subtotal'],
+                ]);
+
+                // Update Stock (Increase for Return)
+                $item = Items::find($it['item_id']);
+                if ($item) {
+                    $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
+                    $item->save();
+                }
+            }
+
+            // 5. Update New Original Invoice Balance
+            if ($request->original_invoice) {
+                $newSale = Sales::where('invoice', $request->original_invoice)->first();
+                if ($newSale) {
+                    $newSale->remaining_amount -= $request->net_total;
+
+                    // Update Status
+                    $totalSoldQty = SalesItem::where('sale_id', $newSale->id)->sum('total_pcs');
+                    $allReturnIds = SalesReturn::where('original_invoice', $newSale->invoice)->pluck('id');
+                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+                    $newSale->status = ($totalReturnedQty >= $totalSoldQty) ? 'Returned' : 'Partial Return';
+
+                    $newSale->save();
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('sales_return.index')->with('success', 'Sales Return updated successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+        }
+    }
+
+    //destroy
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $return = SalesReturn::findOrFail($id);
+            $netTotal = $return->net_total;
+            $originalInvoice = $return->original_invoice;
+
+            // 1. Revert Stock (Decrease because return added stock)
+            $items = SalesReturnItem::where('sales_return_id', $id)->get();
+            foreach ($items as $si) {
+                $product = Items::find($si->item_id);
+                if ($product) {
+                    $product->stock_1 = ($product->stock_1 ?? 0) - $si->total_pcs;
+                    $product->save();
+                }
+            }
+
+            // 2. Revert Original Invoice Balance & Status
+            if ($originalInvoice) {
+                $sale = Sales::where('invoice', $originalInvoice)->first();
+                if ($sale) {
+                    $sale->remaining_amount += $netTotal;
+
+                    // Recalculate Status
+                    $totalSoldQty = SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+                    $allReturnIds = SalesReturn::where('original_invoice', $sale->invoice)
+                        ->where('id', '!=', $id)
+                        ->pluck('id');
+                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+
+                    if ($totalReturnedQty <= 0) {
+                        $sale->status = 'Active';
+                    } elseif ($totalReturnedQty < $totalSoldQty) {
+                        $sale->status = 'Partial Return';
+                    } else {
+                        $sale->status = 'Returned';
+                    }
+
+                    $sale->save();
+                }
+            }
+
+            // 3. Delete Return Items & Return
+            SalesReturnItem::where('sales_return_id', $id)->delete();
+            $return->delete();
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Sales Return deleted and stock/balances reverted successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+        }
+    }
+
+    public function pdf($id)
+    {
+        $salesReturn = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sales_return', compact('salesReturn'));
+        $pdf->setPaper('A4', 'portrait');
+        return $pdf->stream("Sales-Return-{$salesReturn->invoice}.pdf");
     }
 }

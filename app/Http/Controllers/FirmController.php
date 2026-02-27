@@ -75,6 +75,10 @@ class FirmController extends Controller
         $validated['defult']       = $request->boolean('defult');
         $validated['status']       = $request->boolean('status');
 
+        if ($validated['defult']) {
+            Firm::query()->update(['defult' => 0]);
+        }
+
         // ✅ Add created_by user
         $validated['created_by'] = Auth::id();
 
@@ -150,6 +154,10 @@ class FirmController extends Controller
         $data['printinvoice'] = $request->boolean('printinvoice');
         $data['defult']       = $request->boolean('defult');
         $data['status']       = $request->boolean('status');
+
+        if ($data['defult']) {
+            Firm::where('id', '!=', $firm->id)->update(['defult' => 0]);
+        }
 
         // ✅ Handle Logo Update
         if ($request->hasFile('logo')) {
