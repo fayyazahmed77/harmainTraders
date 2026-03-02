@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Saleman;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
+use App\Models\Firm;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -106,12 +107,15 @@ class PurchaseController extends Controller
             ->where('status', 'active')
             ->get();
 
+        $firms = Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/purchase/create", [
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'nextInvoiceNo' => $nextInvoiceNo,
             'messageLines' => $messageLines,
+            'firms' => $firms,
         ]);
     }
     //store
@@ -144,6 +148,7 @@ class PurchaseController extends Controller
             'items.*.subtotal'        => 'required|numeric',
             'print_format'            => 'nullable|in:big,small',
             'message_line_id'         => 'nullable|integer',
+            'firm_id'                 => 'nullable|integer',
             'update_prices'           => 'nullable|boolean',
         ]);
 
@@ -168,6 +173,7 @@ class PurchaseController extends Controller
                 'remaining_amount' => $request->remaining_amount,
                 'status'          => 'Completed',
                 'message_line_id' => $request->message_line_id,
+                'firm_id'         => $request->firm_id,
             ]);
 
             // Fetch supplier category percentage
@@ -236,12 +242,15 @@ class PurchaseController extends Controller
             ->where('status', 'active')
             ->get();
 
+        $firms = Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/purchase/edit", [
             'purchase' => $purchase,
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'messageLines' => $messageLines,
+            'firms' => $firms,
         ]);
     }
     //update
@@ -273,6 +282,7 @@ class PurchaseController extends Controller
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
             'message_line_id'         => 'nullable|integer',
+            'firm_id'                 => 'nullable|integer',
             'update_prices'           => 'nullable|boolean',
         ]);
 
@@ -296,6 +306,7 @@ class PurchaseController extends Controller
                 'remaining_amount' => $request->remaining_amount,
                 'status'          => $request->status ?? $purchase->status,
                 'message_line_id' => $request->message_line_id,
+                'firm_id'         => $request->firm_id ?? $purchase->firm_id,
             ]);
 
             // Revert Stock for old items
@@ -367,11 +378,12 @@ class PurchaseController extends Controller
     {
         $purchase = Purchase::with('supplier', 'salesman', 'items.item')->findOrFail($id);
 
+        $firm = Firm::find($purchase->firm_id);
 
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.purchasehalf' : 'pdf.purchase';
 
-        $pdf = Pdf::loadView($view, compact('purchase'));
+        $pdf = Pdf::loadView($view, compact('purchase', 'firm'));
 
         if ($format === 'small') {
             // Receipt size for thermal printers

@@ -18,6 +18,7 @@ class Purchase extends Model
         'code',
         'supplier_id',
         'salesman_id',
+        'firm_id',
         'no_of_items',
         'status',
         'gross_total',

@@ -164,6 +164,11 @@ class ItemsController extends Controller
     {
         $item = Items::findOrFail($id);
         $categories = ItemCategory::all();
+        $compaines = Account::with('accountType')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Company']);
+            })
+            ->get();
 
         // Pagination logic (same as show)
         $prevId = Items::where('id', '>', $id)->orderBy('id', 'asc')->value('id');
@@ -174,6 +179,7 @@ class ItemsController extends Controller
         return Inertia::render("setup/items/edit", [
             'item' => $item,
             'categories' => $categories,
+            'compaines' => $compaines,
             'pagination' => [
                 'prev_id' => $prevId,
                 'next_id' => $nextId,

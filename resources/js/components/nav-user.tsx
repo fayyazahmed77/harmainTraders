@@ -13,7 +13,7 @@ import {
 import { Link } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
 import { useAppearance } from '@/hooks/use-appearance';
-declare var route: any;
+declare let route: any;
 
 import {
   Avatar,

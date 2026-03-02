@@ -89,8 +89,8 @@ const SalesMap: React.FC<SalesMapProps> = ({ data, center, zoom, level, formatCu
         fillColor: "#F54A00",
         fillOpacity: 0.03,
         dashArray: "8, 12",
-        lineCap: "round" as "round",
-        lineJoin: "round" as "round"
+        lineCap: "round" as const,
+        lineJoin: "round" as const
     };
 
     return (

@@ -133,8 +133,14 @@ interface PurchaseProps {
     items: Item[];
     accounts: Account[];
     salemans: Saleman[];
+    firms: Firm[];
     nextInvoiceNo: string;
     messageLines?: MessageLine[];
+}
+interface Firm {
+    id: number;
+    name: string;
+    defult: number;
 }
 // ───────────────────────────────────────────
 // Util helpers
@@ -162,6 +168,7 @@ export default function Purchase({
     items,
     accounts,
     salemans,
+    firms,
     nextInvoiceNo,
     messageLines,
 }: PurchaseProps) {
@@ -223,6 +230,10 @@ export default function Purchase({
     const [courier, setCourier] = useState<number>(0);
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
     const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+    const [selectedFirmId, setSelectedFirmId] = useState<string>(() => {
+        const defaultFirm = firms?.find(f => f.defult === 1);
+        return defaultFirm ? defaultFirm.id.toString() : "";
+    });
     const accountTypeOptions: Option[] = accounts.map((a) => ({
         value: a.id,
         label: a.title,
@@ -438,6 +449,7 @@ export default function Purchase({
 
             supplier_id: accountType?.value,
             salesman_id: salesman,
+            firm_id: selectedFirmId ? Number(selectedFirmId) : null,
             no_of_items: rowsWithComputed.length,
 
             gross_total: totals.gross,
@@ -490,6 +502,7 @@ export default function Purchase({
                 setInvoiceNo(newProps.nextInvoiceNo); // Update with new invoice number from server
                 setAccountType(null);
                 setSalesman(null);
+                setSelectedFirmId(firms?.find(f => f.defult === 1)?.id.toString() || "");
                 setCreditLimit("");
                 setCreditDays(0);
                 setMarkupPercentage(0);
@@ -623,6 +636,20 @@ export default function Purchase({
                             <FieldWrapper label="Credit Days" className="col-span-1">
                                 <Input value={creditDays} readOnly className="h-9 bg-transparent border-gray-200 dark:border-gray-800 font-mono text-center text-xs" />
                             </FieldWrapper>
+                            <FieldWrapper label="Firm" className="col-span-2">
+                                <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                    <SelectTrigger className="w-full h-9 bg-transparent border-gray-200 dark:border-gray-800 text-xs text-left">
+                                        <SelectValue placeholder="Select Firm" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {firms?.map((f) => (
+                                            <SelectItem key={f.id} value={f.id.toString()}>
+                                                {f.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FieldWrapper>
                         </div>
                     </Card>
 
@@ -734,7 +761,7 @@ export default function Purchase({
                             </FieldWrapper>
 
                             {/* Invoice # */}
-                            <FieldWrapper label="Bill #" className="lg:col-span-2">
+                            <FieldWrapper label="Bill #" className="lg:col-span-1">
                                 <Input
                                     placeholder="Invoice #"
                                     value={invoiceNo}
@@ -745,12 +772,21 @@ export default function Purchase({
 
                             {/* Salesman */}
                             <FieldWrapper label="Salesman" className="lg:col-span-2">
-                                <Input
-                                    placeholder="Salesman"
-                                    value={salesman ? (salemanMap.get(salesman) || "") : ""}
-                                    readOnly
-                                    className="h-10 bg-slate-50/50 italic text-slate-600 border-slate-200 text-[10px]"
-                                />
+                                <Select
+                                    value={salesman?.toString() || ""}
+                                    onValueChange={(val) => setSalesman(val ? Number(val) : null)}
+                                >
+                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left">
+                                        <SelectValue placeholder="Select Salesman" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {salemans.map((s) => (
+                                            <SelectItem key={s.id} value={s.id.toString()}>
+                                                {s.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </FieldWrapper>
 
                             {/* Items # */}
@@ -1368,6 +1404,22 @@ export default function Purchase({
                                             {messageLines?.map((msg) => (
                                                 <SelectItem key={msg.id} value={msg.id.toString()}>
                                                     {msg.messageline}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-sky-600 dark:text-sky-400 mb-1">Firm</div>
+                                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                        <SelectTrigger className="w-full h-9 border-sky-200 dark:border-sky-900/50 bg-sky-50/30 dark:bg-sky-950/20">
+                                            <SelectValue placeholder="Select Firm" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {firms?.map((f) => (
+                                                <SelectItem key={f.id} value={f.id.toString()}>
+                                                    {f.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
