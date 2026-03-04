@@ -85,7 +85,7 @@ class ItemsController extends Controller
                 $q->whereIn('name', ['Company']);
             })
             ->get();
-       
+
         return Inertia::render("setup/items/create", [
             'categories' => $categories,
             'compaines' => $compaines
@@ -97,25 +97,25 @@ class ItemsController extends Controller
         $validated = $request->validate([
             'date' => 'nullable|date',
             'code' => 'nullable|string|max:255',
-            'title' => 'nullable|string|max:255',
+            'title' => 'required|string|max:255',
             'short_name' => 'nullable|string|max:255',
-            'company' => 'nullable|string|max:255',
+            'company' => 'required|exists:accounts,id',
 
             // Pricing
-            'trade_price' => 'nullable|numeric',
-            'retail' => 'nullable|numeric',
+            'trade_price' => 'required|numeric',
+            'retail' => 'required|numeric',
             'retail_tp_diff' => 'nullable|numeric',
 
             // Inventory & Packing
-            'reorder_level' => 'nullable|numeric',
-            'packing_qty' => 'nullable|numeric',
-            'packing_size' => 'nullable|string|max:255',
+            'reorder_level' => 'required|numeric',
+            'packing_qty' => 'required|numeric',
+            'packing_size' => 'required|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects
             'formation' => 'nullable|string|max:255',
             'type' => 'nullable|string|max:255',
-            'category' => 'nullable|string|max:255',
+            'category' => 'required|exists:item_categories,id',
             'shelf' => 'nullable|string|max:255',
 
             // GST
@@ -130,7 +130,7 @@ class ItemsController extends Controller
             // Right Section
             'discount' => 'nullable|numeric',
             'packing_full' => 'nullable|numeric',
-            'packing_pcs' => 'nullable|numeric',
+            'packing_pcs' => 'required|numeric',
             'limit_pcs' => 'nullable|numeric',
             'order_qty' => 'nullable|numeric',
             'weight' => 'nullable|numeric',
@@ -195,25 +195,25 @@ class ItemsController extends Controller
         $validated = $request->validate([
             'date' => 'nullable|date',
             'code' => 'nullable|string|max:255',
-            'title' => 'nullable|string|max:255',
+            'title' => 'required|string|max:255',
             'short_name' => 'nullable|string|max:255',
-            'company' => 'nullable|string|max:255',
+            'company' => 'required|exists:accounts,id',
 
             // Pricing
-            'trade_price' => 'nullable|numeric',
-            'retail' => 'nullable|numeric',
+            'trade_price' => 'required|numeric',
+            'retail' => 'required|numeric',
             'retail_tp_diff' => 'nullable|numeric',
 
             // Inventory & Packing
-            'reorder_level' => 'nullable|numeric',
-            'packing_qty' => 'nullable|numeric',
-            'packing_size' => 'nullable|string|max:255',
+            'reorder_level' => 'required|numeric',
+            'packing_qty' => 'required|numeric',
+            'packing_size' => 'required|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects
             'formation' => 'nullable|string|max:255',
             'type' => 'nullable|string|max:255',
-            'category' => 'nullable|exists:item_categories,id',
+            'category' => 'required|exists:item_categories,id',
             'shelf' => 'nullable|string|max:255',
 
             // GST
@@ -228,7 +228,7 @@ class ItemsController extends Controller
             // Right Section
             'discount' => 'nullable|numeric',
             'packing_full' => 'nullable|numeric',
-            'packing_pcs' => 'nullable|numeric',
+            'packing_pcs' => 'required|numeric',
             'limit_pcs' => 'nullable|numeric',
             'order_qty' => 'nullable|numeric',
             'weight' => 'nullable|numeric',
@@ -352,5 +352,39 @@ class ItemsController extends Controller
                 'total' => $totalCount,
             ]
         ]);
+    }
+    public function getNextCode(Request $request)
+    {
+        $categoryId = $request->query('category_id');
+        if (!$categoryId) {
+            return response()->json(['code' => '']);
+        }
+
+        $category = ItemCategory::find($categoryId);
+        if (!$category) {
+            return response()->json(['code' => '']);
+        }
+
+        // Get category code prefix
+        $prefix = $category->code ? strtoupper($category->code) : strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $category->name), 0, 3));
+
+        // Find latest item in this category
+        $latestItem = Items::where('category', $categoryId)
+            ->where('code', 'like', $prefix . '-%')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (!$latestItem) {
+            return response()->json(['code' => $prefix . '-001']);
+        }
+
+        // Extract and increment numeric part
+        if (preg_match('/-(\d+)$/', $latestItem->code, $matches)) {
+            $number = intval($matches[1]);
+            $nextCode = $prefix . '-' . str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+            return response()->json(['code' => $nextCode]);
+        }
+
+        return response()->json(['code' => $prefix . '-001']);
     }
 }

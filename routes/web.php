@@ -207,6 +207,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [ItemsController::class, 'index'])->name('items.index');
         Route::get('/create', [ItemsController::class, 'create'])->name('items.create');
         Route::post('/', [ItemsController::class, 'store'])->name('items.store');
+        Route::get('/next-code', [ItemsController::class, 'getNextCode'])->name('items.next-code');
         Route::get('/{items}/edit', [ItemsController::class, 'edit'])->name('items.edit');
         Route::get('/{items}/show', [ItemsController::class, 'show'])->name('items.show');
         Route::put('/{items}', [ItemsController::class, 'update'])->name('items.update');
@@ -299,6 +300,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase_return.update');
         Route::delete('/{id}', [PurchaseReturnController::class, 'destroy'])->name('purchase_return.destroy');
         Route::get('/supplier/{supplierId}/purchased-items', [PurchaseReturnController::class, 'getSupplierPurchasedItems'])->name('purchase_return.supplier_items');
+        Route::get('/supplier/{supplierId}/invoices', [PurchaseReturnController::class, 'getSupplierInvoices'])->name('purchase_return.supplier_invoices');
+        Route::get('/invoice/{invoiceId}/items', [PurchaseReturnController::class, 'getInvoiceItems'])->name('purchase_return.invoice_items');
     });
     //--------------------------------------------Payments-----------------------------------------------
     Route::prefix('/payments')->group(function () {

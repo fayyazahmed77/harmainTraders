@@ -129,11 +129,11 @@ class AccountController extends Controller
     }
     public function store(Request $request)
     {
-        // ✅ Validate incoming data
-        $validated = $request->validate([
+        // ✅ Basic rules common to all
+        $rules = [
             'code' => 'required|string|max:50',
             'title' => 'required|string|max:255',
-            'type' => 'required|string',
+            'type' => 'required|integer|exists:account_types,id',
             'purchase' => 'nullable|boolean',
             'cashbank' => 'nullable|boolean',
             'sale' => 'nullable|boolean',
@@ -166,7 +166,25 @@ class AccountController extends Controller
             'ats_type' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
             'status' => 'boolean',
-        ]);
+        ];
+
+        // ✅ Apply conditional rules
+        $accountType = AccountType::find($request->type);
+        if ($accountType) {
+            if ($accountType->name === 'Customers') {
+                $rules['saleman_id'] = 'required|integer';
+                $rules['credit_limit'] = 'required|numeric';
+                $rules['aging_days'] = 'required|integer';
+                $rules['item_category'] = 'required|integer';
+            } elseif ($accountType->name === 'Supplier') {
+                $rules['opening_balance'] = 'required|numeric';
+                $rules['saleman_id'] = 'required|integer';
+                $rules['aging_days'] = 'required|integer';
+                $rules['category'] = 'required|numeric|exists:account_categories,id';
+            }
+        }
+
+        $validated = $request->validate($rules);
 
         // ✅ Convert checkbox booleans
         $validated['purchase'] = $request->boolean('purchase');

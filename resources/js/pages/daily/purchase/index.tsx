@@ -140,10 +140,7 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
                             transition={{ delay: 0.4 }}
                             className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl shadow-2xl shadow-zinc-200/50 dark:shadow-none overflow-hidden"
                         >
-                            <div className="p-1 bg-gradient-to-r from-orange-500/20 via-transparent to-transparent" />
-                            <div className="p-6">
-                                <DataTable data={purchases} />
-                            </div>
+                            <DataTable data={purchases} />
                         </motion.div>
                     </div>
                 </div>

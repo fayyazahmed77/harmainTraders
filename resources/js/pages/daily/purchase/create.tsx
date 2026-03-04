@@ -338,6 +338,7 @@ export default function Purchase({
         const disc = toNumber(selected.discount ?? 0);
         const tradePrice = toNumber(selected.trade_price ?? baseRate);
 
+        // Initial update with base rate
         updateRow(rowId, { item_id: itemId, rate: baseRate, discPercent: disc, trade_price: tradePrice });
 
         // Set this item as the selected one to display info below
@@ -349,9 +350,15 @@ export default function Purchase({
             const response = await axios.get(`/api/purchase/last-purchase-info?item_id=${itemId}`);
             setLastPurchaseInfo(response.data);
 
-            // Update row with last purchase rate for warning comparison
+            // Update row with last purchase rate as the default rate if available
             if (response.data?.previous_retail_price) {
-                updateRow(rowId, { last_purchase_rate: Number(response.data.previous_retail_price) });
+                const lastPrice = toNumber(response.data.previous_retail_price);
+                if (lastPrice > 0) {
+                    updateRow(rowId, {
+                        rate: lastPrice,
+                        last_purchase_rate: lastPrice
+                    });
+                }
             }
         } catch (error) {
             console.error('Failed to fetch last purchase info:', error);

@@ -171,31 +171,89 @@ class PurchaseReturnController extends Controller
         }
     }
 
-    // Get supplier's purchased items
+    // Get supplier's purchase invoices
+    public function getSupplierInvoices($supplierId)
+    {
+        try {
+            $invoices = Purchase::where('supplier_id', $supplierId)
+                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($p) {
+                    return [
+                        'id'               => $p->id,
+                        'invoice'          => $p->invoice,
+                        'date'             => $p->date,
+                        'net_total'        => $p->net_total,
+                        'remaining_amount' => $p->remaining_amount,
+                        'status'           => $p->status ?? 'Active',
+                    ];
+                });
+
+            return response()->json($invoices);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get items for a specific purchase invoice
+    public function getInvoiceItems($invoiceId)
+    {
+        try {
+            $purchase = Purchase::with('items.item')->find($invoiceId);
+            if (!$purchase) {
+                return response()->json(['error' => 'Invoice not found'], 404);
+            }
+
+            $items = $purchase->items->map(function ($pi) {
+                return [
+                    'item_id'     => $pi->item_id,
+                    'item'        => $pi->item,
+                    'qty_carton'  => $pi->qty_carton,
+                    'qty_pcs'     => $pi->qty_pcs,
+                    'total_pcs'   => $pi->total_pcs,
+                    'trade_price' => $pi->trade_price,
+                    'discount'    => $pi->discount,
+                    'gst_amount'  => $pi->gst_amount,
+                    'subtotal'    => $pi->subtotal,
+                ];
+            });
+
+            return response()->json([
+                'invoice'  => $purchase->invoice,
+                'date'     => $purchase->date,
+                'net_total' => $purchase->net_total,
+                'items'    => $items,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get supplier's purchased items (manual/bulk mode)
     public function getSupplierPurchasedItems($supplierId)
     {
         try {
-            // Get all purchases for this supplier
-            $purchases = \App\Models\Purchase::where('supplier_id', $supplierId)->pluck('id');
+            $purchases = Purchase::where('supplier_id', $supplierId)->pluck('id');
 
-            // Get all items from those purchases with aggregated quantities
             $purchasedItems = \App\Models\PurchaseItem::whereIn('purchase_id', $purchases)
-                ->with('item')
+                ->with(['item', 'purchase:id,invoice,date'])
                 ->get()
-                ->groupBy('item_id')
-                ->map(function ($items) {
-                    $firstItem = $items->first();
+                ->map(function ($pi) {
                     return [
-                        'item_id' => $firstItem->item_id,
-                        'item' => $firstItem->item,
-                        'total_qty_carton' => $items->sum('qty_carton'),
-                        'total_qty_pcs' => $items->sum('qty_pcs'),
-                        'total_pcs' => $items->sum('total_pcs'),
-                        'avg_trade_price' => $items->avg('trade_price'),
-                        'last_trade_price' => $items->last()->trade_price,
+                        'id'               => $pi->id,
+                        'item_id'          => $pi->item_id,
+                        'item'             => $pi->item,
+                        'invoice_no'       => $pi->purchase->invoice ?? 'N/A',
+                        'date'             => $pi->purchase->date ?? 'N/A',
+                        'qty_carton'       => $pi->qty_carton,
+                        'qty_pcs'          => $pi->qty_pcs,
+                        'total_pcs'        => $pi->total_pcs,
+                        'last_trade_price' => $pi->trade_price,
+                        'gst_amount'       => $pi->gst_amount,
+                        'discount'         => $pi->discount,
                     ];
-                })
-                ->values();
+                });
 
             return response()->json($purchasedItems);
         } catch (\Exception $e) {

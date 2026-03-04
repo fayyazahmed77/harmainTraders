@@ -149,23 +149,39 @@ export default function Create({
     code: c.code,
   }));
 
-  const categoryOptions: Option[] = (accountCategories || []).map((cat) => ({
+  const categoryOptions: Option[] = (accountCategories || []).map((cat: any) => ({
     value: cat.id,
     label: `${cat.name} (${cat.percentage}%)`,
     percentage: cat.percentage,
   }));
 
-  // Define custom styles for react-select to match Shadcn UI
-  const customStyles = {
+  const isCustomer = accountType?.label === "Customers";
+  const isSupplier = accountType?.label === "Supplier";
+
+  // Reusable Label component with required star and error message
+  const TechLabel = ({ children, required, error, className }: { children: React.ReactNode, required?: boolean, error?: string, className?: string }) => (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <div className="flex items-center gap-1">
+        <Label className="font-medium text-slate-700 dark:text-slate-300">
+          {children}
+        </Label>
+        {required && <span className="text-rose-500 font-bold">*</span>}
+      </div>
+      {error && <p className="text-[11px] font-medium text-rose-500 animate-in fade-in slide-in-from-top-1">{error}</p>}
+    </div>
+  );
+
+  // Define custom styles for react-select to match Shadcn UI with error support
+  const getSelectStyles = (hasError: boolean) => ({
     control: (base: any, state: any) => ({
       ...base,
-      borderColor: state.isFocused ? "var(--ring)" : "var(--border)",
+      borderColor: hasError ? "rgb(244 63 94)" : state.isFocused ? "var(--ring)" : "var(--border)",
       borderRadius: "var(--radius)",
-      boxShadow: state.isFocused ? "0 0 0 1px var(--ring)" : "none",
+      boxShadow: state.isFocused ? (hasError ? "0 0 0 1px rgb(244 63 94)" : "0 0 0 1px var(--ring)") : "none",
       "&:hover": {
-        borderColor: state.isFocused ? "var(--ring)" : "var(--border)",
+        borderColor: hasError ? "rgb(244 63 94)" : state.isFocused ? "var(--ring)" : "var(--border)",
       },
-      minHeight: "40px", // h-10
+      minHeight: "40px",
       backgroundColor: "var(--background)",
       color: "var(--foreground)",
       opacity: state.isDisabled ? 0.5 : 1,
@@ -222,7 +238,7 @@ export default function Create({
     indicatorSeparator: () => ({
       display: "none",
     }),
-  };
+  });
 
   // ---------- cascading fetch helpers ----------
   const fetchProvinces = async (countryId: number) => {
@@ -422,7 +438,7 @@ export default function Create({
     post(getSubmitUrl(), {
       preserveState: false,
       onSuccess: () => {
-
+        toast.success("Account created successfully!");
         reset();
         // clear local selects/dates
         setCountry(null);
@@ -442,7 +458,8 @@ export default function Create({
       },
       onError: (err) => {
         console.error("submit error", err);
-        toast.error("Failed to create account. Please check errors.");
+        const firstError = Object.values(err)[0];
+        toast.error(typeof firstError === 'string' ? firstError : "Failed to create account. Please check errors.");
       },
     });
   };
@@ -477,29 +494,29 @@ export default function Create({
                       {/* Code & Title */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Code</Label>
+                          <TechLabel error={errors.code}>Code</TechLabel>
                           <Input
                             value={data.code}
                             onChange={(e) => onInputChange("code", e.target.value)}
                             placeholder="Auto-generated"
+                            className={cn(errors.code && "border-rose-500 focus-visible:ring-rose-500")}
                           />
-                          {errors.code && <p className="text-xs text-red-500 mt-1">{errors.code}</p>}
                         </div>
 
                         <div>
-                          <Label className="mb-2 block">Title</Label>
+                          <TechLabel required error={errors.title}>Title</TechLabel>
                           <Input
                             value={data.title}
                             onChange={(e) => onInputChange("title", e.target.value)}
                             placeholder="Enter title"
+                            className={cn(errors.title && "border-rose-500 focus-visible:ring-rose-500")}
                           />
-                          {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
                         </div>
                       </div>
 
                       {/* Account Type */}
                       <div>
-                        <Label className="mb-2 block">Account Type</Label>
+                        <TechLabel required error={errors.type}>Account Type</TechLabel>
                         <Select
                           value={accountType}
                           onChange={(opt) => {
@@ -510,9 +527,8 @@ export default function Create({
                           placeholder="Select account type"
                           isSearchable
                           className="text-sm"
-                          styles={customStyles}
+                          styles={getSelectStyles(!!errors.type)}
                         />
-                        {errors.type && <p className="text-xs text-red-500 mt-1">{errors.type}</p>}
                       </div>
 
                       {/* Checkboxes */}
@@ -549,13 +565,17 @@ export default function Create({
                       {/* Opening Balance */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Opening Date</Label>
+                          <TechLabel error={errors.opening_date}>Opening Date</TechLabel>
                           <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
                             <PopoverTrigger asChild>
                               <Button
                                 type="button"
                                 variant="outline"
-                                className={cn("w-full justify-between text-left font-normal", !openingDate && "text-muted-foreground")}
+                                className={cn(
+                                  "w-full justify-between text-left font-normal",
+                                  !openingDate && "text-muted-foreground",
+                                  errors.opening_date && "border-rose-500"
+                                )}
                               >
                                 {openingDate
                                   ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
@@ -577,12 +597,13 @@ export default function Create({
                           </Popover>
                         </div>
                         <div>
-                          <Label className="mb-2 block">Opening Balance</Label>
+                          <TechLabel required={isSupplier} error={errors.opening_balance}>Opening Balance</TechLabel>
                           <Input
                             value={data.opening_balance}
                             type="number"
                             placeholder="0.00"
                             onChange={(e) => onInputChange("opening_balance", e.target.value)}
+                            className={cn(errors.opening_balance && "border-rose-500 focus-visible:ring-rose-500")}
                           />
                         </div>
                       </div>
@@ -682,7 +703,7 @@ export default function Create({
                             placeholder="Select country..."
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.country_id)}
                             formatOptionLabel={(opt: any) => (
                               <div className="flex items-center gap-2">
                                 <img src={`https://flagcdn.com/w40/${opt.code?.toLowerCase()}.png`} alt={opt.label} className="w-5 h-4 rounded object-cover" />
@@ -702,7 +723,7 @@ export default function Create({
                             isDisabled={!country}
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.province_id)}
                           />
                         </div>
                       </div>
@@ -718,7 +739,7 @@ export default function Create({
                             isDisabled={!province}
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.city_id)}
                           />
                         </div>
 
@@ -732,7 +753,7 @@ export default function Create({
                             isDisabled={!city}
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.area_id)}
                           />
                         </div>
                       </div>
@@ -750,14 +771,14 @@ export default function Create({
                           isDisabled={!area}
                           isSearchable
                           className="text-sm"
-                          styles={customStyles}
+                          styles={getSelectStyles(!!errors.subarea_id)}
                         />
                       </div>
 
                       {/* Salesman & Booker */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Salesman</Label>
+                          <TechLabel required error={errors.saleman_id}>Salesman</TechLabel>
                           <Select
                             value={saleman}
                             onChange={(opt) => {
@@ -768,11 +789,11 @@ export default function Create({
                             placeholder="Select salesman"
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.saleman_id)}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">Booker</Label>
+                          <TechLabel error={errors.booker_id}>Booker</TechLabel>
                           <Select
                             value={booker}
                             onChange={(opt) => {
@@ -783,7 +804,7 @@ export default function Create({
                             placeholder="Select booker"
                             isSearchable
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.booker_id)}
                           />
                         </div>
                       </div>
@@ -791,21 +812,23 @@ export default function Create({
                       {/* Financial Details */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Credit Limit</Label>
+                          <TechLabel required={isCustomer} error={errors.credit_limit}>Credit Limit</TechLabel>
                           <Input
                             value={data.credit_limit}
                             type="number"
                             onChange={(e) => onInputChange("credit_limit", e.target.value)}
                             placeholder="Amount..."
+                            className={cn(errors.credit_limit && "border-rose-500 focus-visible:ring-rose-500")}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">Aging Days</Label>
+                          <TechLabel required error={errors.aging_days}>Aging Days</TechLabel>
                           <Input
                             value={data.aging_days}
                             type="number"
                             onChange={(e) => onInputChange("aging_days", e.target.value)}
                             placeholder="Days..."
+                            className={cn(errors.aging_days && "border-rose-500 focus-visible:ring-rose-500")}
                           />
                         </div>
                       </div>
@@ -868,7 +891,7 @@ export default function Create({
                       {/* Misc */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Note Head</Label>
+                          <TechLabel error={errors.note_head}>Note Head</TechLabel>
                           <Select
                             options={[
                               { value: "Legal Expenses", label: "Legal Expenses" },
@@ -885,11 +908,11 @@ export default function Create({
                             onChange={(opt: any) => onInputChange("note_head", opt ? String(opt.value) : "")}
                             placeholder="Select Note Head"
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.note_head)}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">Category (Dynamic)</Label>
+                          <TechLabel required={isSupplier} error={errors.category}>Category (Dynamic)</TechLabel>
                           <Select
                             options={categoryOptions}
                             value={selectedCategory}
@@ -899,14 +922,14 @@ export default function Create({
                             }}
                             placeholder="Select Category"
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.category)}
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="mb-2 block">Item Category</Label>
+                          <TechLabel required={isCustomer} error={errors.item_category}>Item Category</TechLabel>
                           <Select
                             options={[
                               { value: "2", label: "2 (T.P 2)" },
@@ -920,17 +943,17 @@ export default function Create({
                             onChange={(opt: any) => onInputChange("item_category", opt ? String(opt.value) : "")}
                             placeholder="Select Item Category"
                             className="text-sm"
-                            styles={customStyles}
+                            styles={getSelectStyles(!!errors.item_category)}
                           />
                         </div>
                         <div>
-                          <Label className="mb-2 block">A.T.S Info</Label>
+                          <TechLabel error={errors.ats_percentage || errors.ats_type}>A.T.S Info</TechLabel>
                           <div className="flex gap-2">
                             <Input
                               value={data.ats_percentage}
                               onChange={(e) => onInputChange("ats_percentage", e.target.value)}
                               placeholder="%"
-                              className="w-20"
+                              className={cn("w-20", errors.ats_percentage && "border-rose-500 focus-visible:ring-rose-500")}
                             />
                             <Select
                               options={[
@@ -945,7 +968,7 @@ export default function Create({
                               onChange={(opt: any) => onInputChange("ats_type", opt ? String(opt.value) : "")}
                               placeholder="Type"
                               className="w-full text-sm"
-                              styles={customStyles}
+                              styles={getSelectStyles(!!errors.ats_type)}
                             />
                           </div>
                         </div>

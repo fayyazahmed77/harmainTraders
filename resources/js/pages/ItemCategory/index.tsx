@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DataTable } from "@/components/itemcategory/DataTable";
 import { type BreadcrumbItem } from "@/types";
-import { Plus, Package, Terminal, Sparkles, Wand2, CheckCircle2, Image as ImageIcon, FileText, Info} from "lucide-react";
+import { Plus, Package, Terminal, Sparkles, Wand2, CheckCircle2, Image as ImageIcon, FileText, Info, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +37,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface ItemCategory {
   id: number;
   name: string;
+  code: string;
   image?: string | null;
   description?: string | null;
   status: "active" | "inactive";
@@ -75,6 +76,7 @@ export default function Index({ categories }: PageProps) {
 
   // Form states
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"active" | "inactive">("active");
   const [image, setImage] = useState<File | null>(null);
@@ -101,6 +103,7 @@ export default function Index({ categories }: PageProps) {
     setIsSubmitting(true);
     const formData = new FormData();
     formData.append("name", name);
+    formData.append("code", code);
     formData.append("description", description);
     formData.append("status", status);
 
@@ -122,6 +125,7 @@ export default function Index({ categories }: PageProps) {
 
   const resetForm = () => {
     setName("");
+    setCode("");
     setDescription("");
     setStatus("active");
     setImage(null);
@@ -243,6 +247,22 @@ export default function Index({ categories }: PageProps) {
                     />
                   </div>
                   {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.name}</p>}
+                </div>
+
+                {/* Category Code */}
+                <div className="space-y-2">
+                  <Label htmlFor="code" className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Registry Code (E.g. BEV)</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                    <Input
+                      id="code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      placeholder="Category Code..."
+                      className="pl-10 h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all uppercase"
+                    />
+                  </div>
+                  {errors.code && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.code}</p>}
                 </div>
 
                 {/* Description */}

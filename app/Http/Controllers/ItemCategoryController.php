@@ -26,6 +26,7 @@ class ItemCategoryController extends Controller
     {
         $request->validate([
             'name' => 'required',
+            'code' => 'required|unique:item_categories,code',
             'description' => 'required',
             'status' => 'required',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -36,6 +37,7 @@ class ItemCategoryController extends Controller
         $userId = Auth::user()->id;
         ItemCategory::create([
             'name' => $request->name,
+            'code' => strtoupper($request->code),
             'description' => $request->description,
             'status' => $request->status,
             'image' => $image_name,
@@ -48,21 +50,28 @@ class ItemCategoryController extends Controller
     {
         $request->validate([
             'name' => 'required',
+            'code' => 'required|unique:item_categories,code,' . $id,
             'description' => 'required',
             'status' => 'required',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
-        $image = $request->file('image');
-        $image_name = time() . '.' . $image->getClientOriginalExtension();
-        $image->move(public_path('images'), $image_name);
         $userId = Auth::user()->id;
-        ItemCategory::where('id', $id)->update([
+        $data = [
             'name' => $request->name,
+            'code' => strtoupper($request->code),
             'description' => $request->description,
             'status' => $request->status,
-            'image' => $image_name,
             'updated_by' => $userId,
-        ]);
+        ];
+
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $image_name = time() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('images'), $image_name);
+            $data['image'] = $image_name;
+        }
+
+        ItemCategory::where('id', $id)->update($data);
         return redirect()->back()->with('success', 'Category updated successfully');
     }
     //delete

@@ -75,6 +75,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface ItemCategory {
   id: number;
   name: string;
+  code: string;
   image?: string | null;
   description?: string | null;
   status: "active" | "inactive";
@@ -108,6 +109,7 @@ export function DataTable({ data }: DataTableProps) {
 
   // form states for edit
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ItemCategory["status"]>("active");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -117,6 +119,7 @@ export function DataTable({ data }: DataTableProps) {
   const openEdit = (cat: ItemCategory) => {
     setEditCategory(cat);
     setName(cat.name ?? "");
+    setCode(cat.code ?? "");
     setDescription(cat.description ?? "");
     setStatus(cat.status ?? "active");
     setImageFile(null);
@@ -131,6 +134,7 @@ export function DataTable({ data }: DataTableProps) {
     const formData = new FormData();
     formData.append("_method", "PUT");
     formData.append("name", name);
+    formData.append("code", code);
     formData.append("description", description ?? "");
     formData.append("status", status);
 
@@ -194,6 +198,11 @@ export function DataTable({ data }: DataTableProps) {
           </div>
         );
       },
+    },
+    {
+      accessorKey: "code",
+      header: "Code",
+      cell: ({ row }) => <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-500/5 px-2 py-1 rounded-lg border border-orange-500/10 tracking-widest">{row.original.code}</span>,
     },
     {
       accessorKey: "status",
@@ -319,7 +328,7 @@ export function DataTable({ data }: DataTableProps) {
           />
         </div>
         <div className="flex items-center gap-2">
-          
+
           <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1" />
           <Button variant="ghost" size="sm" className="rounded-lg h-10 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-orange-500 transition-colors">
             <Archive className="mr-2 h-3.5 w-3.5" /> Export DB
@@ -464,6 +473,15 @@ export function DataTable({ data }: DataTableProps) {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter title..."
                     className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Registry Code</Label>
+                  <Input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Enter code..."
+                    className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all uppercase"
                   />
                 </div>
                 <div className="space-y-2">

@@ -10,6 +10,7 @@ class ItemCategory extends Model
 
     protected $fillable = [
         "name",
+        "code",
         "image",
         "description",
         "status",

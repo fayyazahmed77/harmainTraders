@@ -1,5 +1,5 @@
 // sales_return/create.tsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
     Trash2, Plus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
-    ArrowDownToLine
+    ArrowDownToLine, Clock, Banknote, Database, ShieldCheck, History, Tags
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -64,6 +64,16 @@ interface RowData {
     discReadOnly?: boolean;
     amount: number;
     packing: number;
+    // Bonus Fields
+    bonus_full: number;
+    bonus_pcs: number;
+    has_bonus_available?: boolean;
+    // Intelligence Fields
+    sales_date?: string;
+    sales_invoice?: string;
+    current_stock?: number;
+    tp?: number;
+    salesman?: string;
 }
 
 interface Account {
@@ -122,6 +132,140 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
         <span className={`px-2 py-0.5 ${PREMIUM_ROUNDING_MD} text-[10px] font-black uppercase tracking-tighter border ${colors[type]}`}>
             {text}
         </span>
+    );
+};
+
+const ItemDetailCard = ({ row }: { row: RowData }) => {
+    const mainReturnPcs = (row.full || 0) * (row.packing || 1) + (row.pcs || 0);
+    const bonusReturnPcs = (row.bonus_full || 0) * (row.packing || 1) + (row.bonus_pcs || 0);
+    const totalReturnPcs = mainReturnPcs + bonusReturnPcs;
+    const updatedStock = (row.current_stock || 0) + totalReturnPcs;
+
+    return (
+        <Card className={`p-0 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden relative group hover:border-orange-500/50 transition-all border-l-4 border-l-orange-500 w-full shadow-lg shadow-black/5`}>
+            <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-zinc-100 dark:divide-zinc-800">
+                {/* Sec 1: Identity & Traceability */}
+                <div className="p-4 flex-1 min-w-[260px] relative overflow-hidden group/id">
+                    <div className="absolute -right-4 -top-4 opacity-[0.03] dark:opacity-[0.07] group-hover/id:scale-110 transition-transform duration-700">
+                        <ShieldCheck size={96} />
+                    </div>
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1.5 text-zinc-400">
+                                <Hash size={10} className="text-orange-500 shadow-sm" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">Registry Identity</span>
+                            </div>
+                            <span className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tighter leading-tight block truncate">
+                                {row.item_title}
+                            </span>
+                        </div>
+                        <div className="mt-3">
+                            <span className="bg-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase flex items-center w-fit gap-1 shadow-sm">
+                                <History size={10} />
+                                INV: {row.sales_invoice}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 2: Historical Context */}
+                <div className="p-4 flex-1 min-w-[220px] bg-zinc-50/30 dark:bg-zinc-900/10">
+                    <div className="flex flex-col h-full justify-between gap-4">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <CalendarIcon size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Transaction Date</div>
+                            </div>
+                            <div className="text-sm font-black text-zinc-800 dark:text-zinc-200 font-mono italic">
+                                {fmtDate(row.sales_date || "")}
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <UserIcon size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Assignee</div>
+                            </div>
+                            <div className="text-xs font-black text-zinc-700 dark:text-zinc-300 truncate tracking-tight uppercase">
+                                {row.salesman}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 3: Tactical Delta */}
+                <div className="p-4 flex-1 min-w-[220px]">
+                    <div className="flex flex-col h-full justify-between gap-4">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <Package size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Sales Qty</div>
+                            </div>
+                            <div className="text-sm font-black text-zinc-600 dark:text-zinc-400 font-mono">
+                                {row.sold_full}F <span className="text-[10px] opacity-40">&bull;</span> {row.sold_pcs}P
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-orange-500/50">
+                                <ArrowRightLeft size={10} className="text-orange-500" />
+                                <div className="text-[9px] font-black uppercase tracking-widest text-orange-600">Return Qty</div>
+                            </div>
+                            <div className="text-sm font-black text-orange-600 font-mono">
+                                {row.full}F <span className="text-[10px] opacity-40">&bull;</span> {row.pcs}P
+                                {bonusReturnPcs > 0 && (
+                                    <span className="ml-2 text-emerald-600 text-[10px]">
+                                        (+{row.bonus_full}F {row.bonus_pcs}P Bonus)
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 4: Asset Intelligence */}
+                <div className="p-4 flex-1 min-w-[260px] bg-zinc-50/30 dark:bg-zinc-900/10">
+                    <div className="grid grid-cols-2 gap-4 h-full">
+                        <div className="flex flex-col justify-between truncate">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-zinc-400">
+                                    <Banknote size={10} />
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Sold Price</div>
+                                </div>
+                                <div className="text-sm font-black text-zinc-900 dark:text-white font-mono tracking-tighter">Rs {row.rate}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-zinc-400 opacity-60">
+                                    <Tags size={10} />
+                                    <div className="text-[8px] font-black uppercase tracking-widest ">Item T.P</div>
+                                </div>
+                                <div className="text-xs font-bold text-zinc-500 font-mono tracking-tighter">Rs {row.tp}</div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col justify-end items-end h-full">
+                            <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-live-pulse" />
+                                Live Stock
+                            </div>
+                            <div className="flex flex-col items-end">
+                                {totalReturnPcs > 0 && (
+                                    <motion.div initial={{ y: 5, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                        className="text-[10px] font-black text-orange-500 flex items-center gap-1 mb-1">
+                                        <Plus size={8} /> {totalReturnPcs} PCS
+                                    </motion.div>
+                                )}
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-xl font-black text-emerald-600 tracking-tighter leading-none">{updatedStock}</span>
+                                    <span className="text-[9px] font-black text-emerald-600/50 uppercase">Pcs</span>
+                                </div>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                                <Database size={12} className="text-zinc-300 dark:text-zinc-700" />
+                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-[0.2em]">{row.packing} PCS/PK</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Card>
     );
 };
 
@@ -208,6 +352,14 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         discReadOnly: false,
         amount: 0,
         packing: 1,
+        bonus_full: 0,
+        bonus_pcs: 0,
+        has_bonus_available: false,
+        sales_date: "",
+        sales_invoice: "",
+        current_stock: 0,
+        tp: 0,
+        salesman: "",
     });
 
     const [rows, setRows] = useState<RowData[]>([getEmptyRow()]);
@@ -215,6 +367,19 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const [rowSearchMap, setRowSearchMap] = useState<Record<number, string>>({});
     const [rowPopoverOpen, setRowPopoverOpen] = useState<Record<number, boolean>>({});
     const [customerItems, setCustomerItems] = useState<any[]>([]);
+    const [focusedRowId, setFocusedRowId] = useState<number | null>(null);
+    const manifestRef = useRef<HTMLDivElement>(null);
+
+    // Clear focus on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (manifestRef.current && !manifestRef.current.contains(event.target as Node)) {
+                setFocusedRowId(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // ── Account selection ──────────────────────
     const handleAccountSelect = (accId: number) => {
@@ -287,9 +452,19 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             discReadOnly: true,
                             amount: 0,
                             packing: packing,
+                            bonus_full: 0,
+                            bonus_pcs: 0,
+                            has_bonus_available: toNum(si.bonus_carton) > 0 || toNum(si.bonus_pcs) > 0,
+                            sales_date: inv.date,
+                            sales_invoice: inv.invoice,
+                            current_stock: toNum(si.item?.stock_1),
+                            tp: toNum(si.item?.trade_price),
+                            salesman: salemans.find(s => s.id === (selectedAccount?.saleman_id || si.salesman_id))?.name || "N/A",
                         };
                     });
                     setRows(loadedRows.length > 0 ? loadedRows : [getEmptyRow()]);
+                    if (loadedRows.length > 0) setFocusedRowId(loadedRows[0].id);
+                    setInvoiceDialogOpen(false);
                 }
             });
     };
@@ -327,7 +502,16 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             taxReadOnly: true,
             discReadOnly: true,
             packing: packing,
+            sales_date: found.date,
+            sales_invoice: found.invoice_no,
+            current_stock: toNum(it?.stock_1),
+            tp: toNum(it?.trade_price),
+            bonus_full: 0,
+            bonus_pcs: 0,
+            has_bonus_available: toNum(found.bonus_carton) > 0 || toNum(found.bonus_pcs) > 0,
+            salesman: salemans.find(s => s.id === (selectedAccount?.saleman_id || found.salesman_id))?.name || "N/A",
         } : r));
+        setFocusedRowId(rowId);
         setSelectedRowItemId(itemId);
     };
 
@@ -363,12 +547,24 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                 discReadOnly: true,
                 amount: 0,
                 packing: packing,
+                sales_date: ci.date,
+                sales_invoice: ci.invoice_no,
+                current_stock: toNum(it?.stock_1),
+                tp: toNum(it?.trade_price),
+                bonus_full: 0,
+                bonus_pcs: 0,
+                has_bonus_available: toNum(ci.bonus_carton) > 0 || toNum(ci.bonus_pcs) > 0,
+                salesman: salemans.find(s => s.id === (selectedAccount?.saleman_id || ci.salesman_id))?.name || "N/A",
             };
         });
 
-        setRows(prev => {
-            const existing = prev.filter(r => r.item_id !== null);
-            return [...existing, ...newRows];
+        setRows(p => {
+            const existingIds = p.map(r => r.id);
+            const cleanRows = p.filter(r => r.item_id);
+            const combined = [...newRows, ...cleanRows];
+            if (combined.length === 0) combined.push(getEmptyRow());
+            if (newRows.length > 0) setFocusedRowId(newRows[0].id);
+            return combined;
         });
 
         setAssignItemDialogOpen(false);
@@ -387,6 +583,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             return { ...r, amount: +(taxableAmount + taxAmount).toFixed(2) };
         });
     }, [rows]);
+
+    const hasAnyBonus = useMemo(() => rows.some(r => r.has_bonus_available), [rows]);
 
     const totals = useMemo(() => {
         let gross = 0, tax = 0, disc = 0;
@@ -627,83 +825,115 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         <div className={`hidden md:flex flex-1 overflow-hidden flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
                             <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-4 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20`}>
                                 <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Inventory Identification</div>
-                                <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100/30 dark:bg-zinc-950/50 -mx-1 py-1">Manifest Qty</div>
+                                <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-2'} text-center text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100/30 dark:bg-zinc-950/50 -mx-1 py-1`}>Manifest Qty</div>
+                                {hasAnyBonus && (
+                                    <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-500/5 dark:bg-green-500/10 -mx-1 py-1">Bonus Qty</div>
+                                )}
                                 <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-500/5 dark:bg-orange-500/10 -mx-1 py-1">Return Qty</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
-                                <div className="col-span-2 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
+                                <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-1'} text-right text-[10px] font-black uppercase tracking-widest text-zinc-500`}>Position Net</div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {rowsWithAmount.map((row, idx) => (
-                                    <motion.div key={row.id} initial={{ x: -10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.05 }}
-                                        className="grid grid-cols-12 gap-2 p-3 items-center group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                            {/* Main Item Table Section */}
+                            <div className="flex-1 min-h-0 flex flex-col" ref={manifestRef}>
+                                <div className="flex-1 overflow-y-auto scrollbar-none custom-scrollbar p-0.5">
+                                    {rowsWithAmount.map((row, idx) => (
+                                        <motion.div key={row.id} initial={{ x: -10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.05 }}
+                                            className="grid grid-cols-12 gap-2 p-3 items-center group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
 
-                                        {/* Item Select */}
-                                        <div className="col-span-3 relative">
-                                            {row.item_id && row.item_title ? (
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-black uppercase tracking-tighter truncate leading-tight dark:text-zinc-100">{row.item_title}</span>
-                                                    <span className="text-[9px] font-mono text-zinc-400">ID: {row.item_id.toString().padStart(5, '0')}</span>
+                                            {/* Item Select */}
+                                            <div className="col-span-3 relative" onClick={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}>
+                                                {row.item_id && row.item_title ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-tighter truncate leading-tight dark:text-zinc-100">{row.item_title}</span>
+                                                        <span className="text-[9px] font-mono text-zinc-400">ID: {row.item_id.toString().padStart(5, '0')}</span>
+                                                    </div>
+                                                ) : (
+                                                    <Button variant="outline" className={`w-full h-8 text-[10px] font-black uppercase justify-start ${PREMIUM_ROUNDING_MD} border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500`}
+                                                        onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount}>
+                                                        <Plus size={12} className="mr-2 text-orange-500" />
+                                                        Assign Item
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            {/* Manifest Qty (Sold) */}
+                                            <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-2'}`}>
+                                                <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800 tracking-tight">
+                                                    {row.sold_full}<span className="text-[8px] opacity-50">F</span> | {row.sold_pcs}<span className="text-[8px] opacity-50">P</span>
                                                 </div>
-                                            ) : (
-                                                <Button variant="outline" className={`w-full h-8 text-[10px] font-black uppercase justify-start ${PREMIUM_ROUNDING_MD} border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500`}
-                                                    onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount}>
-                                                    <Plus size={12} className="mr-2 text-orange-500" />
-                                                    Assign Item
-                                                </Button>
+                                            </div>
+
+                                            {/* Bonus Qty */}
+                                            {hasAnyBonus && (
+                                                <>
+                                                    <div className="col-span-1">
+                                                        <Input type="number" value={row.bonus_full || ""}
+                                                            onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                            onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_full: toNum(e.target.value) } : r))}
+                                                            className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
+                                                    </div>
+                                                    <div className="col-span-1">
+                                                        <Input type="number" value={row.bonus_pcs || ""}
+                                                            onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                            onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_pcs: toNum(e.target.value) } : r))}
+                                                            className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
+                                                    </div>
+                                                </>
                                             )}
-                                        </div>
+                                            {/* Return Qty */}
+                                            <div className="col-span-1">
+                                                <Input type="number" value={row.full || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
+                                                    className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <Input type="number" value={row.pcs || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
+                                                    className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
+                                            </div>
 
-                                        {/* Manifest Qty (Sold) */}
-                                        <div className="col-span-1">
-                                            <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800">{row.sold_full}<span className="text-[8px] ml-0.5 opacity-50 font-normal">full</span></div>
-                                        </div>
-                                        <div className="col-span-1">
-                                            <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800">{row.sold_pcs}<span className="text-[8px] ml-0.5 opacity-50 font-normal">pcs</span></div>
-                                        </div>
+                                            {/* Rate */}
+                                            <div className="col-span-1">
+                                                <Input type="number" value={row.rate || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
+                                                    className={`h-8 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
+                                            </div>
 
-                                        {/* Return Qty */}
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
-                                        </div>
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
-                                        </div>
+                                            {/* Duty / Tax % */}
+                                            <div className="col-span-1">
+                                                <Input type="number" value={row.taxPercent || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
+                                                    readOnly={row.taxReadOnly} tabIndex={row.taxReadOnly ? -1 : 0}
+                                                    className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                            </div>
 
-                                        {/* Rate */}
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
-                                        </div>
+                                            {/* Dec % (Discount) */}
+                                            <div className="col-span-1">
+                                                <Input type="number" value={row.discPercent || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                    readOnly={row.discReadOnly} tabIndex={row.discReadOnly ? -1 : 0}
+                                                    className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                            </div>
 
-                                        {/* Duty / Tax % */}
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
-                                                readOnly={row.taxReadOnly} tabIndex={row.taxReadOnly ? -1 : 0}
-                                                className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
-
-                                        {/* Dec % (Discount) */}
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
-                                                readOnly={row.discReadOnly} tabIndex={row.discReadOnly ? -1 : 0}
-                                                className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
-
-                                        {/* Total Position */}
-                                        <div className="col-span-2 flex items-center justify-end gap-2 group-hover:pr-1 transition-all">
-                                            <div className="text-right font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
-                                            <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
-                                                onClick={() => setRows(p => p.filter(r => r.id !== row.id))}>
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                            {/* Total Position */}
+                                            <div className="col-span-1 flex items-center justify-end gap-2 group-hover:pr-1 transition-all">
+                                                <div className="text-right font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                                <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                    onClick={() => setRows(p => p.filter(r => r.id !== row.id))}>
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Table Actions */}
@@ -724,6 +954,21 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     Purge Workspace
                                 </Button>
                             </div>
+
+                            {/* Sales Detail Cards (Context Registry) - Desktop */}
+                            {rowsWithAmount.some(r => r.item_id && r.id === focusedRowId) && (
+                                <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10">
+                                    <div className="flex items-center gap-2 mb-3 px-1">
+                                        <Info size={14} className="text-orange-500" />
+                                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em]">Active Item Intelligence</span>
+                                    </div>
+                                    <div className="w-full">
+                                        {rowsWithAmount.filter(r => r.item_id && r.id === focusedRowId).map((row) => (
+                                            <ItemDetailCard key={row.id} row={row} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Item Cards (Mobile Only) */}
@@ -744,7 +989,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             </div>
 
                             {rows.map((row, idx) => (
-                                <Card key={row.id} className={`${CARD_BASE} ${PREMIUM_ROUNDING_MD} p-4 space-y-3 relative overflow-hidden`}>
+                                <Card key={row.id} onClick={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                    className={`${CARD_BASE} ${PREMIUM_ROUNDING_MD} p-4 space-y-3 relative overflow-hidden ${focusedRowId === row.id ? 'ring-2 ring-orange-500/50 border-orange-500/50' : ''}`}>
                                     {row.item_id ? (
                                         <div className="flex justify-between items-start">
                                             <div className="flex flex-col">
@@ -770,27 +1016,52 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
-                                            <div className="text-[9px] font-black uppercase text-zinc-400">Cartons / PCS</div>
+                                            <div className="text-[9px] font-black uppercase text-zinc-400">Return (Full / PCS)</div>
                                             <div className="flex items-center gap-1">
-                                                <Input type="number" placeholder="Full" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
-                                                <Input type="number" placeholder="Pcs" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
+                                                <Input type="number" placeholder="F" value={row.full || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
+                                                <Input type="number" placeholder="P" value={row.pcs || ""}
+                                                    onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
                                             </div>
                                         </div>
+
+                                        {hasAnyBonus && (
+                                            <div className="space-y-1">
+                                                <div className="text-[9px] font-black uppercase text-emerald-500">Bonus Return</div>
+                                                <div className="flex items-center gap-1">
+                                                    <Input type="number" placeholder="F" value={row.bonus_full || ""}
+                                                        onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_full: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
+                                                    <Input type="number" placeholder="P" value={row.bonus_pcs || ""}
+                                                        onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_pcs: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="space-y-1">
                                             <div className="text-[9px] font-black uppercase text-zinc-400">Return Rate</div>
-                                            <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-right border-emerald-500/30" />
+                                            <Input type="number" value={row.rate || ""}
+                                                onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-right border-zinc-200" />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3 pb-1">
                                         <div className="space-y-1">
                                             <div className="text-[9px] font-black uppercase text-zinc-400">Duty %</div>
-                                            <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
+                                            <Input type="number" value={row.taxPercent || ""}
+                                                onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
                                                 readOnly={row.taxReadOnly} className={`h-9 text-xs font-bold text-center ${row.taxReadOnly ? 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 opacity-70' : ''}`} />
                                         </div>
                                         <div className="space-y-1">
                                             <div className="text-[9px] font-black uppercase text-zinc-400">Dec %</div>
-                                            <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                            <Input type="number" value={row.discPercent || ""}
+                                                onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
+                                                onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
                                                 readOnly={row.discReadOnly} className={`h-9 text-xs font-bold text-center ${row.discReadOnly ? 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 opacity-70' : ''}`} />
                                         </div>
                                     </div>
@@ -835,6 +1106,18 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     </div>
                                 </Card>
                             </motion.div>
+
+                            {/* Mobile Item Details */}
+                            {rowsWithAmount.some(r => r.item_id && r.id === focusedRowId) && (
+                                <div className="space-y-3 pt-2">
+                                    <div className="text-[10px] font-black uppercase text-zinc-400 tracking-widest px-1">Active Item Intelligence</div>
+                                    <div className="w-full px-1">
+                                        {rowsWithAmount.filter(r => r.item_id && r.id === focusedRowId).map((row) => (
+                                            <ItemDetailCard key={row.id} row={row} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1143,6 +1426,15 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
                     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
+
+                    @keyframes live-pulse {
+                        0% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.2); opacity: 0.5; }
+                        100% { transform: scale(1); opacity: 1; }
+                    }
+                    .animate-live-pulse {
+                        animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                    }
                 `}</style>
 
             </SidebarInset>

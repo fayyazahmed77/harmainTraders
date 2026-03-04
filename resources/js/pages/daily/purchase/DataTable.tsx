@@ -45,7 +45,8 @@ import {
     Trash2,
     Edit,
     Eye,
-    Receipt
+    Receipt,
+    Plane
 } from "lucide-react";
 import {
     Tooltip,
@@ -192,7 +193,7 @@ export default function DataTable({ data }: DataTableProps) {
         {
             accessorKey: "net_total",
             header: () => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2 w-full">
                     <Wallet className="h-3 w-3 text-orange-500" />
                     <span>Valuation</span>
                 </div>
@@ -208,7 +209,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "paid_amount",
-            header: "Cleared",
+            header: () => <div className="text-right w-full">Cleared</div>,
             cell: ({ row }) => (
                 <div className="flex flex-col items-end min-w-[70px]">
                     <span className="font-mono text-xs font-black text-emerald-500 tabular-nums">
@@ -219,9 +220,9 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "remaining_amount",
-            header: "Deficit",
+            header: () => <div className="text-right w-full">Deficit</div>,
             cell: ({ row }) => (
-                <div className="flex flex-col items-end min-w-[70px]">
+                <div className="flex flex-col items-end min-w-[70px] text-right">
                     <span className={cn(
                         "font-mono text-xs font-black tabular-nums",
                         row.original.remaining_amount > 0 ? "text-rose-500 animate-pulse" : "text-zinc-300 dark:text-zinc-700 font-normal"
@@ -240,19 +241,27 @@ export default function DataTable({ data }: DataTableProps) {
                 const StatusIcon = safeStatus.icon;
 
                 return (
-                    <div className={cn(
-                        "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest",
-                        safeStatus.color
-                    )}>
-                        <StatusIcon className="h-3 w-3" />
-                        {safeStatus.label}
+                    <div className="flex items-center gap-3 min-w-[120px]">
+                        <div className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest leading-none",
+                            safeStatus.color
+                        )}>
+                            <StatusIcon className="h-3 w-3 shrink-0" />
+                            {safeStatus.label}
+                        </div>
+                        <Plane size={14} className="text-orange-500 rotate-90 opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all shrink-0" />
                     </div>
                 );
             },
         },
         {
             id: "actions",
-            header: () => <div className="text-right">Intelligence</div>,
+            header: () => (
+                <div className="flex items-center justify-end gap-2">
+                    <Info className="h-3 w-3 text-orange-500" />
+                    <span>Intelligence</span>
+                </div>
+            ),
             enableHiding: false,
             cell: ({ row }) => {
                 const purchase = row.original;
@@ -391,7 +400,7 @@ export default function DataTable({ data }: DataTableProps) {
             </div>
 
             {/* Pagination HUD */}
-            <div className="flex items-center justify-between px-2 pt-2">
+            <div className="flex items-center justify-between px-2 pt-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pb-2">
                 <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] animate-pulse" />
                     <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
