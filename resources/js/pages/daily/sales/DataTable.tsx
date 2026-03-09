@@ -273,7 +273,7 @@ export default function DataTable({ data }: DataTableProps) {
     return (
         <TooltipProvider>
             <div className="w-full">
-                <div className="rounded-md border overflow-x-auto">
+                <div className="rounded-md border overflow-x-auto bg-gray-100 dark:bg-card">
                     <Table>
                         <TableHeader className="bg-muted sticky top-0 z-10">
                             <TableRow>

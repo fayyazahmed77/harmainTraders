@@ -298,6 +298,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [PurchaseReturnController::class, 'store'])->name('purchase_return.store');
         Route::get('/{purchaseReturn}/edit', [PurchaseReturnController::class, 'edit'])->name('purchase_return.edit');
         Route::put('/{purchaseReturn}', [PurchaseReturnController::class, 'update'])->name('purchase_return.update');
+        Route::get('/{purchaseReturn}/show', [PurchaseReturnController::class, 'show'])->name('purchase_return.show');
+        Route::get('/{id}/pdf', [PurchaseReturnController::class, 'pdf'])->name('purchase_return.pdf');
         Route::delete('/{id}', [PurchaseReturnController::class, 'destroy'])->name('purchase_return.destroy');
         Route::get('/supplier/{supplierId}/purchased-items', [PurchaseReturnController::class, 'getSupplierPurchasedItems'])->name('purchase_return.supplier_items');
         Route::get('/supplier/{supplierId}/invoices', [PurchaseReturnController::class, 'getSupplierInvoices'])->name('purchase_return.supplier_invoices');

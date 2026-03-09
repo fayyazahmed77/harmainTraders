@@ -342,8 +342,12 @@ class SalesController extends Controller
                     'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock
-                $item->stock_1 = ($item->stock_1 ?? 0) - $it['total_pcs'];
+                // Decrease Stock (Billable + Bonus)
+                $packing = $item->packing_full ?? $item->packing_qty ?? 1;
+                $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+                $totalToDeduct = $it['total_pcs'] + $bonusUnits;
+
+                $item->stock_1 = ($item->stock_1 ?? 0) - $totalToDeduct;
                 $item->save();
             }
 
@@ -447,13 +451,17 @@ class SalesController extends Controller
                 'remaining_amount' => $request->remaining_amount ?? $sale->remaining_amount,
             ]);
 
-            // Revert Stock for old items (Increase back)
+            // Revert Stock for old items (Increase back including bonus)
             $oldItems = SalesItem::where('sale_id', $id)->get();
             foreach ($oldItems as $oldItem) {
-                $item = Items::find($oldItem->item_id);
-                if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $oldItem->total_pcs;
-                    $item->save();
+                $product = Items::find($oldItem->item_id);
+                if ($product) {
+                    $packing = $product->packing_full ?? $product->packing_qty ?? 1;
+                    $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
+                    $totalToRevert = $oldItem->total_pcs + $bonusUnits;
+
+                    $product->stock_1 = ($product->stock_1 ?? 0) + $totalToRevert;
+                    $product->save();
                 }
             }
 
@@ -473,12 +481,18 @@ class SalesController extends Controller
                     'discount'    => $it['discount'],
                     'gst_amount'  => $it['gst_amount'],
                     'subtotal'    => $it['subtotal'],
+                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock
+                // Decrease Stock (Billable + Bonus)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $it['total_pcs'];
+                    $packing = $item->packing_full ?? $item->packing_qty ?? 1;
+                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+                    $totalToDeduct = $it['total_pcs'] + $bonusUnits;
+
+                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalToDeduct;
                     $item->save();
                 }
             }
@@ -570,11 +584,15 @@ class SalesController extends Controller
         try {
             $sale = Sales::with('items')->findOrFail($id);
 
-            // Revert Stock (Increase back)
+            // Revert Stock (Increase back including bonus)
             foreach ($sale->items as $item) {
                 $product = Items::find($item->item_id);
                 if ($product) {
-                    $product->stock_1 = ($product->stock_1 ?? 0) + $item->total_pcs;
+                    $packing = $product->packing_full ?? $product->packing_qty ?? 1;
+                    $bonusUnits = (($item->bonus_qty_carton ?? 0) * $packing) + ($item->bonus_qty_pcs ?? 0);
+                    $totalToRevert = $item->total_pcs + $bonusUnits;
+
+                    $product->stock_1 = ($product->stock_1 ?? 0) + $totalToRevert;
                     $product->save();
                 }
             }

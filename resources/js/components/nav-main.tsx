@@ -36,7 +36,7 @@ export function NavMain({
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
-      <SidebarMenu className="gap-4">
+      <SidebarMenu className="gap-2">
         {items.map((item) => {
           // Check if any child matches current URL
           const isChildActive = !!item.items?.some((sub) => url.startsWith(sub.url))

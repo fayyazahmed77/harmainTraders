@@ -20,11 +20,40 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import axios from "axios";
 import { route } from "ziggy-js";
+import { useAppearance } from "@/hooks/use-appearance";
+import {
+  Hash,
+  Type,
+  CalendarDays,
+  User as UserIcon,
+  MapPin,
+  Tag,
+  Tags,
+  DollarSign,
+  Percent,
+  FileText,
+  CheckCircle2,
+  Phone,
+  MessageSquare,
+  ShieldCheck,
+  CreditCard,
+  Briefcase,
+  Layers,
+  Globe,
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Account", href: "/account" },
   { title: "Create", href: "/account/create" },
 ];
+
+// Style Constants (Professional Modern)
+const PREMIUM_ROUNDING_MD = "rounded-md";
+const SIGNAL_ORANGE = "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20";
+const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
+const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
+const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
 
 interface Country {
   id: number;
@@ -99,6 +128,34 @@ interface IndexProps {
   accountCategories: any[];
 }
 
+
+// Reusable TechLabel component matching items/create
+const TechLabel = ({ children, icon: Icon, label, required, error, className }: { children: React.ReactNode, icon?: any, label: string, required?: boolean, error?: string, className?: string }) => (
+  <div className={cn("space-y-1.5", className)}>
+    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
+      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+      {label}
+      {required && <span className="text-rose-500 ml-0.5">*</span>}
+    </div>
+    {children}
+    {error && <p className="text-[10px] text-rose-500 mt-1 font-bold animate-in fade-in slide-in-from-top-1">{error}</p>}
+  </div>
+);
+
+const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
+  const colors = {
+    green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  };
+  return (
+    <span className={`px-2 py-0.5 ${PREMIUM_ROUNDING_MD} text-[10px] font-black uppercase tracking-tighter border ${colors[type]}`}>
+      {text}
+    </span>
+  );
+};
+
 export default function Create({
   countries,
   salemans,
@@ -158,85 +215,80 @@ export default function Create({
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
 
-  // Reusable Label component with required star and error message
-  const TechLabel = ({ children, required, error, className }: { children: React.ReactNode, required?: boolean, error?: string, className?: string }) => (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <div className="flex items-center gap-1">
-        <Label className="font-medium text-slate-700 dark:text-slate-300">
-          {children}
-        </Label>
-        {required && <span className="text-rose-500 font-bold">*</span>}
-      </div>
-      {error && <p className="text-[11px] font-medium text-rose-500 animate-in fade-in slide-in-from-top-1">{error}</p>}
-    </div>
-  );
+  const { appearance } = useAppearance();
+  const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const selectBg = isDark ? '#0a0a0a' : '#ffffff';
+  const selectBorder = isDark ? '#262626' : '#e5e7eb';
 
-  // Define custom styles for react-select to match Shadcn UI with error support
+  // Define custom styles for react-select to match Items form
   const getSelectStyles = (hasError: boolean) => ({
     control: (base: any, state: any) => ({
       ...base,
-      borderColor: hasError ? "rgb(244 63 94)" : state.isFocused ? "var(--ring)" : "var(--border)",
-      borderRadius: "var(--radius)",
-      boxShadow: state.isFocused ? (hasError ? "0 0 0 1px rgb(244 63 94)" : "0 0 0 1px var(--ring)") : "none",
-      "&:hover": {
-        borderColor: hasError ? "rgb(244 63 94)" : state.isFocused ? "var(--ring)" : "var(--border)",
+      backgroundColor: 'transparent',
+      borderColor: hasError ? 'rgb(244 63 94)' : state.isFocused ? 'var(--ring)' : 'var(--border)',
+      color: 'inherit',
+      minHeight: '2.5rem',
+      height: '2.5rem',
+      borderRadius: 'calc(var(--radius) - 2px)',
+      boxShadow: state.isFocused ? (hasError ? '0 0 0 1px rgb(244 63 94)' : '0 0 0 1px var(--ring)') : 'none',
+      '&:hover': {
+        borderColor: hasError ? 'rgb(225 29 72)' : state.isFocused ? 'var(--ring)' : 'var(--border)',
       },
-      minHeight: "40px",
-      backgroundColor: "var(--background)",
-      color: "var(--foreground)",
       opacity: state.isDisabled ? 0.5 : 1,
     }),
     singleValue: (base: any) => ({
       ...base,
-      color: "var(--foreground)",
+      color: 'inherit',
     }),
     placeholder: (base: any) => ({
       ...base,
-      color: "var(--muted-foreground)",
-      fontSize: "0.875rem",
+      color: 'var(--muted-foreground)',
+      fontSize: '0.875rem',
     }),
     menu: (base: any) => ({
       ...base,
-      borderRadius: "var(--radius)",
-      border: "1px solid var(--border)",
-      backgroundColor: "var(--popover)",
-      color: "var(--popover-foreground)",
-      zIndex: 50,
-      padding: "4px",
+      backgroundColor: selectBg,
+      border: `1px solid ${selectBorder}`,
+      borderRadius: 'var(--radius)',
+      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+      zIndex: 9999,
+      padding: '4px',
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
     }),
     option: (base: any, state: any) => ({
       ...base,
-      borderRadius: "calc(var(--radius) - 2px)",
+      borderRadius: 'calc(var(--radius) - 2px)',
       backgroundColor: state.isSelected
-        ? "var(--primary)"
+        ? 'var(--primary)'
         : state.isFocused
-          ? "var(--accent)"
-          : "transparent",
+          ? 'var(--accent)'
+          : 'transparent',
       color: state.isSelected
-        ? "var(--primary-foreground)"
+        ? 'var(--primary-foreground)'
         : state.isFocused
-          ? "var(--accent-foreground)"
-          : "var(--foreground)",
-      cursor: "pointer",
-      "&:active": {
-        backgroundColor: "var(--accent)",
-      },
-      fontSize: "0.875rem",
-      padding: "8px 12px",
+          ? 'var(--accent-foreground)'
+          : 'inherit',
+      cursor: 'pointer',
+      fontSize: '0.875rem',
+      padding: '8px 12px',
     }),
     input: (base: any) => ({
       ...base,
-      color: "var(--foreground)",
+      color: 'inherit',
     }),
     dropdownIndicator: (base: any) => ({
       ...base,
-      color: "var(--muted-foreground)",
-      "&:hover": {
-        color: "var(--foreground)",
+      color: 'var(--muted-foreground)',
+      padding: '4px',
+      '&:hover': {
+        color: 'var(--foreground)',
       },
     }),
     indicatorSeparator: () => ({
-      display: "none",
+      display: 'none',
     }),
   });
 
@@ -347,14 +399,14 @@ export default function Create({
   };
 
   // ---------- Inertia form ----------
-  const { data, setData, post, processing, errors, reset, transform } = useForm({
+  const { data, setData, post, processing, errors, reset, transform, setError, clearErrors } = useForm({
     code: "",
     title: "",
     type: "",
     purchase: false,
     cashbank: false,
     sale: false,
-    opening_balance: "",
+    opening_balance: "0",
     address1: "",
     address2: "",
     telephone1: "",
@@ -365,7 +417,7 @@ export default function Create({
     ntn: "",
     remarks: "",
     regards: "",
-    opening_date: "",
+    opening_date: new Date().toISOString().split("T")[0],
     fbr_date: "",
     country_id: "",
     province_id: "",
@@ -374,8 +426,8 @@ export default function Create({
     subarea_id: "",
     saleman_id: "",
     booker_id: "",
-    credit_limit: "",
-    aging_days: "",
+    credit_limit: "999999",
+    aging_days: "1",
     note_head: "",
     item_category: "",
     category: "",
@@ -418,6 +470,55 @@ export default function Create({
   // ---------- submit ----------
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    clearErrors();
+
+    // Client-side validation
+    let hasError = false;
+    const itemsToValidate: Record<string, string> = {
+      code: "Code is required",
+      title: "Title is required",
+      type: "Account Type is required",
+      opening_date: "Opening Date is required",
+      opening_balance: "Opening Balance is required",
+      aging_days: "Aging Days is required",
+    };
+
+    // Customer specific requirements
+    if (isCustomer) {
+      itemsToValidate.saleman_id = "Salesman is required for customers";
+      itemsToValidate.credit_limit = "Credit limit is required for customers";
+      itemsToValidate.item_category = "Item category is required for customers";
+    }
+
+    // Supplier specific requirements
+    if (isSupplier) {
+      itemsToValidate.category = "Category is required for suppliers";
+    }
+
+    Object.entries(itemsToValidate).forEach(([field, msg]) => {
+      // Check current data or locally held select values
+      let val = data[field as keyof typeof data];
+
+      // If field is saleman_id, check the saleman object too
+      if (field === 'saleman_id' && !val && saleman) val = String(saleman.value);
+      if (field === 'category' && !val && selectedCategory) val = String(selectedCategory.value);
+
+      if (!val) {
+        setError(field as any, msg);
+        hasError = true;
+      }
+    });
+
+    if (!data.purchase && !data.cashbank && !data.sale) {
+      setError("purchase" as any, "Select at least one option");
+      hasError = true;
+    }
+
+    if (hasError) {
+      toast.error("Please fill all required fields.");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     // use transform to ensure payload is correctly mapped before post
     transform((data) => ({
@@ -482,437 +583,389 @@ export default function Create({
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="flex flex-1 flex-col">
-          <div className="flex flex-1 flex-col gap-6 p-4">
-            <Card className="mx-auto w-full shadow-md border">
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmit}>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <main className="flex-1 overflow-auto p-4 md:p-6 flex flex-col gap-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
-                    {/* LEFT COLUMN: Basic Info & Contact */}
-                    <div className="space-y-6">
+              {/* TOP STATUS DECK */}
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative`}>
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD && 'rounded-l-md'}`} />
 
-                      {/* Code & Title */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel error={errors.code}>Code</TechLabel>
-                          <Input
-                            value={data.code}
-                            onChange={(e) => onInputChange("code", e.target.value)}
-                            placeholder="Auto-generated"
-                            className={cn(errors.code && "border-rose-500 focus-visible:ring-rose-500")}
+                <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
+                  <div className="text-[10px] uppercase font-black tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Status</div>
+                  <div className="flex flex-col gap-2">
+                    {data.status && <SignalBadge text="ACTIVE" type="green" />}
+                    {!data.status && <SignalBadge text="INACTIVE" type="red" />}
+                    {isCustomer && <SignalBadge text="CUSTOMER" type="blue" />}
+                    {isSupplier && <SignalBadge text="SUPPLIER" type="orange" />}
+                  </div>
+                </div>
+
+                <div className="col-span-11 grid grid-cols-1 md:grid-cols-12 gap-6">
+                  <div className="md:col-span-4">
+                    <TechLabel label="Registration Date" icon={CalendarDays} required>
+                      <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              `w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`,
+                              !openingDate && "text-zinc-400",
+                              errors.opening_date && "border-rose-500"
+                            )}
+                          >
+                            {openingDate
+                              ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                              : "Select date"}
+                            <CalendarDays size={14} className="text-zinc-400" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={openingDate}
+                            onSelect={(value) => {
+                              setOpeningDate(value);
+                              setOpeningOpen(false);
+                              onInputChange("opening_date", value ? value.toISOString().split("T")[0] : "");
+                            }}
                           />
-                        </div>
+                        </PopoverContent>
+                      </Popover>
+                    </TechLabel>
+                  </div>
 
-                        <div>
-                          <TechLabel required error={errors.title}>Title</TechLabel>
-                          <Input
-                            value={data.title}
-                            onChange={(e) => onInputChange("title", e.target.value)}
-                            placeholder="Enter title"
-                            className={cn(errors.title && "border-rose-500 focus-visible:ring-rose-500")}
-                          />
-                        </div>
-                      </div>
+                  <div className="md:col-span-4">
+                    <TechLabel label="Account Code" icon={Hash} required error={errors.code}>
+                      <Input
+                        value={data.code}
+                        onChange={(e) => onInputChange("code", e.target.value)}
+                        placeholder="Auto-generated"
+                        className={cn(
+                          `h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.1em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500 uppercase`,
+                          errors.code && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
+                      />
+                    </TechLabel>
+                  </div>
 
-                      {/* Account Type */}
-                      <div>
-                        <TechLabel required error={errors.type}>Account Type</TechLabel>
-                        <Select
-                          value={accountType}
-                          onChange={(opt) => {
-                            setAccountType(opt);
-                            setData("type", opt ? String(opt.value) : "");
-                          }}
-                          options={accountTypeOptions}
-                          placeholder="Select account type"
-                          isSearchable
-                          className="text-sm"
-                          styles={getSelectStyles(!!errors.type)}
-                        />
-                      </div>
+                  <div className="md:col-span-4">
+                    <TechLabel label="Account Type" icon={Tags} required error={errors.type}>
+                      <Select
+                        value={accountType}
+                        onChange={(opt) => {
+                          setAccountType(opt);
+                          setData("type", opt ? String(opt.value) : "");
+                        }}
+                        options={accountTypeOptions}
+                        placeholder="Select type"
+                        isSearchable
+                        className="text-sm"
+                        styles={getSelectStyles(!!errors.type)}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                      />
+                    </TechLabel>
+                  </div>
+                </div>
+              </Card>
 
-                      {/* Checkboxes */}
-                      <div className="border rounded-md p-4 bg-muted/20">
-                        <Label className="mb-3 block font-semibold text-sm">Account Options</Label>
-                        <div className="flex items-center flex-wrap gap-6">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="purchase"
-                              checked={data.purchase}
-                              onCheckedChange={(v) => onInputChange("purchase", !!v)}
-                            />
-                            <Label htmlFor="purchase" className="cursor-pointer">Purchase</Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="cashbank"
-                              checked={data.cashbank}
-                              onCheckedChange={(v) => onInputChange("cashbank", !!v)}
-                            />
-                            <Label htmlFor="cashbank" className="cursor-pointer">Cash / Bank</Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="sale"
-                              checked={data.sale}
-                              onCheckedChange={(v) => onInputChange("sale", !!v)}
-                            />
-                            <Label htmlFor="sale" className="cursor-pointer">Sale</Label>
-                          </div>
-                        </div>
-                      </div>
+              {/* MAIN CONTENT GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                      {/* Opening Balance */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel error={errors.opening_date}>Opening Date</TechLabel>
-                          <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-between text-left font-normal",
-                                  !openingDate && "text-muted-foreground",
-                                  errors.opening_date && "border-rose-500"
-                                )}
-                              >
-                                {openingDate
-                                  ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                                  : "Select date"}
-                                <CalendarIcon className="h-4 w-4 opacity-60" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={openingDate}
-                                onSelect={(value) => {
-                                  setOpeningDate(value);
-                                  setOpeningOpen(false);
-                                  onInputChange("opening_date", value ? value.toISOString().split("T")[0] : "");
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div>
-                          <TechLabel required={isSupplier} error={errors.opening_balance}>Opening Balance</TechLabel>
-                          <Input
-                            value={data.opening_balance}
-                            type="number"
-                            placeholder="0.00"
-                            onChange={(e) => onInputChange("opening_balance", e.target.value)}
-                            className={cn(errors.opening_balance && "border-rose-500 focus-visible:ring-rose-500")}
-                          />
-                        </div>
-                      </div>
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
 
-                      {/* Address & Contact */}
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <Label className="mb-2 block">Address 1</Label>
-                            <Input
-                              value={data.address1}
-                              onChange={(e) => onInputChange("address1", e.target.value)}
-                              placeholder="Complete address line 1"
-                            />
-                          </div>
-                          <div>
-                            <Label className="mb-2 block">Address 2</Label>
-                            <Input
-                              value={data.address2}
-                              onChange={(e) => onInputChange("address2", e.target.value)}
-                              placeholder="Complete address line 2"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="mb-2 block">Mobile (Primary)</Label>
-                            <Input
-                              value={data.mobile}
-                              onChange={(e) => onInputChange("mobile", e.target.value)}
-                              placeholder="0300-1234567"
-                            />
-                          </div>
-                          <div>
-                            <Label className="mb-2 block">Telephone 1</Label>
-                            <Input
-                              value={data.telephone1}
-                              onChange={(e) => onInputChange("telephone1", e.target.value)}
-                              placeholder="Phone number"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="mb-2 block">Telephone 2</Label>
-                            <Input
-                              value={data.telephone2}
-                              onChange={(e) => onInputChange("telephone2", e.target.value)}
-                              placeholder="Alt phone number"
-                            />
-                          </div>
-                          <div>
-                            <Label className="mb-2 block">Fax</Label>
-                            <Input
-                              value={data.fax}
-                              onChange={(e) => onInputChange("fax", e.target.value)}
-                              placeholder="Fax number"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="mb-2 block">Remarks</Label>
-                            <Input
-                              value={data.remarks}
-                              onChange={(e) => onInputChange("remarks", e.target.value)}
-                              placeholder="Additional remarks"
-                            />
-                          </div>
-                          <div>
-                            <Label className="mb-2 block">Regards</Label>
-                            <Input
-                              value={data.regards}
-                              onChange={(e) => onInputChange("regards", e.target.value)}
-                              placeholder="Details..."
-                            />
-                          </div>
-                        </div>
-                      </div>
-
+                  {/* IDENTITY CARD */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <Type size={16} className="text-orange-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Identity Details</h3>
                     </div>
 
-                    {/* RIGHT COLUMN: Location & Details */}
-                    <div className="space-y-6">
+                    <TechLabel label="Account Title" icon={Type} required error={errors.title}>
+                      <Input
+                        value={data.title}
+                        onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
+                        placeholder="Enter full account name"
+                        className={cn(
+                          `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400 uppercase`,
+                          errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
+                      />
+                    </TechLabel>
 
-                      {/* Location Hierarchy */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label>Country</Label>
-                          <Select
-                            options={countryOptions}
-                            value={country}
-                            onChange={(opt) => handleCountryChange(opt as Option)}
-                            placeholder="Select country..."
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.country_id)}
-                            formatOptionLabel={(opt: any) => (
-                              <div className="flex items-center gap-2">
-                                <img src={`https://flagcdn.com/w40/${opt.code?.toLowerCase()}.png`} alt={opt.label} className="w-5 h-4 rounded object-cover" />
-                                <span>{opt.label}</span>
-                              </div>
-                            )}
-                          />
+                    {/* Permissions / Options */}
+                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-zinc-400">
+                          <ShieldCheck size={12} />
+                          Account Permissions
                         </div>
-
-                        <div className="grid gap-2">
-                          <Label>Province</Label>
-                          <Select
-                            options={provinceOptions}
-                            value={province}
-                            onChange={(opt) => handleProvinceChange(opt as Option)}
-                            placeholder={country ? "Select province..." : "Select country first..."}
-                            isDisabled={!country}
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.province_id)}
+                        {errors.purchase && <SignalBadge text={errors.purchase} type="red" />}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className={`flex items-center gap-3 p-3 border ${PREMIUM_ROUNDING_MD} ${data.purchase ? 'bg-orange-500/5 border-orange-500/30' : 'bg-muted/10 border-zinc-200 dark:border-zinc-800'} transition-all`}>
+                          <Checkbox
+                            id="purchase"
+                            checked={data.purchase}
+                            onCheckedChange={(v) => onInputChange("purchase", !!v)}
+                            className="data-[state=checked]:bg-orange-500 border-zinc-300 dark:border-zinc-600"
                           />
+                          <Label htmlFor="purchase" className="text-xs font-bold uppercase tracking-tighter cursor-pointer">Purchase</Label>
+                        </div>
+                        <div className={`flex items-center gap-3 p-3 border ${PREMIUM_ROUNDING_MD} ${data.cashbank ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-muted/10 border-zinc-200 dark:border-zinc-800'} transition-all`}>
+                          <Checkbox
+                            id="cashbank"
+                            checked={data.cashbank}
+                            onCheckedChange={(v) => onInputChange("cashbank", !!v)}
+                            className="data-[state=checked]:bg-emerald-500 border-zinc-300 dark:border-zinc-600"
+                          />
+                          <Label htmlFor="cashbank" className="text-xs font-bold uppercase tracking-tighter cursor-pointer">Cash/Bank</Label>
+                        </div>
+                        <div className={`flex items-center gap-3 p-3 border ${PREMIUM_ROUNDING_MD} ${data.sale ? 'bg-blue-500/5 border-blue-500/30' : 'bg-muted/10 border-zinc-200 dark:border-zinc-800'} transition-all`}>
+                          <Checkbox
+                            id="sale"
+                            checked={data.sale}
+                            onCheckedChange={(v) => onInputChange("sale", !!v)}
+                            className="data-[state=checked]:bg-blue-500 border-zinc-300 dark:border-zinc-600"
+                          />
+                          <Label htmlFor="sale" className="text-xs font-bold uppercase tracking-tighter cursor-pointer">Sale</Label>
                         </div>
                       </div>
+                    </div>
+                  </Card>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label>City</Label>
-                          <Select
-                            options={cityOptions}
-                            value={city}
-                            onChange={(opt) => handleCityChange(opt as Option)}
-                            placeholder={province ? "Select city..." : "Select province first..."}
-                            isDisabled={!province}
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.city_id)}
-                          />
-                        </div>
+                  {/* FINANCIAL MATRIX */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <DollarSign size={16} className="text-emerald-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Financial Matrix</h3>
+                    </div>
 
-                        <div className="grid gap-2">
-                          <Label>Area</Label>
-                          <Select
-                            options={areaOptions}
-                            value={area}
-                            onChange={(opt) => handleAreaChange(opt as Option)}
-                            placeholder={city ? "Select area..." : "Select city first..."}
-                            isDisabled={!city}
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.area_id)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label>Sub Area</Label>
-                        <Select
-                          options={subareaOptions}
-                          value={subarea}
-                          onChange={(opt) => {
-                            setSubarea(opt as Option | null);
-                            setData("subarea_id", opt ? String((opt as Option).value) : "");
-                          }}
-                          placeholder={area ? "Select subarea..." : "Select area first..."}
-                          isDisabled={!area}
-                          isSearchable
-                          className="text-sm"
-                          styles={getSelectStyles(!!errors.subarea_id)}
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="Opening Balance" icon={CreditCard} required error={errors.opening_balance}>
+                        <Input
+                          type="number"
+                          value={data.opening_balance}
+                          onChange={(e) => onInputChange("opening_balance", e.target.value)}
+                          placeholder="0.00"
+                          className={cn(
+                            "h-10 font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold",
+                            errors.opening_balance && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                          )}
                         />
-                      </div>
+                      </TechLabel>
+                      <TechLabel label="Credit Limit" icon={ShieldCheck} required={isCustomer} error={errors.credit_limit}>
+                        <Input
+                          type="number"
+                          value={data.credit_limit}
+                          onChange={(e) => onInputChange("credit_limit", e.target.value)}
+                          placeholder="999999"
+                          className={cn(
+                            "h-10 font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
+                            errors.credit_limit && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                          )}
+                        />
+                      </TechLabel>
+                    </div>
 
-                      {/* Salesman & Booker */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel required error={errors.saleman_id}>Salesman</TechLabel>
-                          <Select
-                            value={saleman}
-                            onChange={(opt) => {
-                              setSaleman(opt as Option);
-                              setData("saleman_id", opt ? String((opt as Option).value) : "");
-                            }}
-                            options={salemanOptions}
-                            placeholder="Select salesman"
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.saleman_id)}
-                          />
-                        </div>
-                        <div>
-                          <TechLabel error={errors.booker_id}>Booker</TechLabel>
-                          <Select
-                            value={booker}
-                            onChange={(opt) => {
-                              setBooker(opt as Option);
-                              setData("booker_id", opt ? String((opt as Option).value) : "");
-                            }}
-                            options={bookerOptions}
-                            placeholder="Select booker"
-                            isSearchable
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.booker_id)}
-                          />
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="Aging Days" icon={CalendarDays} required error={errors.aging_days}>
+                        <Input
+                          type="number"
+                          value={data.aging_days}
+                          onChange={(e) => onInputChange("aging_days", e.target.value)}
+                          placeholder="1"
+                          className={cn(
+                            "h-10 font-mono text-sm bg-orange-50/50 dark:bg-orange-500/5 text-orange-600 border-orange-200 dark:border-orange-500/30 font-bold",
+                            errors.aging_days && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                          )}
+                        />
+                      </TechLabel>
+                      <TechLabel label="CNIC / Identifier" icon={UserIcon}>
+                        <Input
+                          value={data.cnic}
+                          onChange={(e) => onInputChange("cnic", e.target.value)}
+                          placeholder="00000-0000000-0"
+                          className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        />
+                      </TechLabel>
+                    </div>
+                  </Card>
 
-                      {/* Financial Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel required={isCustomer} error={errors.credit_limit}>Credit Limit</TechLabel>
-                          <Input
-                            value={data.credit_limit}
-                            type="number"
-                            onChange={(e) => onInputChange("credit_limit", e.target.value)}
-                            placeholder="Amount..."
-                            className={cn(errors.credit_limit && "border-rose-500 focus-visible:ring-rose-500")}
-                          />
-                        </div>
-                        <div>
-                          <TechLabel required error={errors.aging_days}>Aging Days</TechLabel>
-                          <Input
-                            value={data.aging_days}
-                            type="number"
-                            onChange={(e) => onInputChange("aging_days", e.target.value)}
-                            placeholder="Days..."
-                            className={cn(errors.aging_days && "border-rose-500 focus-visible:ring-rose-500")}
-                          />
-                        </div>
-                      </div>
+                  {/* CONTACT & REMARKS */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <Phone size={16} className="text-blue-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Contact & Notes</h3>
+                    </div>
 
-                      {/* Tax & Identifiers */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label className="mb-2 block">GST #</Label>
-                          <Input
-                            value={data.gst}
-                            onChange={(e) => onInputChange("gst", e.target.value)}
-                            placeholder="GST Number"
-                          />
-                        </div>
-                        <div>
-                          <Label className="mb-2 block">NTN #</Label>
-                          <Input
-                            value={data.ntn}
-                            onChange={(e) => onInputChange("ntn", e.target.value)}
-                            placeholder="NTN Number"
-                          />
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="Mobile (Primary)" icon={Phone}>
+                        <Input
+                          value={data.mobile}
+                          onChange={(e) => onInputChange("mobile", e.target.value)}
+                          placeholder="0300-0000000"
+                          className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        />
+                      </TechLabel>
+                      <TechLabel label="Telephone" icon={Phone}>
+                        <Input
+                          value={data.telephone1}
+                          onChange={(e) => onInputChange("telephone1", e.target.value)}
+                          placeholder="Office/Home"
+                          className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        />
+                      </TechLabel>
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label className="mb-2 block">CNIC #</Label>
-                          <Input value={data.cnic} onChange={(e) => onInputChange("cnic", e.target.value)} placeholder="CNIC Number" />
-                        </div>
-                        <div>
-                          <Label className="mb-2 block">FBR Date</Label>
-                          <Popover open={fbrOpen} onOpenChange={setFbrOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className={cn("w-full justify-between text-left font-normal", !fbrDate && "text-muted-foreground")}
-                              >
-                                {fbrDate
-                                  ? fbrDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                                  : "Select date"}
-                                <CalendarIcon className="h-4 w-4 opacity-60" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={fbrDate}
-                                onSelect={(value) => {
-                                  setFbrDate(value);
-                                  setFbrOpen(false);
-                                  onInputChange("fbr_date", value ? value.toISOString().split("T")[0] : "");
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
+                    <TechLabel label="Remarks / Details" icon={MessageSquare}>
+                      <Input
+                        value={data.remarks}
+                        onChange={(e) => onInputChange("remarks", e.target.value.toUpperCase())}
+                        placeholder="Internal notes or specific instructions..."
+                        className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 uppercase"
+                      />
+                    </TechLabel>
+                  </Card>
+                </div>
 
-                      {/* Misc */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel error={errors.note_head}>Note Head</TechLabel>
-                          <Select
-                            options={[
-                              { value: "Legal Expenses", label: "Legal Expenses" },
-                              { value: "Bank Charges", label: "Bank Charges" },
-                              { value: "Depreciation", label: "Depreciation" },
-                              { value: "N/A", label: "N/A" },
-                              { value: "Promotional & Marketing", label: "Promotional & Marketing" },
-                              { value: "Daily Customer", label: "Daily Customer" },
-                              { value: "Zakat", label: "Zakat" },
-                              { value: "Home Expenses", label: "Home Expenses" },
-                              { value: "Office Expenses", label: "Office Expenses" },
-                            ]}
-                            value={data.note_head ? { value: data.note_head, label: data.note_head } : null}
-                            onChange={(opt: any) => onInputChange("note_head", opt ? String(opt.value) : "")}
-                            placeholder="Select Note Head"
-                            className="text-sm"
-                            styles={getSelectStyles(!!errors.note_head)}
-                          />
-                        </div>
-                        <div>
-                          <TechLabel required={isSupplier} error={errors.category}>Category (Dynamic)</TechLabel>
+                {/* RIGHT COLUMN */}
+                <div className="space-y-6">
+
+                  {/* LOCATION CARD */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <Globe size={16} className="text-cyan-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Location Logistics</h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="Country" icon={Globe}>
+                        <Select
+                          options={countryOptions}
+                          value={country}
+                          onChange={(opt) => handleCountryChange(opt as Option)}
+                          placeholder="Select..."
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.country_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                          formatOptionLabel={(opt: any) => (
+                            <div className="flex items-center gap-2">
+                              {opt.code && <img src={`https://flagcdn.com/w40/${opt.code.toLowerCase()}.png`} alt="" className="w-5 h-4 rounded object-cover" />}
+                              <span>{opt.label}</span>
+                            </div>
+                          )}
+                        />
+                      </TechLabel>
+                      <TechLabel label="Province" icon={MapPin}>
+                        <Select
+                          options={provinceOptions}
+                          value={province}
+                          onChange={(opt) => handleProvinceChange(opt as Option)}
+                          placeholder={country ? "Select..." : "Wait..."}
+                          isDisabled={!country}
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.province_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                        />
+                      </TechLabel>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="City" icon={MapPin}>
+                        <Select
+                          options={cityOptions}
+                          value={city}
+                          onChange={(opt) => handleCityChange(opt as Option)}
+                          placeholder={province ? "Select..." : "Wait..."}
+                          isDisabled={!province}
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.city_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                        />
+                      </TechLabel>
+                      <TechLabel label="Area" icon={MapPin}>
+                        <Select
+                          options={areaOptions}
+                          value={area}
+                          onChange={(opt) => handleAreaChange(opt as Option)}
+                          placeholder={city ? "Select..." : "Wait..."}
+                          isDisabled={!city}
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.area_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                        />
+                      </TechLabel>
+                    </div>
+
+                    <TechLabel label="Sub-Area / Locality" icon={MapPin}>
+                      <Select
+                        options={subareaOptions}
+                        value={subarea}
+                        onChange={(opt) => {
+                          setSubarea(opt as Option | null);
+                          setData("subarea_id", opt ? String((opt as Option).value) : "");
+                        }}
+                        placeholder={area ? "Select locality..." : "Select area first..."}
+                        isDisabled={!area}
+                        className="text-sm"
+                        styles={getSelectStyles(!!errors.subarea_id)}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                      />
+                    </TechLabel>
+
+                    <TechLabel label="Primary Address" icon={MapPin}>
+                      <Input
+                        value={data.address1}
+                        onChange={(e) => onInputChange("address1", e.target.value.toUpperCase())}
+                        placeholder="Street, Block, Building..."
+                        className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 uppercase"
+                      />
+                    </TechLabel>
+                  </Card>
+
+                  {/* MANAGEMENT CARD */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <UserIcon size={16} className="text-zinc-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Account Management</h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="Salesman" icon={Briefcase} required={isCustomer} error={errors.saleman_id}>
+                        <Select
+                          value={saleman}
+                          onChange={(opt) => {
+                            setSaleman(opt as Option);
+                            setData("saleman_id", opt ? String((opt as Option).value) : "");
+                          }}
+                          options={salemanOptions}
+                          placeholder="Select..."
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.saleman_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                        />
+                      </TechLabel>
+                      <TechLabel label="Booker" icon={Briefcase} error={errors.booker_id}>
+                        <Select
+                          value={booker}
+                          onChange={(opt) => {
+                            setBooker(opt as Option);
+                            setData("booker_id", opt ? String((opt as Option).value) : "");
+                          }}
+                          options={bookerOptions}
+                          placeholder="Select..."
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.booker_id)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                        />
+                      </TechLabel>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {isSupplier && (
+                        <TechLabel label="Category (Dynamic)" icon={Tags} required={isSupplier} error={errors.category}>
                           <Select
                             options={categoryOptions}
                             value={selectedCategory}
@@ -920,16 +973,15 @@ export default function Create({
                               setSelectedCategory(opt);
                               onInputChange("category", opt ? String(opt.value) : "");
                             }}
-                            placeholder="Select Category"
+                            placeholder="Select..."
                             className="text-sm"
                             styles={getSelectStyles(!!errors.category)}
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                           />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <TechLabel required={isCustomer} error={errors.item_category}>Item Category</TechLabel>
+                        </TechLabel>
+                      )}
+                      {isCustomer && (
+                        <TechLabel label="Item Category" icon={Tags} required={isCustomer} error={errors.item_category}>
                           <Select
                             options={[
                               { value: "2", label: "2 (T.P 2)" },
@@ -941,67 +993,112 @@ export default function Create({
                             ]}
                             value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
                             onChange={(opt: any) => onInputChange("item_category", opt ? String(opt.value) : "")}
-                            placeholder="Select Item Category"
+                            placeholder="Select Category"
                             className="text-sm"
                             styles={getSelectStyles(!!errors.item_category)}
+                            menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                           />
-                        </div>
-                        <div>
-                          <TechLabel error={errors.ats_percentage || errors.ats_type}>A.T.S Info</TechLabel>
-                          <div className="flex gap-2">
-                            <Input
-                              value={data.ats_percentage}
-                              onChange={(e) => onInputChange("ats_percentage", e.target.value)}
-                              placeholder="%"
-                              className={cn("w-20", errors.ats_percentage && "border-rose-500 focus-visible:ring-rose-500")}
-                            />
-                            <Select
-                              options={[
-                                { value: "Filer", label: "Filer" },
-                                { value: "No-Filer", label: "No-Filer" },
-                                { value: "Exempt", label: "Exempt" },
-                                { value: "Manufacturer", label: "Manufacturer" },
-                                { value: "Included", label: "Included" },
-                                { value: "Excluded", label: "Excluded" },
-                              ]}
-                              value={data.ats_type ? { value: data.ats_type, label: data.ats_type } : null}
-                              onChange={(opt: any) => onInputChange("ats_type", opt ? String(opt.value) : "")}
-                              placeholder="Type"
-                              className="w-full text-sm"
-                              styles={getSelectStyles(!!errors.ats_type)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-
-                      <div className="flex items-center gap-2 pt-4 border-t">
-                        <Checkbox
-                          id="status"
-                          checked={!!data.status}
-                          onCheckedChange={(v) => onInputChange("status", !!v)}
+                        </TechLabel>
+                      )}
+                      <TechLabel label="Note Head" icon={FileText} error={errors.note_head}>
+                        <Select
+                          options={[
+                            { value: "Legal Expenses", label: "Legal Expenses" },
+                            { value: "Bank Charges", label: "Bank Charges" },
+                            { value: "Depreciation", label: "Depreciation" },
+                            { value: "N/A", label: "N/A" },
+                            { value: "Promotional & Marketing", label: "Promotional & Marketing" },
+                            { value: "Daily Customer", label: "Daily Customer" },
+                            { value: "Zakat", label: "Zakat" },
+                            { value: "Home Expenses", label: "Home Expenses" },
+                            { value: "Office Expenses", label: "Office Expenses" },
+                          ]}
+                          value={data.note_head ? { value: data.note_head, label: data.note_head } : null}
+                          onChange={(opt: any) => onInputChange("note_head", opt ? String(opt.value) : "")}
+                          placeholder="Tagging..."
+                          className="text-sm"
+                          styles={getSelectStyles(!!errors.note_head)}
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
                         />
-                        <Label htmlFor="status">Active Account</Label>
-                      </div>
-
+                      </TechLabel>
                     </div>
-                  </div>
+                  </Card>
 
-                  <Separator className="my-6" />
+                  {/* TAX COMPLIANCE CARD */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <ShieldCheck size={16} className="text-zinc-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Tax & Compliance</h3>
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex justify-end gap-3">
-                    <Button variant="outline" type="button" onClick={() => reset()}>
-                      Reset
-                    </Button>
-                    <Button type="submit" disabled={processing} className="px-8">
-                      {processing ? "Saving..." : "Create Account"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <TechLabel label="GST / NTN #" icon={Hash}>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input value={data.gst} onChange={(e) => onInputChange("gst", e.target.value)} placeholder="GST" className="h-10 text-xs font-mono" />
+                          <Input value={data.ntn} onChange={(e) => onInputChange("ntn", e.target.value)} placeholder="NTN" className="h-10 text-xs font-mono" />
+                        </div>
+                      </TechLabel>
+                      <TechLabel label="FBR Date" icon={CalendarDays}>
+                        <Popover open={fbrOpen} onOpenChange={setFbrOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className={cn(`w-full h-10 ${PREMIUM_ROUNDING_MD} font-normal text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700`, !fbrDate && "text-muted-foreground")}
+                            >
+                              {fbrDate ? fbrDate.toLocaleDateString("en-GB") : "Compliance Date"}
+                              <CalendarDays size={12} className="ml-2 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar mode="single" selected={fbrDate} onSelect={(v) => { setFbrDate(v); setFbrOpen(false); onInputChange("fbr_date", v ? v.toISOString().split("T")[0] : ""); }} />
+                          </PopoverContent>
+                        </Popover>
+                      </TechLabel>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+
+              {/* ACTION FOOTER */}
+              <div className={`p-4 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} shadow-lg sticky bottom-4 z-30 flex justify-between items-center`}>
+                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-orange-500" />
+                  Account Identity Registry
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      reset();
+                      setCountry(null);
+                      setProvince(null);
+                      setCity(null);
+                      setArea(null);
+                      setSubarea(null);
+                      setProvinceOptions([]);
+                      setCityOptions([]);
+                      setAreaOptions([]);
+                      setSubareaOptions([]);
+                      setOpeningDate(new Date());
+                      setFbrDate(undefined);
+                      setSaleman(null);
+                      setBooker(null);
+                      setAccountType(null);
+                      setSelectedCategory(null);
+                    }}
+                    className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}
+                  >
+                    Reset Form
+                  </Button>
+                  <Button type="submit" disabled={processing} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
+                    {processing ? "Saving..." : "Create Account"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </main>
         </div>
       </SidebarInset>
     </SidebarProvider>

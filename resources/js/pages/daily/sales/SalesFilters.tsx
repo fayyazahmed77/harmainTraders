@@ -80,7 +80,7 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
     };
 
     return (
-        <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
+        <div className="p-4 rounded-md bg-gray-100 dark:bg-card shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
             {/* Date Range Picker */}
             <FieldWrapper label="Date Range" className="flex-1 min-w-[200px]">
                 <Popover>

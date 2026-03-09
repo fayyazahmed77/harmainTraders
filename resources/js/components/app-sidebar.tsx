@@ -46,7 +46,6 @@ const data = {
       title: "Setup",
       url: "#",
       icon: SquareTerminal,
-      isActive: true,
       items: [
         {
           title: "Accounts",
@@ -114,7 +113,7 @@ const data = {
           url: "/purchase",
         },
         {
-          title: "Purchase Return (Transfer Out)",
+          title: "Purchase Return",
           url: "/purchase-return",
         },
         {
@@ -122,7 +121,7 @@ const data = {
           url: "/sales",
         },
         {
-          title: "Sales Return (Credit Note)",
+          title: "Sales Return",
           url: "/sales-return",
         },
         {
@@ -251,7 +250,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <TeamSwitcher />
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="custom-scrollbar">
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
