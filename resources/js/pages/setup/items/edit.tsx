@@ -77,7 +77,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 interface Props {
   item: any
   categories: any
-  compaines: any
+  companies: any
   pagination: {
     prev_id: number | null
     next_id: number | null
@@ -86,7 +86,7 @@ interface Props {
   }
 }
 
-export default function Page({ item, categories, compaines, pagination }: Props) {
+export default function Page({ item, categories, companies, pagination }: Props) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
@@ -148,8 +148,8 @@ export default function Page({ item, categories, compaines, pagination }: Props)
   }), [selectBg, selectBorder]);
 
   const companyOptions = React.useMemo(() =>
-    compaines.map((c: any) => ({ value: String(c.id), label: c.title })),
-    [compaines]
+    companies.map((c: any) => ({ value: String(c.id), label: c.title })),
+    [companies]
   );
 
   const categoryOptions = React.useMemo(() =>
@@ -416,7 +416,7 @@ export default function Page({ item, categories, compaines, pagination }: Props)
                     <TechLabel label="Primary Title" icon={Type}>
                       <Input
                         value={data.title}
-                        onChange={(e) => onInputChange("title", e.target.value)}
+                        onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
                         placeholder="Full Item Description"
                         className={`h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`}
                       />
@@ -536,7 +536,7 @@ export default function Page({ item, categories, compaines, pagination }: Props)
                           placeholder="Select Company"
                           styles={selectStyles}
                           options={companyOptions}
-                          value={companyOptions.find((opt: any) => opt.value === String(data.company)) || null}
+                          value={companyOptions.find((opt: any) => String(opt.value) === String(data.company)) || null}
                           onChange={(opt: any) => onInputChange("company", opt ? opt.value : "")}
                           isSearchable
                           isClearable

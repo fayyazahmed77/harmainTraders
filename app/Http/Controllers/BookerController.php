@@ -51,6 +51,10 @@ class BookerController extends Controller
             'defult' => 'nullable|boolean',
         ]);
 
+        if ($request->defult) {
+            Booker::where('defult', 1)->update(['defult' => 0]);
+        }
+
         $booker = Booker::create([
             'name' => $request->name,
             'shortname' => $request->shortname,
@@ -77,6 +81,10 @@ class BookerController extends Controller
             'status' => 'nullable|boolean',
             'defult' => 'nullable|boolean',
         ]);
+
+        if ($request->defult) {
+            Booker::where('id', '!=', $booker->id)->update(['defult' => 0]);
+        }
 
         $booker->update([
             'name' => $request->name,

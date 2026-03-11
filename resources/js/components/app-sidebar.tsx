@@ -90,7 +90,7 @@ const data = {
         },
 
         {
-          title: "Cheque Book Generatoin",
+          title: "Cheque Books",
           url: "/cheque",
         },
       ],

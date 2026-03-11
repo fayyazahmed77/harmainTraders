@@ -262,6 +262,13 @@
                 <span class="total-value">{{ number_format($sale->net_total, 2) }}</span>
             </div>
 
+            @if($sale->extra_discount > 0)
+            <div class="total-row clearfix">
+                <span class="total-label">Extra Discount :-</span>
+                <span class="total-value">{{ number_format($sale->extra_discount, 2) }}</span>
+            </div>
+            @endif
+
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
                 <span class="total-value">{{ number_format($sale->customer->opening_balance ?? 0, 2) }}</span>
@@ -271,7 +278,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format($sale->net_total + ($sale->customer->opening_balance ?? 0), 2) }}</span>
+                <span class="total-value">{{ number_format($sale->net_total + ($sale->customer->opening_balance ?? 0) - $sale->extra_discount, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -283,7 +290,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Receivable :</span>
-                <span class="total-value">{{ number_format(($sale->net_total + ($sale->customer->opening_balance ?? 0)) - $sale->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format(($sale->net_total + ($sale->customer->opening_balance ?? 0) - $sale->extra_discount) - $sale->paid_amount, 2) }}</span>
             </div>
         </div>
 

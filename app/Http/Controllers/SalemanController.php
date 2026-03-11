@@ -57,6 +57,10 @@ class SalemanController extends Controller
             'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
+        if ($request->defult) {
+            Saleman::where('defult', 1)->update(['defult' => 0]);
+        }
+
         $saleman = Saleman::create([
             'name' => $request->name,
             'shortname' => $request->shortname,
@@ -85,6 +89,10 @@ class SalemanController extends Controller
             'defult' => 'nullable|boolean',
             'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
+
+        if ($request->defult) {
+            Saleman::where('id', '!=', $saleman->id)->update(['defult' => 0]);
+        }
 
         $saleman->update([
             'name' => $request->name,

@@ -378,6 +378,7 @@ if (file_exists($logo_path)) {
                     <tr>
                         <th colspan="2" style="border-bottom: 1px dashed #000;">Quantity</th>
                         <th rowspan="2" class="text-left" style="width: 35%; margin-left: 5px;">Description Of Goods</th>
+                        <th rowspan="2">Retail</th>
                         <th rowspan="2">Rate</th>
                         <th rowspan="2">Disc %</th>
                         <th rowspan="2">After Disc</th>
@@ -400,6 +401,7 @@ if (file_exists($logo_path)) {
                         <td>{{ (int)$item->qty_carton }}</td>
                         <td>{{ (int)$item->qty_pcs }}</td>
                         <td class="text-left">{{ $item->item->title }}</td>
+                        <td>{{ number_format($item->item->retail ?? 0, 2) }}</td>
                         <td>{{ number_format($item->trade_price, 2) }}</td>
                         <td>{{ number_format($disc_percent, 2) }}</td>
                         <td>{{ number_format($after_disc_rate, 2) }}</td>

@@ -150,6 +150,8 @@ interface Sale {
   payment_account_id?: number;
   payment_method?: string;
   active?: number | boolean;
+  extra_discount?: number;
+  total_receivable?: number;
   items?: SalesItem[];
 }
 
@@ -297,6 +299,7 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState<boolean>(false);
   const [paymentAccountId, setPaymentAccountId] = useState<string>(sale.payment_account_id ? sale.payment_account_id.toString() : "");
   const [paymentMethod, setPaymentMethod] = useState<string>(sale.payment_method || "Cash");
+  const [extraDiscount, setExtraDiscount] = useState<number>(toNumber(sale.extra_discount));
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
 
@@ -562,7 +565,8 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
     });
 
     const net = gross + taxTotal - discTotal + courier;
-    const totalReceivable = net + previousBalance;
+    const receivable = net + previousBalance;
+    const finalAmount = Math.round(receivable - extraDiscount);
 
     return {
       gross: Number(gross.toFixed(2)),
@@ -570,9 +574,10 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
       discTotal: Number(discTotal.toFixed(2)),
       courier,
       net: Math.round(net),
-      totalReceivable: Math.round(totalReceivable),
+      receivable: Math.round(receivable),
+      finalAmount,
     };
-  }, [rowsWithComputed, items, courier, previousBalance]);
+  }, [rowsWithComputed, items, courier, previousBalance, extraDiscount]);
 
   // Check if over credit limit
   const isOverLimit = useMemo(() => {
@@ -618,8 +623,10 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
       tax_total: totals.taxTotal,
       courier_charges: totals.courier,
       net_total: totals.net,
+      extra_discount: extraDiscount,
+      total_receivable: totals.receivable,
       paid_amount: cashReceived,
-      remaining_amount: totals.net - cashReceived,
+      remaining_amount: totals.finalAmount - cashReceived,
 
       items: rowsWithComputed.map((r) => {
         const item = items.find(i => i.id === r.item_id);
@@ -1496,14 +1503,40 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest italic">{accountType ? accountType.label : "UNASSIGNED"}</span>
-                        <span className="text-[11px] font-black text-zinc-500">PREV BALANCE</span>
+                        <span className="text-[11px] font-black text-zinc-500 uppercase">PREV BALANCE</span>
                       </div>
                       <div className="text-sm font-black text-zinc-800 dark:text-zinc-200">
                         PKR {previousBalance.toLocaleString()}
                       </div>
                     </div>
 
+                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <TechLabel label="TOTAL RECEIVABLE">
+                        <div className="text-2xl font-black text-zinc-500 dark:text-zinc-400 tracking-tight italic line-through opacity-50 text-right">
+                          {totals.receivable.toLocaleString()}
+                        </div>
+                      </TechLabel>
+                    </div>
 
+                    <div className="pt-2">
+                      <TechLabel label="EXTRA DISCOUNT" className="space-y-1">
+                        <Input
+                          type="number"
+                          value={extraDiscount || ""}
+                          onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                          className="h-9 font-black text-rose-600 bg-rose-50/30 border-rose-100 focus:border-rose-300 focus:ring-rose-300 dark:bg-rose-950/10 dark:border-rose-900/30 text-right"
+                          placeholder="0.00"
+                        />
+                      </TechLabel>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 text-right">
+                      <TechLabel label="FINAL NET PAYABLE">
+                        <div className="text-3xl font-black text-orange-600 dark:text-orange-500 tracking-tight italic">
+                          {totals.finalAmount.toLocaleString()}
+                        </div>
+                      </TechLabel>
+                    </div>
                   </div>
                 </div>
 

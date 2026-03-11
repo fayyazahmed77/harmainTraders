@@ -12,7 +12,7 @@ class ItemsController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Items::with('category')->orderBy('id', 'desc');
+        $query = Items::with(['category', 'companyAccount']);
 
         // Filter by Category
         if ($request->has('category_id') && $request->category_id && $request->category_id !== 'all') {
@@ -28,13 +28,38 @@ class ItemsController extends Controller
             }
         }
 
-        // Filter by Search (Code, Title, Company)
+        // Filter by Stock Status
+        if ($request->has('stock_status') && $request->stock_status !== 'all') {
+            $totalUnitsRaw = '(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0)';
+            if ($request->stock_status === 'out_of_stock') {
+                $query->whereRaw("$totalUnitsRaw <= 0");
+            } elseif ($request->stock_status === 'low_stock') {
+                $query->whereRaw("$totalUnitsRaw <= COALESCE(reorder_level, 0)")
+                      ->whereRaw("$totalUnitsRaw > 0");
+            } elseif ($request->stock_status === 'in_stock') {
+                $query->whereRaw("$totalUnitsRaw > 0");
+            }
+        }
+
+        // Filter by Search (Code, Title, Company Category)
         if ($request->has('search') && $request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('code', 'like', '%' . $request->search . '%')
-                    ->orWhere('title', 'like', '%' . $request->search . '%')
-                    ->orWhere('company', 'like', '%' . $request->search . '%');
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', '%' . $search . '%')
+                    ->orWhere('title', 'like', '%' . $search . '%')
+                    ->orWhereHas('companyAccount', function($qC) use ($search) {
+                        $qC->where('title', 'like', '%' . $search . '%');
+                    })
+                    ->orWhereHas('category', function($qCat) use ($search) {
+                        $qCat->where('name', 'like', '%' . $search . '%');
+                    });
             });
+            // Prefix priority sorting
+            $query->orderByRaw('CASE WHEN title LIKE ? THEN 1 ELSE 2 END', [$search . '%'])
+                  ->orderBy('title', 'asc');
+        } else {
+            // Default alphabetical sorting
+            $query->orderBy('title', 'asc');
         }
 
         $items = $query->get([
@@ -49,6 +74,7 @@ class ItemsController extends Controller
             'stock_1',
             'stock_2',
             'reorder_level',
+            'packing_qty',
             'is_import',
             'is_active',
             'created_at',
@@ -80,7 +106,7 @@ class ItemsController extends Controller
     public function create()
     {
         $categories = ItemCategory::all();
-        $compaines = Account::with('accountType')
+        $companies = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Company']);
             })
@@ -88,7 +114,7 @@ class ItemsController extends Controller
 
         return Inertia::render("setup/items/create", [
             'categories' => $categories,
-            'compaines' => $compaines
+            'companies' => $companies
         ]);
     }
     public function store(Request $request)
@@ -109,7 +135,7 @@ class ItemsController extends Controller
             // Inventory & Packing
             'reorder_level' => 'required|numeric',
             'packing_qty' => 'required|numeric',
-            'packing_size' => 'required|string|max:255',
+            'packing_size' => 'nullable|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects
@@ -130,7 +156,7 @@ class ItemsController extends Controller
             // Right Section
             'discount' => 'nullable|numeric',
             'packing_full' => 'nullable|numeric',
-            'packing_pcs' => 'required|numeric',
+            'packing_pcs' => 'nullable|numeric',
             'limit_pcs' => 'nullable|numeric',
             'order_qty' => 'nullable|numeric',
             'weight' => 'nullable|numeric',
@@ -164,7 +190,7 @@ class ItemsController extends Controller
     {
         $item = Items::findOrFail($id);
         $categories = ItemCategory::all();
-        $compaines = Account::with('accountType')
+        $companies = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Company']);
             })
@@ -179,7 +205,7 @@ class ItemsController extends Controller
         return Inertia::render("setup/items/edit", [
             'item' => $item,
             'categories' => $categories,
-            'compaines' => $compaines,
+            'companies' => $companies,
             'pagination' => [
                 'prev_id' => $prevId,
                 'next_id' => $nextId,
@@ -207,7 +233,7 @@ class ItemsController extends Controller
             // Inventory & Packing
             'reorder_level' => 'required|numeric',
             'packing_qty' => 'required|numeric',
-            'packing_size' => 'required|string|max:255',
+            'packing_size' => 'nullable|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects
@@ -228,7 +254,7 @@ class ItemsController extends Controller
             // Right Section
             'discount' => 'nullable|numeric',
             'packing_full' => 'nullable|numeric',
-            'packing_pcs' => 'required|numeric',
+            'packing_pcs' => 'nullable|numeric',
             'limit_pcs' => 'nullable|numeric',
             'order_qty' => 'nullable|numeric',
             'weight' => 'nullable|numeric',
@@ -387,4 +413,16 @@ class ItemsController extends Controller
 
         return response()->json(['code' => $prefix . '-001']);
     }
+
+
+    public function toggleActive($id)
+    {
+        $item = Items::findOrFail($id);
+        $item->is_active = !$item->is_active;
+        $item->save();
+
+        return redirect()->route('items.index')->with('success', 'Item status updated successfully');
+    }
 }
+
+

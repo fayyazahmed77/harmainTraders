@@ -141,6 +141,8 @@ class SalesController extends Controller
             'tax_total'       => 'required|numeric',
             'net_total'       => 'required|numeric',
             'courier_charges' => 'nullable|numeric',
+            'extra_discount'  => 'nullable|numeric',
+            'total_receivable' => 'nullable|numeric',
             'paid_amount'     => 'required|numeric',
             'remaining_amount' => 'required|numeric',
 
@@ -175,8 +177,9 @@ class SalesController extends Controller
             // For now, I'll map what I can.
 
             $netTotal = $request->net_total;
+            $extraDiscount = $request->extra_discount ?? 0;
             $paidAmount = $request->paid_amount ?? 0;
-            $remainingAmount = $netTotal - $paidAmount;
+            $remainingAmount = ($netTotal - $extraDiscount) - $paidAmount;
 
             $actualPaidOnThisBill = $paidAmount;
             $surplusAmount = 0;
@@ -201,6 +204,8 @@ class SalesController extends Controller
                 'tax_total'       => $request->tax_total,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $request->extra_discount ?? 0,
+                'total_receivable' => $request->total_receivable ?? ($request->net_total + ($request->previous_balance ?? 0)),
                 'paid_amount'     => $actualPaidOnThisBill,
                 'remaining_amount' => $remainingAmount,
             ]);
@@ -447,8 +452,10 @@ class SalesController extends Controller
                 'tax_total'       => $request->tax_total,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $request->extra_discount ?? 0,
+                'total_receivable' => $request->total_receivable ?? $sale->total_receivable,
                 'paid_amount'     => $request->paid_amount ?? $sale->paid_amount,
-                'remaining_amount' => $request->remaining_amount ?? $sale->remaining_amount,
+                'remaining_amount' => ($request->net_total - ($request->extra_discount ?? 0)) - ($request->paid_amount ?? $sale->paid_amount),
             ]);
 
             // Revert Stock for old items (Increase back including bonus)

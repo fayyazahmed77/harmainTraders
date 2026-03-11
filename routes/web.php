@@ -211,6 +211,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{items}/edit', [ItemsController::class, 'edit'])->name('items.edit');
         Route::get('/{items}/show', [ItemsController::class, 'show'])->name('items.show');
         Route::put('/{items}', [ItemsController::class, 'update'])->name('items.update');
+        Route::patch('/{items}/toggle-active', [ItemsController::class, 'toggleActive'])->name('items.toggle-active');
         Route::delete('/{id}', [ItemsController::class, 'destroy'])->name('items.destroy');
     });
     // ---------------------Message Lines------------------------------------------------------------------

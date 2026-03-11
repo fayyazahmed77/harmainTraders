@@ -38,14 +38,7 @@ export default function ItemsSummary({ summary }: SummaryProps) {
             textColor: "text-white",
             isCurrency: false,
         },
-        {
-            title: "Stock Value",
-            value: summary.stock_value,
-            icon: DollarSign,
-            color: "bg-gradient-to-br from-violet-500 to-violet-600",
-            textColor: "text-white",
-            isCurrency: true,
-        },
+
         {
             title: "Out of Stock",
             value: summary.out_of_stock,
@@ -65,7 +58,7 @@ export default function ItemsSummary({ summary }: SummaryProps) {
     ];
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
             {cards.map((card, index) => (
                 <Card key={index} className={`${card.color} border-none shadow-lg transform transition-all hover:scale-105 duration-300`}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

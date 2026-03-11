@@ -247,7 +247,11 @@ export function DataTable({ data }: DataTableProps) {
         {
             accessorKey: "defult",
             header: "Default",
-            cell: ({ row }) => (row.original.defult === "1" || row.original.defult === "true" ? "Yes" : "No"),
+            cell: ({ row }) => {
+                const def = row.original.defult;
+                const isDefault = def === true || def === "true" || def === "1" || String(def) === "1";
+                return isDefault ? "Yes" : "No";
+            },
         },
         {
             accessorKey: "wallet_balance",

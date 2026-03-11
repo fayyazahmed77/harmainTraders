@@ -215,6 +215,7 @@ export default function Edit({
 
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
+  const isCompany = accountType?.label === "Company";
 
   const isDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
@@ -440,7 +441,7 @@ export default function Edit({
     if (!data.aging_days && data.aging_days !== 0) validationErrors.aging_days = "Aging Days is required";
 
     // At least one option must be selected
-    if (!data.purchase && !data.cashbank && !data.sale) {
+    if (!isCompany && !data.purchase && !data.cashbank && !data.sale) {
       validationErrors.purchase = "At least one account option must be selected";
     }
 

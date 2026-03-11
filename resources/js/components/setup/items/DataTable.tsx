@@ -50,13 +50,14 @@ interface Item {
     code: string;
     title: string;
     company: string;
+    company_account?: { id: number; title: string };
     category: { id: number; name: string };
-    type: string;
     trade_price: string;
     retail: string;
     stock_1: string;
     stock_2: string;
-    is_import: boolean;
+    reorder_level: string;
+    packing_qty: string;
     is_active: boolean;
     created_at: string;
 }
@@ -97,22 +98,95 @@ export function DataTable({ data }: DataTableProps) {
             ),
         },
         { accessorKey: "title", header: "Title" },
-        { accessorKey: "company", header: "Company" },
         { accessorKey: "category.name", header: "Category" },
-        { accessorKey: "type", header: "Type" },
-        { accessorKey: "trade_price", header: "Trade Price" },
-        { accessorKey: "retail", header: "Retail Price" },
-        { accessorKey: "stock_1", header: "Stock 1" },
-        { accessorKey: "stock_2", header: "Stock 2" },
         {
-            accessorKey: "is_import",
-            header: "Import",
-            cell: ({ row }) => (row.original.is_import ? "Yes" : "No"),
+            accessorKey: "trade_price",
+            header: "Trade Price",
+            cell: ({ row }) => (
+                <div className="font-semibold text-[13px]">
+                    Rs. {Number(row.original.trade_price).toFixed(2)}
+                </div>
+            )
+        },
+        {
+            accessorKey: "retail",
+            header: "Retail Price",
+            cell: ({ row }) => (
+                <div className="font-semibold text-[13px]">
+                    Rs. {Number(row.original.retail).toFixed(2)}
+                </div>
+            )
+        },
+        {
+            id: "stock",
+            header: "Stock (Full | Pcs)",
+            cell: ({ row }) => {
+                const stock1 = Number(row.original.stock_1) || 0;
+                const stock2 = Number(row.original.stock_2) || 0;
+                const packingQty = Number(row.original.packing_qty) || 1;
+                const totalUnits = (stock1 * packingQty) + stock2;
+                
+                const reorder = Number(row.original.reorder_level) || 0;
+                
+                let statusText = "OK";
+                let statusColor = "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20";
+                
+                if (totalUnits <= 0) {
+                    statusText = "Out of Stock";
+                    statusColor = "text-rose-600 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20";
+                } else if (totalUnits <= reorder) {
+                    statusText = "Lower";
+                    statusColor = "text-orange-600 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20";
+                } else if (totalUnits > reorder * 2) {
+                    statusText = "Higher";
+                    statusColor = "text-blue-600 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20";
+                }
+
+                return (
+                    <div className="flex flex-col gap-1 min-w-[120px]">
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="font-semibold">{stock1} <span className="text-zinc-400 text-[10px] uppercase">Full</span></span>
+                            <span className="text-zinc-300">|</span>
+                            <span className="font-semibold">{stock2} <span className="text-zinc-400 text-[10px] uppercase">Pcs</span></span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                            <span className="text-[10px] font-bold text-zinc-500">Total: {totalUnits}</span>
+                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${statusColor}`}>
+                                {statusText}
+                            </span>
+                        </div>
+                    </div>
+                );
+            }
         },
         {
             accessorKey: "is_active",
             header: "Active",
-            cell: ({ row }) => (row.original.is_active ? "Yes" : "No"),
+            cell: ({ row }) => {
+                const isActive = !!row.original.is_active;
+                return (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            router.patch(`/items/${row.original.id}/toggle-active`, {}, {
+                                preserveScroll: true,
+                                onSuccess: () => toast.success('Status updated')
+                            });
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isActive ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
+                        }`}
+                        role="switch"
+                        aria-checked={isActive}
+                    >
+                        <span
+                            className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                                isActive ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                        />
+                    </button>
+                );
+            },
         },
         {
             accessorKey: "created_at",
@@ -199,7 +273,7 @@ export function DataTable({ data }: DataTableProps) {
             </Dialog>
 
             {/* ✅ Table */}
-            <div className="rounded-md border shadow-sm">
+            <div className="rounded-md border shadow-sm mb-3 overflow-hidden">
                 <Table>
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         {table.getHeaderGroups().map((hg) => (

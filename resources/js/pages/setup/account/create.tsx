@@ -87,12 +87,14 @@ interface Saleman {
   name: string;
   shortname: string;
   code: string;
+  defult?: boolean | string | number;
 }
 interface Booker {
   id: number;
   name: string;
   shortname: string;
   code: string;
+  defult?: boolean | string | number;
 }
 interface AccountType {
   id: number;
@@ -214,6 +216,7 @@ export default function Create({
 
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
+  const isCompany = accountType?.label === "Company";
 
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -452,6 +455,25 @@ export default function Create({
     }
   }, [accountType]);
 
+  // ---------- Auto-select Default Saleman/Booker ----------
+  useEffect(() => {
+    // 1. Search for default saleman
+    const defaultSaleman = salemans.find(s => s.defult === true || s.defult === "true" || s.defult === 1 || s.defult === "1");
+    if (defaultSaleman) {
+      const opt = { value: defaultSaleman.id, label: `${defaultSaleman.name} (${defaultSaleman.shortname ?? ""})` };
+      setSaleman(opt);
+      setData("saleman_id", String(defaultSaleman.id));
+    }
+
+    // 2. Search for default booker
+    const defaultBooker = bookers.find(b => b.defult === true || b.defult === "true" || b.defult === 1 || b.defult === "1");
+    if (defaultBooker) {
+      const opt = { value: defaultBooker.id, label: `${defaultBooker.name} (${defaultBooker.shortname ?? ""})` };
+      setBooker(opt);
+      setData("booker_id", String(defaultBooker.id));
+    }
+  }, [salemans, bookers]);
+
 
   // helper to compute submit url. If Ziggy's route helper is available on window, use it,
   // otherwise fallback to "/accounts".
@@ -492,6 +514,7 @@ export default function Create({
 
     // Supplier specific requirements
     if (isSupplier) {
+      itemsToValidate.saleman_id = "Salesman is required for suppliers";
       itemsToValidate.category = "Category is required for suppliers";
     }
 
@@ -509,7 +532,7 @@ export default function Create({
       }
     });
 
-    if (!data.purchase && !data.cashbank && !data.sale) {
+    if (!isCompany && !data.purchase && !data.cashbank && !data.sale) {
       setError("purchase" as any, "Select at least one option");
       hasError = true;
     }
@@ -933,7 +956,7 @@ export default function Create({
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <TechLabel label="Salesman" icon={Briefcase} required={isCustomer} error={errors.saleman_id}>
+                      <TechLabel label="Salesman" icon={Briefcase} required={isCustomer || isSupplier} error={errors.saleman_id}>
                         <Select
                           value={saleman}
                           onChange={(opt) => {

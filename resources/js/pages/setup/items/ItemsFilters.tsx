@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import { Search, Filter, X, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ interface FilterProps {
     filters: {
         category_id?: string;
         status?: string;
+        stock_status?: string;
         search?: string;
     };
     categories: {
@@ -28,28 +29,42 @@ interface FilterProps {
 export default function ItemsFilters({ filters, categories }: FilterProps) {
     const [categoryId, setCategoryId] = useState(filters.category_id || "all");
     const [status, setStatus] = useState(filters.status || "all");
+    const [stockStatus, setStockStatus] = useState(filters.stock_status || "all");
     const [search, setSearch] = useState(filters.search || "");
     const [categorySearchOpen, setCategorySearchOpen] = useState(false);
     const [categorySearchQuery, setCategorySearchQuery] = useState("");
+    const isFirstRender = useRef(true);
 
-    const applyFilters = () => {
-        router.get(
-            "/items",
-            {
-                category_id: categoryId === "all" ? "" : categoryId,
-                status: status === "all" ? "" : status,
-                search: search,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-            }
-        );
-    };
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(() => {
+            router.get(
+                "/items",
+                {
+                    category_id: categoryId === "all" ? "" : categoryId,
+                    status: status === "all" ? "" : status,
+                    stock_status: stockStatus === "all" ? "" : stockStatus,
+                    search: search,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                }
+            );
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [search, categoryId, status, stockStatus]);
 
     const clearFilters = () => {
         setCategoryId("all");
         setStatus("all");
+        setStockStatus("all");
         setSearch("");
         router.get("/items");
     };
@@ -62,8 +77,20 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
 
     return (
         <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
+            {/* Search Input */}
+            <div className="flex-1 min-w-[200px] relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="text"
+                    placeholder="Search code, title, company, category..."
+                    className="pl-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm transition-all focus-visible:ring-primary"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
+
             {/* Category Filter - Searchable */}
-            <div className="flex-1 min-w-[200px]">
+            <div className="w-[200px]">
                 <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
                     <PopoverTrigger asChild>
                         <Button
@@ -143,8 +170,23 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
                 </Popover>
             </div>
 
+            {/* Stock Filter */}
+            <div className="w-[150px]">
+                <Select value={stockStatus} onValueChange={setStockStatus}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Stock" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Stock</SelectItem>
+                        <SelectItem value="in_stock">In Stock</SelectItem>
+                        <SelectItem value="low_stock">Low Stock</SelectItem>
+                        <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
             {/* Status Filter */}
-            <div className="flex-1 min-w-[150px]">
+            <div className="w-[150px]">
                 <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Status" />
@@ -157,24 +199,9 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
                 </Select>
             </div>
 
-            {/* Search Input */}
-            <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder="Search code, title, or company..."
-                    className="pl-8"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-            </div>
-
             {/* Actions */}
             <div className="flex items-center gap-2">
-                <Button onClick={applyFilters} className="bg-primary hover:bg-primary/90">
-                    <Filter className="mr-2 h-4 w-4" /> Apply
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                <Button variant="ghost" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 px-3 transition-colors delay-75 duration-200">
                     <X className="mr-2 h-4 w-4" /> Clear
                 </Button>
             </div>

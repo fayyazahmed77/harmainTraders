@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 /**
  * Local screenshot path (you uploaded this file).
@@ -52,10 +53,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const PREMIUM_ROUNDING = "rounded-xl";
+const PREMIUM_ROUNDING_XS = "rounded-md";
+const PREMIUM_ROUNDING_SM = "rounded-lg";
 const PREMIUM_ROUNDING_MD = "rounded-md";
+const PREMIUM_ROUNDING_LG = "rounded-2xl";
+const PREMIUM_ROUNDING_XL = "rounded-3xl";
 const PREMIUM_GRADIENT = "bg-white dark:bg-zinc-950 shadow-xl shadow-zinc-200/50 dark:shadow-none transition-all duration-300";
-const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-orange-600";
+const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600";
 const CARD_BASE = "bg-white dark:bg-card border border-zinc-200 dark:border-zinc-800 shadow-sm";
+const SOFT_GLASS = "bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md";
 
 // ───────────────────────────────────────────
 // Types
@@ -224,6 +230,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState<boolean>(false);
   const [paymentAccountId, setPaymentAccountId] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+  const [bankMethod, setBankMethod] = useState<string>("Online");
+  const [chequeNo, setChequeNo] = useState<string>("");
+  const [extraDiscount, setExtraDiscount] = useState<number>(0);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
 
@@ -281,11 +290,28 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
   const filteredItems = useMemo(() => {
     const q = itemSearch.toLowerCase();
-    return items.filter((it) =>
+
+    // Filter logic
+    const filtered = items.filter((it) =>
       it.title.toLowerCase().includes(q) ||
-      (it.short_name?.toLowerCase().includes(q))
-      // Add other filters if needed (category, etc.)
+      (it.short_name?.toLowerCase().includes(q)) ||
+      (it.category?.toLowerCase().includes(q)) ||
+      String(it.id).includes(q)
     );
+
+    // Sort logic: Prioritize startsWidth matches, then alphabetical
+    return filtered.sort((a, b) => {
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+
+      const aStarts = aTitle.startsWith(q);
+      const bStarts = bTitle.startsWith(q);
+
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      return aTitle.localeCompare(bTitle);
+    });
   }, [items, itemSearch]);
 
   // Function to load all items
@@ -460,20 +486,20 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       discTotal += disc;
     });
 
-    const previousBalance = 0;
-    const cashReceived = 0;
-    const net = gross + taxTotal - discTotal + courier;
-    const totalReceivable = net + previousBalance;
+    const net = Math.round(gross + taxTotal - discTotal + courier);
+    const receivable = Math.round(net + previousBalance);
+    const finalAmount = Math.round(receivable - extraDiscount);
 
     return {
       gross: Number(gross.toFixed(2)),
       taxTotal: Number(taxTotal.toFixed(2)),
       discTotal: Number(discTotal.toFixed(2)),
       courier,
-      net: Number(net.toFixed(2)),
-      totalReceivable: Number(totalReceivable.toFixed(2)),
+      net,
+      receivable,
+      finalAmount,
     };
-  }, [rowsWithComputed, items, courier, previousBalance]);
+  }, [rowsWithComputed, items, courier, previousBalance, extraDiscount]);
 
   // Check if over credit limit
   const isOverLimit = useMemo(() => {
@@ -512,15 +538,19 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       is_pay_now: isPayNow,
       payment_account_id: paymentAccountId,
       payment_method: paymentMethod,
+      bank_method: bankMethod,
+      cheque_no: chequeNo,
       message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
       gross_total: totals.gross,
       discount_total: totals.discTotal,
+      extra_discount: extraDiscount,
       tax_total: totals.taxTotal,
       courier_charges: totals.courier,
       net_total: totals.net,
+      total_receivable: totals.receivable,
       paid_amount: cashReceived,
-      remaining_amount: totals.net - cashReceived,
+      remaining_amount: totals.finalAmount - cashReceived,
 
       items: rowsWithComputed.map((r) => {
         const item = items.find(i => i.id === r.item_id);
@@ -955,7 +985,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                             </div>
 
                             {/* Desktop Row View (Visible only on >= md) */}
-                            <div className="hidden md:grid grid-cols-12 gap-2 p-2.5 border-b border-zinc-200 dark:border-zinc-800 items-center group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors border-b border-zinc-50 dark:border-zinc-900/50 last:border-0">
+                            <div className={cn(
+                              "hidden md:grid grid-cols-12 gap-2 p-2.5 border-b items-center group transition-colors last:border-0",
+                              row.stockExceeded
+                                ? "bg-rose-200 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 shadow-[inset_4px_0_0_0_#f43f5e]"
+                                : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-b-zinc-50 dark:border-b-zinc-900/50"
+                            )}>
                               <div className="col-span-3">
                                 {row.item_id ? (
                                   <button
@@ -1022,31 +1057,56 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   </div>
 
                   {/* Table Footer: Totals */}
-                  <div className="hidden md:flex bg-zinc-50/80 dark:bg-zinc-900/40 border-t border-zinc-200 dark:border-zinc-800 p-3 items-center justify-end gap-6">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Gross Amount</span>
-                      <span className="text-md font-black text-zinc-700 dark:text-zinc-300"><span className="text-[10px] text-zinc-400 mr-1 italic font-semibold">Rs</span>{totals.gross.toLocaleString()}</span>
+                  <div className="hidden md:flex bg-zinc-50/80 dark:bg-zinc-900/40 border-t border-zinc-200 dark:border-zinc-800 p-3 items-center justify-between">
+                    <div className="flex items-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={!rows.some(r => r.item_id !== null)}
+                        onClick={() => {
+                          const lastRow = rows[rows.length - 1];
+                          setActiveRowId(lastRow?.id || null);
+                          setItemDialogOpen(true);
+                        }}
+                        className={cn(
+                          "h-8 px-2 flex items-center gap-2 font-black  rounded-md group transition-all",
+                          rows.some(r => r.item_id !== null)
+                            ? "text-orange-500 border-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500 transition-colors group-hover:border-orange-200"
+                            : "text-zinc-300 dark:text-zinc-700 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <Plus size={16} className={cn("transition-transform", rows.some(r => r.item_id !== null) && "group-hover:rotate-90")} />
+                        <span className="text-[10px] uppercase tracking-widest">Select Product</span>
+                      </Button>
                     </div>
 
-                    <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Gross Amount</span>
+                        <span className="text-md font-black text-zinc-700 dark:text-zinc-300"><span className="text-[10px] text-zinc-400 mr-1 italic font-semibold">Rs</span>{totals.gross.toLocaleString()}</span>
+                      </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Tax Total</span>
-                      <span className="text-md font-black text-blue-600"><span className="text-[10px] text-blue-400/70 mr-0.5 font-bold">+</span>{totals.taxTotal.toLocaleString()}</span>
-                    </div>
+                      <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
 
-                    <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Tax Total</span>
+                        <span className="text-md font-black text-blue-600"><span className="text-[10px] text-blue-400/70 mr-0.5 font-bold">+</span>{totals.taxTotal.toLocaleString()}</span>
+                      </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Disc Total</span>
-                      <span className="text-md font-black text-rose-600"><span className="text-[10px] text-rose-400/70 mr-0.5 font-bold">-</span>{totals.discTotal.toLocaleString()}</span>
+                      <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Disc Total</span>
+                        <span className="text-md font-black text-rose-600"><span className="text-[10px] text-rose-400/70 mr-0.5 font-bold">-</span>{totals.discTotal.toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
                 </Card>
 
+
                 {/* Bottom fields / stock & supplier info */}
-                {/* Bottom fields / stock & supplier info */}
-                <div className="mt-0 md:mt-3 flex flex-col md:h-[206px]">
+                <div className="mt-0 md:mt-3 flex flex-col md:h-[400px]">
                   {/* Mobile Toggle Button for Item Info */}
                   <Button
                     variant="outline"
@@ -1062,36 +1122,43 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   </Button>
 
                   <div className={`${showInfoPanel ? 'flex' : 'hidden'} md:flex flex-col h-full animate-in slide-in-from-bottom-1 duration-300`}>
-                    <Card className="flex-1 p-3 md:p-5 border dark:border-zinc-800 dark:bg-zinc-950 shadow-sm relative overflow-hidden transition-all duration-300 bg-white shadow-zinc-200/40">
+                    <Card className={cn("flex-1 p-3 md:p-5 border dark:border-zinc-800 shadow-sm relative overflow-hidden transition-all duration-300 shadow-zinc-200/40", SOFT_GLASS)}>
                       {selectedItem ? (
                         <div className="flex flex-col h-full relative z-10">
                           {/* Top Header */}
-                          <div className="pb-0 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80">
-                            <h3 className="text-sm md:text-lg font-black dark:text-zinc-100 flex items-center gap-2 tracking-tight uppercase">
-                              <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(249,115,22,0.6)]"></span>
-                              {selectedItem.title}
+                          <div className="pb-3 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80">
+                            <div className="flex flex-col">
+                              <h3 className="text-sm md:text-xl font-black dark:text-zinc-100 flex items-center gap-2 tracking-tight uppercase italic">
+                                <span className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(249,115,22,0.8)]"></span>
+                                {selectedItem.title}
+                              </h3>
                               {selectedItem.short_name && (
-                                <span className="text-[10px] md:text-xs font-semibold text-zinc-400 normal-case ml-1 tracking-tighter">({selectedItem.short_name})</span>
+                                <span className="text-[10px] md:text-xs font-bold text-zinc-400 uppercase tracking-widest mt-0.5 ml-4">{selectedItem.short_name}</span>
                               )}
-                            </h3>
-                            <div className="bg-blue-600 px-3 py-0.5 rounded-full text-[9px] font-black text-white uppercase tracking-wider shadow-sm">
-                              {selectedItem.company || 'N/A'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-1 rounded-lg text-[10px] font-black text-zinc-500 uppercase tracking-widest shadow-sm">
+                                ID: {selectedItem.id.toString().padStart(5, '0')}
+                              </div>
+                              <div className={`${ACCENT_GRADIENT} px-4 py-1.5 rounded-full text-[10px] font-black text-white uppercase tracking-widest shadow-md`}>
+                                {selectedItem.company || 'GENERIC'}
+                              </div>
                             </div>
                           </div>
 
                           {/* Data Sections */}
-                          <div className="flex-1 flex flex-col md:flex-row mt-4 gap-6">
+                          <div className="flex-1 flex flex-col md:flex-row mt-1 gap-2">
 
                             {/* Left Side: Inventory & Pricing Models */}
                             <div className="flex-1 flex flex-col justify-between">
                               {/* Primary Inventory Metrics */}
-                              <div className="grid grid-cols-4 gap-3">
+                              <div className="grid grid-cols-4 gap-2">
                                 {/* Packing */}
-                                <div className="flex flex-col items-center justify-center py-3 px-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                                  <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 leading-none">Packing</div>
-                                  <div className="text-2xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter">
+                                <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 shadow-sm hover:shadow-md transition-all duration-300 group`}>
+                                  <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 leading-none group-hover:text-zinc-500">Packing</div>
+                                  <div className="text-3xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter italic">
                                     {toNumber(selectedItem.packing_full || selectedItem.packing_qty)}
-                                    <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase">PCS/F</span>
+                                    <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase not-italic">PCS/F</span>
                                   </div>
                                 </div>
 
@@ -1105,25 +1172,27 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                                   return (
                                     <>
-                                      <div className="flex flex-col items-center justify-center py-3 px-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                                        <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 leading-none">Stock Full</div>
-                                        <div className="text-2xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter">
+                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 shadow-sm hover:shadow-md transition-all duration-300 group`}>
+                                        <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 leading-none group-hover:text-zinc-500">Stock Full</div>
+                                        <div className="text-3xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter italic">
                                           {Math.floor(remainingStock / packing)}
-                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase">F</span>
+                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase not-italic">F</span>
                                         </div>
                                       </div>
-                                      <div className="flex flex-col items-center justify-center py-3 px-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                                        <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 leading-none">Pieces</div>
-                                        <div className="text-2xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter">
+                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 shadow-sm hover:shadow-md transition-all duration-300 group`}>
+                                        <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 leading-none group-hover:text-zinc-500">Pieces</div>
+                                        <div className="text-3xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter italic">
                                           {remainingStock % packing}
-                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase">P</span>
+                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase not-italic">P</span>
                                         </div>
                                       </div>
-                                      <div className={`flex flex-col items-center justify-center py-3 px-2 rounded-xl border ${remainingStock < 0 ? 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-900/10' : 'border-orange-200 bg-orange-50/80 dark:border-orange-900/30 dark:bg-orange-900/10'}`}>
-                                        <div className={`text-[9px] font-black uppercase tracking-widest mb-1.5 leading-none ${remainingStock < 0 ? 'text-rose-500' : 'text-orange-500'}`}>Active Stock</div>
-                                        <div className={`text-2xl font-black leading-none tracking-tighter ${remainingStock < 0 ? 'text-rose-600' : 'text-orange-600'}`}>
+                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border-2 shadow-lg transition-all duration-500 active:scale-95 cursor-default ${remainingStock < 0
+                                        ? 'border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 shadow-rose-200/40'
+                                        : 'border-orange-500/40 bg-orange-50/50 dark:bg-orange-950/20 text-orange-600 shadow-orange-200/40'}`}>
+                                        <div className={`text-[10px] font-black uppercase tracking-widest mb-2 leading-none animate-pulse`}>Active Stock</div>
+                                        <div className={`text-3xl font-black leading-none tracking-tighter italic`}>
                                           {remainingStock}
-                                          <span className="text-[10px] font-bold ml-1 uppercase opacity-60">PCS</span>
+                                          <span className="text-[10px] font-bold ml-1 uppercase opacity-60 not-italic">PCS</span>
                                         </div>
                                       </div>
                                     </>
@@ -1131,8 +1200,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 })()}
                               </div>
 
-                              {/* Price Tiers (Minimal Sub-row) */}
-                              <div className="grid grid-cols-6 gap-2 mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 h-[50px]">
+                              {/* Price Tiers (Redesigned for Perfection) */}
+                              <div className="grid grid-cols-6 gap-3 mt-1 pt-1 border-t border-zinc-200 dark:border-zinc-800/40">
                                 {[2, 3, 4, 5, 6, 7].map((num) => {
                                   const priceKey = `pt${num}` as keyof Item;
                                   const percentage = toNumber(selectedItem[priceKey as keyof Item]);
@@ -1143,33 +1212,89 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                   const isActive = String(num) === customerCategory;
 
                                   return (
-                                    <div key={num} className={`rounded-md px-2 py-1 flex flex-col justify-center text-center transition-all ${isActive ? 'bg-orange-500 text-white shadow-md' : 'bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500'}`}>
-                                      <div className="flex items-center justify-between gap-1 w-full">
-                                        <span className={`text-[8px] font-black uppercase ${isActive ? 'text-orange-100' : 'text-zinc-400'}`}>Price Type-{num}</span>
-                                        <span className={`text-[8px] font-black ${isActive ? 'text-orange-100' : 'text-zinc-400'}`}>{percentage}%</span>
+                                    <div
+                                      key={num}
+                                      className={cn(
+                                        "relative group flex flex-col p-2 transition-all duration-300 cursor-help overflow-hidden",
+                                        PREMIUM_ROUNDING_MD,
+                                        isActive
+                                          ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30 scale-[1.05] z-10"
+                                          : "bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-500 border border-zinc-200 dark:border-zinc-800/50"
+                                      )}
+                                    >
+                                      {/* Background accent for inactive */}
+                                      {!isActive && (
+                                        <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <div className="w-1.5 h-1.5 rounded-md bg-orange-500/50" />
+                                        </div>
+                                      )}
+
+                                      <div className="flex items-center justify-between gap-1 w-full mb-1">
+                                        <span className={cn(
+                                          "text-[7px] font-black uppercase tracking-widest truncate",
+                                          isActive ? "text-orange-100" : "text-zinc-400"
+                                        )}>Price {num}</span>
+                                        <span className={cn(
+                                          "text-[9px] font-black",
+                                          isActive ? "text-white" : "text-zinc-500"
+                                        )}>{percentage}%</span>
                                       </div>
-                                      <div className={`text-[11px] font-black tracking-tight ${isActive ? 'text-white' : 'text-zinc-700 dark:text-zinc-300'}`}>
-                                        RS {calculatedPrice.toFixed(0)}
+
+                                      <div className={cn(
+                                        "text-sm font-black tracking-tight font-bold",
+                                        isActive ? "text-white" : "text-zinc-800 dark:text-zinc-200"
+                                      )}>
+                                        <span className="text-[10px] opacity-70 mr-0.5 not-italic">RS</span>
+                                        {calculatedPrice.toLocaleString()}
                                       </div>
+
+                                      {/* Subtle pulse for active item */}
+                                      {isActive && <div className="absolute inset-0 bg-white/10 animate-pulse pointer-events-none" />}
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
 
-                            {/* Right Side: Core Financials */}
-                            <div className="w-full md:w-64 flex flex-col justify-center gap-3 pl-0 md:pl-6 border-l-0 md:border-l border-zinc-100 dark:border-zinc-800/60 pt-4 md:pt-0">
-                              <div className="flex items-center justify-between group">
-                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-zinc-600 transition-colors">Trade Price</span>
-                                <span className="text-[15px] font-black text-purple-600 leading-none"><span className="text-[10px] text-zinc-400 mr-1 italic">Rs</span>{toNumber(selectedItem.trade_price).toFixed(2)}</span>
+                            {/* Right Side: Core Financials (Perfected) */}
+                            <div className="w-full md:w-72 flex flex-col justify-center gap-1 pl-0 md:pl-8 border-l-0 md:border-l border-zinc-100 dark:border-zinc-800/60 pt-6 md:pt-0">
+                              <div className="flex items-center justify-between group/tp p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest group-hover/tp:text-purple-500 transition-colors">Trade Price</span>
+                                  <span className="text-[8px] font-bold text-zinc-300 uppercase">Purchase Base</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xl font-black text-purple-600 tracking-tighter italic">
+                                    <span className="text-[10px] text-zinc-400 mr-1 not-italic font-bold">Rs</span>
+                                    {toNumber(selectedItem.trade_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center justify-between group">
-                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-zinc-600 transition-colors">Retail Price</span>
-                                <span className="text-[15px] font-black text-orange-600 leading-none"><span className="text-[10px] text-zinc-400 mr-1 italic">Rs</span>{toNumber(selectedItem.retail).toFixed(2)}</span>
+
+                              <div className="flex items-center justify-between group/rp p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest group-hover/rp:text-orange-500 transition-colors">Retail Price</span>
+                                  <span className="text-[8px] font-bold text-zinc-300 uppercase">Selling MSRP</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xl font-black text-orange-600 tracking-tighter italic">
+                                    <span className="text-[10px] text-zinc-400 mr-1 not-italic font-bold">Rs</span>
+                                    {toNumber(selectedItem.retail).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center justify-between group">
-                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-zinc-600 transition-colors">Average Cost</span>
-                                <span className="text-[15px] font-black text-emerald-600 leading-none"><span className="text-[10px] text-zinc-400 mr-1 italic">Rs</span>{((toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2).toFixed(2)}</span>
+
+                              <div className="flex items-center justify-between group/ac p-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest group-hover/ac:text-emerald-500 transition-colors">Average Cost</span>
+                                  <span className="text-[8px] font-bold text-zinc-300 uppercase">Weighted Avg</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xl font-black text-emerald-600 tracking-tighter italic">
+                                    <span className="text-[10px] text-zinc-400 mr-1 not-italic font-bold">Rs</span>
+                                    {((toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
@@ -1233,8 +1358,28 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                       <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
                         <TechLabel label="TOTAL RECEIVABLE">
-                          <div className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight italic">
-                            {totals.totalReceivable.toLocaleString()}
+                          <div className="text-2xl font-black text-zinc-500 dark:text-zinc-400 tracking-tight italic line-through opacity-50">
+                            {totals.receivable.toLocaleString()}
+                          </div>
+                        </TechLabel>
+                      </div>
+
+                      <div className="pt-2">
+                        <TechLabel label="EXTRA DISCOUNT" className="space-y-1">
+                          <Input
+                            type="number"
+                            value={extraDiscount || ""}
+                            onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                            className="h-9 font-black text-rose-600 bg-rose-50/30 border-rose-100 focus:border-rose-300 focus:ring-rose-300 dark:bg-rose-950/10 dark:border-rose-900/30"
+                            placeholder="0.00"
+                          />
+                        </TechLabel>
+                      </div>
+
+                      <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                        <TechLabel label="FINAL NET PAYABLE">
+                          <div className="text-3xl font-black text-orange-600 dark:text-orange-500 tracking-tight italic">
+                            {totals.finalAmount.toLocaleString()}
                           </div>
                         </TechLabel>
                       </div>
@@ -1246,7 +1391,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-100 dark:border-zinc-800 group cursor-pointer" onClick={() => {
                           const next = !isPayNow;
                           setIsPayNow(next);
-                          if (next) setCheckoutDialogOpen(true);
+                          if (next) {
+                            setCheckoutDialogOpen(true);
+                            setCashReceived(Math.round(totals.finalAmount));
+                          }
                         }}>
                           <div className="flex items-center gap-3">
                             <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center transition-all ${isPayNow ? 'border-orange-500 bg-orange-500 text-white' : 'border-zinc-300'}`}>
@@ -1360,7 +1508,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             </div>
 
           </div>
-
+          {/* Item Dialog */}
           <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
             <DialogContent className="max-w-[99vw] md:max-w-5xl w-full md:w-[1000px] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl">
               <div className={`p-6 ${ACCENT_GRADIENT} text-white`}>
@@ -1528,10 +1676,20 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
               <div className="p-4 bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest">
                 <span>Showing {filteredItems.length} registry entries</span>
-                <span className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Sync Enabled
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Sync Enabled
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setItemDialogOpen(false)}
+                    className="h-7 px-4 bg-white dark:bg-zinc-800 border-2 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100 font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-zinc-900 transition-all active:scale-95"
+                  >
+                    OK
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -1566,16 +1724,69 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 <div className="flex flex-col gap-2">
                   <Label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Select Account</Label>
                   <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                    <SelectTrigger className="h-11 w-full font-bold bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+                    <SelectTrigger className="h-11 w-full font-black bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
                       <SelectValue placeholder="Select Account" />
                     </SelectTrigger>
                     <SelectContent>
                       {paymentAccounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
+                        <SelectItem key={acc.id} value={acc.id.toString()} className="font-bold">
+                          {acc.title}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {(() => {
+                  const selectedAcc = paymentAccounts.find(a => a.id.toString() === paymentAccountId);
+                  const isBank = selectedAcc?.title.toLowerCase().includes('bank');
+
+                  if (!isBank) return null;
+
+                  return (
+                    <div className="flex flex-col gap-4 p-4 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex flex-col gap-2">
+                        <Label className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest">Payment Method</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            variant={bankMethod === 'Online' ? 'default' : 'outline'}
+                            onClick={() => setBankMethod('Online')}
+                            className={cn(
+                              "h-10 font-black uppercase tracking-widest text-[10px] transition-all",
+                              bankMethod === 'Online' ? ACCENT_GRADIENT : "border-orange-200 text-orange-600 hover:bg-orange-50"
+                            )}
+                          >
+                            Online
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={bankMethod === 'Cheque' ? 'default' : 'outline'}
+                            onClick={() => setBankMethod('Cheque')}
+                            className={cn(
+                              "h-10 font-black uppercase tracking-widest text-[10px] transition-all",
+                              bankMethod === 'Cheque' ? ACCENT_GRADIENT : "border-orange-200 text-orange-600 hover:bg-orange-50"
+                            )}
+                          >
+                            Cheque
+                          </Button>
+                        </div>
+                      </div>
+
+                      {bankMethod === 'Cheque' && (
+                        <div className="flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
+                          <Label className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest">Cheque Number</Label>
+                          <Input
+                            placeholder="Enter Cheque No..."
+                            value={chequeNo}
+                            onChange={(e) => setChequeNo(e.target.value)}
+                            className="h-10 font-bold bg-white dark:bg-zinc-900 border-orange-200 focus:border-orange-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex flex-col gap-2">
                   <Label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Amount Received</Label>

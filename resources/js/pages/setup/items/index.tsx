@@ -18,6 +18,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface FilterData {
   category_id?: string;
   status?: string;
+  stock_status?: string;
   search?: string;
 }
 
@@ -43,6 +44,8 @@ interface Item {
   is_import: boolean;
   is_active: boolean;
   created_at: string;
+  packing_qty: string;
+  reorder_level: string;
 }
 
 interface Category {

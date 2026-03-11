@@ -59,4 +59,9 @@ class Items extends Model
     {
         return $this->hasMany(SalesItem::class, 'item_id');
     }
+
+    public function companyAccount()
+    {
+        return $this->belongsTo(Account::class, 'company');
+    }
 }

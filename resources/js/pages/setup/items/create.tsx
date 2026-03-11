@@ -78,7 +78,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
   );
 };
 
-export default function Page({ categories, compaines }: { categories: any, compaines: any }) {
+export default function Page({ categories, companies }: { categories: any, companies: any }) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
@@ -141,8 +141,8 @@ export default function Page({ categories, compaines }: { categories: any, compa
   });
 
   const companyOptions = React.useMemo(() =>
-    compaines.map((c: any) => ({ value: String(c.id), label: c.title })),
-    [compaines]
+    companies.map((c: any) => ({ value: String(c.id), label: c.title })),
+    [companies]
   );
 
   const categoryOptions = React.useMemo(() =>
@@ -349,7 +349,7 @@ export default function Page({ categories, compaines }: { categories: any, compa
                     <TechLabel label="Primary Title" icon={Type} required error={errors.title}>
                       <Input
                         value={data.title}
-                        onChange={(e) => onInputChange("title", e.target.value)}
+                        onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
                         placeholder="Full Item Description"
                         className={cn(
                           `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
@@ -474,7 +474,7 @@ export default function Page({ categories, compaines }: { categories: any, compa
                           placeholder="Select Company"
                           styles={getSelectStyles(!!errors.company)}
                           options={companyOptions}
-                          value={companyOptions.find((opt: any) => opt.value === Number(data.company)) || null}
+                          value={companyOptions.find((opt: any) => String(opt.value) === String(data.company)) || null}
                           onChange={(opt: any) => onInputChange("company", opt ? opt.value : "")}
                           isSearchable
                           isClearable
@@ -542,7 +542,7 @@ export default function Page({ categories, compaines }: { categories: any, compa
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="w-full">
-                              <TechLabel label="P. Size" icon={Ruler} required error={errors.packing_size}>
+                              <TechLabel label="P. Size" icon={Ruler} error={errors.packing_size}>
                                 <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>
@@ -575,7 +575,7 @@ export default function Page({ categories, compaines }: { categories: any, compa
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="w-full">
-                              <TechLabel label="P. Pcs" icon={Component} required error={errors.packing_pcs}>
+                              <TechLabel label="P. Pcs" icon={Component} error={errors.packing_pcs}>
                                 <Input value={data.packing_pcs} onChange={(e) => onInputChange("packing_pcs", e.target.value)} placeholder="Pcs" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_pcs && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>

@@ -27,6 +27,8 @@ class Sales extends Model
         'tax_total',
         'courier_charges',
         'net_total',
+        'extra_discount',
+        'total_receivable',
         'paid_amount',
         'remaining_amount',
         'status',
