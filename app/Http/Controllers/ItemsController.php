@@ -178,6 +178,7 @@ class ItemsController extends Controller
             'pt5' => 'nullable|numeric',
             'pt6' => 'nullable|numeric',
             'pt7' => 'nullable|numeric',
+            'scheme' => 'nullable|string|max:255',
         ]);
 
         // ✅ Create item
@@ -276,6 +277,7 @@ class ItemsController extends Controller
             'pt5' => 'nullable|numeric',
             'pt6' => 'nullable|numeric',
             'pt7' => 'nullable|numeric',
+            'scheme' => 'nullable|string|max:255',
         ]);
         $item->update($validated);
 

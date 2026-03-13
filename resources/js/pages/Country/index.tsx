@@ -129,7 +129,7 @@ export default function Index({ countries }: IndexProps) {
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-3">
                         <h1 className="text-3xl lg:text-4xl font-black tracking-tighter text-foreground leading-none">
-                          COUNTRIES <span className="text-orange-500">REGISTRY</span>
+                          COUNTRIES
                         </h1>
                         <div className="hidden sm:flex h-5 w-px bg-orange-500/20 mx-1" />
                         <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-sm bg-orange-500/5 border border-orange-500/20 text-[10px] font-black tracking-widest text-orange-600 uppercase">
@@ -137,22 +137,21 @@ export default function Index({ countries }: IndexProps) {
                         </span>
                       </div>
                       <p className="text-muted-foreground/60 text-xs lg:text-sm font-bold uppercase tracking-[0.2em]">
-                        Centralized Geographic Identity Database & Control
+                        Manage your registered countries.
                       </p>
                     </div>
                   </div>
 
                   <div className="hidden xl:flex items-center gap-8 border-l border-orange-500/10 pl-8">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mb-1">Identity Console</span>
+                      <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mb-1">Status Console</span>
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                         <span className="text-xs font-black text-foreground/80 tracking-tight">SYSTEM ACTIVE</span>
                       </div>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mb-1">Registry Scale</span>
-                      <span className="text-xs font-black text-orange-600 uppercase tracking-tight">{countries.total} Identities</span>
+                      <span className="text-xs font-black text-orange-600 uppercase tracking-tight">{countries.total} Saved Countries</span>
                     </div>
                   </div>
                 </div>
@@ -163,7 +162,7 @@ export default function Index({ countries }: IndexProps) {
                     className="group/btn bg-orange-600 hover:bg-orange-700 h-14 lg:h-16 px-8 lg:px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 transition-all active:scale-95 border-b-4 border-orange-800 flex items-center gap-3"
                   >
                     <Plus className="w-5 h-5 group-hover/btn:rotate-180 transition-transform duration-500" />
-                    <span>Generate Identity</span>
+                    <span>Add Country</span>
                   </Button>
                 </div>
               </div>
@@ -175,15 +174,15 @@ export default function Index({ countries }: IndexProps) {
                   <div className="flex flex-col items-center justify-center p-20 bg-white border-2 border-dashed border-orange-500/10 rounded-sm group overflow-hidden relative">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
                     <Plus className="w-20 h-20 text-orange-500/20 mb-6 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" />
-                    <h3 className="text-2xl font-black tracking-tight text-foreground uppercase mb-2 relative z-10">NULL DATA DETECTED</h3>
+                    <h3 className="text-2xl font-black tracking-tight text-foreground uppercase mb-2 relative z-10">No Countries Found</h3>
                     <p className="text-muted-foreground font-semibold uppercase text-[10px] tracking-[0.2em] relative z-10 mb-8 px-4 text-center">
-                      The core geographic registry is currently empty. Initialize a new identity to proceed.
+                      No countries have been added yet. Add a new country to get started.
                     </p>
                     <Button
                       onClick={() => setOpenCreateDialog(true)}
                       className="bg-orange-600 hover:bg-orange-700 h-12 px-8 rounded-sm font-black uppercase tracking-widest transition-all relative z-10 shadow-xl shadow-orange-500/20"
                     >
-                      Initialize Identity
+                      Add Country
                     </Button>
                   </div>
                 ) : (
@@ -208,10 +207,10 @@ export default function Index({ countries }: IndexProps) {
                 </div>
                 <div>
                   <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    IDENTITY <span className="text-orange-500 italic">GENESIS</span>
+                    Add <span className="text-orange-500 italic">Country</span>
                   </DialogTitle>
                   <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Geographic Registry Initialization Protocol
+                    Create a new country entry.
                   </DialogDescription>
                 </div>
               </div>
@@ -221,7 +220,7 @@ export default function Index({ countries }: IndexProps) {
               <div className="grid grid-cols-2 gap-6 relative">
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="name" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                    Country Full Name
+                    Country Name
                   </Label>
                   <div className="relative group">
                     <Input
@@ -238,7 +237,7 @@ export default function Index({ countries }: IndexProps) {
 
                 <div className="space-y-2 lg:col-span-1 col-span-2">
                   <Label htmlFor="code" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                    ISO Identity Code
+                    Country Code
                   </Label>
                   <Input
                     id="code"
@@ -252,7 +251,7 @@ export default function Index({ countries }: IndexProps) {
 
                 <div className="space-y-2 lg:col-span-1 col-span-2">
                   <Label htmlFor="phoneCode" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                    Dialing Parameter
+                    Phone Code
                   </Label>
                   <Input
                     id="phoneCode"
@@ -265,7 +264,7 @@ export default function Index({ countries }: IndexProps) {
 
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="currency" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                    Economic Unit
+                    Currency
                   </Label>
                   <Input
                     id="currency"
@@ -285,13 +284,13 @@ export default function Index({ countries }: IndexProps) {
                     className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
                     onClick={() => setOpenCreateDialog(false)}
                   >
-                    Abort
+                    Cancel
                   </Button>
                   <Button
                     type="submit"
                     className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1"
                   >
-                    Confirm Genesis
+                    Save Country
                   </Button>
                 </DialogFooter>
               </div>

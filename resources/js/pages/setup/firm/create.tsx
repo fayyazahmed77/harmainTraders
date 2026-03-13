@@ -53,8 +53,8 @@ export default function FirmCreate() {
   const { auth, errors } = usePage<any>().props as unknown as PageProps;
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Financials", href: "/firms" },
-    { title: "Identity Generation", href: "/firms/create" },
+    { title: "Firms", href: "/firms" },
+    { title: "Add Firm", href: "/firms/create" },
   ];
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -128,7 +128,7 @@ export default function FirmCreate() {
     router.post("/firms", formData, {
       forceFormData: true,
       onSuccess: () => {
-        toast.success("Identity Module Committed", { description: "New commercial node has been synchronized." });
+        toast.success("Firm added successfully", { description: "New firm has been saved." });
       },
       onError: () => toast.error("Sync Failed"),
       onFinish: () => setIsSubmitting(false),
@@ -152,15 +152,15 @@ export default function FirmCreate() {
                   <div className="h-8 w-8 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center group-hover:bg-zinc-100 dark:group-hover:bg-zinc-900 transition-all">
                     <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Abort Generation</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Go Back</span>
                 </Link>
               </motion.div>
 
               {/* Header */}
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                 <Heading
-                  title="Generate Commercial Identity"
-                  description="Initialize a new institutional commercial segment with branding assets and fiscal parameters"
+                  title="Add Firm"
+                  description="Add a new firm with branding and business details"
                 />
               </motion.div>
 
@@ -180,14 +180,14 @@ export default function FirmCreate() {
                         <Building className="h-5 w-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node_Segment_01</span>
-                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Identity Core</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Step 01</span>
+                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Basic Info</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="md:col-span-2 space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Institution Label</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Firm Name</Label>
                         <div className="relative group">
                           <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
@@ -203,14 +203,14 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Registry Code</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Firm Code</Label>
                         <div className="relative group">
                           <Code className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
                             name="code"
                             value={form.code}
                             onChange={handleChange}
-                            placeholder="[ID-ALPHA-4]"
+                            placeholder="e.g. HTG-01"
                             className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all text-xs pl-10 uppercase tracking-widest font-mono"
                           />
                         </div>
@@ -218,7 +218,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Sync Date</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Registration Date</Label>
                         <Popover open={openCalendar} onOpenChange={setOpenCalendar}>
                           <PopoverTrigger asChild>
                             <Button
@@ -241,7 +241,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="md:col-span-2 space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Business Directive</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Business Type</Label>
                         <div className="relative group">
                           <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
@@ -255,7 +255,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="md:col-span-2 space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Operator Designation</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Owner Name</Label>
                         <div className="relative group">
                           <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
@@ -282,8 +282,8 @@ export default function FirmCreate() {
                         <Receipt className="h-5 w-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node_Segment_02</span>
-                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Fiscal Parameters</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Step 02</span>
+                        <span className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mt-1">Tax Details</span>
                       </div>
                     </div>
 
@@ -303,7 +303,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">N.T.N Designation</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">N.T.N Number</Label>
                         <div className="relative group">
                           <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
@@ -317,7 +317,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="md:col-span-2 space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Base Station (Address 1)</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Head Office (Address 1)</Label>
                         <div className="relative group">
                           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300 group-focus-within:text-orange-500 transition-colors" />
                           <Input
@@ -331,7 +331,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Satellite node (Address 2)</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Branch 1 (Address 2)</Label>
                         <Input
                           name="address2"
                           value={form.address2}
@@ -342,7 +342,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Satellite node (Address 3)</Label>
+                        <Label className="text-[10px] uppercase font-black tracking-[0.2em] text-zinc-400 mb-2 block">Branch 2 (Address 3)</Label>
                         <Input
                           name="address3"
                           value={form.address3}
@@ -366,7 +366,7 @@ export default function FirmCreate() {
                     className={cn(PREMIUM_ROUNDING, "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl p-8 flex flex-col items-center justify-center text-center space-y-6")}
                   >
                     <div className="w-full flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Identity Badge</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Firm Logo</span>
                       <div className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
                     </div>
 
@@ -377,8 +377,7 @@ export default function FirmCreate() {
                           <img src={logoPreview} className="h-full w-full object-cover" alt="Preview" />
                         ) : (
                           <>
-                            <ImageIcon className="h-10 w-10 text-zinc-200 dark:text-zinc-800 mb-2" />
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-4">Awaiting Index</span>
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-4">No Image</span>
                           </>
                         )}
                         <input
@@ -393,8 +392,8 @@ export default function FirmCreate() {
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-900 dark:text-zinc-100">Synchronize Institution Brand</p>
-                      <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Only SVG, PNG or JPEG nodes accepted</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-900 dark:text-zinc-100">Upload Firm Logo</p>
+                      <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Support SVG, PNG or JPG</p>
                     </div>
 
                     <Button
@@ -403,7 +402,7 @@ export default function FirmCreate() {
                       className="rounded-xl border border-zinc-100 dark:border-zinc-800 font-bold uppercase tracking-widest text-[9px] h-10 px-6 relative overflow-hidden group"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      Browse File Segments
+                      Choose File
                     </Button>
                   </motion.div>
 
@@ -416,7 +415,7 @@ export default function FirmCreate() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.8)]" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Registry Communications</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Contact Info</span>
                     </div>
 
                     <div className="space-y-6">
@@ -434,7 +433,7 @@ export default function FirmCreate() {
                           </div>
                         </div>
                         <div className="space-y-2 group">
-                          <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Fax Node</Label>
+                          <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Fax</Label>
                           <Input
                             name="fax"
                             value={form.fax}
@@ -445,7 +444,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2 group">
-                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Mailbox</Label>
+                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500">Email Address</Label>
                         <div className="relative">
                           <Mail className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-700 transition-colors group-focus-within:text-orange-500" />
                           <Input
@@ -459,7 +458,7 @@ export default function FirmCreate() {
                       </div>
 
                       <div className="space-y-2 group">
-                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500 transition-colors">Digital Portal</Label>
+                        <Label className="text-[9px] uppercase font-black tracking-[0.3em] text-zinc-500 group-focus-within:text-orange-500 transition-colors">Website</Label>
                         <div className="relative">
                           <Globe className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-700 transition-colors group-focus-within:text-orange-500" />
                           <Input
@@ -475,8 +474,8 @@ export default function FirmCreate() {
                     <div className="space-y-5 pt-4 border-t border-zinc-800">
                       <div className="flex items-center justify-between group">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Invoice Protocol</span>
-                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Auto-generate hardcopies</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Print Invoice</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Enable printing for this firm</span>
                         </div>
                         <Checkbox
                           checked={form.printinvoice}
@@ -486,8 +485,8 @@ export default function FirmCreate() {
                       </div>
                       <div className="flex items-center justify-between group">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Primary Terminal</span>
-                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Set as main identity node</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Primary Firm</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Set as default firm</span>
                         </div>
                         <Checkbox
                           checked={form.defult}
@@ -497,8 +496,8 @@ export default function FirmCreate() {
                       </div>
                       <div className="flex items-center justify-between group">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Active Pulse</span>
-                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">System availability status</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-zinc-100 italic">Status</span>
+                          <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Enable or disable firm</span>
                         </div>
                         <Checkbox
                           checked={form.status}
@@ -515,7 +514,7 @@ export default function FirmCreate() {
                         className="w-full h-14 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-orange-500/20 relative group overflow-hidden"
                       >
                         <span className="relative z-10 flex items-center justify-center gap-3">
-                          {isSubmitting ? "COMMITING..." : "COMMIT IDENTITY PULSE"}
+                          {isSubmitting ? "SAVING..." : "SAVE FIRM"}
                           {!isSubmitting && <Wand2 className="h-4 w-4 group-hover:rotate-12 transition-transform duration-500" />}
                         </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />

@@ -162,7 +162,7 @@ export function DataTable({ data, countries }: DataTableProps) {
     {
       accessorKey: "country",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Parent Jurisdiction</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country</span>
       ),
       cell: ({ row }) => {
         const province = row.original;
@@ -192,7 +192,7 @@ export function DataTable({ data, countries }: DataTableProps) {
     {
       accessorKey: "name",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Province Identity</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Province</span>
       ),
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
@@ -204,7 +204,7 @@ export function DataTable({ data, countries }: DataTableProps) {
     {
       accessorKey: "code",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Technical ID</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Code</span>
       ),
       cell: ({ row }) => (
         <span className="font-mono font-black text-orange-600 bg-orange-500/5 px-2 py-1 rounded-sm border border-orange-500/10 tracking-widest leading-none block w-fit">{row.original.code}</span>
@@ -233,7 +233,7 @@ export function DataTable({ data, countries }: DataTableProps) {
     {
       accessorKey: "created_by",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Origin Author</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Added By</span>
       ),
       cell: ({ row }) => {
         const name = row.original.created_by_name || "Unknown";
@@ -263,7 +263,7 @@ export function DataTable({ data, countries }: DataTableProps) {
     {
       id: "actions",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Interlink</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Actions</span>
       ),
       enableHiding: false,
       cell: ({ row }) => {
@@ -299,7 +299,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                   }}
                 >
                   <PencilLine className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Modify Identity</span>
+                  <span>Edit Province</span>
                 </DropdownMenuItem>
               )}
               {canDelete && (
@@ -311,7 +311,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                   }}
                 >
                   <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Purge Record</span>
+                  <span>Delete Province</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -348,10 +348,10 @@ export function DataTable({ data, countries }: DataTableProps) {
                 </div>
                 <div>
                   <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    IDENTITY <span className="text-orange-500 italic">MODIFICATION</span>
+                    Edit <span className="text-orange-500 italic">Province</span>
                   </DialogTitle>
                   <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Administrative Node Reconfiguration
+                    Update province details.
                   </DialogDescription>
                 </div>
               </div>
@@ -362,7 +362,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
                     <Globe className="w-3 h-3" />
-                    Parent Jurisdiction
+                    Country
                   </Label>
                   <Select<CountryOption, false>
                     options={countryOptions}
@@ -403,7 +403,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Province Designation
+                      Province Name
                     </Label>
                     <Input
                       required
@@ -414,7 +414,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                   </div>
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Technical Code
+                      Province Code
                     </Label>
                     <Input
                       required
@@ -428,7 +428,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                 <div className="bg-orange-500/5 p-6 rounded-sm border-2 border-orange-500/10 space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Spatial Drift Parameters</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Location Info</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -465,7 +465,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                     type="submit"
                     className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1 text-white border-b-4 border-orange-800/50"
                   >
-                    Apply Reconfiguration
+                    Save Changes
                   </Button>
                 </DialogFooter>
               </div>
@@ -485,13 +485,13 @@ export function DataTable({ data, countries }: DataTableProps) {
               </div>
               <div className="space-y-2">
                 <h3 className="text-3xl font-black tracking-tighter uppercase text-foreground leading-none">
-                  PURGE <span className="text-red-600">COMMAND</span>
+                  Delete <span className="text-red-600">Province</span>
                 </h3>
-                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest opacity-60">Critical Node Deletion Protocol</p>
+                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest opacity-60">This action cannot be undone.</p>
               </div>
               <div className="w-full p-6 bg-red-50 rounded-sm border-2 border-red-200/50 space-y-2">
                 <p className="text-xs font-bold text-red-800 uppercase leading-relaxed">
-                  You are about to permanently decommission administrative node:
+                  Are you sure you want to delete this province?
                 </p>
                 <p className="text-xl font-black text-red-600 uppercase tracking-tight">
                   {selectedProvince?.name}
@@ -503,13 +503,13 @@ export function DataTable({ data, countries }: DataTableProps) {
                   className="h-14 font-black uppercase tracking-widest rounded-sm border-2 border-transparent hover:border-border transition-all"
                   onClick={() => setOpenDeleteDialog(false)}
                 >
-                  Abort
+                  Cancel
                 </Button>
                 <Button
                   className="bg-red-600 hover:bg-red-700 h-14 font-black uppercase tracking-widest rounded-sm shadow-xl shadow-red-600/20 text-white border-b-4 border-red-800/50 active:scale-95 transition-all"
                   onClick={handleDelete}
                 >
-                  Confirm Purge
+                  Delete
                 </Button>
               </div>
             </div>
@@ -573,7 +573,7 @@ export function DataTable({ data, countries }: DataTableProps) {
                         </div>
                         <div className="space-y-1">
                           <p className="font-black text-foreground uppercase tracking-tighter">No regional data detected</p>
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40 italic">Awaiting registry synchronization...</p>
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40 italic">No entries found</p>
                         </div>
                       </div>
                     </TableCell>

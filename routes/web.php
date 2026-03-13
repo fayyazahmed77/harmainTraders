@@ -91,6 +91,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{account}', [AccountController::class, 'destroy'])->name('account.destroy');
         Route::get('/{id}/balance', [AccountController::class, 'getBalance'])->name('account.balance');
         Route::get('/next-code', [AccountController::class, 'getNextCode'])->name('account.next-code');
+        Route::patch('/{account}/toggle-status', [AccountController::class, 'toggleStatus'])->name('account.toggle-status');
     });
     Route::prefix('/firms')->group(function () {
         Route::get('/', [FirmController::class, 'index'])->name('firms.index');

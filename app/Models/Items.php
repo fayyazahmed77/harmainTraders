@@ -48,6 +48,16 @@ class Items extends Model
         'pt5',
         'pt6',
         'pt7',
+        'scheme',
+    ];
+
+    protected $casts = [
+        'is_import' => 'boolean',
+        'is_fridge' => 'boolean',
+        'is_active' => 'boolean',
+        'is_recipe' => 'boolean',
+        'trade_price' => 'decimal:2',
+        'retail' => 'decimal:2',
     ];
 
     public function category()

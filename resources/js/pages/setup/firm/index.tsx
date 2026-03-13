@@ -62,8 +62,8 @@ export default function FirmIndex() {
   const canCreate = permissions.includes("create firms");
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Financials", href: "#" },
-    { title: "Commercial Identities", href: "/firms" },
+    { title: "Setup", href: "#" },
+    { title: "Firms", href: "/firms" },
   ];
 
   useToastFromQuery();
@@ -76,7 +76,7 @@ export default function FirmIndex() {
   return (
     <>
       <SidebarProvider>
-        <Head title="Firm Directory | Business Core" />
+        <Head title="Firms | View All" />
         <AppSidebar variant="inset" />
         <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
           <SiteHeader breadcrumbs={breadcrumbs} />
@@ -90,8 +90,8 @@ export default function FirmIndex() {
                 className="flex flex-col md:flex-row md:items-center justify-between gap-6"
               >
                 <Heading
-                  title="Firm Directory"
-                  description="Govern institutional branding, fiscal parameters, and global commercial node signatures"
+                  title="Firms"
+                  description="Manage your firms, branding, and business details"
                 />
 
                 {canCreate && (
@@ -100,7 +100,7 @@ export default function FirmIndex() {
                       <Button
                         className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-zinc-200/50 dark:shadow-none"
                       >
-                        <Plus className="mr-2 h-4 w-4" /> Generate Identity Node
+                        <Plus className="mr-2 h-4 w-4" /> Add Firm
                       </Button>
                     </Link>
                   </motion.div>
@@ -117,7 +117,7 @@ export default function FirmIndex() {
                 <div className="md:col-span-4 relative group">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
                   <Input
-                    placeholder="Search Identity Signature..."
+                    placeholder="Search Firms..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 h-12 bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-orange-500/20 transition-all text-xs font-bold"
@@ -129,23 +129,23 @@ export default function FirmIndex() {
                     <SelectTrigger className="h-12 bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-orange-500/20 transition-all text-xs font-bold">
                       <div className="flex items-center gap-2">
                         <Filter className="h-3.5 w-3.5 text-zinc-400" />
-                        <SelectValue placeholder="Protocol Rank" />
+                        <SelectValue placeholder="Filter By" />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl">
-                      <SelectItem value="all" className="text-xs font-bold uppercase">All Authorities</SelectItem>
-                      <SelectItem value="primary" className="text-xs font-bold uppercase text-orange-600">Primary Node Only</SelectItem>
-                      <SelectItem value="standard" className="text-xs font-bold uppercase">Standard Segments</SelectItem>
+                      <SelectItem value="all" className="text-xs font-bold uppercase">All Firms</SelectItem>
+                      <SelectItem value="primary" className="text-xs font-bold uppercase text-orange-600">Primary Only</SelectItem>
+                      <SelectItem value="standard" className="text-xs font-bold uppercase">Others</SelectItem>
                     </SelectContent>
                   </ShadSelect>
                 </div>
 
                 <div className="md:col-span-5 flex items-center justify-end gap-6 px-4">
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Registry Density</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Total Count</span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-black text-orange-500 tabular-nums">{firms.length.toString().padStart(2, '0')}</span>
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">Verified Identities</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">Firms Found</span>
                     </div>
                   </div>
                   <div className="h-10 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
@@ -171,8 +171,8 @@ export default function FirmIndex() {
                       <div className="h-20 w-20 rounded-3xl bg-white dark:bg-zinc-950 flex items-center justify-center shadow-xl mb-6">
                         <Building2 className="h-10 w-10 text-zinc-300" />
                       </div>
-                      <h3 className="text-xl font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Null State Detected</h3>
-                      <p className="text-zinc-500 font-bold text-xs uppercase tracking-tighter mt-2">No registered commercial segments found in primary directory</p>
+                      <h3 className="text-xl font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">No Firms Found</h3>
+                      <p className="text-zinc-500 font-bold text-xs uppercase tracking-tighter mt-2">There are no firms added yet</p>
 
                       {canCreate && (
                         <Link href="/firms/create">
@@ -180,7 +180,7 @@ export default function FirmIndex() {
                             variant="outline"
                             className="mt-8 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold uppercase tracking-widest text-[10px]"
                           >
-                            Initiate First Identity
+                            Add Your First Firm
                           </Button>
                         </Link>
                       )}

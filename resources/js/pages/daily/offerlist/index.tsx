@@ -11,8 +11,8 @@ import { router } from "@inertiajs/react";
 import { motion } from "framer-motion";
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Material Control", href: "/offer" },
-    { title: "Negotiation Registry", href: "/offer/list" },
+    { title: "Offers", href: "/offer" },
+    { title: "Offer List", href: "/offer/list" },
 ];
 
 interface Offer {
@@ -50,11 +50,11 @@ export default function Index({ offers }: Props) {
                         >
                             <div className="flex items-center gap-2 text-orange-500 font-black text-[10px] uppercase tracking-[0.3em]">
                                 <Sparkles className="h-3 w-3" />
-                                <span>Commercial Intelligence</span>
+                                <span>Business Info</span>
                             </div>
                             <Heading
-                                title="Negotiation Registry"
-                                description="Comprehensive ledger of price offers, material tenders, and supplier negotiations."
+                                title="Offer List"
+                                description="View and manage all price offers and negotiations."
                             />
                         </motion.div>
 
@@ -67,7 +67,7 @@ export default function Index({ offers }: Props) {
                                 className="bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-orange-600 dark:hover:bg-orange-500 hover:text-white transition-all duration-300 rounded-xl px-6 h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-zinc-200 dark:shadow-none group"
                             >
                                 <Plus className="mr-2 h-4 w-4 transition-transform group-hover:rotate-90" />
-                                Initialize New Offer
+                                Add Offer
                             </Button>
                         </motion.div>
                     </div>
@@ -79,12 +79,7 @@ export default function Index({ offers }: Props) {
                         transition={{ delay: 0.1 }}
                         className="relative group mt-4"
                     >
-                        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/10 to-zinc-500/10 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
-                        <div className="relative bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-[1.5rem] shadow-sm overflow-hidden backdrop-blur-xl p-2">
-                            <div className="bg-zinc-50/50 dark:bg-zinc-950/30 rounded-[1.2rem] p-4 lg:p-6 border border-zinc-100/50 dark:border-zinc-800/50">
-                                <DataTable data={offers} />
-                            </div>
-                        </div>
+                        <DataTable data={offers} />
                     </motion.div>
                 </div>
             </SidebarInset>

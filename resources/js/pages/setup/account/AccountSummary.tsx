@@ -54,18 +54,10 @@ export default function AccountSummary({ summary }: SummaryProps) {
             textColor: "text-white",
             isCurrency: true,
         },
-        {
-            title: "Total Payables",
-            value: summary.total_payables,
-            icon: ArrowUpCircle,
-            color: "bg-gradient-to-br from-rose-500 to-red-600",
-            textColor: "text-white",
-            isCurrency: true,
-        },
     ];
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
             {cards.map((card, index) => (
                 <Card key={index} className={`${card.color} border-none shadow-lg transform transition-all hover:scale-105 duration-300`}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

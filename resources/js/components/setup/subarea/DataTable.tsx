@@ -269,7 +269,7 @@ export function DataTable({
     {
       accessorKey: "country",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Parent Jurisdiction</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Country</span>
       ),
       cell: ({ row }) => {
         const subarea = row.original;
@@ -297,7 +297,7 @@ export function DataTable({
     {
       accessorKey: "province",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Regional Zone</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Province</span>
       ),
       cell: ({ row }) => {
         const province = provinces.find((p) => p.id === Number(row.original.province_id));
@@ -312,7 +312,7 @@ export function DataTable({
     {
       accessorKey: "city",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">City Node</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">City</span>
       ),
       cell: ({ row }) => {
         const city = cities.find((c) => c.id === Number(row.original.city_id));
@@ -327,7 +327,7 @@ export function DataTable({
     {
       accessorKey: "area",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Area Segment</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Area</span>
       ),
       cell: ({ row }) => {
         const area = areas.find((a) => a.id === Number(row.original.area_id));
@@ -342,7 +342,7 @@ export function DataTable({
     {
       accessorKey: "name",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Subarea Identity</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Subarea Name</span>
       ),
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
@@ -354,7 +354,7 @@ export function DataTable({
     {
       accessorKey: "status",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Node Status</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Status</span>
       ),
       cell: ({ row }) => {
         const isActive = row.original.status === "active";
@@ -374,7 +374,7 @@ export function DataTable({
     {
       accessorKey: "created_by",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Origin registrar</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Created By</span>
       ),
       cell: ({ row }) => {
         const name = row.original.created_by_name || "System";
@@ -408,7 +408,7 @@ export function DataTable({
     {
       id: "actions",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Interlink</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Actions</span>
       ),
       cell: ({ row }) => {
         const subarea = row.original;
@@ -423,9 +423,9 @@ export function DataTable({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-2 rounded-sm border-2 border-orange-500/10 bg-white/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-              <div className="px-3 py-2 border-b border-orange-500/5 mb-1">
-                <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none mb-1">Node Operations</p>
-                <p className="text-[10px] font-bold text-foreground truncate uppercase tracking-tight leading-none">{subarea.name}</p>
+              <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
+                <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Operations</p>
+                <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100 truncate uppercase tracking-tight leading-none">{subarea.name}</p>
               </div>
               {canEdit && (
                 <DropdownMenuItem
@@ -469,8 +469,8 @@ export function DataTable({
                     }
                   }}
                 >
-                  <PencilLine className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
-                  Modify Identity
+                  <PencilLine className="w-4 h-4 text-zinc-400 group-hover/item:text-orange-600 transition-colors" />
+                  Edit Subarea
                 </DropdownMenuItem>
               )}
               {canDelete && (
@@ -482,7 +482,7 @@ export function DataTable({
                   }}
                 >
                   <Trash2 className="w-4 h-4 group-hover/item-delete:scale-110 transition-transform" />
-                  Purge record
+                  Delete Subarea
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -517,11 +517,11 @@ export function DataTable({
                   <PencilLine className="w-8 h-8" />
                 </div>
                 <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    MODIFY <span className="text-orange-500 italic">IDENTITY</span>
+                  <DialogTitle className="text-2xl font-black tracking-tight uppercase leading-none mb-1">
+                    Edit Subarea
                   </DialogTitle>
-                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Administrative Node Reconfiguration
+                  <DialogDescription className="font-bold text-zinc-500 uppercase text-[10px] tracking-widest mt-1">
+                    Update subarea information
                   </DialogDescription>
                 </div>
               </div>
@@ -712,8 +712,8 @@ export function DataTable({
                     Node Status
                   </Label>
                   <ShadSelect value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-black uppercase tracking-tight transition-all">
-                      <SelectValue placeholder="Operational Status" />
+                    <SelectTrigger className="h-12 border border-zinc-200 dark:border-zinc-800 focus:ring-0 rounded-xl font-bold transition-all text-sm uppercase tracking-tight">
+                      <SelectValue placeholder="Select Status" />
                     </SelectTrigger>
                     <SelectContent className="rounded-sm border-2 border-orange-500/10 shadow-2xl">
                       <SelectItem value="active" className="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-sm focus:bg-orange-50">Operational</SelectItem>
@@ -734,9 +734,9 @@ export function DataTable({
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 transition-all text-white border-b-4 border-orange-800/50 flex-1"
+                  className="rounded-xl px-10 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-widest text-[10px] flex-1"
                 >
-                  Commit Changes
+                  Save Changes
                 </Button>
               </DialogFooter>
             </form>
@@ -752,11 +752,11 @@ export function DataTable({
             <div className="mx-auto w-20 h-20 bg-red-600/10 text-red-600 rounded-sm flex items-center justify-center mb-6 ring-4 ring-red-500/5 rotate-45 group hover:rotate-0 transition-transform duration-500">
               <Trash2 className="w-10 h-10 -rotate-45 group-hover:rotate-0 transition-transform duration-500" />
             </div>
-            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-2">
-              CRITICAL <span className="text-red-600 italic">PURGE</span>
+            <DialogTitle className="text-2xl font-black tracking-tight uppercase leading-none mb-2">
+              Delete <span className="text-rose-600">Subarea</span>
             </DialogTitle>
-            <DialogDescription className="font-black text-rose-600 uppercase text-[10px] tracking-widest opacity-70 mb-8">
-              Critical Node Deletion Protocol
+            <DialogDescription className="font-bold text-rose-500/60 uppercase text-[10px] tracking-widest mb-8">
+              Are you sure you want to delete this subarea?
             </DialogDescription>
 
             <div className="p-6 bg-red-50 border-2 border-red-500/10 rounded-sm mb-10 text-left">
@@ -786,11 +786,11 @@ export function DataTable({
         </DialogContent>
       </Dialog>
 
-      {/* Technical Console Table */}
-      <div className="bg-white/80 backdrop-blur-xl border-2 border-orange-500/10 rounded-sm shadow-2xl shadow-orange-500/5 overflow-hidden group/table hover:border-orange-500/20 transition-all duration-700 mt-4">
-        <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
+      {/* Data Table Container */}
+      <div className="rounded-md border-none overflow-hidden bg-white dark:bg-zinc-950 shadow-sm">
+        <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-muted/30 sticky top-0 z-10 border-b-2 border-orange-500/10 h-14">
+            <TableHeader className="bg-muted sticky top-0 z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                   {headerGroup.headers.map((header) => (
@@ -848,57 +848,50 @@ export function DataTable({
           </Table>
         </div>
 
-        {/* Technical Footer */}
-        <div className="px-6 py-6 bg-[#fafafa] border-t-2 border-orange-500/10 flex flex-col sm:flex-row items-center justify-between gap-6">
+        {/* Navigation Footer */}
+        <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-8">
             <div className="flex flex-col gap-1.5">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none">Density selection</p>
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none">Rows per page</p>
               <ShadSelect
                 value={table.getState().pagination.pageSize.toString()}
                 onValueChange={(value) => table.setPageSize(Number(value))}
               >
-                <SelectTrigger className="h-9 w-[100px] bg-white border-2 border-orange-500/10 focus:ring-0 rounded-sm text-[10px] font-black uppercase shadow-sm group hover:border-orange-500/30 transition-all">
+                <SelectTrigger className="h-10 w-[100px] bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 focus:ring-0 rounded-xl text-[10px] font-black uppercase shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-sm border-2 border-orange-500/10 bg-white">
                   {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={pageSize.toString()} className="text-[10px] font-black uppercase focus:bg-orange-50 rounded-sm py-2 italic font-black">
-                      {pageSize} Nodes
+                    <SelectItem key={pageSize} value={pageSize.toString()} className="text-[10px] font-black uppercase rounded-xl py-2 font-black">
+                      {pageSize} Items
                     </SelectItem>
                   ))}
                 </SelectContent>
               </ShadSelect>
             </div>
 
-            <div className="h-10 w-[2px] bg-orange-500/10 hidden sm:block" />
+            <div className="h-8 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
             <div className="flex flex-col gap-1.5">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none group-hover/table:text-orange-600 transition-colors">Segment Information</p>
-              <div className="h-9 flex items-center px-4 bg-white border-2 border-orange-500/10 rounded-sm shadow-sm group hover:border-orange-500/30 transition-all">
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none">Page Info</p>
+              <div className="h-10 flex items-center px-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
                 <p className="text-[10px] font-black text-foreground uppercase tracking-tighter">
-                  Index {table.getState().pagination.pageIndex + 1} <span className="text-orange-600/40 font-mono mx-1">/</span> {table.getPageCount()}
+                  Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-white border-2 border-orange-500/10 rounded-sm p-1 shadow-sm mr-2 group/stream">
-              <div className="flex items-center gap-1.5 px-3 border-r border-orange-500/10 mr-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.4)]" />
-                <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest leading-none">Live stream</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 opacity-40 group-hover/stream:opacity-100 transition-opacity">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="w-1 h-3 bg-orange-600/20 rounded-full group-hover/stream:animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
-                ))}
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">System Live</span>
             </div>
 
-            <div className="flex items-center gap-1 bg-white border-2 border-orange-500/10 rounded-sm p-1 shadow-sm overflow-hidden group/pagination">
+            <div className="flex items-center gap-1 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-1 shadow-sm">
               <Button
                 variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
+                className="h-8 w-8 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-20 transition-all active:scale-95"
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -906,16 +899,16 @@ export function DataTable({
               </Button>
               <Button
                 variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
+                className="h-8 w-8 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-20 transition-all active:scale-95"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
                 <IconChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="h-5 w-[1px] bg-orange-500/10 mx-1" />
+              <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1" />
               <Button
                 variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
+                className="h-8 w-8 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-20 transition-all active:scale-95"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
@@ -923,7 +916,7 @@ export function DataTable({
               </Button>
               <Button
                 variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
+                className="h-8 w-8 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-20 transition-all active:scale-95"
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >

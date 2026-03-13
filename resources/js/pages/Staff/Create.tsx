@@ -34,7 +34,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Staff", href: "/staff" },
-    { title: "Provisioning", href: "#" },
+    { title: "Add New", href: "#" },
 ];
 
 const PREMIUM_ROUNDING = "rounded-xl";
@@ -89,7 +89,7 @@ export default function StaffCreate({ roles }: Props) {
 
     return (
         <SidebarProvider>
-            <Head title="Provision Staff Member" />
+            <Head title="Add Staff Member" />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -102,12 +102,12 @@ export default function StaffCreate({ roles }: Props) {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-4"
                         >
                             <Heading
-                                title="Personnel Provisioning"
-                                description="Onboard new system operators and establish security clearances"
+                                title="Add Staff Member"
+                                description="Create a new staff profile and set system permissions"
                             />
                             <div className="flex items-center gap-2 px-4 py-2 bg-orange-500/10 rounded-xl border border-orange-500/20">
                                 <Sparkles className="h-4 w-4 text-orange-500" />
-                                <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-tighter">Profile Integrity: High</span>
+                                <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-tighter">Profile Status: Ready</span>
                             </div>
                         </motion.div>
 
@@ -125,15 +125,15 @@ export default function StaffCreate({ roles }: Props) {
                                                 <UserIcon size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Core Credentials</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Authentication & Identification Layer</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Personal Information</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Contact & Authentication Details</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <TechLabel label="Legal Identity" icon={UserIcon}>
+                                            <TechLabel label="Full Name" icon={UserIcon}>
                                                 <Input
-                                                    placeholder="Full personnel name"
+                                                    placeholder="Enter full name"
                                                     value={data.name}
                                                     onChange={e => setData("name", e.target.value)}
                                                     className="rounded-xl border-zinc-200 dark:border-zinc-800 focus:ring-orange-500/20"
@@ -141,10 +141,10 @@ export default function StaffCreate({ roles }: Props) {
                                                 {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Primary Comms" icon={Mail}>
+                                            <TechLabel label="Email Address" icon={Mail}>
                                                 <Input
                                                     type="email"
-                                                    placeholder="personnel@system.com"
+                                                    placeholder="email@example.com"
                                                     value={data.email}
                                                     onChange={e => setData("email", e.target.value)}
                                                     className="rounded-xl border-zinc-200 dark:border-zinc-800 focus:ring-orange-500/20"
@@ -152,7 +152,7 @@ export default function StaffCreate({ roles }: Props) {
                                                 {errors.email && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.email}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Terminal Access" icon={Phone}>
+                                            <TechLabel label="Phone Number" icon={Phone}>
                                                 <Input
                                                     placeholder="+1.000.000.0000"
                                                     value={data.phone}
@@ -161,10 +161,10 @@ export default function StaffCreate({ roles }: Props) {
                                                 />
                                             </TechLabel>
 
-                                            <TechLabel label="Deployment Zone" icon={MapPin}>
+                                            <TechLabel label="Location / Country" icon={MapPin}>
                                                 <Select onValueChange={val => setData("country", val)} value={data.country}>
                                                     <SelectTrigger className="rounded-xl w-full border-zinc-200 dark:border-zinc-800">
-                                                        <SelectValue placeholder="Select Sector" />
+                                                        <SelectValue placeholder="Select Country" />
                                                     </SelectTrigger>
                                                     <SelectContent className="rounded-xl">
                                                         <SelectItem value="Pakistan">Pakistan</SelectItem>
@@ -177,7 +177,7 @@ export default function StaffCreate({ roles }: Props) {
                                                 </Select>
                                             </TechLabel>
 
-                                            <TechLabel label="Access Key" icon={Shield}>
+                                            <TechLabel label="Set Password" icon={Shield}>
                                                 <div className="relative">
                                                     <Input
                                                         type={showPassword ? "text" : "password"}
@@ -197,7 +197,7 @@ export default function StaffCreate({ roles }: Props) {
                                                 {errors.password && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.password}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Confirm Key" icon={Shield}>
+                                            <TechLabel label="Confirm Password" icon={Shield}>
                                                 <div className="relative">
                                                     <Input
                                                         type={showPassword ? "text" : "password"}
@@ -218,8 +218,8 @@ export default function StaffCreate({ roles }: Props) {
                                                 className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-none"
                                             />
                                             <div className="flex flex-col">
-                                                <Label htmlFor="status" className="text-xs font-black uppercase tracking-widest cursor-pointer text-zinc-700 dark:text-zinc-300 group-hover:text-emerald-500 transition-colors">Operational Status</Label>
-                                                <p className="text-[10px] text-zinc-400 font-mono">ENABLING THIS ALLOWS SYSTEM AUTHENTICATION</p>
+                                                <Label htmlFor="status" className="text-xs font-black uppercase tracking-widest cursor-pointer text-zinc-700 dark:text-zinc-300 group-hover:text-emerald-500 transition-colors">Account Status</Label>
+                                                <p className="text-[10px] text-zinc-400 font-mono">ENABLING THIS ALLOWS THE USER TO LOG IN</p>
                                             </div>
                                         </div>
                                     </Card>
@@ -236,13 +236,13 @@ export default function StaffCreate({ roles }: Props) {
                                                 <Briefcase size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Dossier Information</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Professional Background & Functional Context</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Professional Details</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Job Title & Unit Information</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <TechLabel label="Designation" icon={Briefcase}>
+                                            <TechLabel label="Job Title" icon={Briefcase}>
                                                 <Input
                                                     placeholder="Role Title"
                                                     value={data.job_title}
@@ -254,7 +254,7 @@ export default function StaffCreate({ roles }: Props) {
                                             <TechLabel label="Department" icon={Globe}>
                                                 <Select onValueChange={val => setData("department", val)} value={data.department}>
                                                     <SelectTrigger className="rounded-xl border-zinc-200 dark:border-zinc-800 w-full">
-                                                        <SelectValue placeholder="Select Unit" />
+                                                        <SelectValue placeholder="Select Department" />
                                                     </SelectTrigger>
                                                     <SelectContent className="rounded-xl">
                                                         <SelectItem value="Engineering">Engineering</SelectItem>
@@ -267,9 +267,9 @@ export default function StaffCreate({ roles }: Props) {
                                             </TechLabel>
                                         </div>
 
-                                        <TechLabel label="Personnel Bio" icon={UserIcon}>
+                                        <TechLabel label="Bio / Summary" icon={UserIcon}>
                                             <Textarea
-                                                placeholder="Professional summary and system context..."
+                                                placeholder="Write a brief professional summary..."
                                                 className="rounded-xl border-zinc-200 dark:border-zinc-800 min-h-[120px] focus:ring-orange-500/20"
                                                 value={data.bio}
                                                 onChange={e => setData("bio", e.target.value)}
@@ -289,13 +289,13 @@ export default function StaffCreate({ roles }: Props) {
                                                 <Globe size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Social Connectivity</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External Profile Integration</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Social Connections</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External Profiles</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <TechLabel label="LinkedIn Network" icon={Linkedin}>
+                                            <TechLabel label="LinkedIn Profile" icon={Linkedin}>
                                                 <Input
                                                     placeholder="URL"
                                                     value={data.linkedin_url}
@@ -328,7 +328,7 @@ export default function StaffCreate({ roles }: Props) {
                                                 />
                                             </TechLabel>
                                         </div>
-                                        <TechLabel label="Portfolio / Web Terminal" icon={ExternalLink}>
+                                        <TechLabel label="Website / Portfolio" icon={ExternalLink}>
                                             <Input
                                                 placeholder="https://..."
                                                 value={data.portfolio_url}
@@ -349,8 +349,8 @@ export default function StaffCreate({ roles }: Props) {
                                 >
                                     <Card className={cn(PREMIUM_ROUNDING, "p-8 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none bg-white dark:bg-zinc-900 flex flex-col items-center text-center space-y-6")}>
                                         <div className="w-full text-left">
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Biometric Profile</h2>
-                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Visual Identification Matrix</p>
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Profile Photo</h2>
+                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Visual Identification</p>
                                         </div>
                                         <div className="relative group">
                                             <div className="h-48 w-48 rounded-full border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 overflow-hidden transition-all group-hover:border-orange-500 group-hover:bg-orange-500/[0.02]">
@@ -391,8 +391,8 @@ export default function StaffCreate({ roles }: Props) {
                                 >
                                     <Card className={cn(PREMIUM_ROUNDING, "p-8 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none bg-white dark:bg-zinc-900 space-y-6")}>
                                         <div>
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Security Clearance</h2>
-                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Assigned Authorization Levels</p>
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Roles & Permissions</h2>
+                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Assigned Access Levels</p>
                                         </div>
 
                                         <div className="border border-zinc-100 dark:border-zinc-800 rounded-xl divide-y dark:divide-zinc-800 overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -433,10 +433,10 @@ export default function StaffCreate({ roles }: Props) {
                                         disabled={processing}
                                     >
                                         <Save className="mr-3 h-5 w-5" />
-                                        {processing ? "Encrypting..." : "Finalize Provisioning"}
+                                        {processing ? "Saving..." : "Save Staff Member"}
                                     </Button>
                                     <p className="text-center text-[9px] text-zinc-400 mt-4 font-mono uppercase tracking-widest">
-                                        By clicking, you authorize system-wide terminal access for this profile.
+                                        By clicking, you save this staff member to the system.
                                     </p>
                                 </motion.div>
                             </div>

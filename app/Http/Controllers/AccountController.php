@@ -382,4 +382,12 @@ class AccountController extends Controller
         // Fallback if regex fails (e.g. empty code)
         return response()->json(['code' => '000001']);
     }
+
+    public function toggleStatus(Account $account)
+    {
+        $account->status = !$account->status;
+        $account->save();
+
+        return redirect()->route('account.index')->with('success', 'Account status updated successfully');
+    }
 }

@@ -14,13 +14,19 @@ use Inertia\Inertia;
 class AreasController extends Controller
 {
     //index
-    public function index()
+    public function index(Request $request)
     {
         $countries = Country::all();
         $provinces = Province::all();
         $cities = City::all();
-        $areas  = Areas::with(['creator', 'province', 'country', 'city'])
-            ->latest()
+
+        $query = Areas::with(['creator', 'province', 'country', 'city']);
+
+        if ($request->has('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        $areas = $query->latest()
             ->get()
             ->map(function ($item) {
                 $item->created_by_name = $item->creator?->name ?? 'Unknown';
@@ -29,11 +35,13 @@ class AreasController extends Controller
                     : null;
                 return $item;
             });
+
         return Inertia::render("setup/area/index", [
             'areas' => $areas,
             'cities' => $cities,
             'countries' => $countries,
-            'provinces' => $provinces
+            'provinces' => $provinces,
+            'filters' => $request->only(['search'])
         ]);
     }
     public function store(Request $request)

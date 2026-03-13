@@ -45,9 +45,9 @@ import { cn } from "@/lib/utils";
 // Breadcrumbs
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Material Control", href: "/offer" },
-    { title: "Negotiation Registry", href: "/offer/list" },
-    { title: "Node Initialization", href: "/offer-list/create" },
+    { title: "Offers", href: "/offer" },
+    { title: "Offer List", href: "/offer/list" },
+    { title: "Add Offer", href: "/offer-list/create" },
 ];
 
 // ───────────────────────────────────────────
@@ -239,7 +239,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
 
     const storeOffer = () => {
         if (!selectedAccount) {
-            alert("Please select a Negotiation Entity (Account) first.");
+            alert("Please select a Customer first.");
             return;
         }
 
@@ -257,7 +257,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
             }));
 
         if (itemsData.length === 0) {
-            alert("Provisioning failed: No item nodes detected in current manifest.");
+            alert("Failed to save: No items found in the current list.");
             return;
         }
 
@@ -292,11 +292,11 @@ export default function OfferListing({ items, categories, accounts, messageLines
                         >
                             <div className="flex items-center gap-2 text-orange-500 font-black text-[10px] uppercase tracking-[0.3em]">
                                 <Workflow className="h-3 w-3" />
-                                <span>Negotiation Protocol</span>
+                                <span>Offer Details</span>
                             </div>
                             <Heading
-                                title="Offer List Creation"
-                                description="Provisioning new material offers and negotiation dossiers for commercial entities."
+                                title="Add Offer"
+                                description="Create new price offers for customers."
                             />
                         </motion.div>
 
@@ -311,14 +311,14 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 className="rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-12 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
                             >
                                 <History className="mr-2 h-4 w-4" />
-                                Cancel & Return
+                                Cancel
                             </Button>
                             <Button
                                 onClick={storeOffer}
                                 className="bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-orange-600 dark:hover:bg-orange-500 hover:text-white transition-all duration-300 rounded-xl px-8 h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-zinc-200 dark:shadow-none bg-orange-500/100"
                             >
                                 <Save className="mr-2 h-4 w-4" />
-                                Synchronize Offer
+                                Save Offer
                             </Button>
                         </motion.div>
                     </div>
@@ -338,7 +338,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 <div className="col-span-12 lg:col-span-2 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <CalendarClock className="h-3 w-3" />
-                                        Temporal Node
+                                        Date
                                     </div>
                                     <Input
                                         value={date}
@@ -358,7 +358,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                         setCustomerCategory(account?.item_category ?? null);
                                     }}>
                                         <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold">
-                                            <SelectValue placeholder="Identify Commercial Profile" />
+                                            <SelectValue placeholder="Select Customer" />
                                         </SelectTrigger>
                                         <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                             <SelectGroup>
@@ -376,7 +376,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 <div className="col-span-12 lg:col-span-3 space-y-2 text-orange-500">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <Zap className="h-3 w-3" />
-                                        Pricing Logic
+                                        Price Type
                                     </div>
                                     <Select value={priceType} onValueChange={(v: any) => setPriceType(v)}>
                                         <SelectTrigger className={cn(
@@ -385,7 +385,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                         )}>
                                             <SelectValue>
                                                 {selectedAccount && priceType === 'trade'
-                                                    ? `TP ${customerCategory ?? 'Base'} Protocol`
+                                                    ? `TP ${customerCategory ?? 'Base'} Price`
                                                     : undefined}
                                             </SelectValue>
                                         </SelectTrigger>
@@ -410,11 +410,11 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 <div className="col-span-12 lg:col-span-3 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <Tag className="h-3 w-3" />
-                                        Protocol Context
+                                        Message
                                     </div>
                                     <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
                                         <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold">
-                                            <SelectValue placeholder="Registry Message" />
+                                            <SelectValue placeholder="Select Message" />
                                         </SelectTrigger>
                                         <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
                                             <SelectItem value="0" className="text-xs font-bold">No Custom Header</SelectItem>
@@ -449,7 +449,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                     className="h-9 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
                                 >
                                     <ListPlus className="mr-2 h-3.5 w-3.5" />
-                                    Insert Node
+                                    Add Item
                                 </Button>
                                 <Button
                                     size="sm"
@@ -457,7 +457,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                     className="h-9 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
                                 >
                                     <LayoutGrid className="mr-2 h-3.5 w-3.5" />
-                                    Provision Full Matrix
+                                    Add All Items
                                 </Button>
                                 <Button
                                     size="sm"
@@ -478,13 +478,13 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                             <th className="px-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
                                                 <div className="flex items-center gap-2 italic">
                                                     <PackageSearch className="h-3 w-3 text-orange-500" />
-                                                    Material Node
+                                                    Item
                                                 </div>
                                             </th>
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Configuration</th>
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Reference M.R.P</th>
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme Logic</th>
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Protocol Valuation</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Quantity</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Retail Price</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme</th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Price</th>
                                             <th className="px-6 w-10"></th>
                                         </tr>
                                     </thead>
@@ -506,11 +506,11 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                             onValueChange={(val) => handleSelectItem(row.id, Number(val))}
                                                         >
                                                             <SelectTrigger className="h-10 rounded-sm w-full border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-[11px] font-black">
-                                                                <SelectValue placeholder="Identify Item Node..." />
+                                                                <SelectValue placeholder="Select Item..." />
                                                             </SelectTrigger>
                                                             <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                                 <SelectGroup>
-                                                                    <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-400 p-2">Item Matrix</SelectLabel>
+                                                                    <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-400 p-2">Item List</SelectLabel>
                                                                     {items.map((item) => (
                                                                         <SelectItem key={item.id} value={item.id.toString()} className="rounded-lg m-1 text-xs font-bold">
                                                                             {item.title} ({item.short_name})
@@ -552,7 +552,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                     </td>
                                                     <td className="px-4">
                                                         <div className="space-y-1">
-                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Negotiation Scheme</Label>
+                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none">Scheme</Label>
                                                             <Input
                                                                 className="h-8 text-[10px] font-bold rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30 w-full"
                                                                 placeholder="e.g. 10+1 Promo..."
@@ -570,7 +570,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                                         `${row.trade_price.toLocaleString()} | ${row.retail.toLocaleString()}`}
                                                             </span>
                                                             <span className="text-[8px] font-black uppercase tracking-[0.2em] text-orange-500 opacity-60 mt-0.5">
-                                                                {priceType === 'both' ? 'Dual Node' : priceType + ' Logic'}
+                                                                {priceType === 'both' ? 'Both' : priceType === 'trade' ? 'Trade' : 'Retail'}
                                                             </span>
                                                         </div>
                                                     </td>
@@ -591,29 +591,29 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 </table>
                             </div>
 
-                            {/* Manifest Summary Footer */}
+                            {/* Summary Footer */}
                             <div className="bg-zinc-950/20 dark:bg-zinc-950/40 p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                                 <div className="flex items-center gap-6">
                                     <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Total Manifest Nodes</span>
+                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Total Items</span>
                                         <span className="text-sm font-black text-orange-500 tabular-nums">{rows.filter(r => r.item_id).length} Active</span>
                                     </div>
                                     <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
                                     <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Pricing Alignment</span>
+                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Price Type</span>
                                         <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase italic">
-                                            {priceType === 'trade' ? 'Trade Price Protocol' : priceType === 'retail' ? 'Retail Price Matrix' : 'Dual Synchronization'}
+                                            {priceType === 'trade' ? 'Trade Price' : priceType === 'retail' ? 'Retail Price' : 'Both (Trade & Retail)'}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-2 text-zinc-400 italic text-[10px]">
                                     <BadgeInfo className="h-3 w-3" />
-                                    All values are normalized based on current server-side Commercial Intelligence.
+                                    All values are based on current server-side price info.
                                 </div>
                             </div>
 
-                            {/* Price Protocol Dashboard (TP2-TP7 Intelligence) */}
+                            {/* Price Dashboard */}
                             {selectedItem && (
                                 <motion.div
                                     initial={{ opacity: 0, height: 0 }}
@@ -622,7 +622,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                 >
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Price Protocol Intelligence: {selectedItem.title}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Price Details: {selectedItem.title}</span>
                                     </div>
 
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

@@ -107,10 +107,10 @@ export function DataTable({ data }: DataTableProps) {
     if (!selectedChequeBook) return;
     router.delete(`/chequebook/${selectedChequeBook.id}`, {
       onSuccess: () => {
-        toast.success("✅ Protocol terminated. Cheque data purged.");
+        toast.success("Cheque book deleted successfully.");
         setOpenDeleteDialog(false);
       },
-      onError: () => toast.error("❌ PURGE ACTION FAILED"),
+      onError: () => toast.error("Delete failed"),
     });
   };
 
@@ -118,7 +118,7 @@ export function DataTable({ data }: DataTableProps) {
   const columns: ColumnDef<ChequeBook>[] = [
     {
       accessorKey: "bank",
-      header: "Financial Institution",
+      header: "Bank",
       cell: ({ row }) => {
         const cheque = row.original;
         return (
@@ -130,20 +130,20 @@ export function DataTable({ data }: DataTableProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col">
-              <span className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter">{cheque.bank?.title || "VOID BANK"}</span>
-              <span className="text-[10px] text-zinc-400 font-mono tracking-widest uppercase">BANK-ENTITY: {cheque.bank_id.toString().padStart(3, '0')}</span>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter">{cheque.bank?.title || "Unknown Bank"}</span>
+              <span className="text-[10px] text-zinc-400 font-mono tracking-widest uppercase">Bank ID: {cheque.bank_id.toString().padStart(3, '0')}</span>
             </div>
           </div>
         );
       },
     },
     {
-      header: "Asset Signature",
+      header: "Cheque Detail",
       cell: ({ row }) => {
         const cheque = row.original;
         return (
           <div className="flex items-center gap-2 font-mono text-xs">
-            <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-400 font-bold">{cheque.prefix || "PFX"}</span>
+            <span className="bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-400 font-bold">{cheque.prefix || "Prefix"}</span>
             <span className="text-orange-500 font-black tracking-widest">{cheque.cheque_no}</span>
           </div>
         );
@@ -151,7 +151,7 @@ export function DataTable({ data }: DataTableProps) {
     },
     {
       accessorKey: "entry_date",
-      header: "Induction Date",
+      header: "Date Added",
       cell: ({ row }) => {
         const date = row.original.entry_date
           ? new Date(row.original.entry_date)
@@ -167,7 +167,7 @@ export function DataTable({ data }: DataTableProps) {
 
     {
       accessorKey: "status",
-      header: "Protocol Status",
+      header: "Status",
       cell: ({ row }) => {
         const status = row.original.status || "unused";
         return (
@@ -190,7 +190,7 @@ export function DataTable({ data }: DataTableProps) {
     },
     {
       accessorKey: "created_by_name",
-      header: "Assigned Operator",
+      header: "Added By",
       cell: ({ row }) => {
         const cheque = row.original;
         return (
@@ -203,7 +203,7 @@ export function DataTable({ data }: DataTableProps) {
     },
     {
       id: "actions",
-      header: "Registry Actions",
+      header: "Actions",
       cell: ({ row }) => {
         const cheque = row.original;
         const canDelete = permissions.includes("delete chequebooks");
@@ -222,9 +222,9 @@ export function DataTable({ data }: DataTableProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 rounded-xl border-zinc-200 dark:border-zinc-800">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 p-3">Asset Intelligence</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 p-3">Options</DropdownMenuLabel>
                 <DropdownMenuItem asChild className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer">
-                  <Link href={`/cheque/${cheque.id}/view`}>Dossier Insight</Link>
+                  <Link href={`/cheque/${cheque.id}/view`}>View Details</Link>
                 </DropdownMenuItem>
                 {canDelete && (
                   <>
@@ -236,7 +236,7 @@ export function DataTable({ data }: DataTableProps) {
                         setOpenDeleteDialog(true);
                       }}
                     >
-                      <Trash2 className="mr-2 h-3.5 w-3.5" /> Purge Asset
+                      <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                     </DropdownMenuItem>
                   </>
                 )}
@@ -269,18 +269,18 @@ export function DataTable({ data }: DataTableProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-600">
               <Trash2 className="h-5 w-5" />
-              Asset Purge Authorization
+              Delete Cheque Book
             </DialogTitle>
             <DialogDescription className="text-xs font-medium text-zinc-500 uppercase tracking-widest py-4">
-              CRITICAL: YOU ARE ABOUT TO PURGE FINANCIAL ASSET <span className="text-zinc-900 dark:text-zinc-100 font-black">{selectedChequeBook?.prefix}-{selectedChequeBook?.cheque_no}</span> FROM THE SYSTEM REGISTRY. THIS ACTION IS IRREVERSIBLE.
+              Are you sure you want to delete this cheque book? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="ghost" onClick={() => setOpenDeleteDialog(false)} className="rounded-xl font-bold uppercase tracking-widest text-[10px]">
-              Abort
+              Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} className="rounded-xl font-bold uppercase tracking-widest text-[10px] bg-rose-600 hover:bg-rose-700">
-              Confirm Purge
+              Delete Now
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -339,7 +339,7 @@ export function DataTable({ data }: DataTableProps) {
                     colSpan={columns.length}
                     className="text-center py-20 text-zinc-400 font-mono text-xs uppercase tracking-[0.3em]"
                   >
-                    Empty Registry Archive
+                    No cheque books found
                   </TableCell>
                 </TableRow>
               )}
@@ -350,12 +350,12 @@ export function DataTable({ data }: DataTableProps) {
         {/* 🔢 Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
           <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-            Archive Entry: {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} - {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of {table.getFilteredRowModel().rows.length}
+            Showing: {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} - {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of {table.getFilteredRowModel().rows.length}
           </div>
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Load Factor</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Show</span>
               <ShadSelect
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => table.setPageSize(Number(value))}

@@ -47,6 +47,15 @@ class Account extends Model
         'account_category_id',
     ];
 
+    protected $casts = [
+        'purchase' => 'boolean',
+        'cashbank' => 'boolean',
+        'sale' => 'boolean',
+        'status' => 'boolean',
+        'opening_balance' => 'decimal:2',
+        'credit_limit' => 'decimal:2',
+    ];
+
     public function accountCategory()
     {
         return $this->belongsTo(AccountCategory::class, 'category');

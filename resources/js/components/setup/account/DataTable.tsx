@@ -124,11 +124,27 @@ export function DataTable({ data }: DataTableProps) {
             accessorKey: "status",
             header: "Status",
             cell: ({ row }) => {
-                const isActive = row.original.status;
+                const isActive = !!row.original.status;
                 return (
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                        {isActive ? "Active" : "Inactive"}
-                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            router.patch(`/account/${row.original.id}/toggle-status`, {}, {
+                                preserveScroll: true,
+                            });
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isActive ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
+                        }`}
+                        role="switch"
+                        aria-checked={isActive}
+                    >
+                        <span
+                            className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                                isActive ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                        />
+                    </button>
                 );
             },
         },
@@ -234,7 +250,7 @@ export function DataTable({ data }: DataTableProps) {
             </Dialog>
 
             {/* Data Table */}
-            <div className="rounded-md border shadow-sm ">
+            <div className="rounded-md border shadow-sm mb-3 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none">
                 <Table>
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         {table.getHeaderGroups().map((headerGroup) => (

@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 // ✅ Breadcrumbs
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Financials", href: "#" },
-    { title: "Cheque Assets", href: "/cheque" },
+    { title: "Cheque Books", href: "/cheque" },
 ];
 
 // ✅ ChequeBook Interface
@@ -69,7 +69,7 @@ export default function ChequeBookPage() {
 
     return (
         <SidebarProvider>
-            <Head title="Financial Assets | Cheque Registry" />
+            <Head title="Cheque Books" />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -83,13 +83,13 @@ export default function ChequeBookPage() {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-4"
                         >
                             <Heading
-                                title="Cheque Assets"
-                                description="Secure registry of generated cheque books and financial instruments"
+                                title="Cheque Books"
+                                description="Manage all your cheque books here"
                             />
                             <div className="flex gap-3">
                                 <Button asChild className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95">
                                     <Link href="/cheque/create">
-                                        <Plus className="mr-2 h-4 w-4" /> Provision Cheque Book
+                                        <Plus className="mr-2 h-4 w-4" /> Add Cheque Book
                                     </Link>
                                 </Button>
                             </div>
@@ -103,10 +103,10 @@ export default function ChequeBookPage() {
                             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
                         >
                             {[
-                                { label: "Total Asset Count", value: chequebook.length, icon: CreditCard, color: "text-orange-500" },
-                                { label: "Bank Entities", value: Array.from(new Set(chequebook.map(c => c.bank_id))).length, icon: Building2, color: "text-zinc-500" },
-                                { label: "Registry Protocols", value: "ACTIVE", icon: Hash, color: "text-green-500", suffix: "ONLINE" },
-                                { label: "Last Induction", value: chequebook.length > 0 ? new Date(chequebook[0].created_at).toLocaleDateString() : "VOID", icon: CalendarIcon, color: "text-blue-500" },
+                                { label: "Total Cheque Books", value: chequebook.length, icon: CreditCard, color: "text-orange-500" },
+                                { label: "Total Banks", value: Array.from(new Set(chequebook.map(c => c.bank_id))).length, icon: Building2, color: "text-zinc-500" },
+                                { label: "System Status", value: "ACTIVE", icon: Hash, color: "text-green-500", suffix: "ONLINE" },
+                                { label: "Last Added", value: chequebook.length > 0 ? new Date(chequebook[0].created_at).toLocaleDateString() : "NONE", icon: CalendarIcon, color: "text-blue-500" },
                             ].map((stat, i) => (
                                 <Card key={i} className={cn(PREMIUM_ROUNDING, "p-4 border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl flex items-center justify-between")}>
                                     <div className="space-y-1">
@@ -134,7 +134,7 @@ export default function ChequeBookPage() {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                                             <input
                                                 type="text"
-                                                placeholder="Decrypt cheque serial or bank signature..."
+                                                placeholder="Search by cheque number or bank..."
                                                 className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
                                             />
                                         </div>
@@ -145,7 +145,7 @@ export default function ChequeBookPage() {
 
                                     <div className="flex items-center gap-3">
                                         <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Master Financial Registry</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Cheque List</span>
                                     </div>
                                 </div>
 
@@ -156,11 +156,11 @@ export default function ChequeBookPage() {
                                                 <CreditCard className="h-8 w-8 text-zinc-300" />
                                             </div>
                                             <div className="space-y-1">
-                                                <h3 className="font-bold uppercase tracking-widest text-sm">No Assets Detected</h3>
-                                                <p className="text-xs text-zinc-400">Initialize a new cheque book to begin tracking</p>
+                                                <h3 className="font-bold uppercase tracking-widest text-sm">No Cheque Books Found</h3>
+                                                <p className="text-xs text-zinc-400">Add a new cheque book to start tracking</p>
                                             </div>
                                             <Button asChild variant="outline" className="mt-2 rounded-xl border-dashed">
-                                                <Link href="/cheque/create">Provision New Registry</Link>
+                                                <Link href="/cheque/create">Add Cheque Book</Link>
                                             </Button>
                                         </div>
                                     ) : (

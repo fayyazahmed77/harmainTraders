@@ -39,7 +39,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Staff", href: "/staff" },
-    { title: "Registry", href: "#" },
+    { title: "List", href: "#" },
 ];
 
 const PREMIUM_ROUNDING = "rounded-xl";
@@ -62,7 +62,7 @@ export default function StaffIndex({ staff }: Props) {
 
     return (
         <SidebarProvider>
-            <Head title="Staff Registry" />
+            <Head title="Staff List" />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -75,12 +75,12 @@ export default function StaffIndex({ staff }: Props) {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-4"
                         >
                             <Heading
-                                title="Staff Registry"
-                                description="Manage system operators, field agents and administrative personnel"
+                                title="Staff"
+                                description="Manage system users, field staff, and office personnel"
                             />
                             <Button asChild className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95">
                                 <Link href="/staff/create">
-                                    <Plus className="mr-2 h-4 w-4" /> Provision Staff
+                                    <Plus className="mr-2 h-4 w-4" /> Add Staff
                                 </Link>
                             </Button>
                         </motion.div>
@@ -97,7 +97,7 @@ export default function StaffIndex({ staff }: Props) {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                                             <input
                                                 type="text"
-                                                placeholder="Decrypt signature or mail hash..."
+                                                placeholder="Search by name or email..."
                                                 className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
                                             />
                                         </div>
@@ -107,7 +107,7 @@ export default function StaffIndex({ staff }: Props) {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">System Active</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Active Members</span>
                                     </div>
                                 </div>
 
@@ -115,11 +115,11 @@ export default function StaffIndex({ staff }: Props) {
                                     <table className="w-full text-sm text-left">
                                         <thead>
                                             <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/30">
-                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Personnel Identification</th>
-                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Communication</th>
-                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Security Clearance</th>
-                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400 text-center">Protocol Status</th>
-                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Deployment</th>
+                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Name & ID</th>
+                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Contact</th>
+                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Roles & Permissions</th>
+                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400 text-center">Status</th>
+                                                <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400">Member Since</th>
                                                 <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-400 text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -143,7 +143,7 @@ export default function StaffIndex({ staff }: Props) {
                                                                 </Avatar>
                                                                 <div className="flex flex-col">
                                                                     <span className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter">{user.name}</span>
-                                                                    <span className="text-[10px] text-zinc-400 font-mono tracking-widest">ID-PROTOCOL: {user.id.toString().padStart(4, '0')}</span>
+                                                                    <span className="text-[10px] text-zinc-400 font-mono tracking-widest">ID: {user.id.toString().padStart(4, '0')}</span>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -155,7 +155,7 @@ export default function StaffIndex({ staff }: Props) {
                                                                 </div>
                                                                 <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
                                                                     <Phone className="w-3 h-3 opacity-50" />
-                                                                    {user.phone || "VOID"}
+                                                                    {user.phone || "---"}
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -184,10 +184,10 @@ export default function StaffIndex({ staff }: Props) {
                                                             <div className="flex flex-col gap-1">
                                                                 <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
                                                                     <MapPin className="w-3 h-3 text-orange-500" />
-                                                                    {user.country || "GLOBAL-OPS"}
+                                                                    {user.country || "GLOBAL"}
                                                                 </div>
                                                                 <div className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">
-                                                                    INIT: {new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                    JOINED: {new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -205,16 +205,16 @@ export default function StaffIndex({ staff }: Props) {
                                                                         </Button>
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end" className="w-48 rounded-xl border-zinc-200 dark:border-zinc-800">
-                                                                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 p-3">Intelligence Actions</DropdownMenuLabel>
+                                                                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 p-3">Manage Member</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer">
-                                                                            <Link href={`/staff/${user.id}`}>View Dossier</Link>
+                                                                            <Link href={`/staff/${user.id}`}>View Details</Link>
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
                                                                         <DropdownMenuItem
                                                                             className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-500/10"
                                                                             onClick={() => handleDelete(user.id)}
                                                                         >
-                                                                            Terminate Profile
+                                                                            Delete Staff
                                                                         </DropdownMenuItem>
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
@@ -228,7 +228,7 @@ export default function StaffIndex({ staff }: Props) {
                                 </div>
                                 <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
                                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                                        Total Personnel Count: {staff.length}
+                                        Total Staff: {staff.length}
                                     </div>
                                     <div className="flex gap-1.5">
                                         {[1, 2, 3].map(i => (

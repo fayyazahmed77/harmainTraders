@@ -9,16 +9,26 @@ use Inertia\Inertia;
 
 class ItemCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $categories = ItemCategory::with('creator')->get()->map(function ($category) {
+        $query = ItemCategory::with('creator');
+
+        if ($request->has('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                  ->orWhere('code', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        $categories = $query->latest()->get()->map(function ($category) {
             $category->created_by_name = $category->creator ? $category->creator->name : 'Unknown';
-            $category->created_by_avatar = $category->creator && $category->creator->image ? '/storage/' . $category->creator->image : null;
+            $category->created_by_avatar = $category->creator && $category->creator->image ? asset('storage/' . $category->creator->image) : null;
             return $category;
         });
 
         return Inertia::render('ItemCategory/index', [
             'categories' => $categories,
+            'filters' => $request->only(['search'])
         ]);
     }
     //store

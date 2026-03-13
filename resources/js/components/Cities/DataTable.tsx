@@ -167,7 +167,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       accessorKey: "country",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Parent Jurisdiction</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country</span>
       ),
       cell: ({ row }) => {
         const city = row.original;
@@ -195,7 +195,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       accessorKey: "province.name",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Regional Area</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Province</span>
       ),
       cell: ({ row }) => {
         const province = provinces.find((p) => p.id === Number(row.original.province_id));
@@ -210,7 +210,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       accessorKey: "name",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">City Identity</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">City</span>
       ),
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
@@ -233,7 +233,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       accessorKey: "is_active",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Node Status</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Status</span>
       ),
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5 group/status">
@@ -250,7 +250,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       accessorKey: "created_by",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Origin registrar</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Added By</span>
       ),
       cell: ({ row }) => {
         const name = row.original.created_by_name || "System";
@@ -284,7 +284,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     {
       id: "actions",
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Interlink</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Actions</span>
       ),
       cell: ({ row }) => {
         const city = row.original;
@@ -317,7 +317,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                   }}
                 >
                   <PencilLine className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
-                  Modify Identity
+                  Edit City
                 </DropdownMenuItem>
               )}
               {canDelete && (
@@ -329,7 +329,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                   }}
                 >
                   <Trash2 className="w-4 h-4 group-hover/item-delete:scale-110 transition-transform" />
-                  Purge record
+                  Delete City
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -365,10 +365,10 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                 </div>
                 <div>
                   <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    MODIFY <span className="text-orange-500 italic">IDENTITY</span>
+                    Edit <span className="text-orange-500 italic">City</span>
                   </DialogTitle>
                   <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Administrative Node Reconfiguration
+                    Update city details.
                   </DialogDescription>
                 </div>
               </div>
@@ -378,7 +378,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
               <div className="grid gap-6">
                 {/* Country Dropdown */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Parent Jurisdiction</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Country</Label>
                   <ShadSelect
                     value={selectedCountry}
                     onValueChange={(value) => {
@@ -412,7 +412,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
 
                 {/* Province Dropdown */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Regional Area</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Province</Label>
                   <ShadSelect
                     value={selectedProvince}
                     onValueChange={setSelectedProvince}
@@ -439,7 +439,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">City Designation</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">City Name</Label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -448,7 +448,7 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Registry Code</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">City Code</Label>
                     <Input
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
@@ -487,13 +487,13 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                   className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
                   onClick={() => setEditCity(null)}
                 >
-                  Abort
+                  Cancel
                 </Button>
                 <Button
                   type="submit"
                   className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group transition-all text-white border-b-4 border-orange-800/50"
                 >
-                  Commit Changes
+                  Save Changes
                 </Button>
               </DialogFooter>
             </form>
@@ -510,16 +510,16 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
               <Trash2 className="w-10 h-10 -rotate-45 group-hover:rotate-0 transition-transform duration-500" />
             </div>
             <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-2">
-              CRITICAL <span className="text-red-600 italic">PURGE</span>
+              Delete <span className="text-red-600 italic">City</span>
             </DialogTitle>
             <DialogDescription className="font-black text-rose-600 uppercase text-[10px] tracking-widest opacity-70 mb-8">
-              Critical Node Deletion Protocol
+              This action cannot be undone.
             </DialogDescription>
 
             <div className="p-6 bg-red-50 border-2 border-red-500/10 rounded-sm mb-10 text-left">
               <p className="text-xs font-black text-red-950 uppercase leading-relaxed mb-1">Warning: Irreversible Operation</p>
               <p className="text-xs font-bold text-red-900/60 leading-relaxed uppercase tracking-tight">
-                Are you absolutely sure you want to purge <span className="text-red-600 font-black">{selectedCity?.name}</span> from the registry?
+                Are you sure you want to delete <span className="text-red-600 font-black">{selectedCity?.name}</span>?
                 This action cannot be undone.
               </p>
             </div>
@@ -530,13 +530,13 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
                 className="h-14 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all"
                 onClick={() => setOpenDeleteDialog(false)}
               >
-                Abort
+                Cancel
               </Button>
               <Button
                 className="bg-red-600 hover:bg-red-700 h-14 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-red-600/20 active:scale-95 transition-all text-white border-b-4 border-red-800/50"
                 onClick={handleDelete}
               >
-                Confirm Purge
+                Delete
               </Button>
             </div>
           </div>

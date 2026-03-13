@@ -13,14 +13,20 @@ use Inertia\Inertia;
 
 class SubareaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $countries = Country::all();
         $provinces = Province::all();
         $cities = City::all();
         $areas = Areas::all();
-        $subareas  = Subarea::with(['creator', 'province', 'country', 'city', 'area'])
-            ->latest()
+
+        $query = Subarea::with(['creator', 'province', 'country', 'city', 'area']);
+
+        if ($request->has('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        $subareas = $query->latest()
             ->get()
             ->map(function ($item) {
                 $item->created_by_name = $item->creator?->name ?? 'Unknown';
@@ -29,12 +35,14 @@ class SubareaController extends Controller
                     : null;
                 return $item;
             });
+
         return Inertia::render("setup/subarea/index", [
             'subareas' => $subareas,
             'areas' => $areas,
             'cities' => $cities,
             'countries' => $countries,
-            'provinces' => $provinces
+            'provinces' => $provinces,
+            'filters' => $request->only(['search'])
         ]);
     }
     public function store(Request $request)

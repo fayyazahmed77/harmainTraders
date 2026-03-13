@@ -27,7 +27,7 @@ import { toast } from "sonner";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Financials", href: "/cheque" },
-  { title: "Provisioning", href: "/cheque/create" },
+  { title: "Add Cheque Book", href: "/cheque/create" },
 ];
 
 interface Bank {
@@ -68,17 +68,17 @@ export default function ChequeGenerationPage() {
   // ✅ Generate cheque numbers
   const handleGenerate = () => {
     if (!chequeFrom || !chequeTo)
-      return toast.error("Missing Sequence Parameters", { description: "Both start and end values are required." });
+      return toast.error("Missing Numbers", { description: "Please enter both start and end numbers." });
 
     const from = parseInt(chequeFrom);
     const to = parseInt(chequeTo);
 
     if (isNaN(from) || isNaN(to) || from > to) {
-      return toast.error("Invalid Sequence Detected", { description: "End value must be greater than start value." });
+      return toast.error("Invalid Numbers", { description: "End number must be greater than start number." });
     }
 
     if (to - from > 100) {
-      return toast.warning("Large Batch Detected", { description: "Generating more than 100 cheques might affect performance." });
+      return toast.warning("Large Batch", { description: "Adding more than 100 cheques might be slow." });
     }
 
     const cheques: string[] = [];
@@ -86,14 +86,14 @@ export default function ChequeGenerationPage() {
       cheques.push(i.toString().padStart(3, "0"));
     }
     setGeneratedCheques(cheques);
-    toast.success(`${cheques.length} Assets Previewed`, { icon: <Sparkles className="h-4 w-4" /> });
+    toast.success(`${cheques.length} Cheques Previewed`, { icon: <Sparkles className="h-4 w-4" /> });
   };
 
   // ✅ Submit data to backend
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bankId) return toast.error("Bank Identity Required");
-    if (generatedCheques.length === 0) return toast.error("Provisioning List Empty");
+    if (!bankId) return toast.error("Please Select a Bank");
+    if (generatedCheques.length === 0) return toast.error("No Cheques to Add");
 
     setIsProcessing(true);
     router.post("/cheque", {
@@ -105,8 +105,8 @@ export default function ChequeGenerationPage() {
       cheques: generatedCheques,
     }, {
       onFinish: () => setIsProcessing(false),
-      onSuccess: () => toast.success("Assets Successfully Inducted"),
-      onError: () => toast.error("Provisioning Protocol Failed")
+      onSuccess: () => toast.success("Cheque Book Added Successfully"),
+      onError: () => toast.error("Failed to Add Cheque Book")
     });
   };
 
@@ -116,7 +116,7 @@ export default function ChequeGenerationPage() {
 
   return (
     <SidebarProvider>
-      <Head title="Asset Provisioning | Cheque Induction" />
+      <Head title="Add Cheque Book" />
       <AppSidebar variant="inset" />
       <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
         <SiteHeader breadcrumbs={breadcrumbs} />
@@ -130,12 +130,12 @@ export default function ChequeGenerationPage() {
               className="flex items-center justify-between"
             >
               <Heading
-                title="Asset Provisioning"
-                description="Initialize new financial instruments into the secure system registry"
+                title="Add Cheque Book"
+                description="Add a new cheque book to your system"
               />
               <div className="hidden md:flex items-center gap-3">
                 <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Secure Induction Protocol</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Safe Entry</span>
               </div>
             </motion.div>
 
@@ -152,14 +152,14 @@ export default function ChequeGenerationPage() {
                   <CardHeader className="pb-4">
                     <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                       <Terminal className="h-4 w-4 text-orange-500" />
-                      Configuration Matrix
+                      Cheque Details
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                       {/* Entry Date */}
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Entry Timestamp</Label>
+                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Date</Label>
                         <Popover open={open} onOpenChange={setOpen}>
                           <PopoverTrigger asChild>
                             <Button
@@ -195,10 +195,10 @@ export default function ChequeGenerationPage() {
 
                       {/* Bank Identity */}
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Bank Entity</Label>
+                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Bank</Label>
                         <Select value={bankId} onValueChange={setBankId}>
                           <SelectTrigger className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all w-full">
-                            <SelectValue placeholder="Identify Bank..." />
+                            <SelectValue placeholder="Select Bank..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
                             {banks.map((bank) => (
@@ -211,9 +211,9 @@ export default function ChequeGenerationPage() {
                         {errors.bank_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.bank_id}</p>}
                       </div>
 
-                      {/* Voucher Signature */}
+                      {/* Voucher No */}
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Voucher Signature</Label>
+                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Voucher No</Label>
                         <div className="relative">
                           <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
@@ -227,7 +227,7 @@ export default function ChequeGenerationPage() {
 
                       {/* Asset Prefix */}
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Serial Prefix</Label>
+                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Cheque Prefix</Label>
                         <div className="relative">
                           <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
@@ -242,7 +242,7 @@ export default function ChequeGenerationPage() {
                       {/* Sequence Control */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Start Sequence</Label>
+                          <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Start No</Label>
                           <Input
                             value={chequeFrom}
                             onChange={(e) => setChequeFrom(e.target.value)}
@@ -251,7 +251,7 @@ export default function ChequeGenerationPage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">End Sequence</Label>
+                          <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">End No</Label>
                           <Input
                             value={chequeTo}
                             onChange={(e) => setChequeTo(e.target.value)}
@@ -261,15 +261,15 @@ export default function ChequeGenerationPage() {
                         </div>
                       </div>
 
-                      {/* Remarks / Metadata */}
+                      {/* Remarks */}
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Operational Metadata</Label>
+                        <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Remarks</Label>
                         <div className="relative">
                           <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
                             value={remarks}
                             onChange={(e) => setRemarks(e.target.value)}
-                            placeholder="Asset induction justification..."
+                            placeholder="Add any notes here..."
                             className="pl-10 h-12 rounded-xl border-zinc-200 dark:border-zinc-800 text-sm focus:ring-orange-500/20 transition-all"
                           />
                         </div>
@@ -286,7 +286,7 @@ export default function ChequeGenerationPage() {
                         className="w-full md:w-auto px-8 rounded-xl h-12 border-zinc-200 dark:border-zinc-800 font-bold uppercase tracking-widest text-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800 group transition-all"
                       >
                         <Wand2 className="mr-2 h-4 w-4 text-orange-500 group-hover:rotate-12 transition-transform" />
-                        Review Sequence
+                        Preview Cheques
                       </Button>
 
                       <Button
@@ -302,7 +302,7 @@ export default function ChequeGenerationPage() {
                         ) : (
                           <div className="flex items-center gap-2">
                             <CheckCircle2 className="h-4 w-4" />
-                            Activate Induction
+                            Save Cheque Book
                           </div>
                         )}
                       </Button>
@@ -323,7 +323,7 @@ export default function ChequeGenerationPage() {
                         <CardHeader className="pb-4 border-b border-zinc-100 dark:border-zinc-800">
                           <div className="flex items-center justify-between">
                             <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                              Sequence Visualization ({generatedCheques.length} nodes)
+                              Cheque Preview ({generatedCheques.length} cheques)
                             </CardTitle>
                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">
                               <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
@@ -363,14 +363,14 @@ export default function ChequeGenerationPage() {
                 <Card className={cn(PREMIUM_ROUNDING, "border-zinc-200 dark:border-zinc-800 bg-zinc-900 text-white shadow-2xl relative overflow-hidden")}>
                   <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />
                   <CardHeader>
-                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">Summary Manifest</CardTitle>
+                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">Quick Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6 relative">
                     {[
-                      { label: "Target Entity", value: selectedBankName, icon: Building2 },
-                      { label: "Provision Type", value: "CHEQUE-BOOK", icon: Hash },
-                      { label: "Asset Volume", value: generatedCheques.length > 0 ? `${generatedCheques.length} INSTRUMENTS` : "EMPTY", icon: Sparkles },
-                      { label: "Protocol", value: "MANUAL-INDUCTION", icon: Terminal },
+                      { label: "Selected Bank", value: selectedBankName, icon: Building2 },
+                      { label: "Type", value: "CHEQUE-BOOK", icon: Hash },
+                      { label: "Total Cheques", value: generatedCheques.length > 0 ? `${generatedCheques.length} CHEQUES` : "EMPTY", icon: Sparkles },
+                      { label: "Entry Method", value: "Manual Entry", icon: Terminal },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-4 group">
                         <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 transition-colors group-hover:bg-orange-500/20 group-hover:border-orange-500/50">
@@ -385,7 +385,7 @@ export default function ChequeGenerationPage() {
 
                     <div className="pt-4 mt-4 border-t border-white/10">
                       <p className="text-[9px] text-zinc-500 italic leading-relaxed uppercase tracking-tighter">
-                        "I understand that generating these cheque assets will register them as 'UNUSED' in the central financial database and they will be available for payment allocation immediately."
+                        "I understand that adding these cheques will register them as 'UNUSED' and they will be available to use immediately."
                       </p>
                     </div>
                   </CardContent>
@@ -395,7 +395,7 @@ export default function ChequeGenerationPage() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
                       <AlertCircle className="h-4 w-4" />
-                      <h4 className="text-[10px] font-black uppercase tracking-widest">Compliance Protocol</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest">Last Checks</h4>
                     </div>
                   </CardHeader>
                   <CardContent>

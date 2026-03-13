@@ -162,7 +162,7 @@ export function DataTable({ data }: DataTableProps) {
     { 
       accessorKey: "name", 
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country Identity</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country</span>
       ),
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
@@ -183,7 +183,7 @@ export function DataTable({ data }: DataTableProps) {
     { 
       accessorKey: "phone_code", 
       header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Dial Parameter</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Phone Code</span>
       ),
       cell: ({ row }) => (
         <span className="font-mono font-bold text-foreground/70 tracking-tighter leading-none">{row.original.phone_code}</span>
@@ -247,7 +247,7 @@ export function DataTable({ data }: DataTableProps) {
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-black text-foreground/70 uppercase tracking-tight leading-none">{name}</span>
-              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none">Registrar</span>
+              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none">Added By</span>
             </div>
           </div>
         );
@@ -287,7 +287,7 @@ export function DataTable({ data }: DataTableProps) {
                   }}
                 >
                   <PencilLine className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Modify Identity</span>
+                  <span>Edit Country</span>
                 </DropdownMenuItem>
               )}
               {canDelete && (
@@ -299,7 +299,7 @@ export function DataTable({ data }: DataTableProps) {
                   }}
                 >
                   <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Purge Record</span>
+                  <span>Delete Country</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -338,10 +338,10 @@ export function DataTable({ data }: DataTableProps) {
                 </div>
                 <div>
                   <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    IDENTITY <span className="text-orange-500 italic">MODIFICATION</span>
+                    Edit <span className="text-orange-500 italic">Country</span>
                   </DialogTitle>
                   <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Registry Reconfiguration Protocol
+                    Update country details.
                   </DialogDescription>
                 </div>
               </div>
@@ -351,7 +351,7 @@ export function DataTable({ data }: DataTableProps) {
               <div className="grid grid-cols-2 gap-6 relative">
                  <div className="space-y-2 col-span-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Country Full Name
+                      Country Name
                     </Label>
                     <Input
                       value={name}
@@ -361,7 +361,7 @@ export function DataTable({ data }: DataTableProps) {
                   </div>
                   <div className="space-y-2 lg:col-span-1 col-span-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      ISO Identity Code
+                      Country Code
                     </Label>
                     <Input
                       value={code}
@@ -371,7 +371,7 @@ export function DataTable({ data }: DataTableProps) {
                   </div>
                   <div className="space-y-2 lg:col-span-1 col-span-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Dialing Parameter
+                      Phone Code
                     </Label>
                     <Input
                       value={phoneCode}
@@ -381,7 +381,7 @@ export function DataTable({ data }: DataTableProps) {
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Economic Unit
+                      Currency
                     </Label>
                     <Input
                       value={currency}
@@ -398,13 +398,13 @@ export function DataTable({ data }: DataTableProps) {
                     className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
                     onClick={() => setEditCountry(null)}
                   >
-                    Abort
+                    Cancel
                   </Button>
                   <Button
                     type="submit"
                     className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1"
                   >
-                    Commit Changes
+                    Save Changes
                   </Button>
                 </DialogFooter>
               </div>
@@ -424,22 +424,22 @@ export function DataTable({ data }: DataTableProps) {
               </div>
               <div className="space-y-2">
                 <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-red-600">
-                  PURGE <span className="text-foreground italic">RECORD</span>
+                  Delete <span className="text-foreground italic">Country</span>
                 </DialogTitle>
                 <DialogDescription className="font-black text-red-600 uppercase text-[10px] tracking-[0.2em] opacity-70">
-                  Critical Destruction Protocol
+                  This action cannot be undone.
                 </DialogDescription>
               </div>
               <div className="p-4 bg-red-50 border-2 border-red-200 rounded-sm w-full">
                 <p className="text-xs font-bold text-red-700 uppercase tracking-tight">
-                  Proceed with the permanent removal of identity:
+                  Are you sure you want to delete this country?
                 </p>
                 <p className="text-xl font-black text-red-800 uppercase tracking-tighter mt-1">
                   {selectedCountry?.name}
                 </p>
               </div>
               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-relaxed">
-                Warning: This action will permanently erase this record and all associated interlinks from the central registry.
+                Warning: This will permanently remove the record from the system.
               </p>
             </div>
             <div className="mt-8 pt-6 border-t-2 border-red-500/10 flex flex-col sm:flex-row gap-3">
@@ -448,14 +448,14 @@ export function DataTable({ data }: DataTableProps) {
                 className="h-12 flex-1 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all order-2 sm:order-1"
                 onClick={() => setOpenDeleteDialog(false)}
               >
-                Cancel Protocol
+                Cancel
               </Button>
               <Button
                 variant="destructive"
                 className="h-12 flex-1 bg-red-600 hover:bg-red-700 rounded-sm font-black uppercase tracking-widest shadow-xl shadow-red-600/20 active:scale-95 order-1 sm:order-2"
                 onClick={handleDelete}
               >
-                Execute Purge
+                Delete
               </Button>
             </div>
           </div>
@@ -521,7 +521,7 @@ export function DataTable({ data }: DataTableProps) {
                         <div className="w-12 h-12 rounded-sm bg-orange-500/5 flex items-center justify-center">
                           <Plus className="w-6 h-6 text-orange-500/20" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">No Registry Data Detected</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">No entries found</p>
                       </div>
                     </TableCell>
                   </TableRow>

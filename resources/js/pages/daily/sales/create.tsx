@@ -88,6 +88,7 @@ interface Item {
   pt6?: number;
   pt7?: number;
   category?: string;
+  scheme?: string;
   // any other fields you may have
 }
 
@@ -1145,6 +1146,15 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                               </div>
                             </div>
                           </div>
+
+                          {selectedItem.scheme && (
+                            <div className="mt-2 px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-2 animate-pulse">
+                              <Info size={14} className="text-rose-600 shrink-0" />
+                              <span className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 tracking-widest">
+                                SCHEME: {selectedItem.scheme}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Data Sections */}
                           <div className="flex-1 flex flex-col md:flex-row mt-1 gap-2">

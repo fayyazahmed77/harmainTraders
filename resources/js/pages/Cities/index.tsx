@@ -159,7 +159,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
   return (
     <>
 
-      <Head title="CITIES REGISTRY" />
+      <Head title="CITIES" />
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset className="bg-[#fafafa]">
@@ -180,14 +180,14 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
                       <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">
-                        CITIES <span className="text-orange-500 italic">REGISTRY</span>
+                        CITIES
                       </h1>
                       <div className="px-2 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded-sm">
                         <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">v2.0</span>
                       </div>
                     </div>
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] opacity-60 flex items-center gap-2">
-                      Local Administrative Node Management Protocol
+                      Manage cities for each province.
                     </p>
                   </div>
                 </div>
@@ -212,8 +212,8 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                       <Database className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Registry Scale</p>
-                      <p className="text-xs font-black text-foreground uppercase tracking-tight">{cities.length} Active Nodes</p>
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Status</p>
+                      <p className="text-xs font-black text-foreground uppercase tracking-tight">{cities.length} Active Cities</p>
                     </div>
                   </div>
 
@@ -223,7 +223,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                     className="bg-orange-600 hover:bg-orange-700 h-16 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 transition-all group border-b-4 border-orange-800/50 text-white"
                   >
                     <Plus className="mr-3 w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
-                    New City
+                    Add City
                   </Button>
                 </div>
               </div>
@@ -240,14 +240,14 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                   <div className="p-8 bg-orange-500/5 rounded-sm mb-6 group-hover:scale-110 transition-transform duration-500">
                     <Plus className="w-12 h-12 text-orange-500/20" />
                   </div>
-                  <h3 className="text-xl font-black text-foreground uppercase tracking-tighter mb-1">NULL DATA DETECTED</h3>
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 italic mb-8">System awaiting administrative initialization...</p>
+                  <h3 className="text-xl font-black text-foreground uppercase tracking-tighter mb-1">No Cities Found</h3>
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 italic mb-8">No cities have been added yet. Add a new city to get started.</p>
                   <Button
                     onClick={() => setOpenCreateDialog(true)}
                     variant="outline"
                     className="border-2 border-orange-500/20 hover:bg-orange-500/5 text-orange-600 font-black uppercase tracking-widest px-8 rounded-sm"
                   >
-                    Initialize Registry
+                    Add City
                   </Button>
                 </div>
               ) : (
@@ -270,10 +270,10 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                 </div>
                 <div>
                   <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    CITY <span className="text-orange-500 italic">GENESIS</span>
+                    Add <span className="text-orange-500 italic">City</span>
                   </DialogTitle>
-                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Administrative Node Initialization
+                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70" >
+                    Create a new city entry.
                   </DialogDescription>
                 </div>
               </div>
@@ -285,7 +285,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
                       <Globe className="w-3 h-3" />
-                      Jurisdiction
+                      Country
                     </Label>
                     <Select<CountryOption, false>
                       options={countryOptions}
@@ -326,7 +326,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
                       <Navigation className="w-3 h-3" />
-                      Regional Area
+                      Province
                     </Label>
                     <Select<ProvinceOption, false>
                       options={provinceOptions}
@@ -363,7 +363,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      City Designation
+                      City Name
                     </Label>
                     <Input
                       required
@@ -375,7 +375,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                   </div>
                   <div className="space-y-2 col-span-2 sm:col-span-1">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Registry Code
+                      City Code
                     </Label>
                     <Input
                       required
@@ -390,7 +390,7 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                 <div className="bg-orange-500/5 p-6 rounded-sm border-2 border-orange-500/10 space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Activity className="w-4 h-4 text-orange-600 shadow-[0_0_10px_rgba(249,115,22,0.2)]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Geospatial Fixation</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Location Info</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -423,13 +423,13 @@ export default function Index({ cities, countries, provinces }: IndexProps) {
                     className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
                     onClick={() => setOpenCreateDialog(false)}
                   >
-                    Abort
+                    Cancel
                   </Button>
                   <Button
                     type="submit"
                     className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1 text-white border-b-4 border-orange-800/50"
                   >
-                    Commit Entry
+                    Save City
                   </Button>
                 </DialogFooter>
               </div>

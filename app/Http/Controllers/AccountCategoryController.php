@@ -8,10 +8,19 @@ use Inertia\Inertia;
 
 class AccountCategoryController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $search = $request->input('search');
+
+        $categories = AccountCategory::latest()
+            ->when($search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->get();
+
         return Inertia::render('setup/account-category/index', [
-            'categories' => AccountCategory::all()
+            'categories' => $categories,
+            'filters' => $request->only(['search'])
         ]);
     }
 

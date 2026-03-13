@@ -81,6 +81,7 @@ interface Item {
   pt6?: number;
   pt7?: number;
   category?: string;
+  scheme?: string;
   // any other fields you may have
 }
 
@@ -1356,6 +1357,15 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
                               {selectedItem.company || 'N/A'}
                             </div>
                           </div>
+
+                          {selectedItem.scheme && (
+                            <div className="mt-1 px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-md flex items-center gap-2 animate-pulse mb-1">
+                              <Info size={12} className="text-rose-600 shrink-0" />
+                              <span className="text-[9px] font-black uppercase text-rose-700 dark:text-rose-400 tracking-widest leading-none">
+                                SCHEME: {selectedItem.scheme}
+                              </span>
+                            </div>
+                          )}
 
                           {/* Content Grid */}
                           <div className="flex-1 flex flex-col md:flex-row p-3 gap-4 overflow-hidden">

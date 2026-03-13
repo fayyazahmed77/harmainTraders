@@ -24,9 +24,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Material Control", href: "/offer" },
-    { title: "Negotiation Registry", href: "/offer/list" },
-    { title: "Protocol Archive", href: "#" },
+    { title: "Offers", href: "/offer" },
+    { title: "Offer List", href: "/offer/list" },
+    { title: "View Offer", href: "#" },
 ];
 
 interface OfferItem {
@@ -91,13 +91,13 @@ export default function View({ offer }: Props) {
                         >
                             <div className="flex items-center gap-2 text-orange-500 font-black text-[10px] uppercase tracking-[0.3em]">
                                 <Workflow className="h-3 w-3" />
-                                <span>Protocol Archive</span>
+                                <span>Offer Details</span>
                             </div>
                             <h1 className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
-                                Offer Snapshot #{offer.id.toString().padStart(4, '0')}
+                                Offer Details #{offer.id.toString().padStart(4, '0')}
                             </h1>
                             <p className="text-sm text-zinc-500 font-medium">
-                                Reviewing historical negotiation dossiers for commercial entities.
+                                View details of this price offer.
                             </p>
                         </motion.div>
 
@@ -112,7 +112,7 @@ export default function View({ offer }: Props) {
                                 className="rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-12 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
                             >
                                 <ArrowLeft className="mr-2 h-4 w-4" />
-                                Return to Registry
+                                Back to List
                             </Button>
                             <div className="flex gap-2 h-12">
                                 <Button
@@ -147,7 +147,7 @@ export default function View({ offer }: Props) {
                                 <div className="col-span-12 lg:col-span-2 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <CalendarClock className="h-3 w-3" />
-                                        Protocol Date
+                                        Offer Date
                                     </div>
                                     <div className="h-11 flex items-center px-4 bg-zinc-100/50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-sm font-black tabular-nums text-zinc-600">
                                         {new Date(offer.date).toLocaleDateString('en-GB')}
@@ -157,7 +157,7 @@ export default function View({ offer }: Props) {
                                 <div className="col-span-12 lg:col-span-4 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <UserCircle2 className="h-3 w-3" />
-                                        Negotiation Entity
+                                        Customer
                                     </div>
                                     <div className="flex bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 h-24 rounded-sm p-4 relative overflow-hidden">
                                         <div className="relative z-10">
@@ -177,12 +177,12 @@ export default function View({ offer }: Props) {
                                 <div className="col-span-12 lg:col-span-3 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <ShieldCheck className="h-3 w-3 text-orange-500" />
-                                        Pricing Rule
+                                        Price Type
                                     </div>
                                     <div className="h-11 flex items-center px-4 border-2 border-orange-500/20 bg-orange-500/5 dark:bg-orange-500/10 rounded-sm font-black text-xs text-orange-600 uppercase italic tracking-wider">
-                                        {offer.offertype === 'trade' ? 'Trade Price Protocol' :
-                                            offer.offertype === 'retail' ? 'Retail Price Matrix' :
-                                                'Dual Node Synchronization'}
+                                        {offer.offertype === 'trade' ? 'Trade Price' :
+                                            offer.offertype === 'retail' ? 'Retail Price' :
+                                                'Both'}
                                     </div>
                                     <div className="text-[9px] font-black uppercase tracking-widest animate-pulse flex items-center gap-1 text-orange-500">
                                         <ShieldCheck className="h-2.5 w-2.5" />
@@ -193,10 +193,10 @@ export default function View({ offer }: Props) {
                                 <div className="col-span-12 lg:col-span-3 space-y-2">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
                                         <FileText className="h-3 w-3" />
-                                        Protocol Context
+                                        Message
                                     </div>
                                     <div className="min-h-[64px] p-4 bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-800/50 rounded-md text-[10px] font-bold text-zinc-500 italic leading-relaxed">
-                                        {offer.message_line?.messageline || "No additional context provided for this protocol."}
+                                        {offer.message_line?.messageline || "No message."}
                                     </div>
                                 </div>
                             </div>
@@ -217,7 +217,7 @@ export default function View({ offer }: Props) {
                                     <div className="flex items-center gap-3 px-4">
                                         <div className="h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
                                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">
-                                            {category} <span className="text-zinc-300 dark:text-zinc-600 px-2">/</span> {items.length} Nodes
+                                            {category} <span className="text-zinc-300 dark:text-zinc-600 px-2">/</span> {items.length} Items
                                         </span>
                                     </div>
 
@@ -226,12 +226,12 @@ export default function View({ offer }: Props) {
                                             <table className="w-full text-left border-collapse">
                                                 <thead>
                                                     <tr className="border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">
-                                                        <th className="px-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Material Node</th>
+                                                        <th className="px-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Item</th>
                                                         <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Full</th>
                                                         <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Pieces</th>
                                                         <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">Retail Price</th>
-                                                        <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme Logic</th>
-                                                        <th className="px-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Settled Valuation</th>
+                                                        <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme</th>
+                                                        <th className="px-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Price</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -285,7 +285,7 @@ export default function View({ offer }: Props) {
                             className="bg-zinc-900/90 dark:bg-zinc-100/90 backdrop-blur-xl border border-white/10 dark:border-black/5 rounded-full px-8 py-4 shadow-2xl flex items-center gap-10"
                         >
                             <div className="flex flex-col">
-                                <span className="text-[8px] font-black text-white/40 dark:text-black/40 uppercase tracking-[0.2em] mb-0.5">Total manifest nodes</span>
+                                <span className="text-[8px] font-black text-white/40 dark:text-black/40 uppercase tracking-[0.2em] mb-0.5">Total Items</span>
                                 <span className="text-lg font-black text-orange-500 leading-none">{offer.items.length} ACTIVE</span>
                             </div>
                             <div className="h-8 w-px bg-white/10 dark:bg-black/5" />
@@ -301,7 +301,7 @@ export default function View({ offer }: Props) {
                                     onClick={() => router.visit('/offer-list')}
                                     className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-6 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/30"
                                 >
-                                    Archive Protocol
+                                    Back to List
                                 </Button>
                             </div>
                         </motion.div>

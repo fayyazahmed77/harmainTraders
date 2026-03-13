@@ -132,7 +132,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
     setIsSubmitting(true);
     router.delete(`/firms/${selectedFirm.id}`, {
       onSuccess: () => {
-        toast.success("Identity Purged", { description: "Firm profile removed from primary registry." });
+        toast.success("Firm deleted successfully", { description: "Firm has been removed from the list." });
         setOpenDeleteDialog(false);
       },
       onError: () => toast.error("Purge Failed"),
@@ -143,7 +143,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
   const columns: ColumnDef<Firm>[] = [
     {
       accessorKey: "name",
-      header: "Institution Identity",
+      header: "Firm Details",
       cell: ({ row }) => {
         const firm = row.original;
         return (
@@ -177,7 +177,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
     },
     {
       accessorKey: "business",
-      header: "Core Operations",
+      header: "Business Type",
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100 italic">
@@ -189,7 +189,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
     },
     {
       accessorKey: "contact",
-      header: "Registry Connectivity",
+      header: "Contacts",
       cell: ({ row }) => {
         const firm = row.original;
         return (
@@ -208,7 +208,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
     },
     {
       accessorKey: "registration",
-      header: "Registry Sync",
+      header: "Registered On",
       cell: ({ row }) => {
         const firm = row.original;
         return (
@@ -221,7 +221,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                 {new Date(firm.created_at).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
               <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter mt-1 italic leading-none">
-                Node Verified
+                Verified
               </span>
             </div>
           </div>
@@ -230,7 +230,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
     },
     {
       id: "actions",
-      header: () => <div className="text-right mr-4">Operations</div>,
+      header: () => <div className="text-right mr-4">Actions</div>,
       cell: ({ row }) => {
         const firm = row.original;
         const canEdit = permissions.includes("edit firms");
@@ -245,7 +245,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl p-2 shadow-2xl">
-                <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 px-4 py-2">Entity Protocols</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 px-4 py-2">Firm Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800 mx-2" />
                 <Link href={`/firms/${firm.id}/show`} className="block w-full">
                   <DropdownMenuItem className="flex items-center gap-3 rounded-lg focus:bg-zinc-100 dark:focus:bg-zinc-800 cursor-pointer py-3 px-4 group">
@@ -253,8 +253,8 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                       <Eye className="h-4 w-4 text-zinc-500" />
                     </div>
                     <div className="flex flex-col text-left">
-                      <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Company Dossier</span>
-                      <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">View full commercial profile</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">View Details</span>
+                      <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">View company profile</span>
                     </div>
                   </DropdownMenuItem>
                 </Link>
@@ -265,8 +265,8 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                         <Pencil className="h-4 w-4 text-orange-500" />
                       </div>
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-orange-600 dark:text-orange-400">Modify Identity</span>
-                        <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Update branding & parameters</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-orange-600 dark:text-orange-400">Edit Firm</span>
+                        <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Update details</span>
                       </div>
                     </DropdownMenuItem>
                   </Link>
@@ -285,8 +285,8 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                         <Trash2 className="h-4 w-4 text-rose-500" />
                       </div>
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-rose-500">Purge Profile</span>
-                        <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Permanent registry removal</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-rose-500">Delete Firm</span>
+                        <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Permanently remove this firm</span>
                       </div>
                     </DropdownMenuItem>
                   </>
@@ -322,20 +322,20 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
             <div className="h-16 w-16 rounded-3xl bg-rose-500/10 flex items-center justify-center mb-6 border border-rose-500/20 shadow-lg shadow-rose-500/10">
               <ShieldAlert className="h-8 w-8 text-rose-500 animate-pulse" />
             </div>
-            <DialogTitle className="text-xl font-black uppercase tracking-[0.1em] text-zinc-900 dark:text-white">Security Handshake</DialogTitle>
-            <DialogDescription className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mt-2">EXECUTING DESTRUCTIVE IDENTITY PURGE</DialogDescription>
+            <DialogTitle className="text-xl font-black uppercase tracking-[0.1em] text-zinc-900 dark:text-white">Delete Firm</DialogTitle>
+            <DialogDescription className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mt-2">Are you sure you want to delete this firm?</DialogDescription>
           </DialogHeader>
 
           <div className="p-8 text-center">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              You are about to purge this commercial identity from the central directory. This modification will affect all linked transaction segments and is <span className="text-rose-600 font-black italic underline decoration-rose-500/30 underline-offset-4">irreversible</span>.
+              This action cannot be undone. All data related to this firm will be permanently removed.
             </p>
             <div className="mt-8 p-6 rounded-2xl border-2 border-dashed border-rose-500/20 bg-rose-500/5 relative overflow-hidden group">
-              <div className="absolute right-0 top-0 text-[60px] font-black text-rose-500/5 -translate-y-1/2 translate-x-1/2 pointer-events-none italic tracking-tighter">PURGE</div>
+              <div className="absolute right-0 top-0 text-[60px] font-black text-rose-500/5 -translate-y-1/2 translate-x-1/2 pointer-events-none italic tracking-tighter">DELETE</div>
               <div className="flex flex-col gap-1 relative z-10 text-left">
-                <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 block mb-1">Target Signature</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 block mb-1">Deleting Firm</span>
                 <span className="text-lg font-black text-zinc-900 dark:text-white uppercase tracking-tight leading-none tabular-nums">{selectedFirm?.name}</span>
-                <span className="text-[9px] font-mono font-bold text-zinc-400 truncate">MS-ID: {selectedFirm?.id}</span>
+                <span className="text-[9px] font-mono font-bold text-zinc-400 truncate">ID: {selectedFirm?.id}</span>
               </div>
             </div>
           </div>
@@ -346,14 +346,14 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
               onClick={() => setOpenDeleteDialog(false)}
               className="flex-1 rounded-xl font-bold uppercase tracking-widest text-[10px] h-12 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
             >
-              Abort Operation
+              Cancel
             </Button>
             <Button
               onClick={handleDelete}
               disabled={isSubmitting}
-              className="flex-1 h-12 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-500/20 group overflow-hidden relative"
+              className="flex-1 h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-orange-500/20 group overflow-hidden relative"
             >
-              <span className="relative z-10">{isSubmitting ? "Expunging Node..." : "Execute Purge"}</span>
+              <span className="relative z-10">{isSubmitting ? "Deleting..." : "Delete Now"}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             </Button>
           </DialogFooter>
@@ -434,22 +434,22 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
         {/* ✅ Precision Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between p-6 bg-zinc-50/50 dark:bg-zinc-900/30 border-t border-zinc-200 dark:border-zinc-800">
           <div className="flex flex-col gap-1 mb-4 sm:mb-0">
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Directory Coverage</p>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Firms Pagination</p>
             <div className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <p className="text-xs font-black text-zinc-900 dark:text-zinc-100 italic">
-                Viewing <span className="text-orange-500">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span>
+                Showing <span className="text-orange-500">{table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}</span>
                 &mdash;
                 <span className="text-orange-500">{Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, filteredData.length)}</span>
                 <span className="text-[10px] text-zinc-400 font-bold uppercase mx-3 tracking-tighter">of total</span>
-                <span className="text-zinc-900 dark:text-zinc-100">{filteredData.length} Identities</span>
+                <span className="text-zinc-900 dark:text-zinc-100">{filteredData.length} Firms</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-10">
             <div className="hidden lg:flex items-center gap-3">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Node Density</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Show Rows</Label>
               <ShadSelect
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => table.setPageSize(Number(value))}
@@ -460,7 +460,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                 <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl">
                   {[10, 20, 30, 40, 50].map((pageSize) => (
                     <SelectItem key={pageSize} value={`${pageSize}`} className="text-[10px] font-bold">
-                      {pageSize} NODES
+                      {pageSize} ROWS
                     </SelectItem>
                   ))}
                 </SelectContent>

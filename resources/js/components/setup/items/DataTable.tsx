@@ -273,7 +273,7 @@ export function DataTable({ data }: DataTableProps) {
             </Dialog>
 
             {/* ✅ Table */}
-            <div className="rounded-md border shadow-sm mb-3 overflow-hidden">
+            <div className="rounded-md border shadow-sm mb-3 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none">
                 <Table>
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         {table.getHeaderGroups().map((hg) => (

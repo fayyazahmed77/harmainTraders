@@ -10,9 +10,15 @@ use Illuminate\Support\Facades\Auth;
 class AccountTypeController extends Controller
 {
     //index
-    public function index()
+    public function index(Request $request)
     {
-        $accountTypes = AccountType::with(['creator']) // if you have a `creator()` relation
+        $search = $request->input('search');
+
+        $accountTypes = AccountType::with(['creator'])
+            ->when($search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+            })
             ->latest()
             ->get()
             ->map(function ($account) {
@@ -26,7 +32,8 @@ class AccountTypeController extends Controller
             });
             
         return Inertia::render("setup/accounttype/index", [
-            'accountTypes' => $accountTypes
+            'accountTypes' => $accountTypes,
+            'filters' => $request->only(['search'])
         ]);
     }
     //store

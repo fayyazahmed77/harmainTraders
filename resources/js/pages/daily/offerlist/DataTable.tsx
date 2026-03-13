@@ -82,7 +82,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Calendar className="h-3 w-3 text-orange-500" />
-                    <span>Temporal Node</span>
+                    <span>Date</span>
                 </div>
             ),
             cell: ({ row }) => {
@@ -93,7 +93,7 @@ export default function DataTable({ data }: DataTableProps) {
                             {date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                         </span>
                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter tabular-nums">
-                            Registry Timestamp
+                            Saved Date
                         </span>
                     </div>
                 );
@@ -104,16 +104,16 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3 text-orange-500" />
-                    <span>Negotiation Entity</span>
+                    <span>Customer</span>
                 </div>
             ),
             cell: ({ row }) => (
                 <div className="flex flex-col max-w-[250px]">
                     <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
-                        {row.original.account?.title || "Unknown Entity"}
+                        {row.original.account?.title || "Unknown"}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
-                        Verified Account
+                        Customer Name
                     </span>
                 </div>
             )
@@ -123,7 +123,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Tag className="h-3 w-3 text-orange-500" />
-                    <span>Pricing Logic</span>
+                    <span>Price Type</span>
                 </div>
             ),
             cell: ({ row }) => {
@@ -144,7 +144,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Shield className="h-3 w-3 text-orange-500" />
-                    <span>Protocol Operator</span>
+                    <span>Prepared By</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -160,7 +160,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             id: "actions",
-            header: () => <div className="text-right">Registry Intel</div>,
+            header: () => <div className="text-right">Actions</div>,
             enableHiding: false,
             cell: ({ row }) => {
                 const offer = row.original;
@@ -175,7 +175,7 @@ export default function DataTable({ data }: DataTableProps) {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-60 rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl p-1.5 backdrop-blur-xl bg-white/95 dark:bg-zinc-900/95">
                                 <div className="px-2 py-1.5 mb-1">
-                                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">Protocol Registry</p>
+                                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">Offer Options</p>
                                     <div className="flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                                             <Tag className="h-4 w-4 text-orange-500" />
@@ -189,17 +189,17 @@ export default function DataTable({ data }: DataTableProps) {
 
                                 <DropdownMenuItem onClick={() => router.visit(`/offer-list/${offer.id}/view`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer focus:bg-orange-500 focus:text-white group">
                                     <Eye className="h-3.5 w-3.5 opacity-50 group-focus:opacity-100" />
-                                    Visual Audit
+                                    View Details
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem onClick={() => window.open(`/offer-list/${offer.id}/pdf`, '_blank')} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
                                     <FileSearch className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Extract PDF
+                                    View PDF
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem onClick={() => window.location.href = `/offer-list/${offer.id}/download`} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
                                     <DownloadCloud className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Provision Archive
+                                    Download
                                 </DropdownMenuItem>
 
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
@@ -213,7 +213,7 @@ export default function DataTable({ data }: DataTableProps) {
                                     className="rounded-lg text-xs font-bold gap-2 cursor-pointer text-rose-500 focus:bg-rose-500 focus:text-white group"
                                 >
                                     <Trash2 className="h-3.5 w-3.5 opacity-70 group-focus:opacity-100" />
-                                    Purge Record
+                                    Delete Offer
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -299,8 +299,8 @@ export default function DataTable({ data }: DataTableProps) {
                                                 <Info className="h-8 w-8 text-zinc-300" />
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none">Inert Registry</p>
-                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">No negotiation cycles detected in current matrix</p>
+                                                <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none">No Offers</p>
+                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">No price offers found in the list</p>
                                             </div>
                                         </div>
                                     </TableCell>
@@ -316,7 +316,7 @@ export default function DataTable({ data }: DataTableProps) {
                 <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] animate-pulse" />
                     <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
-                        {table.getFilteredRowModel().rows.length} Total Core Threads
+                        {table.getFilteredRowModel().rows.length} Total Offers
                     </span>
                 </div>
 

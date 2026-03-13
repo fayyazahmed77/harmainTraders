@@ -64,7 +64,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Staff", href: "/staff" },
-    { title: "Dossier", href: "#" },
+    { title: "Staff Details", href: "#" },
 ];
 
 const PREMIUM_ROUNDING = "rounded-2xl";
@@ -109,7 +109,7 @@ const SocialLink = ({ icon: Icon, label, href }: { icon: any, label: string, hre
 export default function StaffShow({ staff }: Props) {
     return (
         <SidebarProvider>
-            <Head title={`Personnel Dossier: ${staff.name}`} />
+            <Head title={`Staff Profile: ${staff.name}`} />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -146,17 +146,17 @@ export default function StaffShow({ staff }: Props) {
                                     <div className="flex items-center gap-3">
                                         <h1 className="text-2xl md:text-4xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">{staff.name}</h1>
                                         <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
-                                            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest font-mono">LVL-MAX</span>
+                                            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest font-mono">STAFF</span>
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                         <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
                                             <Briefcase size={14} />
-                                            <span className="text-xs font-bold uppercase tracking-widest">{staff.job_title || "OPERATIVE"}</span>
+                                            <span className="text-xs font-bold uppercase tracking-widest">{staff.job_title || "STAFF MEMBER"}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
                                             <Globe size={14} />
-                                            <span className="text-xs font-bold uppercase tracking-widest">{staff.department || "CENTRAL_UNIT"}</span>
+                                            <span className="text-xs font-bold uppercase tracking-widest">{staff.department || "GENERAL"}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -164,7 +164,7 @@ export default function StaffShow({ staff }: Props) {
                             <div className="flex items-center gap-3">
                                 <Button asChild className="h-12 px-6 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-black uppercase tracking-widest rounded-xl hover:scale-105 transition-all active:scale-95 shadow-xl">
                                     <Link href={`/staff/${staff.id}/edit`}>
-                                        <Edit className="mr-2 h-4 w-4" /> Reconfigure Profile
+                                        <Edit className="mr-2 h-4 w-4" /> Edit Profile
                                     </Link>
                                 </Button>
                             </div>
@@ -179,10 +179,10 @@ export default function StaffShow({ staff }: Props) {
                                     transition={{ delay: 0.1 }}
                                 >
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <InfoBadge icon={Mail} label="Comms Vector" value={staff.email} />
-                                        <InfoBadge icon={Phone} label="Terminal Uplink" value={staff.phone} />
-                                        <InfoBadge icon={MapPin} label="Deployment Zone" value={staff.country} />
-                                        <InfoBadge icon={Calendar} label="Induction Date" value={new Date(staff.created_at).toLocaleDateString()} />
+                                        <InfoBadge icon={Mail} label="Email Address" value={staff.email} />
+                                        <InfoBadge icon={Phone} label="Phone Number" value={staff.phone} />
+                                        <InfoBadge icon={MapPin} label="Location" value={staff.country} />
+                                        <InfoBadge icon={Calendar} label="Joined Date" value={new Date(staff.created_at).toLocaleDateString()} />
                                     </div>
                                 </motion.div>
 
@@ -198,8 +198,8 @@ export default function StaffShow({ staff }: Props) {
                                                     <Fingerprint size={18} />
                                                 </div>
                                                 <div>
-                                                    <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Tactical Summary</h2>
-                                                    <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Personnel psychological & functional profile</p>
+                                                    <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">About Staff</h2>
+                                                    <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Brief professional summary</p>
                                                 </div>
                                             </div>
                                             <Cpu size={24} className="text-zinc-100 dark:text-zinc-800" />
@@ -207,12 +207,12 @@ export default function StaffShow({ staff }: Props) {
                                         <div className="relative">
                                             <div className="absolute -left-4 top-0 bottom-0 w-1 bg-orange-500/20 rounded-full"></div>
                                             <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium italic pl-4">
-                                                {staff.bio || "No professional dossier data available for this operative. System record remains encrypted."}
+                                                {staff.bio || "No professional summary available for this staff member."}
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4 pt-4">
                                             <div className="text-center p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
-                                                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-1">Loyalty</p>
+                                                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-1">Performance</p>
                                                 <div className="flex justify-center gap-0.5">
                                                     {[1, 2, 3, 4, 5].map(i => <Star key={i} size={10} className="fill-orange-500 text-orange-500" />)}
                                                 </div>
@@ -249,8 +249,8 @@ export default function StaffShow({ staff }: Props) {
                                                 <Shield size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Security Clearance</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Active privilege protocols</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Roles & Permissions</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Active access permissions</p>
                                             </div>
                                         </div>
 
@@ -267,7 +267,7 @@ export default function StaffShow({ staff }: Props) {
                                                 ))
                                             ) : (
                                                 <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-center">
-                                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">No Authorized Roles</span>
+                                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">No Assigned Roles</span>
                                                 </div>
                                             )}
                                         </div>
@@ -285,8 +285,8 @@ export default function StaffShow({ staff }: Props) {
                                                 <Globe size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Web Presence</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External communication matrix</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Online Profiles</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External profile links</p>
                                             </div>
                                         </div>
 
@@ -299,7 +299,7 @@ export default function StaffShow({ staff }: Props) {
 
                                             {![staff.linkedin_url, staff.facebook_url, staff.instagram_url, staff.twitter_url, staff.portfolio_url].some(url => !!url) && (
                                                 <div className="p-8 text-center border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl">
-                                                    <p className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 uppercase tracking-[0.2em]">No Active Nodes</p>
+                                                    <p className="text-[10px] font-black text-zinc-300 dark:text-zinc-700 uppercase tracking-[0.2em]">No Links Added</p>
                                                 </div>
                                             )}
                                         </div>
@@ -311,11 +311,9 @@ export default function StaffShow({ staff }: Props) {
                                         <Shield size={120} />
                                     </div>
                                     <h3 className="text-xs font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-                                        <Zap size={14} /> Security Notice
+                                        <Shield size={14} /> Account Notice
                                     </h3>
-                                    <p className="text-[10px] leading-relaxed font-bold opacity-90 uppercase tracking-tight">
-                                        This dossier contains sensitive personnel data. Unauthorized access or duplication is a level 4 security violation.
-                                    </p>
+                                        This page contains sensitive staff data. Please handle with care.
                                 </div>
                             </div>
                         </div>

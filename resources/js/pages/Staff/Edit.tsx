@@ -54,7 +54,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Staff", href: "/staff" },
-    { title: "Configuration", href: "#" },
+    { title: "Edit", href: "#" },
 ];
 
 const PREMIUM_ROUNDING = "rounded-xl";
@@ -108,14 +108,14 @@ export default function StaffEdit({ staff, roles }: Props) {
     };
 
     const handleDelete = () => {
-        if (confirm("Are you sure you want to terminate this staff profile? This action is IRREVERSIBLE.")) {
+        if (confirm("Are you sure you want to delete this staff member? This action cannot be undone.")) {
             router.delete(`/staff/${staff.id}`);
         }
     };
 
     return (
         <SidebarProvider>
-            <Head title={`Update Profile: ${staff.name}`} />
+            <Head title={`Edit Profile: ${staff.name}`} />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -128,11 +128,11 @@ export default function StaffEdit({ staff, roles }: Props) {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-4"
                         >
                             <Heading
-                                title="Profile Configuration"
-                                description={`Modify credentials and authorization levels for ${staff.name}`}
+                                title="Edit Staff Member"
+                                description={`Update profile and permissions for ${staff.name}`}
                             />
                             <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] font-mono">STAFF-ID: {staff.id.toString().padStart(4, '0')}</span>
+                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] font-mono">ID: {staff.id.toString().padStart(4, '0')}</span>
                             </div>
                         </motion.div>
 
@@ -150,13 +150,13 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 <UserIcon size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Core Credentials</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Authentication & Identification Layer</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Personal Information</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Contact & Authentication Details</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <TechLabel label="Legal Identity" icon={UserIcon}>
+                                            <TechLabel label="Full Name" icon={UserIcon}>
                                                 <Input
                                                     placeholder="Full personnel name"
                                                     value={data.name}
@@ -166,7 +166,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Primary Comms" icon={Mail}>
+                                            <TechLabel label="Email Address" icon={Mail}>
                                                 <Input
                                                     type="email"
                                                     placeholder="personnel@system.com"
@@ -177,7 +177,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 {errors.email && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.email}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Terminal Access" icon={Phone}>
+                                            <TechLabel label="Phone Number" icon={Phone}>
                                                 <Input
                                                     placeholder="+1.000.000.0000"
                                                     value={data.phone}
@@ -186,10 +186,10 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 />
                                             </TechLabel>
 
-                                            <TechLabel label="Deployment Zone" icon={MapPin}>
+                                            <TechLabel label="Location / Country" icon={MapPin}>
                                                 <Select onValueChange={val => setData("country", val)} value={data.country}>
                                                     <SelectTrigger className="rounded-xl border-zinc-200 dark:border-zinc-800 w-full">
-                                                        <SelectValue placeholder="Select Sector" />
+                                                        <SelectValue placeholder="Select Country" />
                                                     </SelectTrigger>
                                                     <SelectContent className="rounded-xl">
                                                         <SelectItem value="Pakistan">Pakistan</SelectItem>
@@ -202,11 +202,11 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 </Select>
                                             </TechLabel>
 
-                                            <TechLabel label="Rotate Access Key" icon={Shield}>
+                                            <TechLabel label="Change Password" icon={Shield}>
                                                 <div className="relative">
                                                     <Input
                                                         type={showPassword ? "text" : "password"}
-                                                        placeholder="Leave blank to maintain current"
+                                                        placeholder="Leave blank to keep current"
                                                         value={data.password}
                                                         onChange={e => setData("password", e.target.value)}
                                                         className="rounded-xl border-zinc-200 dark:border-zinc-800 pr-10 focus:ring-orange-500/20"
@@ -222,7 +222,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 {errors.password && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.password}</p>}
                                             </TechLabel>
 
-                                            <TechLabel label="Confirm Rotate" icon={Shield}>
+                                            <TechLabel label="Confirm Password" icon={Shield}>
                                                 <div className="relative">
                                                     <Input
                                                         type={showPassword ? "text" : "password"}
@@ -243,8 +243,8 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-none"
                                             />
                                             <div className="flex flex-col">
-                                                <Label htmlFor="status" className="text-xs font-black uppercase tracking-widest cursor-pointer text-zinc-700 dark:text-zinc-300 group-hover:text-emerald-500 transition-colors">Operational Status</Label>
-                                                <p className="text-[10px] text-zinc-400 font-mono">ENABLING THIS ALLOWS SYSTEM AUTHENTICATION</p>
+                                                <Label htmlFor="status" className="text-xs font-black uppercase tracking-widest cursor-pointer text-zinc-700 dark:text-zinc-300 group-hover:text-emerald-500 transition-colors">Account Status</Label>
+                                                <p className="text-[10px] text-zinc-400 font-mono">ENABLING THIS ALLOWS THE USER TO LOG IN</p>
                                             </div>
                                         </div>
                                     </Card>
@@ -261,13 +261,13 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 <Briefcase size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Dossier Information</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Professional Background & Functional Context</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Professional Details</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Job Title & Unit Information</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <TechLabel label="Designation" icon={Briefcase}>
+                                            <TechLabel label="Job Title" icon={Briefcase}>
                                                 <Input
                                                     placeholder="Role Title"
                                                     value={data.job_title}
@@ -279,7 +279,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                             <TechLabel label="Department" icon={Globe}>
                                                 <Select onValueChange={val => setData("department", val)} value={data.department}>
                                                     <SelectTrigger className="rounded-xl border-zinc-200 dark:border-zinc-800 w-full">
-                                                        <SelectValue placeholder="Select Unit" />
+                                                        <SelectValue placeholder="Select Department" />
                                                     </SelectTrigger>
                                                     <SelectContent className="rounded-xl">
                                                         <SelectItem value="Engineering">Engineering</SelectItem>
@@ -292,9 +292,9 @@ export default function StaffEdit({ staff, roles }: Props) {
                                             </TechLabel>
                                         </div>
 
-                                        <TechLabel label="Personnel Bio" icon={UserIcon}>
+                                        <TechLabel label="Bio / Summary" icon={UserIcon}>
                                             <Textarea
-                                                placeholder="Professional summary and system context..."
+                                                placeholder="Write a brief professional summary..."
                                                 className="rounded-xl border-zinc-200 dark:border-zinc-800 min-h-[120px] focus:ring-orange-500/20"
                                                 value={data.bio}
                                                 onChange={e => setData("bio", e.target.value)}
@@ -314,15 +314,15 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 <AlertCircle size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-rose-600 dark:text-rose-500">Hazardous Operations</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Permanent Resource Termination</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-rose-600 dark:text-rose-500">Danger Zone</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Delete Profile Data</p>
                                             </div>
                                         </div>
 
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-rose-500/[0.02] border border-rose-500/10 rounded-xl">
                                             <div>
-                                                <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-tight">Decommission Profile</p>
-                                                <p className="text-[10px] text-zinc-400 font-mono uppercase">Deletes all auth keys and dossier data</p>
+                                                <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-tight">Delete Staff Profile</p>
+                                                <p className="text-[10px] text-zinc-400 font-mono uppercase">Deleting this will remove all profile and access records</p>
                                             </div>
                                             <Button
                                                 variant="outline"
@@ -330,7 +330,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 onClick={handleDelete}
                                                 className="rounded-lg border-rose-200 dark:border-rose-500/20 text-rose-600 hover:bg-rose-500 hover:text-white transition-all font-bold uppercase text-[10px] tracking-widest shadow-sm active:scale-95"
                                             >
-                                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Execute Deletion
+                                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Member
                                             </Button>
                                         </div>
                                     </Card>
@@ -346,8 +346,8 @@ export default function StaffEdit({ staff, roles }: Props) {
                                 >
                                     <Card className={cn(PREMIUM_ROUNDING, "p-8 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none bg-white dark:bg-zinc-900 flex flex-col items-center text-center space-y-6")}>
                                         <div className="w-full text-left">
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Biometric Profile</h2>
-                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Visual Identification Matrix</p>
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Profile Photo</h2>
+                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Visual Identification</p>
                                         </div>
                                         <div className="relative group">
                                             <div className="h-48 w-48 rounded-full border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 overflow-hidden transition-all group-hover:border-orange-500 group-hover:bg-orange-500/[0.02]">
@@ -394,8 +394,8 @@ export default function StaffEdit({ staff, roles }: Props) {
                                 >
                                     <Card className={cn(PREMIUM_ROUNDING, "p-8 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none bg-white dark:bg-zinc-900 space-y-6")}>
                                         <div>
-                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Security Clearance</h2>
-                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Assigned Authorization Levels</p>
+                                            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Roles & Permissions</h2>
+                                            <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">Assigned Access Levels</p>
                                         </div>
 
                                         <div className="border border-zinc-100 dark:border-zinc-800 rounded-xl divide-y dark:divide-zinc-800 overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -436,13 +436,13 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                 <Globe size={18} />
                                             </div>
                                             <div>
-                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Social Connectivity</h2>
-                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External Profile Integration</p>
+                                                <h2 className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Social Connections</h2>
+                                                <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase">External Profiles</p>
                                             </div>
                                         </div>
 
                                         <div className="space-y-6">
-                                            <TechLabel label="LinkedIn Network" icon={Linkedin}>
+                                            <TechLabel label="LinkedIn Profile" icon={Linkedin}>
                                                 <Input
                                                     placeholder="URL"
                                                     value={data.linkedin_url}
@@ -466,7 +466,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                     className="rounded-xl border-zinc-200 dark:border-zinc-800 transition-colors hover:border-sky-500/50"
                                                 />
                                             </TechLabel>
-                                            <TechLabel label="Portfolio / Web Terminal" icon={ExternalLink}>
+                                            <TechLabel label="Website / Portfolio" icon={ExternalLink}>
                                                 <Input
                                                     placeholder="https://..."
                                                     value={data.portfolio_url}
@@ -489,10 +489,10 @@ export default function StaffEdit({ staff, roles }: Props) {
                                         disabled={processing}
                                     >
                                         <Save className="mr-3 h-5 w-5" />
-                                        {processing ? "Updating Meta..." : "Commit Profile Changes"}
+                                        {processing ? "Updating..." : "Save Changes"}
                                     </Button>
                                     <p className="text-center text-[9px] text-zinc-400 mt-4 font-mono uppercase tracking-widest">
-                                        Committing changes will instantly update system authorization records.
+                                        Saving changes will update member profile and permissions.
                                     </p>
                                 </motion.div>
                             </div>
