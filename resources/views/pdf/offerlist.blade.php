@@ -160,6 +160,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                 <th>Pack Ctn</th>
                 <th>Loose Ctn</th>
                 <th>M.R.P</th>
+                <th>Price</th>
                 <th>Scheme</th>
             </tr>
         </thead>
@@ -169,7 +170,8 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                 <td class="text-left">{{ $item->items->title }}</td>
                 <td>{{ $item->pack_ctn }}</td>
                 <td>{{ $item->loos_ctn }}</td>
-                <td>{{ $item->mrp }}</td>
+                <td>{{ number_format($item->mrp, 2) }}</td>
+                <td>{{ number_format($item->price, 2) }}</td>
                 <td>{{ $item->scheme }}</td>
             </tr>
             @endforeach

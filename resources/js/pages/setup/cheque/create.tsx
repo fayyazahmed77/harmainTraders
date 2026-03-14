@@ -18,7 +18,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { BreadcrumbItem } from "@/types";
-import { router, usePage, Head } from "@inertiajs/react";
+import { router, usePage, Head, useForm } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import useToastFromQuery from "@/hooks/useToastFromQuery";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heading } from "@/components/ui/Heading";
@@ -38,40 +40,33 @@ interface Bank {
 const PREMIUM_ROUNDING = "rounded-2xl";
 
 export default function ChequeGenerationPage() {
-  // ✅ Page props from Laravel
-  const { banks } = usePage().props as unknown as { banks: Bank[] };
+  const { banks } = usePage<any>().props as unknown as { banks: Bank[] };
 
   useToastFromQuery();
 
-  const pageProps = usePage().props as unknown as {
-    auth: {
-      user: any;
-      permissions: string[];
-    };
-    errors: Record<string, string>;
-  };
-
-  const permissions = pageProps.auth?.permissions || [];
-  const errors = pageProps.errors || {};
-
-  const [date, setDate] = useState<Date | undefined>(new Date());
   const [open, setOpen] = useState(false);
-  const [bankId, setBankId] = useState("");
-  const [chequeFrom, setChequeFrom] = useState("");
-  const [voucherno, setVoucherno] = useState("");
-  const [prefix, setPrefix] = useState("");
-  const [chequeTo, setChequeTo] = useState("");
-  const [remarks, setRemarks] = useState("");
   const [generatedCheques, setGeneratedCheques] = useState<string[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+
+  const { data: form, setData: setForm, post, processing: isSubmitting, errors, isDirty } = useForm({
+    entry_date: new Date() as Date | undefined,
+    bank_id: "",
+    voucher_code: "",
+    prefix: "",
+    cheque_from: "",
+    cheque_to: "",
+    remarks: "",
+    cheques: [] as string[],
+  });
+
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // ✅ Generate cheque numbers
   const handleGenerate = () => {
-    if (!chequeFrom || !chequeTo)
+    if (!form.cheque_from || !form.cheque_to)
       return toast.error("Missing Numbers", { description: "Please enter both start and end numbers." });
 
-    const from = parseInt(chequeFrom);
-    const to = parseInt(chequeTo);
+    const from = parseInt(form.cheque_from);
+    const to = parseInt(form.cheque_to);
 
     if (isNaN(from) || isNaN(to) || from > to) {
       return toast.error("Invalid Numbers", { description: "End number must be greater than start number." });
@@ -86,33 +81,25 @@ export default function ChequeGenerationPage() {
       cheques.push(i.toString().padStart(3, "0"));
     }
     setGeneratedCheques(cheques);
+    setForm("cheques", cheques);
     toast.success(`${cheques.length} Cheques Previewed`, { icon: <Sparkles className="h-4 w-4" /> });
   };
 
   // ✅ Submit data to backend
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bankId) return toast.error("Please Select a Bank");
+    if (!form.bank_id) return toast.error("Please Select a Bank");
     if (generatedCheques.length === 0) return toast.error("No Cheques to Add");
 
-    setIsProcessing(true);
-    router.post("/cheque", {
-      bank_id: bankId,
-      entry_date: date,
-      remarks,
-      voucher_code: voucherno,
-      prefix,
-      cheques: generatedCheques,
-    }, {
-      onFinish: () => setIsProcessing(false),
+    post("/cheque", {
       onSuccess: () => toast.success("Cheque Book Added Successfully"),
-      onError: () => toast.error("Failed to Add Cheque Book")
+      onError: () => toast.error("Failed to Add Cheque Book"),
     });
   };
 
   const selectedBankName = useMemo(() => {
-    return banks.find(b => b.id.toString() === bankId)?.name || "Not Selected";
-  }, [bankId, banks]);
+    return banks.find(b => b.id.toString() === form.bank_id)?.name || "Not Selected";
+  }, [form.bank_id, banks]);
 
   return (
     <SidebarProvider>
@@ -166,11 +153,11 @@ export default function ChequeGenerationPage() {
                               variant="outline"
                               className={cn(
                                 "w-full justify-between text-left font-bold rounded-xl h-12 border-zinc-200 dark:border-zinc-800 hover:border-orange-500/50 transition-all",
-                                !date && "text-muted-foreground"
+                                !form.entry_date && "text-muted-foreground"
                               )}
                             >
-                              {date
-                                ? date.toLocaleDateString("en-GB", {
+                              {form.entry_date
+                                ? form.entry_date.toLocaleDateString("en-GB", {
                                   day: "2-digit",
                                   month: "short",
                                   year: "numeric",
@@ -182,9 +169,9 @@ export default function ChequeGenerationPage() {
                           <PopoverContent className="w-auto p-0 rounded-2xl border-zinc-200 dark:border-zinc-800" align="start">
                             <Calendar
                               mode="single"
-                              selected={date}
+                              selected={form.entry_date}
                               onSelect={(value) => {
-                                setDate(value);
+                                setForm("entry_date", value);
                                 setOpen(false);
                               }}
                               className="rounded-2xl shadow-2xl"
@@ -196,7 +183,7 @@ export default function ChequeGenerationPage() {
                       {/* Bank Identity */}
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Bank</Label>
-                        <Select value={bankId} onValueChange={setBankId}>
+                        <Select value={form.bank_id} onValueChange={(v) => setForm("bank_id", v)}>
                           <SelectTrigger className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all w-full">
                             <SelectValue placeholder="Select Bank..." />
                           </SelectTrigger>
@@ -217,8 +204,8 @@ export default function ChequeGenerationPage() {
                         <div className="relative">
                           <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
-                            value={voucherno}
-                            onChange={(e) => setVoucherno(e.target.value)}
+                            value={form.voucher_code}
+                            onChange={(e) => setForm("voucher_code", e.target.value)}
                             placeholder="SYS-VOUCH-XXX"
                             className="pl-10 h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm uppercase focus:ring-orange-500/20 transition-all"
                           />
@@ -231,8 +218,8 @@ export default function ChequeGenerationPage() {
                         <div className="relative">
                           <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
-                            value={prefix}
-                            onChange={(e) => setPrefix(e.target.value)}
+                            value={form.prefix}
+                            onChange={(e) => setForm("prefix", e.target.value)}
                             placeholder="D-"
                             className="pl-10 h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm uppercase focus:ring-orange-500/20 transition-all"
                           />
@@ -244,8 +231,8 @@ export default function ChequeGenerationPage() {
                         <div className="space-y-2">
                           <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Start No</Label>
                           <Input
-                            value={chequeFrom}
-                            onChange={(e) => setChequeFrom(e.target.value)}
+                            value={form.cheque_from}
+                            onChange={(e) => setForm("cheque_from", e.target.value)}
                             placeholder="001"
                             className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all"
                           />
@@ -253,8 +240,8 @@ export default function ChequeGenerationPage() {
                         <div className="space-y-2">
                           <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">End No</Label>
                           <Input
-                            value={chequeTo}
-                            onChange={(e) => setChequeTo(e.target.value)}
+                            value={form.cheque_to}
+                            onChange={(e) => setForm("cheque_to", e.target.value)}
                             placeholder="050"
                             className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all"
                           />
@@ -267,8 +254,8 @@ export default function ChequeGenerationPage() {
                         <div className="relative">
                           <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                           <Input
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
+                            value={form.remarks}
+                            onChange={(e) => setForm("remarks", e.target.value)}
                             placeholder="Add any notes here..."
                             className="pl-10 h-12 rounded-xl border-zinc-200 dark:border-zinc-800 text-sm focus:ring-orange-500/20 transition-all"
                           />
@@ -291,10 +278,10 @@ export default function ChequeGenerationPage() {
 
                       <Button
                         type="submit"
-                        disabled={isProcessing}
+                        disabled={isSubmitting}
                         className="w-full md:w-auto px-12 rounded-xl h-12 bg-zinc-900 border-orange-500/20 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-widest text-[10px] hover:shadow-xl hover:shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50"
                       >
-                        {isProcessing ? (
+                        {isSubmitting ? (
                           <div className="flex items-center gap-2">
                             <div className="h-3 w-3 border-2 border-t-transparent border-zinc-500 animate-spin rounded-full" />
                             Processing...
@@ -341,7 +328,7 @@ export default function ChequeGenerationPage() {
                                 transition={{ delay: Math.min(i * 0.01, 0.5) }}
                                 className="aspect-video flex items-center justify-center rounded-lg bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 text-[10px] font-mono font-black text-zinc-400 hover:border-orange-500/30 hover:text-orange-500 transition-all cursor-crosshair group shadow-sm"
                               >
-                                <span className="opacity-40 group-hover:opacity-100">{prefix}</span>
+                                <span className="opacity-40 group-hover:opacity-100">{form.prefix}</span>
                                 <span className="text-zinc-900 dark:text-zinc-100 group-hover:text-orange-500">{num}</span>
                               </motion.div>
                             ))}
@@ -424,6 +411,11 @@ export default function ChequeGenerationPage() {
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; border: 1px solid transparent; background-clip: padding-box; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
         `}</style>
+        <DirtyStateDialog
+          isOpen={showConfirm}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

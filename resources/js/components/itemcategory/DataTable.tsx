@@ -28,7 +28,9 @@ import {
   Layers,
   ImageIcon
 } from "lucide-react";
-import { router, usePage } from "@inertiajs/react";
+import { router, usePage, useForm } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,10 +89,8 @@ interface DataTableProps {
 export function DataTable({ data }: DataTableProps) {
   const pageProps = usePage().props as unknown as {
     auth: { user: any; permissions: string[] };
-    errors: Record<string, string>;
   };
   const permissions = pageProps.auth?.permissions || [];
-  const errors = pageProps.errors || {};
   const canEdit = Array.isArray(permissions) && (permissions.includes("edit item_categories") || permissions.includes("edit item-categories") || true);
   const canDelete = Array.isArray(permissions) && (permissions.includes("delete item_categories") || permissions.includes("delete item-categories") || true);
 
@@ -101,47 +101,43 @@ export function DataTable({ data }: DataTableProps) {
   const [editCategory, setEditCategory] = useState<ItemCategory | null>(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ItemCategory | null>(null);
-
-  // Form states for edit
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<ItemCategory["status"]>("active");
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: form, setData: setForm, post, processing: isSubmitting, errors, isDirty, reset: resetForm } = useForm({
+    name: "",
+    code: "",
+    description: "",
+    status: "active" as "active" | "inactive",
+    image: null as File | null,
+    _method: "PUT",
+  });
+
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   const openEdit = (cat: ItemCategory) => {
     setEditCategory(cat);
-    setName(cat.name ?? "");
-    setCode(cat.code ?? "");
-    setDescription(cat.description ?? "");
-    setStatus(cat.status ?? "active");
-    setImageFile(null);
+    setForm({
+      name: cat.name ?? "",
+      code: cat.code ?? "",
+      description: cat.description ?? "",
+      status: cat.status ?? "active",
+      image: null,
+      _method: "PUT",
+    });
     setImagePreview(cat.image ? `/images/${cat.image}` : null);
   };
 
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editCategory) return;
-    setIsSubmitting(true);
 
-    const formData = new FormData();
-    formData.append("_method", "PUT");
-    formData.append("name", name);
-    formData.append("code", code);
-    formData.append("description", description ?? "");
-    formData.append("status", status);
-
-    if (imageFile) formData.append("image", imageFile);
-
-    router.post(`/item-categories/${editCategory.id}`, formData, {
+    post(`/item-categories/${editCategory.id}`, {
       forceFormData: true,
       onSuccess: () => {
         toast.success("Category updated successfully");
         setEditCategory(null);
+        resetForm();
       },
-      onFinish: () => setIsSubmitting(false),
     });
   };
 
@@ -439,8 +435,8 @@ export function DataTable({ data }: DataTableProps) {
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Name</Label>
                   <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={form.name}
+                    onChange={(e) => setForm("name", e.target.value)}
                     className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
                   />
                   {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
@@ -448,8 +444,8 @@ export function DataTable({ data }: DataTableProps) {
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Code</Label>
                   <Input
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    value={form.code}
+                    onChange={(e) => setForm("code", e.target.value.toUpperCase())}
                     className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
                   />
                   {errors.code && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.code}</p>}
@@ -471,7 +467,7 @@ export function DataTable({ data }: DataTableProps) {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          setImageFile(file);
+                          setForm("image", file);
                           const reader = new FileReader();
                           reader.onloadend = () => setImagePreview(reader.result as string);
                           reader.readAsDataURL(file);
@@ -482,19 +478,19 @@ export function DataTable({ data }: DataTableProps) {
                   {errors.image && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.image}</p>}
                 </div>
               </div>
-              <div className="space-y-4">
+                <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Description</Label>
                   <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    value={form.description}
+                    onChange={(e) => setForm("description", e.target.value)}
                     className="min-h-[150px] border-zinc-200 dark:border-zinc-800 rounded-xl font-medium text-sm"
                   />
                   {errors.description && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.description}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Status</Label>
-                  <ShadSelect value={status} onValueChange={(v: any) => setStatus(v)}>
+                  <ShadSelect value={form.status} onValueChange={(v: any) => setForm("status", v)}>
                     <SelectTrigger className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[10px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -547,6 +543,11 @@ export function DataTable({ data }: DataTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DirtyStateDialog
+        isOpen={showConfirm}
+        onClose={cancelNavigation}
+        onConfirm={confirmNavigation}
+      />
     </div>
   );
 }

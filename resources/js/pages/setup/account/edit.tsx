@@ -13,7 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { BreadcrumbItem } from "@/types";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { CalendarIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -285,7 +287,7 @@ export default function Edit({
   });
 
   // ---------- Inertia Form (Moved Up) ----------
-  const { data, setData, put, processing, errors, transform, reset, clearErrors, setError } = useForm<AccountForm>({
+  const { data, setData, put, processing, errors, transform, reset, clearErrors, setError, isDirty } = useForm<AccountForm>({
     ...account,
     // ensure boolean types
     purchase: Number(account.purchase) === 1,
@@ -318,6 +320,8 @@ export default function Edit({
     ats_percentage: account.ats_percentage ?? "",
     ats_type: account.ats_type ?? "",
   } as AccountForm);
+
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // ---------- Cascading Fetchers ----------
   const fetchProvinces = async (countryId: number) => {
@@ -1055,6 +1059,11 @@ export default function Edit({
             </div>
           </div>
         </div>
+        <DirtyStateDialog
+          isOpen={showConfirm}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

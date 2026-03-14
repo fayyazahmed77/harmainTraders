@@ -2,7 +2,9 @@
 
 import * as React from "react"
 import { useState, useEffect } from "react"
-import { useForm } from "@inertiajs/react"
+import { useForm, router } from "@inertiajs/react"
+import { useNavigationGuard } from "@/hooks/use-navigation-guard"
+import { DirtyStateDialog } from "@/components/dirty-state-dialog"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -36,6 +38,50 @@ const breadcrumbs: BreadcrumbItem[] = [
   { title: "Items", href: "/items" },
   { title: "Create", href: "/items/create" },
 ]
+
+interface ItemForm {
+  date: string;
+  code: string;
+  title: string;
+  short_name: string;
+  company: string;
+  trade_price: string | number;
+  retail: string | number;
+  retail_tp_diff: string | number;
+  reorder_level: string | number;
+  packing_qty: string | number;
+  packing_size: string;
+  pcs: string | number;
+  formation: string;
+  type: string;
+  category: string;
+  shelf: string;
+  gst_percent: string | number;
+  gst_amount: string | number;
+  adv_tax_filer: string | number;
+  adv_tax_non_filer: string | number;
+  adv_tax_manufacturer: string | number;
+  discount: string | number;
+  packing_full: string | number;
+  packing_pcs: string | number;
+  limit_pcs: string | number;
+  order_qty: string | number;
+  weight: string | number;
+  stock_1: string | number;
+  stock_2: string | number;
+  is_import: boolean;
+  is_fridge: boolean;
+  is_active: boolean;
+  is_recipe: boolean;
+  pt2: string | number;
+  pt3: string | number;
+  pt4: string | number;
+  pt5: string | number;
+  pt6: string | number;
+  pt7: string | number;
+  scheme: string;
+  [key: string]: any;
+}
 
 // Style Constants (Professional Modern)
 const PREMIUM_ROUNDING = "rounded-xl";
@@ -155,7 +201,7 @@ export default function Page({ categories, companies }: { categories: any, compa
   const [openingOpen, setOpeningOpen] = useState(false)
 
   // Inertia form initialised with keys matching your migration
-  const { data, setData, post, processing, errors, reset } = useForm({
+  const { data, setData, post, processing, errors, reset, isDirty } = useForm<ItemForm>({
     date: "",
     code: "",
     title: "",
@@ -189,23 +235,25 @@ export default function Page({ categories, companies }: { categories: any, compa
     is_fridge: false,
     is_active: true,
     is_recipe: false,
-    pt2: "",
-    pt3: "",
-    pt4: "",
-    pt5: "",
-    pt6: "",
-    pt7: "",
+    pt2: 0,
+    pt3: 0,
+    pt4: 0,
+    pt5: 0,
+    pt6: 0,
+    pt7: 0,
     scheme: "",
   })
 
-  // small helper typed setter
-  const onInputChange = <K extends keyof typeof data>(key: K, value: typeof data[K]) =>
-    setData(key, value as any)
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
+
+  // small helper typed setter - using type bypass to resolve deep recursion in large forms
+  const onInputChange = (key: keyof ItemForm, value: any) =>
+    (setData as any)(key, value)
 
   // UseEffect to calculating Retail and Trade Price difference
   useEffect(() => {
-    const tradePrice = parseFloat(data.trade_price);
-    const retailPrice = parseFloat(data.retail);
+    const tradePrice = parseFloat(String(data.trade_price));
+    const retailPrice = parseFloat(String(data.retail));
 
     if (!isNaN(tradePrice) && !isNaN(retailPrice) && tradePrice !== 0) {
       const diff = ((retailPrice - tradePrice) / tradePrice) * 100;
@@ -213,13 +261,13 @@ export default function Page({ categories, companies }: { categories: any, compa
       // Using toFixed(2) for display
       const diffStr = diff.toFixed(2);
       if (data.retail_tp_diff !== diffStr) {
-        setData("retail_tp_diff", diffStr);
+        (setData as any)("retail_tp_diff", diffStr);
       }
     } else {
       // Clear if inputs invalid/cleared? Or keep last valid?
       // Usually better to clear if inputs are cleared to avoid stale data
       if ((data.trade_price === "" || data.retail === "") && data.retail_tp_diff !== "") {
-        setData("retail_tp_diff", "");
+        (setData as any)("retail_tp_diff", "");
       }
     }
   }, [data.trade_price, data.retail]);
@@ -712,6 +760,11 @@ export default function Page({ categories, companies }: { categories: any, compa
           </main>
         </div>
       </SidebarInset>
+      <DirtyStateDialog 
+        isOpen={showConfirm} 
+        onClose={cancelNavigation} 
+        onConfirm={confirmNavigation} 
+      />
     </SidebarProvider>
   )
 }

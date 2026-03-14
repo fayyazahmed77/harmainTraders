@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Head, router, usePage } from "@inertiajs/react";
+import { Head, router, usePage, useForm } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -57,24 +59,26 @@ interface PageProps {
 export default function Index({ categories, filters }: PageProps) {
   useToastFromQuery();
 
-  const { auth, errors } = usePage<any>().props as unknown as PageProps;
+  const { auth } = usePage<any>().props as unknown as PageProps;
   const permissions = auth?.permissions || [];
   const canCreate = Array.isArray(permissions) && (permissions.includes("create item_categories") || permissions.includes("create item-categories") || true);
 
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Form states
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"active" | "inactive">("active");
-  const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const { data: form, setData: setForm, post, processing: isSubmitting, reset: resetForm, errors, isDirty } = useForm({
+    name: "",
+    code: "",
+    description: "",
+    status: "active" as "active" | "inactive",
+    image: null as File | null,
+  });
+
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
-    setImage(file);
+    setForm("image", file);
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
@@ -86,36 +90,19 @@ export default function Index({ categories, filters }: PageProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return toast.error("Please enter a category name");
+    if (!form.name.trim()) return toast.error("Please enter a category name");
 
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("code", code);
-    formData.append("description", description);
-    formData.append("status", status);
-
-    if (image) formData.append("image", image);
-
-    router.post("/item-categories", formData, {
+    post("/item-categories", {
       onSuccess: () => {
         toast.success("Category created successfully");
         setOpenCreateDialog(false);
         resetForm();
+        setImagePreview(null);
       },
-      onFinish: () => setIsSubmitting(false),
       forceFormData: true,
     });
   };
 
-  const resetForm = () => {
-    setName("");
-    setCode("");
-    setDescription("");
-    setStatus("active");
-    setImage(null);
-    setImagePreview(null);
-  };
 
   return (
     <>
@@ -164,6 +151,11 @@ export default function Index({ categories, filters }: PageProps) {
             </div>
           </div>
         </SidebarInset>
+        <DirtyStateDialog
+          isOpen={showConfirm}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+        />
       </SidebarProvider>
 
       <Dialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}>
@@ -189,8 +181,8 @@ export default function Index({ categories, filters }: PageProps) {
                     <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                     <Input
                       required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      value={form.name}
+                      onChange={(e) => setForm("name", e.target.value)}
                       placeholder="e.g. Beverages"
                       className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
                     />
@@ -204,8 +196,8 @@ export default function Index({ categories, filters }: PageProps) {
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                     <Input
                       required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      value={form.code}
+                      onChange={(e) => setForm("code", e.target.value.toUpperCase())}
                       placeholder="e.g. BEV"
                       className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
                     />
@@ -238,18 +230,20 @@ export default function Index({ categories, filters }: PageProps) {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Description</Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter category details..."
-                    className="min-h-[150px] border-zinc-200 dark:border-zinc-800 rounded-xl font-medium text-sm"
-                  />
+                  <div className="relative">
+                    <Textarea
+                      value={form.description}
+                      onChange={(e) => setForm("description", e.target.value)}
+                      placeholder="Enter category details..."
+                      className="min-h-[150px] border-zinc-200 dark:border-zinc-800 rounded-xl font-medium text-sm"
+                    />
+                  </div>
                   {errors.description && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.description}</p>}
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Status</Label>
-                  <Select value={status} onValueChange={(v: "active" | "inactive") => setStatus(v)}>
+                  <Select value={form.status} onValueChange={(v: "active" | "inactive") => setForm("status", v)}>
                     <SelectTrigger className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[10px]">
                       <SelectValue placeholder="Select Status" />
                     </SelectTrigger>

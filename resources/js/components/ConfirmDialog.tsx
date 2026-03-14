@@ -32,63 +32,59 @@ export function ConfirmDialog({
     cancelText = "Cancel",
     variant = "default"
 }: ConfirmDialogProps) {
-    const getIcon = () => {
+    const getVariantConfig = () => {
         switch (variant) {
-            case 'destructive':
-            case 'warning':
-                return <AlertCircle className={cn("h-12 w-12 mb-4", variant === 'destructive' ? "text-red-500" : "text-amber-500")} />;
-            case 'success':
-                return <CheckCircle2 className="h-12 w-12 text-emerald-500 mb-4" />;
-            default:
-                return <HelpCircle className="h-12 w-12 text-blue-500 mb-4" />;
+            case 'destructive': return { color: "rose", bg: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" };
+            case 'warning': return { color: "orange", bg: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" };
+            case 'success': return { color: "emerald", bg: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" };
+            default: return { color: "blue", bg: "bg-blue-500", text: "text-blue-600 dark:text-blue-400" };
         }
     };
 
-    const getConfirmButtonVariant = () => {
-        switch (variant) {
-            case 'destructive': return "destructive";
-            case 'success': return "default"; // emerald would be custom, but let's stick to standard or custom class
-            case 'warning': return "default";
-            default: return "default";
-        }
-    };
-
-    const confirmButtonClass = cn(
-        variant === 'success' && "bg-emerald-600 hover:bg-emerald-700 text-white",
-        variant === 'warning' && "bg-amber-600 hover:bg-amber-700 text-white"
-    );
+    const config = getVariantConfig();
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden border-none shadow-2xl">
-                <div className="p-6 flex flex-col items-center text-center">
-                    <div className="animate-in fade-in zoom-in duration-300">
-                        {getIcon()}
+            <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-2xl bg-white dark:bg-zinc-950 rounded-[2rem] animate-in fade-in zoom-in duration-300">
+                <div className="p-8 pb-4 flex flex-col items-center text-center gap-6">
+                    {/* Simplified & Clean Icon Container */}
+                    <div className={cn(
+                        "w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-500 hover:rotate-12",
+                        `bg-${config.color}-500/10 ${config.text}`
+                    )}>
+                        {variant === 'destructive' || variant === 'warning' ? <AlertCircle className="w-8 h-8" /> :
+                         variant === 'success' ? <CheckCircle2 className="w-8 h-8" /> :
+                         <HelpCircle className="w-8 h-8" />}
                     </div>
+                    
                     <DialogHeader className="sm:text-center space-y-2">
-                        <DialogTitle className="text-2xl font-bold tracking-tight text-gray-900 group-data-[theme=dark]:text-gray-100">
+                        <DialogTitle className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                             {title}
                         </DialogTitle>
-                        <DialogDescription className="text-base text-gray-500 dark:text-gray-400">
+                        <DialogDescription className="text-base font-medium leading-relaxed text-zinc-500 dark:text-zinc-400 px-2">
                             {description}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
-                <DialogFooter className="bg-gray-50 dark:bg-gray-900/50 p-4 sm:justify-center gap-3 border-t">
+
+                <DialogFooter className="p-6 sm:justify-center gap-3">
                     <Button
                         variant="ghost"
                         onClick={onClose}
-                        className="w-full sm:w-28 font-semibold hover:bg-gray-200 dark:hover:bg-gray-800"
+                        className="w-full sm:w-28 h-11 font-bold text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-xl transition-all active:scale-95"
                     >
                         {cancelText}
                     </Button>
                     <Button
-                        variant={getConfirmButtonVariant()}
                         onClick={() => {
                             onConfirm();
                             onClose();
                         }}
-                        className={cn("w-full sm:w-28 font-semibold shadow-md active:scale-95 transition-all", confirmButtonClass)}
+                        className={cn(
+                            "w-full sm:w-32 h-11 font-bold text-sm text-white shadow-lg transition-all active:scale-95 rounded-xl",
+                            config.bg,
+                            `hover:${config.bg}/90`
+                        )}
                     >
                         {confirmText}
                     </Button>

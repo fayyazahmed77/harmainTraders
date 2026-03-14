@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage, useForm } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -50,7 +52,7 @@ interface PageProps {
 
 export default function FirmCreate() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { auth, errors } = usePage<any>().props as unknown as PageProps;
+  const { auth } = usePage<any>().props as unknown as PageProps;
 
   const breadcrumbs: BreadcrumbItem[] = [
     { title: "Firms", href: "/firms" },
@@ -60,9 +62,7 @@ export default function FirmCreate() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [openCalendar, setOpenCalendar] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [form, setForm] = useState({
+  const { data: form, setData: setForm, post, processing: isSubmitting, errors, isDirty } = useForm({
     code: "",
     name: "",
     business: "",
@@ -82,17 +82,16 @@ export default function FirmCreate() {
     logo: null as File | null,
   });
 
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setForm({
-      ...form,
-      [name]: type === "checkbox" ? checked : value,
-    });
+    setForm(name as any, type === "checkbox" ? checked : value);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setForm({ ...form, logo: file });
+    setForm("logo", file);
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => setLogoPreview(reader.result as string);
@@ -104,34 +103,22 @@ export default function FirmCreate() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
-    const formData = new FormData();
-    Object.entries(form).forEach(([key, value]) => {
-      if (value !== null) {
-        if (typeof value === "boolean") {
-          formData.append(key, value ? "1" : "0");
-        } else {
-          formData.append(key, value as any);
-        }
-      }
-    });
-
+    const finalForm = { ...form };
     if (date) {
-      formData.append("date", date.toLocaleDateString("en-GB", {
+      (finalForm as any).date = date.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-      }));
+      });
     }
 
-    router.post("/firms", formData, {
+    post("/firms", {
       forceFormData: true,
       onSuccess: () => {
         toast.success("Firm added successfully", { description: "New firm has been saved." });
       },
       onError: () => toast.error("Sync Failed"),
-      onFinish: () => setIsSubmitting(false),
     });
   };
 
@@ -479,7 +466,7 @@ export default function FirmCreate() {
                         </div>
                         <Checkbox
                           checked={form.printinvoice}
-                          onCheckedChange={(val) => setForm({ ...form, printinvoice: !!val })}
+                          onCheckedChange={(val) => setForm("printinvoice", !!val)}
                           className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                         />
                       </div>
@@ -490,7 +477,7 @@ export default function FirmCreate() {
                         </div>
                         <Checkbox
                           checked={form.defult}
-                          onCheckedChange={(val) => setForm({ ...form, defult: !!val })}
+                          onCheckedChange={(val) => setForm("defult", !!val)}
                           className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                         />
                       </div>
@@ -501,7 +488,7 @@ export default function FirmCreate() {
                         </div>
                         <Checkbox
                           checked={form.status}
-                          onCheckedChange={(val) => setForm({ ...form, status: !!val })}
+                          onCheckedChange={(val) => setForm("status", !!val)}
                           className="h-5 w-5 rounded-lg border-2 border-zinc-800 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                         />
                       </div>
@@ -543,6 +530,11 @@ export default function FirmCreate() {
             .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d4d4d8; }
           `}} />
         </SidebarInset>
+        <DirtyStateDialog
+          isOpen={showConfirm}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+        />
       </SidebarProvider>
     </>
   );

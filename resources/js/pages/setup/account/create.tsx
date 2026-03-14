@@ -13,7 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { BreadcrumbItem } from "@/types";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useForm } from "@inertiajs/react";
+import { useForm, router } from "@inertiajs/react";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { CalendarIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -402,7 +404,7 @@ export default function Create({
   };
 
   // ---------- Inertia form ----------
-  const { data, setData, post, processing, errors, reset, transform, setError, clearErrors } = useForm({
+  const { data, setData, post, processing, errors, reset, transform, setError, clearErrors, isDirty } = useForm({
     code: "",
     title: "",
     type: "",
@@ -439,6 +441,8 @@ export default function Create({
     cnic: "",
     status: true,
   });
+
+  const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // ---------- Auto-generate Code Logic ----------
   useEffect(() => {
@@ -1123,6 +1127,11 @@ export default function Create({
             </form>
           </main>
         </div>
+        <DirtyStateDialog
+          isOpen={showConfirm}
+          onClose={cancelNavigation}
+          onConfirm={confirmNavigation}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

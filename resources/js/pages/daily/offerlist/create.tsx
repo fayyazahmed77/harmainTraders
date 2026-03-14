@@ -251,7 +251,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                 loos_ctn: r.loos_ctn,
                 price_type: priceType === 'both' ? 'trade-retail' : priceType,
                 mrp: r.mrp,
-                price: priceType === 'trade' ? r.trade_price : r.retail,
+                price: priceType === 'retail' ? r.retail : r.trade_price,
                 scheme: r.scheme,
                 status: 'active'
             }));
