@@ -92,7 +92,19 @@ class SalesController extends Controller
             ->get();
         $salemans = Saleman::get();
         // Only load items that are in stock
-        $items = Items::where('stock_1', '>', 0)->get();
+        $items = Items::with('lastPurchaseItem.purchase.supplier')
+            ->where('stock_1', '>', 0)
+            ->get()
+            ->map(function ($item) {
+                if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
+                    $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
+                    $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
+                    $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
+                    $item->last_purchase_rate = $item->lastPurchaseItem->trade_price;
+                    $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
+                }
+                return $item;
+            });
 
         // Calculate Next Invoice Number
         $lastSale = Sales::latest()->first();
@@ -130,7 +142,6 @@ class SalesController extends Controller
     //store
     public function store(Request $request)
     {
-
         $request->validate([
             'date'            => 'required|date',
             'invoice'         => 'required|string', // Assuming auto-generated or passed
@@ -317,20 +328,17 @@ class SalesController extends Controller
                 }
             }
 
+            \Illuminate\Support\Facades\Log::info("SalesController@store: Processing stock for sale " . $sale->id);
             // Insert items and update stock
             foreach ($request->items as $it) {
+                \Illuminate\Support\Facades\Log::info("Processing item ID: " . $it['item_id'] . " Total PCS from payload: " . $it['total_pcs']);
                 $item = Items::find($it['item_id']);
 
                 if (!$item) {
                     throw new \Exception("Item not found: ID " . $it['item_id']);
                 }
 
-                if (($item->stock_1 ?? 0) < $it['total_pcs']) {
-                    // Check if negative stock is allowed for this request
-                    if (!$request->boolean('allow_negative_stock')) {
-                        throw new \Exception("Insufficient stock for item: " . $item->title . ". Available: " . ($item->stock_1 ?? 0));
-                    }
-                }
+
 
                 SalesItem::create([
                     'sale_id'     => $sale->id,
@@ -348,12 +356,13 @@ class SalesController extends Controller
                 ]);
 
                 // Decrease Stock (Billable + Bonus)
-                $packing = $item->packing_full ?? $item->packing_qty ?? 1;
+                $packing = $item->packing_qty ?: 1;
                 $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
                 $totalToDeduct = $it['total_pcs'] + $bonusUnits;
 
-                $item->stock_1 = ($item->stock_1 ?? 0) - $totalToDeduct;
-                $item->save();
+                \Illuminate\Support\Facades\Log::info("Deducting " . $totalToDeduct . " pcs from item " . $item->id . ". Current total_stock_pcs: " . $item->total_stock_pcs);
+                $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
+                \Illuminate\Support\Facades\Log::info("New stock for item " . $item->id . ": stock_1=" . $item->stock_1 . ", stock_2=" . $item->stock_2);
             }
 
             DB::commit();
@@ -383,7 +392,18 @@ class SalesController extends Controller
             })
             ->get();
         $salemans = Saleman::get();
-        $items = Items::get();
+        $items = Items::with('lastPurchaseItem.purchase.supplier')
+            ->get()
+            ->map(function ($item) {
+                if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
+                    $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
+                    $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
+                    $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
+                    $item->last_purchase_rate = $item->lastPurchaseItem->trade_price;
+                    $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
+                }
+                return $item;
+            });
 
         // Fetch Payment Accounts (Cash/Bank)
         $paymentAccounts = Account::whereHas('accountType', function ($q) {
@@ -463,20 +483,21 @@ class SalesController extends Controller
             foreach ($oldItems as $oldItem) {
                 $product = Items::find($oldItem->item_id);
                 if ($product) {
-                    $packing = $product->packing_full ?? $product->packing_qty ?? 1;
+                    $packing = $product->packing_qty ?: 1;
                     $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
                     $totalToRevert = $oldItem->total_pcs + $bonusUnits;
 
-                    $product->stock_1 = ($product->stock_1 ?? 0) + $totalToRevert;
-                    $product->save();
+                    $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
                 }
             }
 
             // Delete old items
             SalesItem::where('sale_id', $id)->delete();
 
+            \Illuminate\Support\Facades\Log::info("SalesController@update: Processing stock for sale " . $id);
             // Insert new items and update stock (Decrease)
             foreach ($request->items as $it) {
+                \Illuminate\Support\Facades\Log::info("Processing new item ID: " . $it['item_id'] . " Total PCS: " . $it['total_pcs']);
                 SalesItem::create([
                     'sale_id'     => $sale->id,
                     'item_id'     => $it['item_id'],
@@ -495,12 +516,11 @@ class SalesController extends Controller
                 // Decrease Stock (Billable + Bonus)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = $item->packing_full ?? $item->packing_qty ?? 1;
+                    $packing = $item->packing_qty ?: 1;
                     $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
                     $totalToDeduct = $it['total_pcs'] + $bonusUnits;
 
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalToDeduct;
-                    $item->save();
+                    $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
                 }
             }
 
@@ -595,12 +615,11 @@ class SalesController extends Controller
             foreach ($sale->items as $item) {
                 $product = Items::find($item->item_id);
                 if ($product) {
-                    $packing = $product->packing_full ?? $product->packing_qty ?? 1;
+                    $packing = $product->packing_qty ?: 1;
                     $bonusUnits = (($item->bonus_qty_carton ?? 0) * $packing) + ($item->bonus_qty_pcs ?? 0);
                     $totalToRevert = $item->total_pcs + $bonusUnits;
 
-                    $product->stock_1 = ($product->stock_1 ?? 0) + $totalToRevert;
-                    $product->save();
+                    $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
                 }
             }
 

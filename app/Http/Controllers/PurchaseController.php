@@ -200,7 +200,7 @@ class PurchaseController extends Controller
                 // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
+                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs']);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {
@@ -314,7 +314,7 @@ class PurchaseController extends Controller
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $oldItem->total_pcs;
+                    $item->updateStockFromPcs($item->total_stock_pcs - $oldItem->total_pcs);
                     $item->save();
                 }
             }
@@ -346,7 +346,7 @@ class PurchaseController extends Controller
                 // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
+                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs']);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {

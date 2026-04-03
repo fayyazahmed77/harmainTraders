@@ -82,7 +82,9 @@ interface Item {
   pt7?: number;
   category?: string;
   scheme?: string;
-  // any other fields you may have
+  total_stock_pcs?: number;
+  price_per_pcs?: number;
+  stock_breakdown?: string;
 }
 
 interface RowData {
@@ -485,13 +487,12 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
 
   // Recalculate a row amount whenever rate/full/pcs/bonus changes
   const recalcRowAmount = (row: RowData, item?: Item) => {
-    const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
-    const totalUnits = toNumber(row.full) * packing + toNumber(row.pcs) + toNumber(row.bonus_full) * packing + toNumber(row.bonus_pcs);
-    // Here amount uses rate * normal units (excluding bonus if you want)
-    // Commonly bonus is free, adjust logic if you want to exclude/add differently.
-    const normalUnits = toNumber(row.full) * packing + toNumber(row.pcs);
-    const amount = normalUnits * toNumber(row.rate);
-    return amount;
+    const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
+    const rate = toNumber(row.rate);
+    
+    // Amount = (Full Items * Full Rate) + (PCS * (Rate/Packing))
+    const amount = (toNumber(row.full) * rate) + (toNumber(row.pcs) * (rate / packing));
+    return Math.round(amount);
   };
 
   // update amounts when rows change
@@ -502,7 +503,7 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
       if (r.item_id) {
         const item = items.find(it => it.id === r.item_id);
         if (item) {
-          const packing = toNumber(item.packing_full ?? item.packing_qty ?? 1);
+          const packing = toNumber(item.packing_qty ?? 1);
           const qty = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
           const current = itemUsage.get(r.item_id) || 0;
           itemUsage.set(r.item_id, current + qty);
@@ -517,7 +518,8 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
       let stockExceeded = false;
       if (item) {
         const totalUsage = itemUsage.get(item.id) || 0;
-        if (totalUsage > (item.stock_1 ?? 0)) {
+        const availableStock = toNumber((item as any).total_stock_pcs ?? ((item.stock_1 ?? 0) * (item.packing_qty ?? 1) + (item.stock_2 ?? 0)));
+        if (totalUsage > availableStock) {
           stockExceeded = true;
         }
       }
@@ -630,17 +632,17 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
       remaining_amount: totals.finalAmount - cashReceived,
 
       items: rowsWithComputed.map((r) => {
-        const item = items.find(i => i.id === r.item_id);
-        const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
+        const item = items.find(i => Number(i.id) === Number(r.item_id));
+        const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
 
-        const totalPCS = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
+        const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs) + (toNumber(r.bonus_full) * packing) + toNumber(r.bonus_pcs);
 
         return {
           item_id: r.item_id,
-          qty_carton: r.full,
-          qty_pcs: r.pcs,
-          bonus_qty_carton: r.bonus_full,
-          bonus_qty_pcs: r.bonus_pcs,
+          qty_carton: toNumber(r.full),
+          qty_pcs: toNumber(r.pcs),
+          bonus_qty_carton: toNumber(r.bonus_full),
+          bonus_qty_pcs: toNumber(r.bonus_pcs),
           total_pcs: totalPCS,
           trade_price: r.rate,
           retail_price: r.trade_price,
@@ -1388,7 +1390,7 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
                                 <div className="flex flex-col items-center justify-center py-2 px-1 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
                                   <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1 leading-none">Stock (Pieces)</div>
                                   <div className="text-lg font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter">
-                                    {remainingStock % packing} <span className="text-[9px] text-zinc-400 uppercase">P</span>
+                                    {remainingStock - (Math.floor(remainingStock / packing) * packing)} <span className="text-[9px] text-zinc-400 uppercase">P</span>
                                   </div>
                                 </div>
                                 <div className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg border ${remainingStock < 0 ? 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-900/10' : 'border-orange-200 bg-orange-50/80 dark:border-orange-900/30 dark:bg-orange-900/10'}`}>
@@ -1703,9 +1705,9 @@ export default function SalesPage({ sale, items, accounts, salemans, paymentAcco
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filteredItems.length > 0 ? filteredItems.map((item) => {
                     const packing = toNumber(item.packing_full || item.packing_qty) || 1;
-                    const stock = toNumber(item.stock_1);
-                    const full = Math.floor(stock / packing);
-                    const pcs = stock % packing;
+                    const stock = toNumber(item.total_stock_pcs);
+                    const full = toNumber(item.stock_1);
+                    const pcs = toNumber(item.stock_2);
 
                     const tradePrice = toNumber(item.trade_price);
                     let activePriceTypeVal = tradePrice; // Default to trade price if no category or category 1

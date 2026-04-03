@@ -241,46 +241,78 @@
             </div>
             <div class="details-col">
                 <div class="payment-meta">
-                    <div class="section-label">PAYMENT DETAILS</div>
-                    <div class="meta-row">
-                        <span class="meta-label">Method:</span>
-                        <span class="meta-value">{{ $payment->payment_method ?: 'Cash' }}</span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-label">Account:</span>
-                        <span class="meta-value">{{ $payment->paymentAccount ? $payment->paymentAccount->title : '-' }}</span>
-                    </div>
-                    @if($payment->cheque_no)
-                    <div class="meta-row">
-                        <span class="meta-label">Cheque #:</span>
-                        <span class="meta-value">{{ $payment->cheque_no }}</span>
-                    </div>
+                    @if(isset($isCombined) && $isCombined)
+                        <div class="section-label">LIQUIDITY DISTRIBUTION</div>
+                        @foreach($groupPayments as $gp)
+                            <div class="meta-row" style="font-size: 11px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px;">
+                                <span style="display: inline-block; width: 140px; text-align: left;">{{ $gp->paymentAccount->title ?? 'Cash' }} ({{ $gp->payment_method ?: 'Cash' }})</span>
+                                <span style="display: inline-block; width: 80px; text-align: right; font-weight: bold;">{{ number_format($gp->amount, 2) }}</span>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="section-label">PAYMENT DETAILS</div>
+                        <div class="meta-row">
+                            <span class="meta-label">Method:</span>
+                            <span class="meta-value">{{ $payment->payment_method ?: 'Cash' }}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">Account:</span>
+                            <span class="meta-value">{{ $payment->paymentAccount ? $payment->paymentAccount->title : '-' }}</span>
+                        </div>
+                        @if($payment->cheque_no)
+                        <div class="meta-row">
+                            <span class="meta-label">Cheque #:</span>
+                            <span class="meta-value">{{ $payment->cheque_no }}</span>
+                        </div>
+                        @endif
                     @endif
                 </div>
             </div>
         </div>
 
         <div class="amount-card">
-            <div class="amount-label">Total Amount</div>
-            <div class="amount-value">{{ number_format($payment->amount, 2) }}</div>
+            <div class="amount-label">Aggregate Amount</div>
+            <div class="amount-value">
+                @if(isset($isCombined) && $isCombined)
+                    {{ number_format($groupPayments->sum('amount'), 2) }}
+                @else
+                    {{ number_format($payment->amount, 2) }}
+                @endif
+            </div>
         </div>
 
-        @if($payment->allocations->count() > 0)
-        <div class="table-section-title">Payment Allocation</div>
+        @php
+            $displayAllocations = isset($isCombined) && $isCombined 
+                ? $groupPayments->flatMap->allocations 
+                : $payment->allocations;
+            
+            // Group by bill to avoid duplicate lines for the same bill across split payments
+            $mergedAllocations = $displayAllocations->groupBy(function($a) {
+                return $a->bill_type . $a->bill_id;
+            });
+        @endphp
+
+        @if($displayAllocations->count() > 0)
+        <div class="table-section-title">Registry Allocation</div>
         <table>
             <thead>
                 <tr>
-                    <th>Bill Type</th>
-                    <th class="text-right">Amount</th>
+                    <th>Invoice / Document Reference</th>
+                    <th>Date</th>
+                    <th class="text-right">Allocated Amount</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($payment->allocations as $allocation)
+                @foreach($mergedAllocations as $group)
+                @php $first = $group->first(); @endphp
                 <tr>
                     <td>
-                        {{ class_basename($allocation->bill_type) }} #{{ $allocation->bill_id }}
+                        {{ $first->bill->invoice ?? ($first->bill->invoice_no ?? class_basename($first->bill_type) . ' #' . $first->bill_id) }}
                     </td>
-                    <td class="text-right">{{ number_format($allocation->amount, 2) }}</td>
+                    <td>
+                        {{ $first->bill ? \Carbon\Carbon::parse($first->bill->date)->format('Y-m-d') : '-' }}
+                    </td>
+                    <td class="text-right">{{ number_format($group->sum('amount'), 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>

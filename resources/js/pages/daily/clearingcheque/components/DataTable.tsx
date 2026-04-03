@@ -53,6 +53,7 @@ interface Payment {
     payment_method: string;
     cheque_status: string;
     clear_date: string;
+    cheque_no?: string;
 }
 
 interface DataTableProps {
@@ -144,7 +145,17 @@ export default function DataTable({ data }: DataTableProps) {
         { accessorKey: "payment_account.title", header: "Account" },
         {
             header: "Cheque No",
-            accessorFn: (row) => `${row.cheque?.prefix ?? ""}-${row.cheque?.cheque_no ?? ""}`,
+            cell: ({ row }) => {
+                const chequeRel = row.original.cheque;
+                const manualChequeNo = row.original.cheque_no; 
+                
+                if (chequeRel) {
+                    const prefix = chequeRel.prefix ? `${chequeRel.prefix}-` : '';
+                    return `${prefix}${chequeRel.cheque_no}`;
+                }
+                
+                return manualChequeNo || "-";
+            }
         },
         {
             accessorKey: "cheque_date",

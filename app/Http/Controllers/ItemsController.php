@@ -80,17 +80,19 @@ class ItemsController extends Controller
             'created_at',
         ]);
 
-        // Calculate Summary (Based on filtered data or broader scope - usually summary shows "current state" but can be filtered)
-        // Let's make summary reflect the filtered dataset to be consistent with Sales
+        // Calculate Summary (Based on filtered data)
         $summary = [
             'total_items' => $items->count(),
             'active_items' => $items->where('is_active', 1)->count(),
             'stock_value' => $items->sum(function ($item) {
-                return ($item->stock_1 ?? 0) * ($item->trade_price ?? 0);
+                // Stock value = (Full * Trade Price) + (Pcs * Price per Pc)
+                return (($item->stock_1 ?? 0) * ($item->trade_price ?? 0)) + (($item->stock_2 ?? 0) * ($item->price_per_pcs ?? 0));
             }),
-            'out_of_stock' => $items->where('stock_1', '<=', 0)->count(),
+            'out_of_stock' => $items->filter(function ($item) {
+                return $item->total_stock_pcs <= 0;
+            })->count(),
             'low_stock' => $items->filter(function ($item) {
-                return ($item->stock_1 ?? 0) <= ($item->reorder_level ?? 0);
+                return $item->total_stock_pcs <= ($item->reorder_level ?? 0);
             })->count(),
         ];
 

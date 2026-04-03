@@ -69,6 +69,8 @@ interface Item {
     discount?: number;
     stock_1?: number;
     stock_2?: number;
+    total_stock_pcs?: number;
+    category?: string;
     // any other fields you may have
 }
 interface Account {
@@ -445,7 +447,7 @@ export default function PurchaseEdit({
 
     // Recalculate a row amount whenever rate/full/pcs/bonus changes
     const recalcRowAmount = (row: RowData, item?: Item) => {
-        const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
+        const packing = toNumber(item?.packing_full || item?.packing_qty || 1);
         const totalUnits = toNumber(row.full) * packing + toNumber(row.pcs) + toNumber(row.bonus_full) * packing + toNumber(row.bonus_pcs);
         // Here amount uses rate * normal units (excluding bonus if you want)
         // Commonly bonus is free, adjust logic if you want to exclude/add differently.
@@ -546,16 +548,16 @@ export default function PurchaseEdit({
             remaining_amount: totals.net,
             update_prices: updatePrices,
 
-            items: rowsWithComputed.map((r) => {
+            items: rowsWithComputed.filter(r => r.item_id !== null).map((r) => {
                 const item = items.find(i => i.id === r.item_id);
-                const packing = item?.packing_full ?? item?.packing_qty ?? 1;
+                const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
 
-                const totalPCS = (r.full * packing) + r.pcs;
+                const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs);
 
                 return {
                     item_id: r.item_id,
-                    qty_carton: r.full,
-                    qty_pcs: r.pcs,
+                    qty_carton: toNumber(r.full),
+                    qty_pcs: toNumber(r.pcs),
                     total_pcs: totalPCS,
                     trade_price: r.rate,
                     discount: (r.discPercent / 100) * r.amount,
@@ -563,7 +565,6 @@ export default function PurchaseEdit({
                     subtotal: r.amount
                 };
             })
-                .filter(r => r.item_id !== null)
         };
         router.put(`/purchase/${purchase.id}`, payload, {
             onSuccess: () => {

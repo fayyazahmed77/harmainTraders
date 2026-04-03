@@ -159,10 +159,10 @@ export default function ItemShow({ item, stats, recentPurchases, recentSales, pa
                                             </div>
                                             <div>
                                                 <h3 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                                                    {Number(item.stock_1).toLocaleString()} <span className="text-sm font-medium text-zinc-400 ml-1">Pcs</span>
+                                                    {item.stock_breakdown}
                                                 </h3>
                                                 <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                                                    Approx. {Math.floor((item.stock_1 || 0) / (item.packing_qty || 1))} full cartons
+                                                    Total: {Number(item.total_stock_pcs).toLocaleString()} Units
                                                 </p>
                                             </div>
                                         </CardContent>
@@ -179,7 +179,7 @@ export default function ItemShow({ item, stats, recentPurchases, recentSales, pa
                                                     {stats.profit.margin.toFixed(1)}%
                                                 </h3>
                                                 <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                                                    {formatCurrency(stats.profit.profit_per_pc)} profit per unit
+                                                    {formatCurrency(stats.profit.profit_per_pc)} profit / pc
                                                 </p>
                                             </div>
                                         </CardContent>
@@ -188,15 +188,15 @@ export default function ItemShow({ item, stats, recentPurchases, recentSales, pa
                                     <Card className="shadow-none border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                                         <CardContent className="p-5 space-y-3">
                                             <div className="flex items-center justify-between text-zinc-500">
-                                                <span className="text-[10px] font-black uppercase tracking-wider">Item Valuation</span>
+                                                <span className="text-[10px] font-black uppercase tracking-wider">Pricing Bridge</span>
                                                 <DollarSign size={14} />
                                             </div>
                                             <div>
                                                 <h3 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
                                                     {formatCurrency(item.trade_price)}
                                                 </h3>
-                                                <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                                                    Standard trade rate
+                                                <p className="text-[11px] text-zinc-500 mt-1 font-medium italic">
+                                                    {formatCurrency(item.price_per_pcs)} per piece
                                                 </p>
                                             </div>
                                         </CardContent>

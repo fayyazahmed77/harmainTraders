@@ -16,7 +16,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 
 <head>
     <meta charset="utf-8">
-    <title>Offer List - {{ $offer->account->title }}</title>
+    <title>Offer List - {{ $offer->account->title ?? "General Client" }}</title>
     <style>
         body {
             font-family: sans-serif;
@@ -121,57 +121,65 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
     </div>
     <div class="header">
         <div class="header-left">
-            <strong>Name:</strong> {{ $offer->account->title }}<br>
-            <small>{{ $offer->account->address }}</small>
+            <strong>Name:</strong> {{ $offer->account->title ?? "General Offer" }}<br>
+            <small>{{ $offer->account->address ?? "Karachi, Pakistan" }}</small>
         </div>
         <div class="header-right">
-            <strong>Date:</strong> {{ \Carbon\Carbon::parse($offer->date)->format('d/m/Y') }}<br>
-            <strong>Price Type:</strong> {{ ucfirst($offer->offertype) }}
+            <strong>Date:</strong> {{ \Carbon\Carbon::parse($offer->date)->format('d/m/Y') }}
         </div>
         <div class="clear"></div>
     </div>
 
     @php
-    $groupedItems = $offer->items->groupBy(function($item) {
-    // The Items model has a 'category' field that stores the category ID
-    // We need to look up the category name
-    if (isset($item->items) && isset($item->items->category)) {
-    // Check if category is already loaded as a relationship
-    if ($item->items->relationLoaded('category') && $item->items->category instanceof \App\Models\ItemCategory) {
-    return $item->items->category->name;
-    }
+    $groupedItems = $offer->items->groupBy(function($item) use ($groupBy) {
+        if ($groupBy === 'company') {
+            return $item->items->companyAccount->title ?? 'NO COMPANY';
+        }
 
-    // Otherwise, category is an ID - look it up
-    if (is_numeric($item->items->category)) {
-    $cat = \App\Models\ItemCategory::find($item->items->category);
-    return $cat ? $cat->name : 'UNCATEGORIZED';
-    }
-    }
-    return 'UNCATEGORIZED';
+        if (isset($item->items) && isset($item->items->category)) {
+            if ($item->items->relationLoaded('category') && $item->items->category instanceof \App\Models\ItemCategory) {
+                return $item->items->category->name;
+            }
+
+            if (is_numeric($item->items->category)) {
+                $cat = \App\Models\ItemCategory::find($item->items->category);
+                return $cat ? $cat->name : 'UNCATEGORIZED';
+            }
+        }
+        return 'UNCATEGORIZED';
     });
     @endphp
 
-    @foreach($groupedItems as $category => $items)
-    <div class="category-title">{{ $category }}</div>
+    @foreach($groupedItems as $groupName => $items)
+    <div class="category-title">{{ $groupName }}</div>
     <table>
         <thead>
-            <tr>
-                <th class="text-left" style="width: 40%;">Items</th>
-                <th>Pack Ctn</th>
-                <th>Loose Ctn</th>
+                <th class="text-left" style="width: 45%;">Items</th>
+                @if($offer->offertype == '1')
+                    <th>Pack Ctn</th>
+                    <th>Loose Ctn</th>
+                @else
+                    <th>Rate</th>
+                @endif
                 <th>M.R.P</th>
-                <th>Price</th>
                 <th>Scheme</th>
-            </tr>
         </thead>
         <tbody>
             @foreach($items as $item)
             <tr>
-                <td class="text-left">{{ $item->items->title }}</td>
-                <td>{{ $item->pack_ctn }}</td>
-                <td>{{ $item->loos_ctn }}</td>
+                <td class="text-left">
+                    {{ $item->items->title }}
+                    @if($groupBy === 'category')
+                        <br><small style="color: #666;">{{ $item->items->companyAccount->title ?? '' }}</small>
+                    @endif
+                </td>
+                @if($offer->offertype == '1')
+                    <td>{{ $item->pack_ctn }}</td>
+                    <td>{{ $item->loos_ctn }}</td>
+                @else
+                    <td>{{ number_format($item->price, 2) }}</td>
+                @endif
                 <td>{{ number_format($item->mrp, 2) }}</td>
-                <td>{{ number_format($item->price, 2) }}</td>
                 <td>{{ $item->scheme }}</td>
             </tr>
             @endforeach

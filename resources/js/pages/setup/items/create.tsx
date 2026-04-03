@@ -479,29 +479,29 @@ export default function Page({ categories, companies }: { categories: any, compa
 
                   {/* Advanced Pricing Tiers */}
                   <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4 space-y-3">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP2 - TP7)</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP1 - TP6)</div>
                     <div className="grid grid-cols-2 gap-3">
-                      <TechLabel label="Loose (T.P.2) %" icon={Percent}>
+                      <TechLabel label="Loose (T.P.1) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt2 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt2) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Retail (T.P.3) %" icon={Percent}>
+                      <TechLabel label="Retail (T.P.2) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt3} onChange={(e) => onInputChange("pt3", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt3 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt3) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Agent (T.P.4) %" icon={Percent}>
+                      <TechLabel label="Agent (T.P.3) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt4 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt4) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.5 %" icon={Percent}>
+                      <TechLabel label="T.P.4 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt5 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt5) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.6 %" icon={Percent}>
+                      <TechLabel label="T.P.5 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt6 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt6) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.7 %" icon={Percent}>
+                      <TechLabel label="T.P.6 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt7 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}</div>}
                       </TechLabel>
@@ -601,7 +601,7 @@ export default function Page({ categories, companies }: { categories: any, compa
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="w-full">
-                              <TechLabel label="P. Size" icon={Ruler} error={errors.packing_size}>
+                              <TechLabel label="Carton Size" icon={Ruler} error={errors.packing_size}>
                                 <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>
@@ -611,51 +611,35 @@ export default function Page({ categories, companies }: { categories: any, compa
 
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="w-full">
-                              <TechLabel label="P. Qty" icon={Box} required error={errors.packing_qty}>
-                                <Input value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_qty && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                            <div className="w-full col-span-2">
+                              <TechLabel label="P. Qty (Units in 1 Full)" icon={Box} required error={errors.packing_qty}>
+                                <Input type="number" value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_qty && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent><p>Packing Quantity</p></TooltipContent>
+                          <TooltipContent><p>Packing Quantity (e.g. 12 if 12 pieces in 1 Full)</p></TooltipContent>
                         </Tooltip>
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="w-full">
-                              <TechLabel label="P. Full" icon={Box}>
-                                <Input value={data.packing_full} onChange={(e) => onInputChange("packing_full", e.target.value)} placeholder="Full" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                              </TechLabel>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Packing Full</p></TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="w-full">
-                              <TechLabel label="P. Pcs" icon={Component} error={errors.packing_pcs}>
-                                <Input value={data.packing_pcs} onChange={(e) => onInputChange("packing_pcs", e.target.value)} placeholder="Pcs" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_pcs && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
-                              </TechLabel>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent><p>Packing Pieces</p></TooltipContent>
-                        </Tooltip>
+                        <div className="flex flex-col justify-end pb-1">
+                          <div className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-tighter">
+                            Pc Price: {data.trade_price && data.packing_qty && Number(data.packing_qty) > 0 ? Math.ceil(Number(data.trade_price) / Number(data.packing_qty)) : "0"}
+                          </div>
+                        </div>
                       </div>
                     </TooltipProvider>
 
                     <div className="grid grid-cols-4 gap-3">
-                      <TechLabel label="Re-Order" icon={FileText} required error={errors.reorder_level}>
-                        <Input value={data.reorder_level} onChange={(e) => onInputChange("reorder_level", e.target.value)} placeholder="0" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.reorder_level && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                      <TechLabel label="Re-Order (Pcs)" icon={FileText} required error={errors.reorder_level}>
+                        <Input type="number" value={data.reorder_level} onChange={(e) => onInputChange("reorder_level", e.target.value)} placeholder="0" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.reorder_level && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                       </TechLabel>
                       <TechLabel label="Pcs / Limit" icon={Component}>
                         <div className="flex gap-1">
-                          <Input value={data.pcs} onChange={(e) => onInputChange("pcs", e.target.value)} placeholder="Pcs" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                          <Input value={data.limit_pcs} onChange={(e) => onInputChange("limit_pcs", e.target.value)} placeholder="Lmt" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                          <Input type="number" value={data.pcs} onChange={(e) => onInputChange("pcs", e.target.value)} placeholder="Pcs" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                          <Input type="number" value={data.limit_pcs} onChange={(e) => onInputChange("limit_pcs", e.target.value)} placeholder="Lmt" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         </div>
                       </TechLabel>
                       <TechLabel label="Order Qty" icon={FileText}>
-                        <Input value={data.order_qty} onChange={(e) => onInputChange("order_qty", e.target.value)} placeholder="0" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                        <Input type="number" value={data.order_qty} onChange={(e) => onInputChange("order_qty", e.target.value)} placeholder="0" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </TechLabel>
                       <TechLabel label="Weight" icon={Box}>
                         <Input value={data.weight} onChange={(e) => onInputChange("weight", e.target.value)} placeholder="kg" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
@@ -669,10 +653,13 @@ export default function Page({ categories, companies }: { categories: any, compa
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <TechLabel label="Stock 1 / 2" icon={Layers}>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input value={data.stock_1} onChange={(e) => onInputChange("stock_1", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Stk 1" />
-                          <Input value={data.stock_2} onChange={(e) => onInputChange("stock_2", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Stk 2" />
+                      <TechLabel label="Stock (Full / Pcs)" icon={Layers}>
+                        <div className="grid grid-cols-2 gap-2 relative">
+                          <Input type="number" value={data.stock_1} onChange={(e) => onInputChange("stock_1", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Full" />
+                          <Input type="number" value={data.stock_2} onChange={(e) => onInputChange("stock_2", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Pcs" />
+                          <div className="absolute -bottom-4 right-0 text-[9px] font-bold text-zinc-400">
+                             Total: {(Number(data.stock_1 || 0) * Number(data.packing_qty || 1)) + Number(data.stock_2 || 0)} Units
+                          </div>
                         </div>
                       </TechLabel>
 

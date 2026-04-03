@@ -25,6 +25,7 @@ class Payment extends Model
         'remarks',
         'payment_method',
         'cheque_id',
+        'group_id',
         'cheque_status',
         'message_line_id',
     ];

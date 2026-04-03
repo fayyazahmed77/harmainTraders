@@ -49,9 +49,9 @@ class OfferListController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => 'nullable|exists:accounts,id',
             'date' => 'required|date',
-            'price_type' => 'required|string',
+            'price_type' => 'required',
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.price' => 'required|numeric',
@@ -64,8 +64,8 @@ class OfferListController extends Controller
             $offer = PriceOfferTo::create([
                 'account_id' => $request->account_id,
                 'date' => $request->date,
-                'offertype' => $request->price_type,
-                'created_by' => Auth::id() ?? 1, // default 1 if no auth
+                'offertype' => (string)$request->price_type,
+                'created_by' => Auth::id() ?? 1,
                 'message_line_id' => $request->message_line_id,
             ]);
 
@@ -76,7 +76,7 @@ class OfferListController extends Controller
                     'item_id' => $item['item_id'],
                     'pack_ctn' => $item['pack_ctn'] ?? 0,
                     'loos_ctn' => $item['loos_ctn'] ?? 0,
-                    'price_type' => $item['price_type'] ?? 'trade',
+                    'price_type' => $item['price_type'] ?? '1',
                     'mrp' => $item['mrp'] ?? null,
                     'price' => $item['price'],
                     'scheme' => $item['scheme'] ?? null,
@@ -96,23 +96,25 @@ class OfferListController extends Controller
 
     public function view($id)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
         return inertia('daily/offerlist/view', [
             'offer' => $offer
         ]);
     }
 
-    public function pdf($id)
+    public function pdf($id, Request $request)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
-        $pdf = Pdf::loadView('pdf.offerlist', compact('offer'));
+        $groupBy = $request->query('group_by', 'category');
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
+        $pdf = Pdf::loadView('pdf.offerlist', compact('offer', 'groupBy'));
         return $pdf->stream('offer-list-' . $offer->id . '.pdf');
     }
 
-    public function download($id)
+    public function download($id, Request $request)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'messageLine'])->findOrFail($id);
-        $pdf = Pdf::loadView('pdf.offerlist', compact('offer'));
+        $groupBy = $request->query('group_by', 'category');
+        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
+        $pdf = Pdf::loadView('pdf.offerlist', compact('offer', 'groupBy'));
         return $pdf->download('offer-list-' . $offer->id . '.pdf');
     }
 

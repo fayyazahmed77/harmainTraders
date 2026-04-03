@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { router } from "@inertiajs/react";
+import { usePage, router } from "@inertiajs/react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,10 +32,12 @@ import {
   Search, ChevronRight, Hash, User as UserIcon,
   ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
   Navigation, Clock, Terminal, Scale, Hash as HashIcon, ArrowUpRight, ArrowDownLeft,
-  CreditCard
+  CreditCard, ClipboardList, Printer
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import toast from "react-hot-toast";
 
 // ───────────────────────────────────────────
 // Style Constants (Perfect UI Aesthetic)
@@ -122,6 +125,7 @@ const fmtDate = (d: string) => {
 };
 
 export default function PaymentVoucher({ accounts, paymentAccounts, messageLines }: Props) {
+  const { flash, errors } = usePage().props as any;
   // State
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
@@ -130,7 +134,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [desktopAccOpen, setDesktopAccOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
 
+  useEffect(() => {
+    if (errors && Object.keys(errors).length > 0) {
+      Object.values(errors).forEach((err: any) => toast.error(err));
+    }
+  }, [errors]);
+
   const [paymentAccountId, setPaymentAccountId] = useState<string>(""); // Cash/Bank
+
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [balanceOrientation, setBalanceOrientation] = useState<string>("dr");
   const [advanceBalance, setAdvanceBalance] = useState<number>(0);
@@ -148,12 +159,41 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">("RECEIPT");
   const [paymentMethod, setPaymentMethod] = useState<string>(""); // Online Transfer, Card, Cheque
   const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+  const [isMultiPayment, setIsMultiPayment] = useState<boolean>(false);
+  const [multiDialogOpen, setMultiDialogOpen] = useState<boolean>(false);
+  const [splitPayments, setSplitPayments] = useState<any[]>([
+    { id: Date.now(), payment_account_id: "", amount: 0, discount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }
+  ]);
+  const [customerCheques, setCustomerCheques] = useState<any[]>([]);
+  const [originalChequeId, setOriginalChequeId] = useState<string>("");
 
   // Bill Detail Modal State
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedBillForDetail, setSelectedBillForDetail] = useState<Bill | null>(null);
   const [billItems, setBillItems] = useState<any[]>([]);
   const [billDetailLoading, setBillDetailLoading] = useState(false);
+
+  // Available cheques for banks (Split Modal)
+  const [availableCheques, setAvailableCheques] = useState<Record<string, string[]>>({});
+
+  const fetchAvailableCheques = async (bankId: string) => {
+    if (!bankId || availableCheques[bankId]) return;
+    try {
+      const res = await axios.get(`/payment/available-cheques?account_id=${bankId}`);
+      setAvailableCheques(prev => ({ ...prev, [bankId]: res.data }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchCustomerCheques = async () => {
+    try {
+      const res = await axios.get(`/payment/available-customer-cheques`);
+      setCustomerCheques(res.data);
+    } catch (err) {
+      console.error("Failed to fetch customer cheques", err);
+    }
+  };
 
   // Filtered Accounts
   const filteredAccounts = useMemo(() => {
@@ -214,12 +254,18 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   useEffect(() => {
     if (paymentAccountId) {
       const account = paymentAccounts.find(a => a.id.toString() === paymentAccountId);
+      const isChequeInHand = account?.account_type?.name === 'Cheque in hand';
 
       if (account && account.account_type?.name === 'Bank') {
         // It's a bank, wait for user to select payment method
         setPaymentMethod("");
         setChequeNo("");
         setChequeDate("");
+      } else if (isChequeInHand) {
+        setPaymentMethod("Cheque");
+        if (paymentType === 'PAYMENT') {
+          fetchCustomerCheques();
+        }
       } else {
         // Cash or other
         setPaymentMethod("");
@@ -231,26 +277,33 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       setChequeNo("");
       setChequeDate("");
     }
-  }, [paymentAccountId]);
+  }, [paymentAccountId, paymentType]);
 
   // Handle Payment Method Change
   useEffect(() => {
     if (paymentMethod === 'Cheque' && paymentAccountId) {
-      axios.get(`/payment/next-cheque?account_id=${paymentAccountId}`)
-        .then(res => {
-          if (res.data) {
-            const { prefix, cheque_no } = res.data;
-            setChequeNo(prefix ? `${prefix}-${cheque_no}` : cheque_no);
-          } else {
-            setChequeNo('');
-          }
-        })
-        .catch(err => console.error("Failed to fetch cheque", err));
+      // For Receipt (Customer giving us Cheque), we leave it blank for manual entry
+      // For Payment (Us giving Supplier), the dropdown logic will handle the value selection
+      if (paymentType === 'RECEIPT') {
+        setChequeNo('');
+      } else {
+        // Auto-select first available cheque if paying supplier and none selected
+        if (availableCheques[paymentAccountId] && availableCheques[paymentAccountId].length > 0 && !chequeNo) {
+          setChequeNo(availableCheques[paymentAccountId][0]);
+        }
+      }
     } else {
       setChequeNo('');
       setChequeDate('');
     }
-  }, [paymentMethod, paymentAccountId]);
+  }, [paymentMethod, paymentAccountId, paymentType, availableCheques]);
+
+  // Fetch available cheques when main payment_account_id changes
+  useEffect(() => {
+    if (paymentAccountId) {
+      fetchAvailableCheques(paymentAccountId);
+    }
+  }, [paymentAccountId]);
 
   // Handle Bill Selection
   const toggleBill = (billId: number, billAmount: number) => {
@@ -345,9 +398,13 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   // Handle Save
   const handleSave = () => {
     if (loading) return;
-    setLoading(true);
 
-    // Prepare allocations
+    if (!selectedAccountId) {
+      toast.error("Please select a Ledger Party.");
+      return;
+    }
+
+    // Process Allocations
     const allocationPayload = unpaidBills
       .filter(b => selectedBillIds.has(b.id.toString()))
       .map(b => ({
@@ -357,26 +414,170 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       }))
       .filter(a => a.amount > 0);
 
-    const payload = {
-      date,
-      account_id: selectedAccountId,
-      payment_account_id: paymentAccountId,
-      amount,
-      discount,
-      net_amount: amount - discount, // Logic can be adjusted
-      type: paymentType,
-      cheque_no: chequeNo,
-      cheque_date: chequeDate,
-      clear_date: clearDate,
-      remarks,
-      payment_method: paymentMethod,
-      message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
-      allocations: allocationPayload
-    };
+    let finalPayload: any;
 
-    router.post('/payment/store', payload, {
+    if (isMultiPayment) {
+      // Multi-Payment Validation
+      let isValid = true;
+      const cleanedSplits = splitPayments.map((p, idx) => {
+        if (!p.payment_account_id) {
+          toast.error(`Row ${idx + 1}: Missing Ledger Account.`);
+          isValid = false;
+        }
+        if (p.amount <= 0 && splitPayments.length > 1) {
+          // allow 0 if it's the only row, otherwise it's weird 
+          // but let's let backend handle 0 filtering
+        }
+
+        const isCashAccount = paymentAccounts.find(a => a.id.toString() === p.payment_account_id)?.account_type?.name === 'Cash';
+        let method = p.payment_method;
+
+        if (isCashAccount) {
+          method = 'Cash';
+        } else {
+          if (!method || method === 'Cash') {
+            toast.error(`Row ${idx + 1}: Please select a valid Bank Method (e.g. Cheque, Online Transfer).`);
+            isValid = false;
+          }
+        }
+
+        if (method === 'Cheque' && !p.cheque_no && paymentType === 'PAYMENT') {
+          toast.error(`Row ${idx + 1}: Missing Cheque Number.`);
+          isValid = false;
+        }
+
+        return { ...p, payment_method: method };
+      });
+
+      if (!isValid) return;
+
+      const splitsTotal = cleanedSplits.reduce((s, p) => s + Number(p.amount), 0);
+      const splitsDiscount = cleanedSplits.reduce((s, p) => s + Number(p.discount), 0);
+
+      finalPayload = {
+        is_multi: true,
+        date,
+        account_id: selectedAccountId,
+        type: paymentType,
+        remarks,
+        message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
+        allocations: allocationPayload,
+        splits: cleanedSplits,
+        amount: splitsTotal, // Master sum
+        discount: splitsDiscount
+      };
+    } else {
+      // Single Payment Validation
+      if (!paymentAccountId) {
+        toast.error("Please select a Payout Source (Cash/Bank) before confirming.");
+        return;
+      }
+
+      let finalMethod = paymentMethod;
+      const isCashAccount = paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cash';
+
+      if (isCashAccount) {
+        finalMethod = 'Cash';
+      } else {
+        if (!finalMethod || finalMethod === 'Cash') {
+          toast.error("Please select a Bank Method (e.g. Cheque, Online Transfer).");
+          return;
+        }
+        if (finalMethod === 'Cheque' && !chequeNo && paymentType === 'PAYMENT') {
+          toast.error("Please select a Cheque Number before saving.");
+          return;
+        }
+      }
+
+      finalPayload = {
+        is_multi: false,
+        date,
+        account_id: selectedAccountId,
+        payment_account_id: paymentAccountId,
+        amount,
+        discount,
+        net_amount: amount - discount,
+        type: paymentType,
+        cheque_no: chequeNo,
+        cheque_date: chequeDate,
+        clear_date: clearDate,
+        remarks,
+        payment_method: finalMethod,
+        message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
+        allocations: allocationPayload,
+        original_cheque_id: originalChequeId
+      };
+    }
+
+    setLoading(true);
+    router.post('/payment/store', finalPayload, {
       onFinish: () => setLoading(false)
     });
+  };
+
+  const addSplitRow = () => {
+    setSplitPayments([...splitPayments, { id: Date.now(), payment_account_id: "", amount: 0, discount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
+  };
+
+  const removeSplitRow = (id: number) => {
+    if (splitPayments.length > 1) {
+      setSplitPayments(splitPayments.filter(p => p.id !== id));
+    }
+  };
+
+  useEffect(() => {
+    if (paymentType !== 'PAYMENT') return;
+
+    let modified = false;
+    const newSplits = splitPayments.map((row) => {
+      if (row.payment_method === 'Cheque' && row.payment_account_id && !row.cheque_no) {
+        const cheques = availableCheques[row.payment_account_id];
+        if (cheques && cheques.length > 0) {
+          // Find next available cheque that isn't already used in previous rows
+          const usedCheques = splitPayments.map(p => p.cheque_no).filter(Boolean);
+          const nextCheque = cheques.find(c => !usedCheques.includes(c)) || cheques[0];
+          modified = true;
+          return { ...row, cheque_no: nextCheque };
+        }
+      }
+      return row;
+    });
+
+    if (modified) {
+      setSplitPayments(newSplits);
+    }
+  }, [splitPayments, paymentType, availableCheques]);
+
+  const updateSplitRow = (id: number, field: string, value: any) => {
+    setSplitPayments(prevSplits => {
+      let updated = prevSplits.map(p => p.id === id ? { ...p, [field]: value } : p);
+
+      if (field === 'payment_account_id' && value) {
+        const account = paymentAccounts.find(a => a.id.toString() === value);
+        if (account?.account_type?.name === 'Cheque in hand') {
+          updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cheque', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+        } else if (account?.account_type?.name === 'Bank') {
+          updated = updated.map(p => p.id === id ? { ...p, payment_method: '', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+        } else if (account?.account_type?.name === 'Cash') {
+          updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cash', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+        }
+      }
+
+      if (field === 'payment_method' && value !== 'Cheque') {
+        updated = updated.map(p => p.id === id ? { ...p, cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+      }
+
+      return updated;
+    });
+
+    if (field === 'payment_account_id' && value) {
+      const account = paymentAccounts.find(a => a.id.toString() === value);
+      if (account?.account_type?.name === 'Bank') {
+        fetchAvailableCheques(value);
+      } else if (account?.account_type?.name === 'Cheque in hand') {
+        fetchCustomerCheques();
+      }
+    }
   };
 
   return (
@@ -389,6 +590,64 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
           {/* ── WORKSPACE ── */}
           <div className="flex-1 flex flex-col gap-4 md:gap-6 md:overflow-hidden">
+
+            {/* Success Alert with Print Option */}
+            <AnimatePresence>
+              {flash?.success && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                  <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex justify-between items-center w-full">
+                      <div className="ml-2">
+                        <AlertTitle className="text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-tighter text-xs">Transaction success</AlertTitle>
+                        <AlertDescription className="text-emerald-700 dark:text-emerald-400 text-[11px] font-medium space-y-3">
+                          <p>{flash.success}</p>
+                          {flash.saved_payments && (
+                            <div className="bg-white/50 dark:bg-black/20 rounded-lg border border-emerald-200/50 dark:border-emerald-500/10 overflow-hidden">
+                              <table className="w-full text-left border-collapse">
+                                <thead className="bg-emerald-100/50 dark:bg-emerald-500/5">
+                                  <tr>
+                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest">Voucher</th>
+                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest">Account</th>
+                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest text-right">Amount</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-200/30 dark:divide-emerald-500/10">
+                                  {flash.saved_payments.map((p: any, i: number) => (
+                                    <tr key={i} className="hover:bg-emerald-100/30 dark:hover:bg-emerald-500/5 transition-colors">
+                                      <td className="px-3 py-1.5 font-mono text-[10px] font-bold text-emerald-900 dark:text-emerald-200">{p.voucher_no}</td>
+                                      <td className="px-3 py-1.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">{p.account}</td>
+                                      <td className="px-3 py-1.5 text-right font-mono text-[10px] font-black text-emerald-900 dark:text-emerald-100">Rs {p.amount.toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot className="bg-emerald-100/30 dark:bg-emerald-500/5 border-t border-emerald-200/50 dark:border-emerald-500/10">
+                                  <tr>
+                                    <td colSpan={2} className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60">Aggregate Total</td>
+                                    <td className="px-3 py-1.5 text-right font-mono text-[10px] font-black text-emerald-900 dark:text-emerald-100">
+                                      Rs {flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          )}
+                        </AlertDescription>
+                      </div>
+                      {flash.print_id && (
+                        <Button
+                          onClick={() => window.open(`/payments/${flash.print_id}/pdf`, '_blank')}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase h-8 px-4 rounded-lg shadow-lg shadow-emerald-500/20"
+                        >
+                          <Printer className="w-3.5 h-3.5 mr-2" />
+                          Print Combined Slip
+                        </Button>
+                      )}
+                    </div>
+                  </Alert>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Mobile Header (Control Deck) */}
             <div className="md:hidden space-y-3">
@@ -561,7 +820,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                               </button>
                             </td>
                             <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                               <SignalBadge text={bill.bill_type_label} type={bill.bill_type_label === 'Sales' ? 'blue' : 'orange'} />
+                              <SignalBadge text={bill.bill_type_label} type={bill.bill_type_label === 'Sales' ? 'blue' : 'orange'} />
                             </td>
                             <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-[11px] font-mono text-zinc-500 font-bold uppercase tracking-tighter">
                               {fmtDate(bill.date)}
@@ -612,12 +871,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <div className={`px-3 py-1.5 bg-purple-500/5 border border-purple-500/20 ${PREMIUM_ROUNDING_MD} flex items-center gap-3 animate-in fade-in slide-in-from-right-2`}>
                         <RotateCcw size={14} className="text-purple-500" />
                         <div className="space-y-0.5">
-                           <div className="text-[8px] font-black text-purple-400 uppercase tracking-widest">Apply Advance</div>
-                           <div className="text-xs font-mono font-black text-purple-600 dark:text-purple-400">- {appliedFromAdvance.toLocaleString()}</div>
+                          <div className="text-[8px] font-black text-purple-400 uppercase tracking-widest">Apply Advance</div>
+                          <div className="text-xs font-mono font-black text-purple-600 dark:text-purple-400">- {appliedFromAdvance.toLocaleString()}</div>
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Effective Payout</div>
@@ -637,103 +896,168 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
           {/* ── FINANCIAL HUD (Right Sidebar) ── */}
           <div className="w-full md:w-[380px] space-y-4 md:space-y-6 flex flex-col md:overflow-hidden">
-            
+
             {/* Executive Summary Card */}
             <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-shrink-0">
               <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none`}>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
-                
+
                 <div className="flex justify-between items-center mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4 relative z-10">
-                   <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${ACCENT_GRADIENT}`} />
-                      <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">Liquidity Command</h3>
-                   </div>
-                   <SignalBadge text={paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${ACCENT_GRADIENT}`} />
+                    <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">PAYMENT</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi-Method</span>
+                      <Switch checked={isMultiPayment} onCheckedChange={setIsMultiPayment} className="scale-75" />
+                    </div>
+                    <SignalBadge text={paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
+                  </div>
                 </div>
 
                 <div className="space-y-6 relative z-10">
                   <div className="flex justify-between items-end gap-4">
                     <div className="flex-1">
-                      <TechLabel label="Primary Disbursement" icon={ArrowRightLeft}>
-                         <div className="relative">
-                           <Input type="number" value={amount || ""} onChange={e => setAmount(toNum(e.target.value))}
-                            className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-2xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500 shadow-inner`} />
-                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 font-mono text-[10px]">PKR</div>
-                         </div>
-                      </TechLabel>
+                      {isMultiPayment ? (
+                        <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <div className="text-[8px] font-black text-orange-500 uppercase tracking-widest">Aggregate Total</div>
+                            <div className="text-xl font-black text-zinc-800 dark:text-white font-mono leading-none">Rs {splitPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}</div>
+                          </div>
+                          <Button onClick={() => setMultiDialogOpen(true)} variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase tracking-tighter bg-white dark:bg-zinc-800 border-orange-500/30 text-orange-600">
+                            Manage Splits
+                          </Button>
+                        </div>
+                      ) : (
+                        <TechLabel label="Primary Disbursement" icon={ArrowRightLeft}>
+                          <div className="relative">
+                            <Input type="number" value={amount || ""} onChange={e => setAmount(toNum(e.target.value))}
+                              className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-2xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500 shadow-inner`} />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 font-mono text-[10px]">PKR</div>
+                          </div>
+                        </TechLabel>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                     <TechLabel label="Discount (Adj)" icon={BadgePercent}>
-                        <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} />
-                     </TechLabel>
-                     <TechLabel label="Clear Date" icon={Clock}>
-                        <Input value={clearDate} onChange={e => setClearDate(e.target.value)} type="date" className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
-                     </TechLabel>
+                    <TechLabel label="Discount (Adj)" icon={BadgePercent}>
+                      <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} />
+                    </TechLabel>
+                    <TechLabel label="Clear Date" icon={Clock}>
+                      <Input value={clearDate} onChange={e => setClearDate(e.target.value)} type="date" className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
+                    </TechLabel>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                     <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-3 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800">
-                        <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Net Settlement</div>
-                        <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-500">Rs {(amount - discount).toLocaleString()}</div>
-                     </div>
+                    <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-3 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800">
+                      <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Net Settlement</div>
+                      <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-500">Rs {(amount - discount).toLocaleString()}</div>
+                    </div>
 
-                     <div className="space-y-2">
-                        <TechLabel label="Payout Source" icon={CreditCard}>
-                           <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                             <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-xs ${PREMIUM_ROUNDING_MD}`}>
-                               <SelectValue placeholder="Select Cash/Bank..." />
-                             </SelectTrigger>
-                             <SelectContent className="rounded-xl">
-                               {paymentAccounts.map(acc => (
-                                 <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
-                        </TechLabel>
-
-                        {paymentAccountId && paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Bank' && (
-                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-2 pt-2">
-                             <TechLabel label="Bank Method" icon={Navigation}>
-                                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                   <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 border-orange-200 dark:border-orange-500/20 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                                      <SelectValue placeholder="Select Method..." />
-                                   </SelectTrigger>
-                                   <SelectContent className="rounded-xl text-xs">
-                                      <SelectItem value="Online Transfer">Online Transfer</SelectItem>
-                                      <SelectItem value="Card">Card Payment</SelectItem>
-                                      <SelectItem value="Cheque">Cheque Release</SelectItem>
-                                   </SelectContent>
-                                </Select>
-                             </TechLabel>
-                             {paymentMethod === 'Cheque' && (
-                                <div className="grid grid-cols-2 gap-2 pt-1 animate-in slide-in-from-top-2">
-                                  <TechLabel label="Cheque No">
-                                     <Input value={chequeNo} onChange={e => setChequeNo(e.target.value)} className={`h-9 font-mono text-xs ${PREMIUM_ROUNDING_MD}`} placeholder="CHQ#" />
-                                  </TechLabel>
-                                  <TechLabel label="Chq Date">
-                                     <Input value={chequeDate} onChange={e => setChequeDate(e.target.value)} type="date" className={`h-9 text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
-                                  </TechLabel>
-                                </div>
-                             )}
-                          </motion.div>
-                        )}
-                     </div>
-
-                     <TechLabel label="Communication" icon={Info}>
-                        <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
-                           <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                              <SelectValue placeholder="Standard Remark..." />
-                           </SelectTrigger>
-                           <SelectContent className="rounded-xl">
-                              <SelectItem value="0">--- No Remark ---</SelectItem>
-                              {messageLines?.map(msg => (
-                                <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs">{msg.messageline}</SelectItem>
-                              ))}
-                           </SelectContent>
+                    <div className="space-y-2">
+                      <TechLabel label="Payout Source" icon={CreditCard}>
+                        <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                          <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-xs ${PREMIUM_ROUNDING_MD}`}>
+                            <SelectValue placeholder="Select Cash/Bank..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {paymentAccounts.map(acc => (
+                              <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
-                     </TechLabel>
+                      </TechLabel>
+
+                      {paymentAccountId && ['Bank', 'Cheque in hand'].includes(paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name || "") && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-2 pt-2">
+                          {paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name !== 'Cheque in hand' && (
+                            <TechLabel label="Bank Method" icon={Navigation}>
+                              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 border-orange-200 dark:border-orange-500/20 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
+                                  <SelectValue placeholder="Select Method..." />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl text-xs">
+                                  <SelectItem value="Online Transfer">Online Transfer</SelectItem>
+                                  <SelectItem value="Card">Card Payment</SelectItem>
+                                  <SelectItem value="Cheque">Cheque Release</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TechLabel>
+                          )}
+                          {paymentMethod === 'Cheque' && (
+                            <div className="grid grid-cols-2 gap-2 pt-1 animate-in slide-in-from-top-2">
+                              <TechLabel label="Cheque No">
+                                {paymentType === 'PAYMENT' ? (
+                                  paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand' ? (
+                                    <Select value={originalChequeId} onValueChange={(v) => {
+                                      const chq = customerCheques.find(c => c.id.toString() === v);
+                                      if (chq) {
+                                        setOriginalChequeId(v);
+                                        setChequeNo(chq.cheque_no);
+                                        setChequeDate(chq.cheque_date);
+                                        setClearDate(chq.clear_date || "");
+                                        setAmount(toNum(chq.amount));
+                                      }
+                                    }}>
+                                      <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!originalChequeId && 'border-orange-500'}`}>
+                                        <SelectValue placeholder="Select In Hand..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {customerCheques.length > 0 ? (
+                                          customerCheques.map((chq: any) => (
+                                            <SelectItem key={chq.id} value={chq.id.toString()} className="text-xs font-mono">
+                                              {chq.cheque_no} - {chq.customer_name} (Rs {toNum(chq.amount).toLocaleString()})
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="none" disabled className="text-xs italic text-rose-500">No cheques in hand</SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Select value={chequeNo} onValueChange={setChequeNo}>
+                                      <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!chequeNo && 'border-orange-500'}`}>
+                                        <SelectValue placeholder="Select Cheque..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {availableCheques[paymentAccountId] && availableCheques[paymentAccountId].length > 0 ? (
+                                          availableCheques[paymentAccountId].map((chq: string) => (
+                                            <SelectItem key={chq} value={chq} className="text-xs font-mono">{chq}</SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="none" disabled className="text-xs italic text-rose-500">no cheque found generate cheque book first</SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  )
+                                ) : (
+                                  <Input value={chequeNo} onChange={e => setChequeNo(e.target.value)} className={`h-9 font-mono text-xs ${PREMIUM_ROUNDING_MD}`} placeholder="CHQ#" />
+                                )}
+                              </TechLabel>
+                              <TechLabel label="Chq Date">
+                                <Input value={chequeDate} onChange={e => setChequeDate(e.target.value)} type="date" disabled={paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand'} className={`h-9 text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
+                              </TechLabel>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+
+                    <TechLabel label="Communication" icon={Info}>
+                      <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                        <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
+                          <SelectValue placeholder="Standard Remark..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="0">--- No Remark ---</SelectItem>
+                          {messageLines?.map(msg => (
+                            <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs">{msg.messageline}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TechLabel>
                   </div>
 
                   <div className="pt-4">
@@ -745,7 +1069,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       </motion.div>
                     </Button>
                     <div className="flex flex-col items-center gap-1 mt-4">
-                       <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest text-center leading-relaxed">System Verification Pending <br /> {new Date().toLocaleTimeString()}</p>
+                      <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest text-center leading-relaxed">System Verification Pending <br /> {new Date().toLocaleTimeString()}</p>
                     </div>
                   </div>
                 </div>
@@ -755,30 +1079,30 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             {/* Account Insight Card */}
             {selectedAccountId && (
               <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                 <Card className={`${CARD_BASE} p-5 ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                    <div className="flex items-center gap-2 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-                       <div className={`w-2 h-2 rounded-full bg-blue-500`} />
-                       <h4 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest leading-none pt-0.5">Financial Auditor</h4>
+                <Card className={`${CARD_BASE} p-5 ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
+                  <div className="flex items-center gap-2 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                    <div className={`w-2 h-2 rounded-full bg-blue-500`} />
+                    <h4 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest leading-none pt-0.5">Financial Auditor</h4>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-zinc-500 font-bold">Ledger Balance</span>
+                      <span className={`font-black font-mono ${currentBalance > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>Rs {Math.abs(currentBalance).toLocaleString()} {balanceOrientation.toUpperCase()}</span>
                     </div>
-                    
-                    <div className="space-y-4">
-                       <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-zinc-500 font-bold">Ledger Balance</span>
-                          <span className={`font-black font-mono ${currentBalance > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>Rs {Math.abs(currentBalance).toLocaleString()} {balanceOrientation.toUpperCase()}</span>
-                       </div>
-                       <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-zinc-500 font-bold text-[10px]">Unused Advance</span>
-                          <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">Rs {toNum(advanceBalance).toLocaleString()}</span>
-                       </div>
-                       
-                       <div className={`p-3 bg-zinc-50 dark:bg-zinc-900/50 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800`}>
-                          <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Contextual Analysis</div>
-                          <p className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
-                             "Liquidity event detected for account #{selectedAccountId}. Current coverage ratio is {(amount / Math.max(1, currentBalance)).toFixed(2)}x against net exposure."
-                          </p>
-                       </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-zinc-500 font-bold text-[10px]">Unused Advance</span>
+                      <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">Rs {toNum(advanceBalance).toLocaleString()}</span>
                     </div>
-                 </Card>
+
+                    <div className={`p-3 bg-zinc-50 dark:bg-zinc-900/50 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800`}>
+                      <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Contextual Analysis</div>
+                      <p className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
+                        "Liquidity event detected for account #{selectedAccountId}. Current coverage ratio is {(amount / Math.max(1, currentBalance)).toFixed(2)}x against net exposure."
+                      </p>
+                    </div>
+                  </div>
+                </Card>
               </motion.div>
             )}
           </div>
@@ -786,34 +1110,34 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
         {/* Mobile Sticky Footer */}
         <div className="md:hidden sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 p-4 z-50 shadow-[0_-8px_30px_rgb(0,0,0,0.1)] transition-transform duration-300">
-            <div className="flex items-center justify-between gap-4 mb-3">
-                <div className="flex flex-col">
-                    <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider mb-0.5">Net Disbursement</div>
-                    <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none tracking-tighter">
-                        <span className="text-sm font-bold mr-1 font-mono">Rs</span>
-                        {(amount - discount).toLocaleString()}
-                    </div>
-                </div>
-                <Button onClick={handleSave} className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95" disabled={loading}>
-                    {loading ? <RotateCcw size={16} className="mr-2 animate-spin" /> : <CheckCircle2 size={16} className="mr-2" />}
-                    {loading ? "..." : (paymentType === 'RECEIPT' ? "RECEIVE" : "PAY")}
-                </Button>
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <div className="flex flex-col">
+              <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider mb-0.5">Net Disbursement</div>
+              <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none tracking-tighter">
+                <span className="text-sm font-bold mr-1 font-mono">Rs</span>
+                {(amount - discount).toLocaleString()}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                <div className="flex flex-col items-center">
-                    <span className="text-[9px] uppercase text-zinc-400 font-bold">Allocated</span>
-                    <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {totalAllocated.toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col items-center border-l border-zinc-100 dark:border-zinc-800">
-                    <span className="text-[9px] uppercase text-zinc-400 font-bold">Unallocated</span>
-                    <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {unallocatedAmount.toLocaleString()}</span>
-                </div>
+            <Button onClick={handleSave} className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95" disabled={loading}>
+              {loading ? <RotateCcw size={16} className="mr-2 animate-spin" /> : <CheckCircle2 size={16} className="mr-2" />}
+              {loading ? "..." : (paymentType === 'RECEIPT' ? "RECEIVE" : "PAY")}
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] uppercase text-zinc-400 font-bold">Allocated</span>
+              <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {totalAllocated.toLocaleString()}</span>
             </div>
+            <div className="flex flex-col items-center border-l border-zinc-100 dark:border-zinc-800">
+              <span className="text-[9px] uppercase text-zinc-400 font-bold">Unallocated</span>
+              <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {unallocatedAmount.toLocaleString()}</span>
+            </div>
+          </div>
         </div>
 
         {/* Bill Detail Modal */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className={`max-w-2xl ${PREMIUM_ROUNDING} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-0 overflow-hidden shadow-2xl`}>
+          <DialogContent className={`sm:max-w-2xl w-full ${PREMIUM_ROUNDING} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-0 overflow-hidden shadow-2xl`}>
             <DialogHeader className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex justify-between items-start">
                 <div className="space-y-1 text-left">
@@ -875,6 +1199,184 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 </motion.div>
               )}
             </AnimatePresence>
+          </DialogContent>
+        </Dialog>
+
+        {/* Multi-Payment Split Dialog */}
+        <Dialog open={multiDialogOpen} onOpenChange={setMultiDialogOpen}>
+          <DialogContent className={`sm:max-w-[1700px] sm:w-[96vw] w-full ${PREMIUM_ROUNDING} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-0 overflow-hidden shadow-2xl transition-all duration-300`}>
+            <DialogHeader className="p-10 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex justify-between items-center">
+                <div className="space-y-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList size={16} className="text-orange-600" />
+                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest px-2 py-0.5 bg-orange-500/10 rounded-md">
+                      {selectedAccountId ? `${accounts.find(a => a.id.toString() === selectedAccountId)?.title} (${accounts.find(a => a.id.toString() === selectedAccountId)?.account_type?.name})` : "No Party Selected"}
+                    </span>
+                  </div>
+                  <DialogTitle className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">Payment Details</DialogTitle>
+                </div>
+                <Button onClick={addSplitRow} size="sm" className={`${ACCENT_GRADIENT} text-white font-bold text-[10px] uppercase h-8 px-4`}>
+                  <Plus size={14} className="mr-1.5" /> Add Split Method
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <div className="p-10 overflow-y-auto max-h-[80vh]">
+              <table className="w-full border-separate border-spacing-y-4">
+                <thead>
+                  <tr className="text-[11px] font-black uppercase tracking-[0.3em] text-zinc-400">
+                    <th className="px-4 text-left w-1/4">Ledger Account</th>
+                    <th className="px-4 text-left w-48">Method</th>
+                    <th className="px-4 text-left w-48">Cheque #</th>
+                    <th className="px-4 text-left w-48">Chq Date</th>
+                    <th className="px-4 text-left w-48">Clear Date</th>
+                    <th className="px-4 text-right w-48">Amount</th>
+                    <th className="px-4 text-right w-32">Discount</th>
+                    <th className="px-4 text-center w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {splitPayments.map((row, idx) => (
+                    <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-lg group shadow-sm">
+                      <td className="p-4 border-l-4 border-orange-500/20 group-hover:border-orange-500 transition-all rounded-l-xl bg-white dark:bg-zinc-900 shadow-sm">
+                        <Select value={row.payment_account_id} onValueChange={v => updateSplitRow(row.id, 'payment_account_id', v)}>
+                          <SelectTrigger className="h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-sm font-bold font-mono uppercase">
+                            <SelectValue placeholder="Account..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentAccounts.map(acc => (
+                              <SelectItem key={acc.id} value={acc.id.toString()} className="text-xs font-bold uppercase">{acc.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        <Select value={row.payment_method} onValueChange={v => updateSplitRow(row.id, 'payment_method', v)}>
+                          <SelectTrigger className="h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase">
+                            <SelectValue placeholder="Method..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cash' ? (
+                              <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
+                            ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Bank' ? (
+                              <>
+                                <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
+                                <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                <SelectItem value="Card" className="text-xs font-bold">Card</SelectItem>
+                              </>
+                            ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
+                              <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                            ) : (
+                              <>
+                                <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
+                                <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
+                                <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                <SelectItem value="Card" className="text-xs font-bold">Card</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        {paymentType === 'PAYMENT' && row.payment_method === 'Cheque' ? (
+                          paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
+                            <Select value={row.original_cheque_id} onValueChange={(v) => {
+                              const chq = customerCheques.find(c => c.id.toString() === v);
+                              if (chq) {
+                                setSplitPayments(splitPayments.map(p => p.id === row.id ? {
+                                  ...p,
+                                  original_cheque_id: v,
+                                  cheque_no: chq.cheque_no,
+                                  cheque_date: chq.cheque_date,
+                                  clear_date: chq.clear_date || "",
+                                  amount: toNum(chq.amount)
+                                } : p));
+                              }
+                            }}>
+                              <SelectTrigger disabled={!row.payment_account_id} className={`h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.original_cheque_id && 'border-orange-500'}`}>
+                                <SelectValue placeholder="Select In Hand..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {customerCheques.length > 0 ? (
+                                  customerCheques.map((chq: any) => (
+                                    <SelectItem key={chq.id} value={chq.id.toString()} className="text-xs font-mono">
+                                      {chq.cheque_no} - {chq.customer_name} (Rs {toNum(chq.amount).toLocaleString()})
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="none" disabled className="text-xs italic text-rose-500">No cheques in hand</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Select value={row.cheque_no} onValueChange={v => updateSplitRow(row.id, 'cheque_no', v)}>
+                              <SelectTrigger disabled={!row.payment_account_id} className={`h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.cheque_no && 'border-orange-500'}`}>
+                                <SelectValue placeholder="Select Cheque..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableCheques[row.payment_account_id] && availableCheques[row.payment_account_id].length > 0 ? (
+                                  availableCheques[row.payment_account_id].map((chq: string) => (
+                                    <SelectItem key={chq} value={chq} className="text-xs font-mono">{chq}</SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="none" disabled className="text-xs italic text-rose-500 py-2">no cheque found generate cheque book first</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          )
+                        ) : (
+                          <Input value={row.cheque_no} onChange={e => updateSplitRow(row.id, 'cheque_no', e.target.value)} disabled={row.payment_method !== 'Cheque'} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono tracking-widest" placeholder="CHQ#" />
+                        )}
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        <Input value={row.cheque_date} onChange={e => updateSplitRow(row.id, 'cheque_date', e.target.value)} type="date" className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs" />
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        <Input value={row.clear_date} onChange={e => updateSplitRow(row.id, 'clear_date', e.target.value)} type="date" className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs" />
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-orange-500/30 text-right font-mono text-sm font-black" placeholder="0.00" />
+                      </td>
+                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                        <Input type="number" value={row.discount || ""} onChange={e => updateSplitRow(row.id, 'discount', toNum(e.target.value))} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-right font-mono text-sm" placeholder="0.00" />
+                      </td>
+                      <td className="p-4 text-center rounded-r-xl bg-white dark:bg-zinc-900 shadow-sm">
+                        <Button variant="ghost" size="icon" onClick={() => removeSplitRow(row.id)} className="h-10 w-10 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                          <Trash2 size={18} />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex justify-between items-center">
+              <div className="flex gap-8">
+                <div className="space-y-0.5">
+                  <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Base Payout Required</div>
+                  <div className="text-sm font-black text-zinc-500 font-mono">Rs {totalAllocated.toLocaleString()}</div>
+                </div>
+                <div className="space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-8">
+                  <div className="text-[9px] font-black text-orange-500 uppercase tracking-widest">Aggregate Split Total</div>
+                  <div className={`text-xl font-black font-mono tracking-tighter ${Math.abs(splitPayments.reduce((s, p) => s + Number(p.amount), 0) - totalAllocated) < 1 ? 'text-emerald-600' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                    Rs {splitPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-8">
+                  <div className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Balance Required</div>
+                  <div className={`text-xl font-black font-mono tracking-tighter ${Math.abs(totalAllocated - splitPayments.reduce((s, p) => s + Number(p.amount), 0)) < 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    Rs {(totalAllocated - splitPayments.reduce((s, p) => s + Number(p.amount), 0)).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={() => setMultiDialogOpen(false)} className={`h-10 text-xs font-bold uppercase ${PREMIUM_ROUNDING_MD}`}>
+                  Confirm & Sync
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 

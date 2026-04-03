@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Link, router } from "@inertiajs/react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SalesHistoryTab, PurchasesHistoryTab, PaymentsLedgerTab, BankStatementTab, ChequesTab } from "./history-tabs";
 import {
     ArrowLeft,
     Edit,
@@ -110,12 +112,13 @@ export default function AccountView({ account, financial_summary }: Props) {
         </div>
     );
 
-    const renderFinancialSummary = () => {
-        const type = account.account_type?.name || account.type;
+    const type = account.account_type?.name || account.type;
+    const typeLower = (type || '').toLowerCase();
 
+    const renderFinancialSummary = () => {
         if (!financial_summary || Object.keys(financial_summary).length === 0) return null;
 
-        if (type === 'Customers') {
+        if (typeLower === 'customers') {
             return (
                 <Card>
                     <CardHeader className="pb-2">
@@ -149,7 +152,7 @@ export default function AccountView({ account, financial_summary }: Props) {
             );
         }
 
-        if (type === 'Supplier') {
+        if (typeLower === 'supplier') {
             return (
                 <Card>
                     <CardHeader className="pb-2">
@@ -183,7 +186,7 @@ export default function AccountView({ account, financial_summary }: Props) {
             );
         }
 
-        if (type === 'Bank' || type === 'Cash') {
+        if (['bank', 'cash', 'cheque in hand'].includes(typeLower)) {
             return (
                 <Card>
                     <CardHeader className="pb-2">
@@ -194,19 +197,19 @@ export default function AccountView({ account, financial_summary }: Props) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Total In</span>
+                            <span className="text-muted-foreground">{typeLower === 'cheque in hand' ? 'Total IN Amount' : 'Total In'}</span>
                             <span className="font-bold text-green-600">{formatCurrency(financial_summary.total_in)}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Total Out</span>
+                            <span className="text-muted-foreground">{typeLower === 'cheque in hand' ? 'Total OUT Amount' : 'Total Out'}</span>
                             <span className="font-bold text-red-600">{formatCurrency(financial_summary.total_out)}</span>
                         </div>
                         <div className="pt-2 border-t font-bold flex items-center justify-between">
-                            <span className="text-sm">Current Balance</span>
+                            <span className="text-sm">{typeLower === 'cheque in hand' ? 'Available Cheques Amount' : 'Current Balance'}</span>
                             <span className="text-sm">{formatCurrency(financial_summary.current_balance)}</span>
                         </div>
 
-                        {type === 'Bank' && (
+                        {typeLower === 'bank' && (
                             <div className="space-y-3 mt-4 pt-4 border-t">
                                 <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Chequebook Usage</p>
                                 <div className="grid grid-cols-3 gap-2">
@@ -263,7 +266,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </div>
                                 <div className="flex items-center gap-1.5 font-medium">
                                     <Tag className="h-4 w-4" />
-                                    Type: <span className="text-foreground">{account.account_type?.name || account.type}</span>
+                                    Type: <span className="text-foreground">{type}</span>
                                 </div>
                             </div>
                         </div>
@@ -278,10 +281,10 @@ export default function AccountView({ account, financial_summary }: Props) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Quick Stats Sidebar */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {/* Quick Stats Sidebar (Left) */}
                         <div className="lg:col-span-1 space-y-6">
-                            <Card className="overflow-hidden border-primary/20 bg-primary/5">
+                            <Card className="overflow-hidden border-primary/20 bg-primary/5 shadow-none">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                                         <CreditCard className="h-4 w-4 text-primary" />
@@ -295,6 +298,14 @@ export default function AccountView({ account, financial_summary }: Props) {
                                             {formatCurrency(account.opening_balance)}
                                         </div>
                                     </div>
+                                    {financial_summary?.current_balance !== undefined && (
+                                        <div className="pt-2">
+                                            <div className="text-xs text-muted-foreground uppercase mb-1">{typeLower === 'cheque in hand' ? 'Available Amount of Check' : 'Current Balance'}</div>
+                                            <div className={cn("text-2xl font-bold", financial_summary.current_balance < 0 ? "text-red-500" : "text-green-600")}>
+                                                {formatCurrency(financial_summary.current_balance)}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-primary/10">
                                         <div>
                                             <div className="text-[10px] text-muted-foreground uppercase mb-1">Credit Limit</div>
@@ -311,7 +322,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                             {/* Type-Specific Dynamic Summary */}
                             {renderFinancialSummary()}
 
-                            <Card>
+                            <Card className="shadow-none">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                                         <Info className="h-4 w-4" />
@@ -340,7 +351,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            <Card className="shadow-none">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                                         <User className="h-4 w-4" />
@@ -361,102 +372,187 @@ export default function AccountView({ account, financial_summary }: Props) {
                             </Card>
                         </div>
 
-                        {/* Main Content Areas */}
-                        <div className="lg:col-span-2 space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-primary" />
-                                        Identity & Contact Info
-                                    </CardTitle>
-                                    <CardDescription>General information and contact points</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                                        <InfoRow icon={Phone} label="Mobile" value={account.mobile} />
-                                        <InfoRow icon={Phone} label="Telephone 1" value={account.telephone1} />
-                                        <InfoRow icon={Phone} label="Telephone 2" value={account.telephone2} />
-                                        <InfoRow icon={Phone} label="Fax" value={account.fax} />
-                                        <InfoRow icon={CalendarIcon} label="Opening Date" value={formatDate(account.opening_date)} />
-                                        <InfoRow icon={CalendarIcon} label="FBR Date" value={formatDate(account.fbr_date)} />
-                                    </div>
+                        {/* Main Content Areas Tabs (Right) */}
+                        <div className="lg:col-span-2 xl:col-span-3 min-w-0">
+                             <Tabs defaultValue="overview" className="w-full">
+                                <div className="border-b mb-4">
+                                    <TabsList className="flex w-full justify-start overflow-x-auto bg-transparent p-0 rounded-none h-auto">
+                                        <TabsTrigger 
+                                            value="overview" 
+                                            className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                                        >
+                                            Identity & Detail
+                                        </TabsTrigger>
+                                        
+                                        {typeLower === 'customers' && (
+                                            <>
+                                                <TabsTrigger value="sales" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    Sales History
+                                                </TabsTrigger>
+                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    Payments & Outstanding
+                                                </TabsTrigger>
+                                            </>
+                                        )}
 
-                                    <div className="mt-4 space-y-1 px-3">
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                            <MapPin className="h-3 w-3" />
-                                            Postal Address
-                                        </div>
-                                        <div className="text-sm mt-1 leading-relaxed">
-                                            {account.address1 || "No address provided"}
-                                            {account.address2 && <div className="mt-0.5">{account.address2}</div>}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                        {typeLower === 'supplier' && (
+                                            <>
+                                                <TabsTrigger value="purchases" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    Purchase History
+                                                </TabsTrigger>
+                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    Payments & Outstanding
+                                                </TabsTrigger>
+                                            </>
+                                        )}
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Globe className="h-5 w-5 text-primary" />
-                                        Location Hierarchy
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
-                                        <InfoRow label="Country" value={account.country?.name} />
-                                        <InfoRow label="Province" value={account.province?.name} />
-                                        <InfoRow label="City" value={account.city?.name} />
-                                        <InfoRow label="Area" value={account.area?.name} />
-                                        <InfoRow label="Sub Area" value={account.subarea?.name} />
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                        {['bank', 'cash', 'cheque in hand'].includes(typeLower) && (
+                                            <>
+                                                <TabsTrigger value="statement" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    {typeLower === 'cheque in hand' ? 'Cheque IN/OUT Ledger' : 'Bank Statement'}
+                                                </TabsTrigger>
+                                                {typeLower === 'bank' && (
+                                                    <TabsTrigger value="cheques" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                        Issued Cheques
+                                                    </TabsTrigger>
+                                                )}
+                                            </>
+                                        )}
+                                    </TabsList>
+                                </div>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <FileText className="h-5 w-5 text-primary" />
-                                        Tax & Professional Details
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                                        <InfoRow label="GST #" value={account.gst} />
-                                        <InfoRow label="NTN #" value={account.ntn} />
-                                        <InfoRow label="CNIC #" value={account.cnic} />
-                                        <InfoRow label="Note Head" value={account.note_head} />
-                                        <InfoRow label="Category" value={account.category} />
-                                        <InfoRow label="Item Category" value={account.item_category} />
-                                        <div className="md:col-span-2">
-                                            <InfoRow label="A.T.S Info" value={account.ats_type ? `${account.ats_type} (${account.ats_percentage}%)` : null} />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                <TabsContent value="overview" className="space-y-6 pt-2 focus-visible:outline-none">
+                                    <Card className="shadow-none border border-muted">
+                                        <CardHeader className="py-4 bg-muted/20 border-b">
+                                            <CardTitle className="text-md flex items-center gap-2">
+                                                <Building2 className="h-4 w-4 text-primary" />
+                                                Identity & Contact Info
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                                                <InfoRow icon={Phone} label="Mobile" value={account.mobile} />
+                                                <InfoRow icon={Phone} label="Telephone 1" value={account.telephone1} />
+                                                <InfoRow icon={Phone} label="Telephone 2" value={account.telephone2} />
+                                                <InfoRow icon={Phone} label="Fax" value={account.fax} />
+                                                <InfoRow icon={CalendarIcon} label="Opening Date" value={formatDate(account.opening_date)} />
+                                                <InfoRow icon={CalendarIcon} label="FBR Date" value={formatDate(account.fbr_date)} />
+                                            </div>
 
-                            {/* Remarks/Regards Section */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Card className="bg-muted/30 border-dashed">
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium">Remarks</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm text-muted-foreground italic leading-relaxed">
-                                            {account.remarks || "No supplementary remarks found for this account."}
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                                <Card className="bg-muted/30 border-dashed">
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium">Regards / Additional Info</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm text-muted-foreground italic leading-relaxed">
-                                            {account.regards || "No complementary details available."}
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                                            <div className="mt-4 space-y-1 px-3">
+                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                                    <MapPin className="h-3 w-3" />
+                                                    Postal Address
+                                                </div>
+                                                <div className="text-sm mt-1 leading-relaxed">
+                                                    {account.address1 || "No address provided"}
+                                                    {account.address2 && <div className="mt-0.5">{account.address2}</div>}
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="shadow-none border border-muted">
+                                        <CardHeader className="py-4 bg-muted/20 border-b">
+                                            <CardTitle className="text-md flex items-center gap-2">
+                                                <Globe className="h-4 w-4 text-primary" />
+                                                Location Hierarchy
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2">
+                                                <InfoRow label="Country" value={account.country?.name} />
+                                                <InfoRow label="Province" value={account.province?.name} />
+                                                <InfoRow label="City" value={account.city?.name} />
+                                                <InfoRow label="Area" value={account.area?.name} />
+                                                <InfoRow label="Sub Area" value={account.subarea?.name} />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="shadow-none border border-muted">
+                                        <CardHeader className="py-4 bg-muted/20 border-b">
+                                            <CardTitle className="text-md flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-primary" />
+                                                Tax & Professional Details
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                                                <InfoRow label="GST #" value={account.gst} />
+                                                <InfoRow label="NTN #" value={account.ntn} />
+                                                <InfoRow label="CNIC #" value={account.cnic} />
+                                                <InfoRow label="Note Head" value={account.note_head} />
+                                                <InfoRow label="Category" value={account.category} />
+                                                <InfoRow label="Item Category" value={account.item_category} />
+                                                <div className="md:col-span-2">
+                                                    <InfoRow label="A.T.S Info" value={account.ats_type ? `${account.ats_type} (${account.ats_percentage}%)` : null} />
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Remarks/Regards Section */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <Card className="bg-muted/30 border-dashed shadow-none">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-medium">Remarks</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                                                    {account.remarks || "No supplementary remarks found for this account."}
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="bg-muted/30 border-dashed shadow-none">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-medium">Regards / Additional Info</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                                                    {account.regards || "No complementary details available."}
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </TabsContent>
+
+                                {/* Dynamic Tabs Content Loading */}
+                                {typeLower === 'customers' && (
+                                    <>
+                                        <TabsContent value="sales" className="mt-2 focus-visible:outline-none">
+                                            <SalesHistoryTab accountId={account.id} />
+                                        </TabsContent>
+                                        <TabsContent value="payments" className="mt-2 focus-visible:outline-none">
+                                            <PaymentsLedgerTab accountId={account.id} accountType={type} />
+                                        </TabsContent>
+                                    </>
+                                )}
+
+                                {typeLower === 'supplier' && (
+                                    <>
+                                        <TabsContent value="purchases" className="mt-2 focus-visible:outline-none">
+                                            <PurchasesHistoryTab accountId={account.id} />
+                                        </TabsContent>
+                                        <TabsContent value="payments" className="mt-2 focus-visible:outline-none">
+                                            <PaymentsLedgerTab accountId={account.id} accountType={type} />
+                                        </TabsContent>
+                                    </>
+                                )}
+
+                                {['bank', 'cash', 'cheque in hand'].includes(typeLower) && (
+                                    <>
+                                        <TabsContent value="statement" className="mt-2 focus-visible:outline-none">
+                                            <BankStatementTab accountId={account.id} accountType={type || ''} />
+                                        </TabsContent>
+                                        {typeLower === 'bank' && (
+                                           <TabsContent value="cheques" className="mt-2 focus-visible:outline-none">
+                                               <ChequesTab accountId={account.id} />
+                                           </TabsContent>
+                                        )}
+                                    </>
+                                )}
+                            </Tabs>
                         </div>
                     </div>
                 </div>

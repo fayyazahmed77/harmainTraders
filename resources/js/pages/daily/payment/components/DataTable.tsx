@@ -49,6 +49,7 @@ interface Payment {
     type: string;
     payment_method: string;
     cheque_status?: string;
+    group_id?: number | null;
 }
 
 interface DataTableProps {
@@ -81,7 +82,24 @@ export default function DataTable({ data }: DataTableProps) {
             }
         },
 
-        { accessorKey: "voucher_no", header: "Voucher #" },
+        { 
+            accessorKey: "voucher_no", 
+            header: "Voucher #",
+            cell: ({ row }) => {
+                const voucherNo = row.getValue("voucher_no") as string;
+                const groupId = row.original.group_id;
+                return (
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold">{voucherNo}</span>
+                        {groupId && (
+                            <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[8px] font-black uppercase tracking-widest rounded border border-orange-500/20 shadow-sm animate-pulse">
+                                Multi
+                            </span>
+                        )}
+                    </div>
+                );
+            }
+        },
         { accessorKey: "account.title", header: "Party" },
         {
             accessorKey: "type",
@@ -150,10 +168,10 @@ export default function DataTable({ data }: DataTableProps) {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 onClick={() => {
-                                    router.visit(`/payments/${payment.id}/pdf`);
+                                    window.open(`/payments/${payment.id}/pdf`, '_blank');
                                 }}
                             >
-                                Print
+                                {payment.group_id ? "Print Combined Slip" : "Print Voucher"}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

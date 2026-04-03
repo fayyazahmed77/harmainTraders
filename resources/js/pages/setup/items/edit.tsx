@@ -31,62 +31,13 @@ import { BreadcrumbItem } from "@/types"
 import { toast } from "sonner"
 import ReactSelect from "react-select"
 import { useAppearance } from "@/hooks/use-appearance"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import axios from "axios"
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Items", href: "/items" },
   { title: "Edit", href: "/items/edit" },
 ]
-
-// Style Constants (Professional Modern)
-const PREMIUM_ROUNDING = "rounded-xl";
-const PREMIUM_ROUNDING_MD = "rounded-md";
-const MONO_FONT = "font-mono tracking-tighter";
-
-const SIGNAL_ORANGE = "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20";
-const SIGNAL_GREEN = "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20";
-const SIGNAL_RED = "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/20";
-
-// Standardizing gradients and surface colors
-const PREMIUM_SURFACE = "bg-white dark:bg-zinc-950/50";
-const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
-const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
-const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
-
-const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode, icon?: any, label: string }) => (
-  <div className="space-y-1">
-    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
-      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
-      {label}
-    </div>
-    {children}
-  </div>
-);
-
-const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
-  const colors = {
-    green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
-    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-  };
-  return (
-    <span className={`px-2 py-0.5 ${PREMIUM_ROUNDING_MD} text-[10px] font-black uppercase tracking-tighter border ${colors[type]}`}>
-      {text}
-    </span>
-  );
-};
-
-interface Props {
-  item: any
-  categories: any
-  companies: any
-  pagination: {
-    prev_id: number | null
-    next_id: number | null
-    current: number
-    total: number
-  }
-}
 
 interface ItemForm {
   date: string;
@@ -132,24 +83,78 @@ interface ItemForm {
   [key: string]: any;
 }
 
+// Style Constants (Professional Modern)
+const PREMIUM_ROUNDING = "rounded-xl";
+const PREMIUM_ROUNDING_MD = "rounded-md";
+const MONO_FONT = "font-mono tracking-tighter";
+
+const SIGNAL_ORANGE = "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20";
+const SIGNAL_GREEN = "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20";
+const SIGNAL_RED = "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-500/20";
+
+// Standardizing gradients and surface colors
+const PREMIUM_SURFACE = "bg-white dark:bg-zinc-950/50";
+const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
+const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
+const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
+
+const TechLabel = ({ children, icon: Icon, label, required, error }: { children: React.ReactNode, icon?: any, label: string, required?: boolean, error?: string }) => (
+  <div className="space-y-1">
+    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
+      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+      {label}
+      {required && <span className="text-rose-500 ml-0.5">*</span>}
+    </div>
+    {children}
+    {error && <p className="text-[10px] text-rose-500 mt-1 font-bold">{error}</p>}
+  </div>
+);
+
+const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
+  const colors = {
+    green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  };
+  return (
+    <span className={`px-2 py-0.5 ${PREMIUM_ROUNDING_MD} text-[10px] font-black uppercase tracking-tighter border ${colors[type]}`}>
+      {text}
+    </span>
+  );
+};
+
+interface Props {
+  item: any
+  categories: any
+  companies: any
+  pagination: {
+    prev_id: number | null
+    next_id: number | null
+    current: number
+    total: number
+  }
+}
+
 export default function Page({ item, categories, companies, pagination }: Props) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
   const selectBorder = isDark ? '#262626' : '#e5e7eb';
 
-  const selectStyles = React.useMemo(() => ({
+  const getSelectStyles = (hasError: boolean) => ({
     control: (base: any) => ({
       ...base,
       backgroundColor: 'transparent',
-      borderColor: 'var(--border)',
+      borderColor: hasError ? 'rgb(244 63 94)' : 'var(--border)',
       color: 'inherit',
       minHeight: '2.25rem',
       height: '2.25rem',
       borderRadius: 'calc(var(--radius) - 2px)',
       '&:hover': {
-        borderColor: 'var(--input)'
-      }
+        borderColor: hasError ? 'rgb(225 29 72)' : 'var(--input)'
+      },
+      boxShadow: hasError ? '0 0 0 1px rgb(244 63 94)' : base.boxShadow,
     }),
     valueContainer: (base: any) => ({ ...base, padding: '0 8px' }),
     dropdownIndicator: (base: any) => ({ ...base, padding: '4px' }),
@@ -191,7 +196,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
       ...base,
       color: 'var(--muted-foreground)',
     }),
-  }), [selectBg, selectBorder]);
+  });
 
   const companyOptions = React.useMemo(() =>
     companies.map((c: any) => ({ value: String(c.id), label: c.title })),
@@ -208,8 +213,8 @@ export default function Page({ item, categories, companies, pagination }: Props)
   const [openingDate, setOpeningDate] = useState<Date | undefined>(initialDate)
   const [openingOpen, setOpeningOpen] = useState(false)
 
-  // Inertia form initialised with item
-  const { data, setData, post, put, processing, errors, reset, isDirty } = useForm<ItemForm>({
+  // Inertia form initialised with keys matching your migration
+  const { data, setData, put, processing, errors, reset, isDirty } = useForm<ItemForm>({
     date: item.date ?? "",
     code: item.code ?? "",
     title: item.title ?? "",
@@ -280,20 +285,27 @@ export default function Page({ item, categories, companies, pagination }: Props)
     }
   }, [data.trade_price, data.retail]);
 
+
   // submit handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // ensure date is yyyy-mm-dd format
     const payload = {
       ...data,
       date: openingDate ? openingDate.toISOString().split("T")[0] : data.date,
     }
 
-    // post to your endpoint (adjust path if needed)
     put(`/items/${item.id}`, {
       onSuccess: () => toast.success("Item updated successfully"),
-      onError: () => toast.error("Please fix the errors and try again"),
+      onError: (errs) => {
+        console.error("Validation Errors:", errs)
+        const errorMessages = Object.values(errs)
+        if (errorMessages.length > 0) {
+          toast.error(String(errorMessages[0]))
+        } else {
+          toast.error("Please fix the errors and try again")
+        }
+      },
     })
   }
 
@@ -313,7 +325,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
           <main className="flex-1 overflow-auto p-4 md:p-6 flex flex-col gap-6">
 
             {/* Pagination Controls moved to the top of main area */}
-            <div className="flex justify-between items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-sm shadow-zinc-200/50 dark:shadow-none">
+            <div className="flex justify-between items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-sm shadow-zinc-200/50 dark:shadow-none mb-6">
               <div className="flex items-center gap-2">
                 <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 ${PREMIUM_ROUNDING_MD} bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20`}>
                   Editing Item: {item.title || item.code || "N/A"}
@@ -401,8 +413,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
                           />
                         </PopoverContent>
                       </Popover>
-                      {/* @ts-ignore */}
-                      {errors?.date && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.date}</p>}
+                      {errors.date && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.date}</p>}
                     </TechLabel>
                   </div>
 
@@ -412,23 +423,26 @@ export default function Page({ item, categories, companies, pagination }: Props)
                         value={data.code}
                         onChange={(e) => onInputChange("code", e.target.value)}
                         placeholder="E.g. ITM-001"
-                        className={`h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.1em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500 uppercase`}
+                        className={cn(
+                          `h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.1em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500 uppercase`,
+                          errors.code && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
                       />
-                      {/* @ts-ignore */}
-                      {errors?.code && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.code}</p>}
+                      {errors.code && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.code}</p>}
                     </TechLabel>
                   </div>
 
                   <div className="md:col-span-4">
-                    <TechLabel label="Primary Title" icon={Type}>
+                    <TechLabel label="Primary Title" icon={Type} required error={errors.title}>
                       <Input
                         value={data.title}
                         onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
                         placeholder="Full Item Description"
-                        className={`h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`}
+                        className={cn(
+                          `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
+                          errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
                       />
-                      {/* @ts-ignore */}
-                      {errors?.title && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.title}</p>}
                     </TechLabel>
                   </div>
 
@@ -454,24 +468,28 @@ export default function Page({ item, categories, companies, pagination }: Props)
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <TechLabel label="Trade Price" icon={DollarSign}>
+                    <TechLabel label="Trade Price" icon={DollarSign} required error={errors.trade_price}>
                       <Input
                         type="number"
                         value={data.trade_price}
                         onChange={(e) => onInputChange("trade_price", e.target.value)}
                         placeholder="0.00"
-                        className="font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        className={cn(
+                          "font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
+                          errors.trade_price && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
                       />
-                      {/* @ts-ignore */}
-                      {errors?.trade_price && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.trade_price}</p>}
                     </TechLabel>
-                    <TechLabel label="Retail" icon={DollarSign}>
+                    <TechLabel label="Retail" icon={DollarSign} required error={errors.retail}>
                       <Input
                         type="number"
                         value={data.retail}
                         onChange={(e) => onInputChange("retail", e.target.value)}
                         placeholder="0.00"
-                        className="font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        className={cn(
+                          "font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
+                          errors.retail && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                        )}
                       />
                     </TechLabel>
                   </div>
@@ -499,29 +517,29 @@ export default function Page({ item, categories, companies, pagination }: Props)
 
                   {/* Advanced Pricing Tiers */}
                   <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4 space-y-3">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP2 - TP7)</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP1 - TP6)</div>
                     <div className="grid grid-cols-2 gap-3">
-                      <TechLabel label="Loose (T.P.2) %" icon={Percent}>
+                      <TechLabel label="Loose (T.P.1) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt2 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt2) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Retail (T.P.3) %" icon={Percent}>
+                      <TechLabel label="Retail (T.P.2) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt3} onChange={(e) => onInputChange("pt3", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt3 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt3) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Agent (T.P.4) %" icon={Percent}>
+                      <TechLabel label="Agent (T.P.3) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt4 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt4) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.5 %" icon={Percent}>
+                      <TechLabel label="T.P.4 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt5 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt5) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.6 %" icon={Percent}>
+                      <TechLabel label="T.P.5 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt6 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt6) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.7 %" icon={Percent}>
+                      <TechLabel label="T.P.6 %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt7 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}</div>}
                       </TechLabel>
@@ -548,24 +566,22 @@ export default function Page({ item, categories, companies, pagination }: Props)
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <TechLabel label="Company" icon={Building2}>
+                      <TechLabel label="Company" icon={Building2} required error={errors.company}>
                         <ReactSelect
                           placeholder="Select Company"
-                          styles={selectStyles}
+                          styles={getSelectStyles(!!errors.company)}
                           options={companyOptions}
                           value={companyOptions.find((opt: any) => String(opt.value) === String(data.company)) || null}
                           onChange={(opt: any) => onInputChange("company", opt ? opt.value : "")}
                           isSearchable
                           isClearable
                         />
-                        {/* @ts-ignore */}
-                        {errors?.company && <p className="text-[10px] text-rose-500 mt-1 font-bold">{errors.company}</p>}
                       </TechLabel>
 
-                      <TechLabel label="Category" icon={Tags}>
+                      <TechLabel label="Category" icon={Tags} required error={errors.category}>
                         <ReactSelect
                           placeholder="Select Category"
-                          styles={selectStyles}
+                          styles={getSelectStyles(!!errors.category)}
                           options={categoryOptions}
                           value={categoryOptions.find((opt: any) => opt.value === String(data.category)) || null}
                           onChange={(opt: any) => onInputChange("category", opt ? opt.value : "")}
@@ -618,44 +634,70 @@ export default function Page({ item, categories, companies, pagination }: Props)
                       <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Logistics & Limits</h3>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-3">
-                      <TechLabel label="P. Size" icon={Ruler}>
-                        <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                      </TechLabel>
-                      <TechLabel label="P. Qty" icon={Box}>
-                        <Input value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                      </TechLabel>
-                      <TechLabel label="P. Full" icon={Box}>
-                        <Input value={data.packing_full} onChange={(e) => onInputChange("packing_full", e.target.value)} placeholder="Full" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                      </TechLabel>
-                      <TechLabel label="P. Pcs" icon={Component}>
-                        <Input value={data.packing_pcs} onChange={(e) => onInputChange("packing_pcs", e.target.value)} placeholder="Pcs" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                      </TechLabel>
-                    </div>
+                    <TooltipProvider>
+                      <div className="grid grid-cols-4 gap-3">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="w-full">
+                              <TechLabel label="Carton Size" icon={Ruler} error={errors.packing_size}>
+                                <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                              </TechLabel>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Packing Size</p></TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="w-full col-span-2">
+                              <TechLabel label="P. Qty (Units in 1 Full)" icon={Box} required error={errors.packing_qty}>
+                                <Input type="number" value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_qty && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                              </TechLabel>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Packing Quantity (e.g. 12 if 12 pieces in 1 Full)</p></TooltipContent>
+                        </Tooltip>
+
+                        <div className="flex flex-col justify-end pb-1">
+                          <div className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-tighter">
+                            Pc Price: {data.trade_price && data.packing_qty && Number(data.packing_qty) > 0 ? Math.ceil(Number(data.trade_price) / Number(data.packing_qty)) : "0"}
+                          </div>
+                        </div>
+                      </div>
+                    </TooltipProvider>
 
                     <div className="grid grid-cols-4 gap-3">
-                      <TechLabel label="Re-Order" icon={FileText}>
-                        <Input value={data.reorder_level} onChange={(e) => onInputChange("reorder_level", e.target.value)} placeholder="0" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                      <TechLabel label="Re-Order (Pcs)" icon={FileText} required error={errors.reorder_level}>
+                        <Input type="number" value={data.reorder_level} onChange={(e) => onInputChange("reorder_level", e.target.value)} placeholder="0" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.reorder_level && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                       </TechLabel>
                       <TechLabel label="Pcs / Limit" icon={Component}>
                         <div className="flex gap-1">
-                          <Input value={data.pcs} onChange={(e) => onInputChange("pcs", e.target.value)} placeholder="Pcs" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
-                          <Input value={data.limit_pcs} onChange={(e) => onInputChange("limit_pcs", e.target.value)} placeholder="Lmt" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                          <Input type="number" value={data.pcs} onChange={(e) => onInputChange("pcs", e.target.value)} placeholder="Pcs" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                          <Input type="number" value={data.limit_pcs} onChange={(e) => onInputChange("limit_pcs", e.target.value)} placeholder="Lmt" className="h-9 w-1/2 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         </div>
                       </TechLabel>
                       <TechLabel label="Order Qty" icon={FileText}>
-                        <Input value={data.order_qty} onChange={(e) => onInputChange("order_qty", e.target.value)} placeholder="0" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
+                        <Input type="number" value={data.order_qty} onChange={(e) => onInputChange("order_qty", e.target.value)} placeholder="0" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </TechLabel>
                       <TechLabel label="Weight" icon={Box}>
                         <Input value={data.weight} onChange={(e) => onInputChange("weight", e.target.value)} placeholder="kg" className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </TechLabel>
                     </div>
 
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="md:col-span-1">
+                        {/* Filler if needed */}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
-                      <TechLabel label="Stock 1 / 2" icon={Layers}>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Input value={data.stock_1} onChange={(e) => onInputChange("stock_1", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Stk 1" />
-                          <Input value={data.stock_2} onChange={(e) => onInputChange("stock_2", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Stk 2" />
+                      <TechLabel label="Stock (Full / Pcs)" icon={Layers}>
+                        <div className="grid grid-cols-2 gap-2 relative">
+                          <Input type="number" value={data.stock_1} onChange={(e) => onInputChange("stock_1", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Full" />
+                          <Input type="number" value={data.stock_2} onChange={(e) => onInputChange("stock_2", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Pcs" />
+                          <div className="absolute -bottom-4 right-0 text-[9px] font-bold text-zinc-400">
+                             Total: {(Number(data.stock_1 || 0) * Number(data.packing_qty || 1)) + Number(data.stock_2 || 0)} Units
+                          </div>
                         </div>
                       </TechLabel>
 

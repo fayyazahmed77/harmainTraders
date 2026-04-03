@@ -431,8 +431,8 @@ export default function Create({
     subarea_id: "",
     saleman_id: "",
     booker_id: "",
-    credit_limit: "999999",
-    aging_days: "1",
+    credit_limit: "99999999",
+    aging_days: "0",
     note_head: "",
     item_category: "",
     category: "",
@@ -787,7 +787,7 @@ export default function Create({
                           type="number"
                           value={data.credit_limit}
                           onChange={(e) => onInputChange("credit_limit", e.target.value)}
-                          placeholder="999999"
+                          placeholder="99999999"
                           className={cn(
                             "h-10 font-mono text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
                             errors.credit_limit && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
@@ -802,7 +802,7 @@ export default function Create({
                           type="number"
                           value={data.aging_days}
                           onChange={(e) => onInputChange("aging_days", e.target.value)}
-                          placeholder="1"
+                          placeholder="0"
                           className={cn(
                             "h-10 font-mono text-sm bg-orange-50/50 dark:bg-orange-500/5 text-orange-600 border-orange-200 dark:border-orange-500/30 font-bold",
                             errors.aging_days && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"

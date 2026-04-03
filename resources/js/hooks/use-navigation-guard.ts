@@ -31,6 +31,11 @@ export function useNavigationGuard(isDirty: boolean) {
         if (!isDirty) return;
 
         const removeListener = router.on('before', (event) => {
+            // Ignore non-GET requests (like form submissions)
+            if (event.detail.visit.method && event.detail.visit.method.toLowerCase() !== 'get') {
+                return;
+            }
+
             // If we are already in the confirmation process, allow the re-triggered visit
             if (pendingVisit === event.detail.visit.url.toString()) {
                 return;

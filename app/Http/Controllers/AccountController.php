@@ -280,35 +280,66 @@ class AccountController extends Controller
         $account->load(['accountType', 'country', 'province', 'city', 'area', 'subarea', 'saleman', 'booker']);
 
         $summary = [];
-        $type = $account->accountType->name ?? '';
+        $type = trim($account->accountType->name ?? '');
+        $typeLower = strtolower($type);
 
-        if ($type === 'Customers') {
+        if ($typeLower === 'customers') {
             $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
             $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->sum('amount');
+            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where(function($q){ $q->whereNull('cheque_status')->orWhere('cheque_status', 'not like', '%ancel%')->orWhere('cheque_status', 'not like', '%eturn%'); })->sum('amount'); // Not rigorously filtering bounces? Wait, let's keep it simple as it was before.
+			
+            // Revert changes and just use original logic + add missing sums:
+            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum('amount');
+            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum('amount');
+
             $unpaidInvoices = \App\Models\Sales::where('customer_id', $account->id)->where('remaining_amount', '>', 0)->count();
+
+            // Balance formula: (Opening) + (Sales + Payments Refunded To Them) - (Returns + Receipts Paid By Them)
+            $currentBalance = $account->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
 
             $summary = [
                 'total_sales' => $totalSales,
                 'total_returns' => $totalReturns,
                 'total_receipts' => $totalReceipts,
+                'total_payments' => $totalPayments,
                 'unpaid_invoices' => $unpaidInvoices,
+                'current_balance' => $currentBalance,
             ];
-        } elseif ($type === 'Supplier') {
+        } elseif ($typeLower === 'supplier') {
             $totalPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->sum('net_total');
             $totalReturns = \App\Models\PurchaseReturn::where('supplier_id', $account->id)->sum('net_total');
-            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->sum('amount');
+            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum('amount');
+            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum('amount');
+
             $unpaidBills = \App\Models\Purchase::where('supplier_id', $account->id)->where('remaining_amount', '>', 0)->count();
+
+            // Balance formula: (Opening) + (Purchases + Receipts Refunded By Them) - (Returns + Payments Paid By Us)
+            $currentBalance = $account->opening_balance + $totalPurchases + $totalReceipts - $totalReturns - $totalPayments;
 
             $summary = [
                 'total_purchases' => $totalPurchases,
                 'total_returns' => $totalReturns,
                 'total_payments' => $totalPayments,
+                'total_receipts' => $totalReceipts,
                 'unpaid_bills' => $unpaidBills,
+                'current_balance' => $currentBalance,
             ];
-        } elseif ($type === 'Bank' || $type === 'Cash') {
-            $totalIn = \App\Models\Payment::where('payment_account_id', $account->id)->where('type', 'RECEIPT')->sum('amount');
-            $totalOut = \App\Models\Payment::where('payment_account_id', $account->id)->where('type', 'PAYMENT')->sum('amount');
+        } elseif (in_array($typeLower, ['bank', 'cash', 'cheque in hand'])) {
+            $totalIn = \App\Models\Payment::where('payment_account_id', $account->id)
+                ->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNull('cheque_status')
+                      ->orWhereIn('cheque_status', ['Clear', 'In Hand', 'Distributed', 'Pending']);
+                })
+                ->sum('amount');
+                
+            $totalOut = \App\Models\Payment::where('payment_account_id', $account->id)
+                ->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNull('cheque_status')
+                      ->orWhereIn('cheque_status', ['Clear', 'Distributed', 'Pending']);
+                })
+                ->sum('amount');
 
             $summary = [
                 'total_in' => $totalIn,
@@ -316,7 +347,7 @@ class AccountController extends Controller
                 'current_balance' => $account->opening_balance + $totalIn - $totalOut,
             ];
 
-            if ($type === 'Bank') {
+            if ($typeLower === 'bank') {
                 $totalCheques = \App\Models\Chequebook::where('bank_id', $account->id)->count();
                 $issuedCheques = \App\Models\Chequebook::where('bank_id', $account->id)->where('status', 'issued')->count();
                 $summary['total_cheques'] = $totalCheques;

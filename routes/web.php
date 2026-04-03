@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AccountHistoryController;
 use App\Http\Controllers\FirmController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -92,6 +93,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{id}/balance', [AccountController::class, 'getBalance'])->name('account.balance');
         Route::get('/next-code', [AccountController::class, 'getNextCode'])->name('account.next-code');
         Route::patch('/{account}/toggle-status', [AccountController::class, 'toggleStatus'])->name('account.toggle-status');
+
+        // History Data Routes
+        Route::get('/{account}/history/sales', [AccountHistoryController::class, 'getSales'])->name('account.history.sales');
+        Route::get('/{account}/history/purchases', [AccountHistoryController::class, 'getPurchases'])->name('account.history.purchases');
+        Route::get('/{account}/history/payments', [AccountHistoryController::class, 'getPayments'])->name('account.history.payments');
+        Route::get('/{account}/history/bank-statement', [AccountHistoryController::class, 'getBankStatement'])->name('account.history.bank-statement');
+        Route::get('/{account}/history/cheques', [AccountHistoryController::class, 'getCheques'])->name('account.history.cheques');
     });
     Route::prefix('/firms')->group(function () {
         Route::get('/', [FirmController::class, 'index'])->name('firms.index');
@@ -362,6 +370,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/payment/store', [App\Http\Controllers\PaymentController::class, 'store'])->name('payment.store');
     Route::get('/payment/unpaid-bills', [App\Http\Controllers\PaymentController::class, 'getUnpaidBills'])->name('payment.unpaid-bills');
     Route::get('/payment/next-cheque', [App\Http\Controllers\PaymentController::class, 'getNextCheque'])->name('payment.next-cheque');
+    Route::get('/payment/available-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCheques'])->name('payment.available-cheques');
+    Route::get('/payment/available-customer-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCustomerCheques'])->name('payment.available-customer-cheques');
     Route::get('/payment/bill-items', [App\Http\Controllers\PaymentController::class, 'getBillItems'])->name('payment.bill-items');
 });
 

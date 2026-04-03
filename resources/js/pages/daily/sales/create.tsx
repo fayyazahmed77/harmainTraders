@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw, ChevronDown, ChevronUp, Save, Wallet, Search, ArrowRightLeft, CheckCircle2, Info, Calculator, BadgePercent, ArrowDownToLine, Package, Hash, AlertTriangle, Banknote, Box, PackageSearch } from "lucide-react";
+import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Wallet, Search, ArrowRightLeft, CheckCircle2, Info, Calculator, BadgePercent, ArrowDownToLine, Package, Hash, AlertTriangle, Banknote, Box, PackageSearch } from "lucide-react";
 import { useAppearance } from '@/hooks/use-appearance';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -89,6 +89,14 @@ interface Item {
   pt7?: number;
   category?: string;
   scheme?: string;
+  total_stock_pcs?: number;
+  price_per_pcs?: number;
+  stock_breakdown?: string;
+  last_purchase_date?: string;
+  last_purchase_full?: number;
+  last_purchase_pcs?: number;
+  last_purchase_rate?: number;
+  last_supplier?: string;
   // any other fields you may have
 }
 
@@ -236,6 +244,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [extraDiscount, setExtraDiscount] = useState<number>(0);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showBottomDetails, setShowBottomDetails] = useState(true);
 
   // Item Selection Dialog State
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -407,13 +417,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
   // Recalculate a row amount whenever rate/full/pcs/bonus changes
   const recalcRowAmount = (row: RowData, item?: Item) => {
-    const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
-    const totalUnits = toNumber(row.full) * packing + toNumber(row.pcs) + toNumber(row.bonus_full) * packing + toNumber(row.bonus_pcs);
-    // Here amount uses rate * normal units (excluding bonus if you want)
-    // Commonly bonus is free, adjust logic if you want to exclude/add differently.
-    const normalUnits = toNumber(row.full) * packing + toNumber(row.pcs);
-    const amount = normalUnits * toNumber(row.rate);
-    return amount;
+    const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
+    const rate = toNumber(row.rate);
+
+    // Amount = (Full Items * Full Rate) + (PCS * (Rate/Packing))
+    const amount = (toNumber(row.full) * rate) + (toNumber(row.pcs) * (rate / packing));
+    return Math.round(amount);
   };
 
   // update amounts when rows change
@@ -424,7 +433,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       if (r.item_id) {
         const item = items.find(it => it.id === r.item_id);
         if (item) {
-          const packing = toNumber(item.packing_full ?? item.packing_qty ?? 1);
+          const packing = toNumber(item.packing_qty ?? 1);
           const qty = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
           const current = itemUsage.get(r.item_id) || 0;
           itemUsage.set(r.item_id, current + qty);
@@ -439,7 +448,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       let stockExceeded = false;
       if (item) {
         const totalUsage = itemUsage.get(item.id) || 0;
-        if (totalUsage > (item.stock_1 ?? 0)) {
+        const availableStock = toNumber(item.total_stock_pcs ?? ((item.stock_1 ?? 0) * (item.packing_qty ?? 1) + (item.stock_2 ?? 0)));
+        if (totalUsage > availableStock) {
           stockExceeded = true;
         }
       }
@@ -554,17 +564,17 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       remaining_amount: totals.finalAmount - cashReceived,
 
       items: rowsWithComputed.map((r) => {
-        const item = items.find(i => i.id === r.item_id);
-        const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
+        const item = items.find(i => Number(i.id) === Number(r.item_id));
+        const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
 
-        const totalPCS = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
+        const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs) + (toNumber(r.bonus_full) * packing) + toNumber(r.bonus_pcs);
 
         return {
           item_id: r.item_id,
-          qty_carton: r.full,
-          qty_pcs: r.pcs,
-          bonus_qty_carton: r.bonus_full,
-          bonus_qty_pcs: r.bonus_pcs,
+          qty_carton: toNumber(r.full),
+          qty_pcs: toNumber(r.pcs),
+          bonus_qty_carton: toNumber(r.bonus_full),
+          bonus_qty_pcs: toNumber(r.bonus_pcs),
           total_pcs: totalPCS,
           trade_price: r.rate,
           retail_price: r.trade_price,
@@ -606,7 +616,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
         <div className="flex-1 flex flex-col md:flex-row min-h-0 md:overflow-hidden">
           {/* Main Area (Left) */}
-          <div className="flex-1 flex flex-col min-h-0 pt-1 md:pt-4 px-4 pb-0 space-y-3 md:overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden p-2 md:p-4 gap-2">
 
 
 
@@ -927,7 +937,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       </div>
 
                       {/* Rows (scrollable) */}
-                      <div className="max-h-none h-auto md:h-[47vh] max-h-[50vh] md:max-h-[47vh] overflow-y-auto custom-scrollbar md:overflow-auto space-y-3 md:space-y-0 text-sm">
+                      <div className="max-h-none h-auto md:h-[100vh] max-h-[100vh] md:max-h-[100vh] overflow-y-auto custom-scrollbar md:overflow-auto space-y-3 md:space-y-0 text-sm">
                         {rowsWithComputed.map((row) => (
                           <React.Fragment key={row.id}>
                             {/* Mobile Card View (Visible only on < md) */}
@@ -1107,7 +1117,19 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
 
                 {/* Bottom fields / stock & supplier info */}
-                <div className="mt-0 md:mt-3 flex flex-col md:h-[400px]">
+                <div className={cn(
+                  "mt-0 flex flex-col transition-all duration-300 relative",
+                  showBottomDetails ? "md:mt-1 md:h-[320px]" : "md:h-12 overflow-hidden"
+                )}>
+                  {/* Desktop Toggle Button for Bottom Details */}
+                  <div className="hidden md:flex absolute -top-3 left-1/2 -translate-x-1/2 z-50">
+                    <button
+                      onClick={() => setShowBottomDetails(!showBottomDetails)}
+                      className="w-12 h-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full flex items-center justify-center shadow-lg hover:bg-orange-50 dark:hover:bg-zinc-800 transition-all text-orange-500"
+                    >
+                      {showBottomDetails ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                    </button>
+                  </div>
                   {/* Mobile Toggle Button for Item Info */}
                   <Button
                     variant="outline"
@@ -1122,8 +1144,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     )}
                   </Button>
 
-                  <div className={`${showInfoPanel ? 'flex' : 'hidden'} md:flex flex-col h-full animate-in slide-in-from-bottom-1 duration-300`}>
-                    <Card className={cn("flex-1 p-3 md:p-5 border dark:border-zinc-800 shadow-sm relative overflow-hidden transition-all duration-300 shadow-zinc-200/40", SOFT_GLASS)}>
+                  <div className={cn(
+                    (showInfoPanel || showBottomDetails) ? 'flex' : 'hidden md:hidden',
+                    "md:flex flex-col h-full animate-in slide-in-from-bottom-1 duration-300"
+                  )}>
+                    <Card className={cn("flex-1 p-2 md:p-4 border dark:border-zinc-800 shadow-sm relative overflow-hidden transition-all duration-300 shadow-zinc-200/40", SOFT_GLASS)}>
                       {selectedItem ? (
                         <div className="flex flex-col h-full relative z-10">
                           {/* Top Header */}
@@ -1174,26 +1199,30 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                                 {/* Stock Calculators */}
                                 {(() => {
-                                  const packing = toNumber(selectedItem.packing_full || selectedItem.packing_qty) || 1;
-                                  const currentStock = toNumber(selectedItem.stock_1);
+                                  const packing = toNumber(selectedItem.packing_qty) || 1;
+                                  const currentTotalStock = toNumber(selectedItem.total_stock_pcs);
                                   const activeRow = rows.find(r => r.item_id === selectedItem.id);
                                   const enteredQty = activeRow ? (toNumber(activeRow.full) * packing) + toNumber(activeRow.pcs) + (toNumber(activeRow.bonus_full) * packing) + toNumber(activeRow.bonus_pcs) : 0;
-                                  const remainingStock = currentStock - enteredQty;
+                                  const remainingStock = currentTotalStock - enteredQty;
 
                                   return (
                                     <>
-                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 shadow-sm hover:shadow-md transition-all duration-300 group`}>
-                                        <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 leading-none group-hover:text-zinc-500">Stock Full</div>
-                                        <div className="text-3xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter italic">
+                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} transition-all duration-300 group shadow-sm ${remainingStock < 0
+                                        ? 'border-2 border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 shadow-rose-200/40'
+                                        : 'border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 hover:shadow-md'}`}>
+                                        <div className={`text-[10px] font-black uppercase tracking-widest mb-2 leading-none ${remainingStock < 0 ? 'text-rose-500' : 'text-zinc-400 group-hover:text-zinc-500'}`}>Stock Full</div>
+                                        <div className={`text-3xl font-black leading-none tracking-tighter italic ${remainingStock < 0 ? 'text-rose-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
                                           {Math.floor(remainingStock / packing)}
-                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase not-italic">F</span>
+                                          <span className={`text-[10px] font-bold ml-1 uppercase not-italic ${remainingStock < 0 ? 'text-rose-500 opacity-80' : 'text-zinc-400'}`}>F</span>
                                         </div>
                                       </div>
-                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 shadow-sm hover:shadow-md transition-all duration-300 group`}>
-                                        <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 leading-none group-hover:text-zinc-500">Pieces</div>
-                                        <div className="text-3xl font-black text-zinc-800 dark:text-zinc-100 leading-none tracking-tighter italic">
-                                          {remainingStock % packing}
-                                          <span className="text-[10px] font-bold text-zinc-400 ml-1 uppercase not-italic">P</span>
+                                      <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} transition-all duration-300 group shadow-sm ${remainingStock < 0
+                                        ? 'border-2 border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 shadow-rose-200/40'
+                                        : 'border border-zinc-300 dark:border-zinc-800/60 bg-white dark:bg-zinc-900/20 hover:shadow-md'}`}>
+                                        <div className={`text-[10px] font-black uppercase tracking-widest mb-2 leading-none ${remainingStock < 0 ? 'text-rose-500' : 'text-zinc-400 group-hover:text-zinc-500'}`}>Pieces</div>
+                                        <div className={`text-3xl font-black leading-none tracking-tighter italic ${remainingStock < 0 ? 'text-rose-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                          {remainingStock - (Math.floor(remainingStock / packing) * packing)}
+                                          <span className={`text-[10px] font-bold ml-1 uppercase not-italic ${remainingStock < 0 ? 'text-rose-500 opacity-80' : 'text-zinc-400'}`}>P</span>
                                         </div>
                                       </div>
                                       <div className={`flex flex-col items-center justify-center py-4 px-2 ${PREMIUM_ROUNDING_MD} border-2 shadow-lg transition-all duration-500 active:scale-95 cursor-default ${remainingStock < 0
@@ -1211,7 +1240,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                               </div>
 
                               {/* Price Tiers (Redesigned for Perfection) */}
-                              <div className="grid grid-cols-6 gap-3 mt-1 pt-1 border-t border-zinc-200 dark:border-zinc-800/40">
+                              <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mt-1 pt-1 border-t border-zinc-200 dark:border-zinc-800/40">
                                 {[2, 3, 4, 5, 6, 7].map((num) => {
                                   const priceKey = `pt${num}` as keyof Item;
                                   const percentage = toNumber(selectedItem[priceKey as keyof Item]);
@@ -1309,6 +1338,44 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                             </div>
 
                           </div>
+
+                          {/* Last Purchase Info Bar */}
+                          <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-wrap lg:flex-nowrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                              <CalendarIcon className="w-4 h-4 text-emerald-500" />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Purchased Date</span>
+                                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{selectedItem.last_purchase_date || '--/--/----'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-emerald-500" />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">P.Qty (Full/Pcs)</span>
+                                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                  <span className="text-emerald-600 font-black">{selectedItem.last_purchase_full ?? '-'}</span><span className="text-[9px] text-zinc-400 mx-0.5">F</span> / <span className="text-emerald-600 font-black">{selectedItem.last_purchase_pcs ?? '-'}</span><span className="text-[9px] text-zinc-400 mx-0.5">P</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Banknote className="w-4 h-4 text-emerald-500" />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Price/Pcs</span>
+                                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300"><span className="text-[9px] text-zinc-400 mr-0.5 italic">Rs</span>{selectedItem.last_purchase_rate ? toNumber(selectedItem.last_purchase_rate).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-.--'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Info className="w-4 h-4 text-emerald-500" />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Supplier Name</span>
+                                <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase truncate max-w-[150px]">{selectedItem.last_supplier || 'N/A'}</span>
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center py-6 relative z-10 w-full">
@@ -1323,8 +1390,34 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </div>
               </div>
 
+              {/* Always Show Toggle when sidebar is closed - floating on the right screen edge */}
+              {!showRightSidebar && (
+                <div className="hidden lg:flex fixed top-1/2 right-0 -translate-y-1/2 z-50">
+                  <button
+                    onClick={() => setShowRightSidebar(true)}
+                    className="w-8 h-12 bg-orange-500 rounded-l-xl flex items-center justify-center shadow-2xl hover:w-10 transition-all text-white border-y border-l border-orange-400/30"
+                  >
+                    <ChevronLeft size={20} className="drop-shadow-sm" />
+                  </button>
+                </div>
+              )}
+
               {/* Right Sidebar: Quick Summary & Financials */}
-              <div className="w-full lg:w-80 flex flex-col min-h-0">
+              <div className={cn(
+                "transition-all duration-500 ease-in-out relative flex flex-col",
+                showRightSidebar ? "w-full lg:w-80 opacity-100" : "w-0 lg:w-0 opacity-0 pointer-events-none"
+              )}>
+                {/* Desktop Toggle Button for Right Sidebar - Floating on the left edge */}
+                <div className="hidden lg:flex absolute top-1/2 -left-4 -translate-y-1/2 z-50 group">
+                  <button
+                    onClick={() => setShowRightSidebar(!showRightSidebar)}
+                    className="w-8 h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg flex items-center justify-center shadow-lg group-hover:bg-orange-50 dark:group-hover:bg-zinc-800 transition-all text-orange-500"
+                  >
+                    {showRightSidebar ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                  </button>
+                </div>
+
+
                 <Card className={`${CARD_BASE} flex flex-col border border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/20 dark:shadow-none max-h-full min-h-0 overflow-hidden`}>
 
                   <div className="overflow-y-auto min-h-0 custom-scrollbar p-4 pb-32 md:pb-4 flex flex-col gap-4">
@@ -1520,8 +1613,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           </div>
           {/* Item Dialog */}
           <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-            <DialogContent className="max-w-[99vw] md:max-w-5xl w-full md:w-[1000px] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl">
-              <div className={`p-6 ${ACCENT_GRADIENT} text-white`}>
+            <DialogContent className="max-w-[99vw] md:max-w-5xl w-full md:w-[1000px] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[90vh]">
+              <div className={`p-6 ${ACCENT_GRADIENT} text-white shrink-0`}>
                 <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
                   <Box className="w-6 h-6" /> Item Registry
                 </DialogTitle>
@@ -1541,14 +1634,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </div>
               </div>
 
-              <div className="max-h-[500px] overflow-auto">
-                <div className="grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex-1 overflow-auto min-h-0">
+                <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
                   <div className="col-span-1 text-[9px] font-black uppercase text-zinc-500">Code</div>
                   <div className="col-span-3 text-[9px] font-black uppercase text-zinc-500">Registry Title</div>
                   <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500">Trade Price</div>
                   <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500 flex flex-col justify-center">
-                    <span className="leading-none">After Disc Price</span>
-                    <span className="text-[7px] text-orange-500 mt-0.5">ACTIVE PRICE TYPE</span>
+                    <span className="text-orange-500 mt-0.5">ACTIVE PRICE TYPE</span>
                   </div>
                   <div className="col-span-1 text-center text-[9px] font-black uppercase text-zinc-500">Avg</div>
                   <div className="col-span-1 text-center text-[9px] font-black uppercase text-zinc-500">Retail</div>
@@ -1558,9 +1650,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filteredItems.length > 0 ? filteredItems.map((item) => {
                     const packing = toNumber(item.packing_full || item.packing_qty) || 1;
-                    const stock = toNumber(item.stock_1);
-                    const full = Math.floor(stock / packing);
-                    const pcs = stock % packing;
+                    const stock = toNumber(item.total_stock_pcs);
+                    const full = toNumber(item.stock_1);
+                    const pcs = toNumber(item.stock_2);
 
                     const tradePrice = toNumber(item.trade_price);
                     let activePriceTypeVal = tradePrice; // Default to trade price if no category or category 1
@@ -1613,65 +1705,118 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                           : "bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-transparent hover:border-orange-300"
                           }`}
                       >
-                        <div className="grid grid-cols-12 gap-4 items-center py-1">
-                          <div className="col-span-1 pl-2">
-                            <span className={`font-mono font-black text-xs ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
-                              #{String(item.id).padStart(4, '0')}
-                            </span>
-                          </div>
-                          <div className="col-span-3 flex flex-col justify-center">
-                            <div className={`font-black uppercase tracking-tight truncate text-base md:text-lg ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
-                              {item.title}
-                            </div>
-                            <div className="text-[11px] flex items-center gap-2 mt-0.5">
-                              <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
-                              {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
-                            </div>
-                          </div>
-
-                          {/* Trade Price (TP) */}
-                          <div className="col-span-2 text-center flex flex-col items-center justify-center">
-                            <div className="text-sm md:text-base font-black text-zinc-800 dark:text-zinc-200">
-                              <span className="text-[10px] text-zinc-400 mr-1 font-semibold">Rs</span>
-                              {tradePrice.toFixed(2)}
-                            </div>
-                          </div>
-
-                          {/* Active Price Type (T>P) */}
-                          <div className={`col-span-2 text-center flex flex-col items-center justify-center rounded border p-1 ${isSelected ? 'bg-orange-500 text-white border-orange-600 shadow-sm' : 'bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-950/30 dark:border-orange-900/50'}`}>
-                            <div className={`text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 ${isSelected ? 'text-orange-100' : 'text-orange-500'}`}>T{`>`}P</div>
-                            <div className="text-base md:text-lg font-black leading-none">
-                              <span className="text-[10px] font-semibold mr-0.5">Rs</span>
-                              {activePriceTypeVal.toFixed(2)}
-                            </div>
-                          </div>
-
-                          {/* Avg Price */}
-                          <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                            {avgPrice.toFixed(0)}
-                          </div>
-
-                          {/* Retail Price */}
-                          <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                            {toNumber(item.retail).toFixed(0)}
-                          </div>
-
-                          <div className="col-span-2 flex justify-end">
-                            <div className="flex flex-col items-end pr-4">
-                              <div className="flex gap-3">
-                                <div className="flex flex-col items-end">
-                                  <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{full}</span>
-                                  <span className="text-[8px] uppercase font-bold text-zinc-400 tracking-tighter">Full</span>
+                        <>
+                          {/* Mobile Layout */}
+                          <div className="md:hidden flex flex-col gap-2 relative">
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col pr-4">
+                                <div className={`font-black uppercase tracking-tight text-base leading-tight ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                  {item.title}
                                 </div>
-                                <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-700 pl-3">
-                                  <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{pcs}</span>
-                                  <span className="text-[8px] uppercase font-bold text-zinc-400 tracking-tighter">Pcs</span>
+                                <div className="text-[10px] flex items-center gap-2 mt-1">
+                                  <span className={`font-mono font-black ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
+                                    #{String(item.id).padStart(4, '0')}
+                                  </span>
+                                  <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
+                                  {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
                                 </div>
                               </div>
-                              <div className="text-[10px] font-mono mt-1 text-zinc-400">Total: {stock} units</div>
+                              <div className="text-right flex flex-col items-end shrink-0">
+                                <div className="flex gap-2">
+                                  <div className="flex flex-col items-end">
+                                    <span className={`text-base font-black leading-none ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{full}</span>
+                                    <span className="text-[8px] uppercase font-bold text-zinc-700 tracking-tighter mt-0.5">Full</span>
+                                  </div>
+                                  <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-700 pl-2">
+                                    <span className={`text-base font-black leading-none ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{pcs}</span>
+                                    <span className="text-[8px] uppercase font-bold text-zinc-700 tracking-tighter mt-0.5">Pcs</span>
+                                  </div>
+                                </div>
+                                <div className="text-[9px] font-mono mt-1 text-zinc-700 font-medium">Tot: {stock}</div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-2 mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800/50">
+                              <div className="flex flex-col items-start justify-center">
+                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Trade</span>
+                                <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 text-center leading-none"><span className="text-[8px] text-zinc-400 mr-0.5 font-semibold">Rs</span>{tradePrice.toFixed(2)}</span>
+                              </div>
+                              <div className="flex flex-col items-start justify-center">
+                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Retail</span>
+                                <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 text-center leading-none">{toNumber(item.retail).toFixed(0)}</span>
+                              </div>
+                              <div className="flex flex-col items-start justify-center">
+                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Sys Avg</span>
+                                <span className="text-xs font-black text-zinc-500 dark:text-zinc-400 text-center leading-none">{avgPrice.toFixed(0)}</span>
+                              </div>
+                              <div className={`col-span-1 flex flex-col items-center justify-center rounded p-1.5 ${isSelected ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-50 text-orange-600 border border-orange-100 dark:bg-orange-950/30 dark:border-orange-900/50'}`}>
+                                <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${isSelected ? 'text-orange-100' : 'text-orange-500'}`}>T{'>'}P</span>
+                                <span className="text-xs font-black leading-none text-center"><span className="text-[8px] font-semibold mr-0.5">Rs</span>{activePriceTypeVal.toFixed(2)}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden md:grid grid-cols-12  items-center py-1">
+                            <div className="col-span-1 pl-2">
+                              <span className={`font-mono font-black text-xs ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
+                                #{String(item.id).padStart(4, '0')}
+                              </span>
+                            </div>
+                            <div className="col-span-3 flex flex-col justify-center">
+                              <div className={`font-black uppercase tracking-tight truncate text-base md:text-lg ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                {item.title}
+                              </div>
+                              <div className="text-[11px] flex items-center gap-2 mt-0.5">
+                                <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
+                                {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
+                              </div>
+                            </div>
+
+                            {/* Trade Price (TP) */}
+                            <div className="col-span-2 text-center flex flex-col items-center justify-center">
+                              <div className="text-sm md:text-base font-black text-zinc-800 dark:text-zinc-200">
+                                <span className="text-[10px] text-zinc-400 mr-1 font-semibold">Rs</span>
+                                {tradePrice.toFixed(2)}
+                              </div>
+                            </div>
+
+                            {/* Active Price Type (T>P) */}
+                            <div className={`col-span-2 text-center flex flex-col items-center justify-center rounded border p-1 ${isSelected ? 'bg-orange-500 text-white border-orange-600 shadow-sm' : 'bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-950/30 dark:border-orange-900/50'}`}>
+                              <div className={`text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 ${isSelected ? 'text-orange-100' : 'text-orange-500'}`}></div>
+                              <div className="text-base md:text-lg font-black leading-none">
+                                <span className="text-[10px] font-semibold mr-0.5">Rs</span>
+                                {activePriceTypeVal.toFixed(2)}
+                              </div>
+                            </div>
+
+                            {/* Avg Price */}
+                            <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                              {avgPrice.toFixed(0)}
+                            </div>
+
+                            {/* Retail Price */}
+                            <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                              {toNumber(item.retail).toFixed(0)}
+                            </div>
+
+                            <div className="col-span-2 flex justify-end">
+                              <div className="flex flex-col items-end pr-4">
+                                <div className="flex gap-3">
+                                  <div className="flex flex-col items-end">
+                                    <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{full}</span>
+                                    <span className="text-[10px] uppercase font-bold text-zinc-900 tracking-tighter">Full</span>
+                                  </div>
+                                  <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-700 pl-3">
+                                    <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{pcs}</span>
+                                    <span className="text-[10px] uppercase font-bold text-zinc-900 tracking-tighter">Pcs</span>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] font-mono mt-1 text-zinc-900">Total: {stock} units</div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
                       </button>
                     );
                   }) : (
@@ -1684,18 +1829,27 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </div>
               </div>
 
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest">
-                <span>Showing {filteredItems.length} registry entries</span>
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-2">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest shrink-0">
+                <span className="hidden sm:inline">Showing {filteredItems.length} registry entries</span>
+                <span className="sm:hidden">{filteredItems.length} entries</span>
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <span className="hidden sm:flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     Live Sync Enabled
                   </span>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setItemDialogOpen(false)}
+                    className="h-8 px-4 bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border-transparent font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setItemDialogOpen(false)}
-                    className="h-7 px-4 bg-white dark:bg-zinc-800 border-2 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100 font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-zinc-900 transition-all active:scale-95"
+                    className="h-8 px-6 bg-white dark:bg-zinc-800 border-2 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100 font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-zinc-900 transition-all active:scale-95 shadow-sm"
                   >
                     OK
                   </Button>

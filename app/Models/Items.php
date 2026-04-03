@@ -58,7 +58,64 @@ class Items extends Model
         'is_recipe' => 'boolean',
         'trade_price' => 'decimal:2',
         'retail' => 'decimal:2',
+        'packing_qty' => 'integer',
+        'stock_1' => 'integer',
+        'stock_2' => 'integer',
     ];
+
+    protected $appends = [
+        'price_per_pcs',
+        'total_stock_pcs',
+        'stock_breakdown',
+    ];
+
+    /**
+     * Get the calculated price per piece.
+     * Trade Price / Packing Qty (Rounded up)
+     */
+    public function getPricePerPcsAttribute()
+    {
+        $packingQty = $this->packing_qty ?: 1;
+        $tradePrice = (float) $this->trade_price;
+        return ceil($tradePrice / $packingQty);
+    }
+
+    /**
+     * Get the total stock in pieces.
+     */
+    public function getTotalStockPcsAttribute()
+    {
+        $packingQty = $this->packing_qty ?: 1;
+        return (($this->stock_1 ?? 0) * $packingQty) + ($this->stock_2 ?? 0);
+    }
+
+    /**
+     * Helper to get stock breakdown string.
+     */
+    public function getStockBreakdownAttribute()
+    {
+        $packingQty = $this->packing_qty ?: 1;
+        if ($packingQty <= 1) {
+            return ($this->stock_1 ?? 0) . ' Units';
+        }
+        return ($this->stock_1 ?? 0) . ' Full, ' . ($this->stock_2 ?? 0) . ' Pcs';
+    }
+
+    /**
+     * Correctly partition total pieces into stock_1 (Full) and stock_2 (PCS)
+     */
+    public function updateStockFromPcs(int $totalPcs)
+    {
+        $packing = $this->packing_qty ?: 1;
+        if ($packing > 1) {
+            $this->stock_1 = floor($totalPcs / $packing);
+            $this->stock_2 = $totalPcs - ($this->stock_1 * $packing);
+        } else {
+            $this->stock_1 = $totalPcs;
+            $this->stock_2 = 0;
+        }
+        return $this->save();
+    }
 
     public function category()
     {
@@ -73,5 +130,10 @@ class Items extends Model
     public function companyAccount()
     {
         return $this->belongsTo(Account::class, 'company');
+    }
+
+    public function lastPurchaseItem()
+    {
+        return $this->hasOne(PurchaseItem::class, 'item_id')->latestOfMany();
     }
 }
