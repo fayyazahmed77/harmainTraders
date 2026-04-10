@@ -75,9 +75,7 @@ interface RowData {
     sold_full: number;
     sold_pcs: number;
     rate: number;
-    taxPercent: number;
     discPercent: number;
-    taxReadOnly?: boolean;
     discReadOnly?: boolean;
     amount: number;
     packing: number;
@@ -301,6 +299,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [refundAmount, setRefundAmount] = useState(0);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState("");
+    const [supplierBalance, setSupplierBalance] = useState<number | null>(null);
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -356,9 +355,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         sold_full: 0,
         sold_pcs: 0,
         rate: 0,
-        taxPercent: 0,
         discPercent: 0,
-        taxReadOnly: false,
         discReadOnly: false,
         amount: 0,
         packing: 1,
@@ -397,9 +394,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         sold_full: toNum(pi.qty_carton),
                         sold_pcs: toNum(pi.qty_pcs),
                         rate: toNum(pi.trade_price),
-                        taxPercent: toNum(it?.gst_percent ?? 0),
                         discPercent: toNum(it?.discount ?? 0),
-                        taxReadOnly: true,
                         discReadOnly: true,
                         amount: 0,
                         packing: packing,
@@ -436,9 +431,17 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         setOriginalInvoiceNo("");
         setRows([getEmptyRow()]);
         setInvoices([]);
+        setSupplierBalance(null);
 
         if (acc) {
             setSalesman(acc.saleman_id ?? null);
+            
+            // Fetch Balance
+            fetch(`/account/balance/${accId}`)
+                .then(r => r.json())
+                .then(data => setSupplierBalance(toNum(data.balance)))
+                .catch(console.error);
+
             fetch(`/purchase-return/supplier/${accId}/purchased-items`)
                 .then(r => r.json())
                 .then(data => { if (Array.isArray(data)) setSupplierItems(data); })
@@ -493,9 +496,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                             sold_full: s_full,
                             sold_pcs: s_pcs,
                             rate: rate,
-                            taxPercent: toNum(pi.tax_percent ?? taxPercent),
                             discPercent: toNum(pi.discount_percent ?? discPercent),
-                            taxReadOnly: true,
                             discReadOnly: true,
                             amount: 0,
                             packing: packing,
@@ -533,9 +534,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             sold_full: toNum(found.qty_carton),
             sold_pcs: toNum(found.qty_pcs),
             rate: toNum(found.last_trade_price ?? it?.trade_price ?? 0),
-            taxPercent: toNum(it?.gst_percent ?? 0),
             discPercent: toNum(it?.discount ?? 0),
-            taxReadOnly: true,
             discReadOnly: true,
             packing: packing,
             purchase_date: found.date,
@@ -571,9 +570,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 sold_full: toNum(pi.qty_carton),
                 sold_pcs: toNum(pi.qty_pcs),
                 rate: toNum(pi.last_trade_price ?? it?.trade_price ?? 0),
-                taxPercent: toNum(it?.gst_percent ?? 0),
                 discPercent: toNum(it?.discount ?? 0),
-                taxReadOnly: true,
                 discReadOnly: true,
                 amount: 0,
                 packing: packing,
@@ -603,6 +600,31 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const initializeWorkspace = () => setRows([getEmptyRow()]);
     const purgeWorkspace = () => setRows([getEmptyRow()]);
 
+    const updateRow = (id: number, field: keyof RowData, value: any) => {
+        setRows(prev => prev.map(r => {
+            if (r.id !== id) return r;
+            const updated = { ...r, [field]: value };
+            
+            // Quantity Validation Guardrails
+            if (field === 'full' || field === 'pcs') {
+                const packing = toNum(r.packing || 1);
+                const maxTotalPcs = toNum(r.sold_full) * packing + toNum(r.sold_pcs);
+                const currentTotalPcs = toNum(updated.full) * packing + toNum(updated.pcs);
+
+                if (maxTotalPcs > 0 && currentTotalPcs > maxTotalPcs) {
+                    // If it exceeds, we cap it for safety
+                    if (field === 'full') {
+                        updated.full = Math.floor(maxTotalPcs / packing);
+                        updated.pcs = maxTotalPcs % packing;
+                    } else {
+                        updated.pcs = maxTotalPcs - (toNum(updated.full) * packing);
+                    }
+                }
+            }
+            return updated;
+        }));
+    };
+
     // ── Filtering logic ────────────────────────
     const filteredInvoices = useMemo(() => {
         const q = invoiceSearch.toLowerCase();
@@ -625,31 +647,32 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     // ── Calculations ───────────────────────────
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const baseAmount = units * toNum(r.rate);
+            const packing = toNum(r.packing || 1);
+            const rate = toNum(r.rate);
+            const baseAmount = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
             const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
-            const taxableAmount = baseAmount - discAmount;
-            const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
-            return { ...r, amount: Math.round(taxableAmount + taxAmount) };
+            return { ...r, amount: Math.round(baseAmount - discAmount) };
         });
     }, [rows]);
 
     const totals = useMemo(() => {
-        let gross = 0, tax = 0, disc = 0;
+        let gross = 0, disc = 0, total_full = 0, total_pcs = 0;
         rowsWithAmount.forEach(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const base = units * toNum(r.rate);
+            const packing = toNum(r.packing || 1);
+            const rate = toNum(r.rate);
+            const base = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
             const d = (toNum(r.discPercent) / 100) * base;
-            const t = (toNum(r.taxPercent) / 100) * (base - d);
             gross += base;
             disc += d;
-            tax += t;
+            total_full += toNum(r.full);
+            total_pcs += toNum(r.pcs);
         });
         return {
             gross: Math.round(gross),
             disc: Math.round(disc),
-            tax: Math.round(tax),
-            net: Math.round(gross - disc + tax),
+            net: Math.round(gross - disc),
+            total_full,
+            total_pcs
         };
     }, [rowsWithAmount]);
 
@@ -677,23 +700,24 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
-            tax_total: totals.tax,
             net_total: totals.net,
             paid_amount: refundAmount,
             remaining_amount: totals.net - refundAmount,
             items: validRows.map(r => {
-                const base = (r.full * r.packing + r.pcs) * r.rate;
+                const packing = toNum(r.packing || 1);
+                const rate = toNum(r.rate);
+                const base = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
                 const d = (toNum(r.discPercent) / 100) * base;
-                const t = (toNum(r.taxPercent) / 100) * (base - d);
                 return {
                     item_id: r.item_id,
                     qty_carton: r.full,
                     qty_pcs: r.pcs,
-                    total_pcs: r.full * r.packing + r.pcs,
+                    total_pcs: (toNum(r.full) * packing) + toNum(r.pcs),
+                    bonus_qty_carton: r.bonus_full,
+                    bonus_qty_pcs: r.bonus_pcs,
                     trade_price: r.rate,
                     discount: Math.round(d),
-                    gst_amount: Math.round(t),
-                    subtotal: r.amount,
+                    subtotal: Math.round(base - d),
                 };
             }),
         };
@@ -736,28 +760,37 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 </div>
 
                                 <TechLabel label="Supplier Designation" icon={UserIcon}>
-                                    <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
-                                                <span className="truncate">{selectedAccount ? selectedAccount.title : "Identify Supplier..."}</span>
-                                                <Search size={14} className="text-zinc-400 flex-shrink-0 ml-2" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[calc(100vw-48px)] p-0 shadow-2xl border-zinc-300 dark:border-zinc-700" align="center" sideOffset={8}>
-                                            <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                    <div className="relative">
+                                        <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
+                                                    <span className="truncate">{selectedAccount ? selectedAccount.title : "Identify Supplier..."}</span>
+                                                    <Search size={14} className="text-zinc-400 flex-shrink-0 ml-2" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[calc(100vw-48px)] p-0 shadow-2xl border-zinc-300 dark:border-zinc-700" align="center" sideOffset={8}>
+                                                <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                                </div>
+                                                <div className="max-h-[60vh] overflow-auto py-1">
+                                                    {filteredAccounts.map(acc => (
+                                                        <button key={acc.id} className="w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-3 group border-l-2 border-transparent hover:border-orange-500"
+                                                            onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
+                                                            <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
+                                                            <span className="truncate">{acc.title}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
+                                        {supplierBalance !== null && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 mr-6 pointer-events-none">
+                                                <span className={`text-[10px] font-black ${toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
+                                                    Rs {toNum(supplierBalance).toLocaleString()}
+                                                </span>
                                             </div>
-                                            <div className="max-h-[60vh] overflow-auto py-1">
-                                                {filteredAccounts.map(acc => (
-                                                    <button key={acc.id} className="w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-3 group border-l-2 border-transparent hover:border-orange-500"
-                                                        onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
-                                                        <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
-                                                        <span className="truncate">{acc.title}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
+                                        )}
+                                    </div>
                                 </TechLabel>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -816,6 +849,17 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 </div>
                                             </PopoverContent>
                                         </Popover>
+                                        {supplierBalance !== null && (
+                                            <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none">
+                                                <div className="bg-zinc-900 border border-zinc-800 text-[9px] font-black px-2 py-0.5 rounded shadow-xl flex items-center gap-1.5">
+                                                    <div className="w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
+                                                    <span className="text-zinc-500">BAL:</span>
+                                                    <span className={toNum(supplierBalance) >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                                                        Rs {toNum(supplierBalance).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </TechLabel>
                                 </div>
 
@@ -887,7 +931,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         {/* Item Manifest */}
                         <Card className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-2xl shadow-black/5 min-h-[400px] p-0`}>
                             <div className="hidden md:grid grid-cols-12 gap-2 bg-zinc-900 dark:bg-black text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-2 py-3 items-center border-b border-zinc-800">
-                                <div className="col-span-3 flex items-center gap-2">
+                                <div className="col-span-4 flex items-center gap-2">
                                     <Database size={12} className="text-orange-500" />
                                     Entity Designation
                                 </div>
@@ -896,9 +940,6 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-1 rounded">B.Full</div>
                                 <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-1 rounded">B.Pcs</div>
                                 <div className="col-span-1 text-right pr-2">Rate</div>
-                                <div className="col-span-1 text-right pr-2 flex items-center justify-end gap-1">
-                                    Tax% <BadgePercent size={8} />
-                                </div>
                                 <div className="col-span-1 text-right pr-2">Disc%</div>
                                 <div className="col-span-2 text-right pr-4 flex items-center justify-end gap-2 text-white">
                                     Sub Total
@@ -918,7 +959,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 {focusedRowId === row.id && <div className="absolute left-0 top-0 w-0.5 h-full bg-orange-500" />}
 
                                                 {/* Entity Selection */}
-                                                <div className="md:col-span-3 pr-2">
+                                                <div className="md:col-span-4 pr-2">
                                                     {!row.item_id ? (
                                                         <Button variant="ghost" className={`h-8 w-full justify-start text-[10px] font-black uppercase tracking-tighter border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500 hover:bg-orange-500/5 ${PREMIUM_ROUNDING_MD}`}
                                                             onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount}>
@@ -936,26 +977,25 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                     )}
                                                 </div>
 
-                                                {/* Quantities */}
                                                 <div className="grid grid-cols-4 md:col-span-4 gap-1.5 md:gap-1 px-1">
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1">Full</label>
-                                                        <Input type="number" value={row.full || ""} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
+                                                        <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
                                                             className="h-8 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1">Pcs</label>
-                                                        <Input type="number" value={row.pcs || ""} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
+                                                        <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
                                                             className="h-8 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-1">B.Full</label>
-                                                        <Input type="number" value={row.bonus_full || ""} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, bonus_full: toNum(e.target.value) } : r))}
+                                                        <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
                                                             className="h-8 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-1">B.Pcs</label>
-                                                        <Input type="number" value={row.bonus_pcs || ""} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, bonus_pcs: toNum(e.target.value) } : r))}
+                                                        <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
                                                             className="h-8 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
                                                     </div>
                                                 </div>
@@ -963,17 +1003,12 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 {/* Financials */}
                                                 <div className="md:col-span-1 px-1">
                                                     <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1 text-right block">Rate</label>
-                                                    <Input type="number" value={row.rate || ""} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
+                                                    <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
                                                         className="h-8 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700" />
                                                 </div>
                                                 <div className="md:col-span-1 px-1">
-                                                    <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1 text-right block">Tax%</label>
-                                                    <Input type="number" value={row.taxPercent || ""} readOnly={row.taxReadOnly} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
-                                                        className={`h-8 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.taxReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`} />
-                                                </div>
-                                                <div className="md:col-span-1 px-1">
                                                     <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1 text-right block">Disc%</label>
-                                                    <Input type="number" value={row.discPercent || ""} readOnly={row.discReadOnly} onChange={e => setRows(rows.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                    <Input type="number" value={row.discPercent || ""} readOnly={row.discReadOnly} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
                                                         className={`h-8 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.discReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`} />
                                                 </div>
 
@@ -1050,10 +1085,25 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 {totals.gross.toLocaleString()}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Tax Payload</span>
-                                            <span className="text-sm font-black font-mono tracking-tighter text-emerald-600">
-                                                +{totals.tax.toLocaleString()}
+                                        {supplierBalance !== null && (
+                                            <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                                <span className="text-[10px] uppercase font-bold text-zinc-400">Supplier Ledger Bal</span>
+                                                <span className={`text-sm font-black font-mono tracking-tighter ${toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                                    Rs {toNum(supplierBalance).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Total Full</span>
+                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-zinc-100">
+                                                {totals.total_full}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Total Pieces</span>
+                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-zinc-100">
+                                                {totals.total_pcs}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-end">

@@ -269,7 +269,7 @@ class PaymentController extends Controller
                 $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
             })
             ->get();
-        // dd($paymentAccounts->toArray());
+        // dd($accounts->toArray());
 
 
 
@@ -508,8 +508,8 @@ class PaymentController extends Controller
         try {
             // Safety checks (Total aggregate)
             $totalAmount = collect($splitsData)->sum('amount');
-            $totalDiscount = collect($splitsData)->sum('discount');
-            $netPaid = $totalAmount - $totalDiscount;
+            $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
+            $netPaid = $totalAmount + $totalDiscount;
             
             $account = Account::findOrFail($request->account_id);
             // ... (keep ledger balance checks if necessary, but use totalAmount)
@@ -526,8 +526,12 @@ class PaymentController extends Controller
             $createdPayments = [];
 
             foreach ($splitsData as $index => $split) {
-                // Skip if amount is 0 and not the only split
-                if ($isMulti && $split['amount'] <= 0) continue;
+                // Determine discount for this specific payment record
+                // If it's multi-payment, apply the global discount to the first split
+                $currentSplitDiscount = $isMulti ? ($index === 0 ? ($request->discount ?? 0) : 0) : ($split['discount'] ?? 0);
+
+                // Skip if amount and discount are both 0 and not the only split
+                if ($isMulti && $split['amount'] <= 0 && $currentSplitDiscount <= 0) continue;
 
                 $voucherNo = $isMulti ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
                 
@@ -557,8 +561,8 @@ class PaymentController extends Controller
                     'account_id' => $request->account_id,
                     'payment_account_id' => !empty($split['payment_account_id']) ? $split['payment_account_id'] : null,
                     'amount' => $split['amount'],
-                    'discount' => $split['discount'] ?? 0,
-                    'net_amount' => ($split['amount'] - ($split['discount'] ?? 0)),
+                    'discount' => $currentSplitDiscount,
+                    'net_amount' => ($split['amount'] + $currentSplitDiscount),
                     'type' => $request->type,
                     'cheque_no' => !empty($split['cheque_no']) ? $split['cheque_no'] : null,
                     'cheque_date' => !empty($split['cheque_date']) ? $split['cheque_date'] : null,

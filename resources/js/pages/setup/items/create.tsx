@@ -80,6 +80,7 @@ interface ItemForm {
   pt6: string | number;
   pt7: string | number;
   scheme: string;
+  scheme2: string;
   [key: string]: any;
 }
 
@@ -211,7 +212,7 @@ export default function Page({ categories, companies }: { categories: any, compa
     retail: "",
     retail_tp_diff: "",
     reorder_level: "",
-    packing_qty: "",
+    packing_qty: "1",
     packing_size: "",
     pcs: "",
     formation: "",
@@ -242,6 +243,7 @@ export default function Page({ categories, companies }: { categories: any, compa
     pt6: 0,
     pt7: 0,
     scheme: "",
+    scheme2: "",
   })
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
@@ -505,12 +507,22 @@ export default function Page({ categories, companies }: { categories: any, compa
                         <Input type="number" placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt7 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <TechLabel label="Scheme" icon={Tag}>
                           <Input
                             value={data.scheme}
                             onChange={(e) => onInputChange("scheme", e.target.value)}
                             placeholder="On 3 Full TP 2000"
+                            className="h-8 text-xs font-bold bg-zinc-50 dark:bg-zinc-800"
+                          />
+                        </TechLabel>
+                      </div>
+                      <div className="col-span-1">
+                        <TechLabel label="Scheme 2" icon={Tag}>
+                          <Input
+                            value={data.scheme2}
+                            onChange={(e) => onInputChange("scheme2", e.target.value)}
+                            placeholder="Market Offer Scheme"
                             className="h-8 text-xs font-bold bg-zinc-50 dark:bg-zinc-800"
                           />
                         </TechLabel>

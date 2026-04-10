@@ -105,20 +105,37 @@ const data = {
           url: "/offer-list",
         },
         {
-          title: "Payment",
+          title: "Create Offer",
+          url: "/offer-list/create",
+        },
+
+        {
+          title: "Payment List",
           url: "/payments",
         },
         {
-          title: "Purchase ",
+          title: "Receipt | Payment",
+          url: "/payments/create",
+        },
+        {
+          title: "Purchase List",
           url: "/purchase",
+        },
+        {
+          title: "Create Purchase",
+          url: "/purchase/create",
         },
         {
           title: "Purchase Return",
           url: "/purchase-return",
         },
         {
-          title: "Sales ",
+          title: "Sales List",
           url: "/sales",
+        },
+        {
+          title: "Create Sales",
+          url: "/sales/create",
         },
         {
           title: "Sales Return",

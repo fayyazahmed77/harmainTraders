@@ -65,6 +65,10 @@ interface Offer {
         id: number;
         title: string;
     };
+    firm: {
+        id: number;
+        name: string;
+    } | null;
     user: {
         id: number;
         name: string;
@@ -124,20 +128,39 @@ export default function DataTable({ data }: DataTableProps) {
             },
         },
         {
+            accessorKey: "firm.name",
+            header: () => (
+                <div className="flex items-center gap-2">
+                    <Briefcase className="h-3 w-3 text-orange-500" />
+                    <span>Firm</span>
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
+                        {row.original.firm?.name || "Default (Harmain)"}
+                    </span>
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">
+                        Firm Info
+                    </span>
+                </div>
+            )
+        },
+        {
             accessorKey: "account.title",
             header: () => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3 text-orange-500" />
-                    <span>Customer</span>
-                </div>
+                    <span>Offer Type</span>
+                </div>  
             ),
             cell: ({ row }) => (
                 <div className="flex flex-col max-w-[250px]">
                     <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
-                        {row.original.account?.title || "General Offer"}
+                        {row.original.offertype === "1" ? "General Offer" : row.original.offertype === "2" ? "Market Offer" : row.original.offertype || "General Offer"}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
-                        Customer Name
+                        Offer Type
                     </span>
                 </div>
             )

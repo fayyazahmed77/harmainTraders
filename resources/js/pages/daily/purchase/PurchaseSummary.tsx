@@ -109,7 +109,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                         <TrendingUp className="h-5 w-5 text-orange-500" />
                     </div>
                     <div>
-                        <p className="text-xs font-black uppercase tracking-tight">Procurement Stream</p>
+                        <p className="text-xs font-black uppercase tracking-tight">Purchase Performance</p>
                         <p className="text-[10px] text-orange-500 font-black tracking-widest uppercase italic">
                             {cappedPercentage < 40 ? "Critical" : cappedPercentage < 80 ? "Stable" : "Optimized"}
                         </p>
@@ -118,8 +118,8 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
 
                 <div className="flex-1 w-full lg:max-w-md">
                     <div className="flex justify-between items-center mb-1.5 px-1">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Efficiency Benchmark</span>
-                        <span className="text-[10px] font-black text-orange-500">{cappedPercentage}% RECOVERY</span>
+                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Payment Progress</span>
+                        <span className="text-[10px] font-black text-orange-500">{cappedPercentage}% PAID</span>
                     </div>
                     <div className="h-2 w-full bg-background rounded-full p-[1px]">
                         <div
@@ -131,7 +131,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
 
                 <div className="hidden lg:flex items-center gap-1.5 text-muted-foreground border-l border-border pl-6 h-6">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span className="text-[10px] font-black tracking-tight uppercase">Period: 12-Day Window</span>
+                    <span className="text-[10px] font-black tracking-tight uppercase">Period: Last 12 Days</span>
                 </div>
             </div>
 
@@ -144,17 +144,17 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                     <div className="h-8 w-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-md mb-4 relative z-10 font-black italic">
                         Σ
                     </div>
-                    <p className="text-[10px] font-black text-orange-500/70 uppercase tracking-[0.2em] mb-1">Total Procurement Value</p>
+                    <p className="text-[10px] font-black text-orange-500/70 uppercase tracking-[0.2em] mb-1">Total Purchases</p>
                     <h3 className="text-4xl font-black text-foreground tracking-tight leading-none mb-4 uppercase">
                         Rs {formatCurrency(summary.total_purchase)}
                     </h3>
                     <div className="mt-auto space-y-3 relative z-10">
                         <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Ledger Count</span>
-                            <span className="text-xs font-black text-foreground uppercase tabular-nums">{summary.count} ENTRIES</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Bills</span>
+                            <span className="text-xs font-black text-foreground uppercase tabular-nums">{summary.count} BILLS</span>
                         </div>
                         <div className="flex items-center justify-between bg-background/50 backdrop-blur-sm p-3 rounded-[0.5rem] border border-border/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Health Index</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Overall Status</span>
                             <span className="text-[10px] font-black text-emerald-500 flex items-center">
                                 <ShieldCheck className="h-3.5 w-3.5 mr-1" /> OPTIMAL
                             </span>
@@ -165,7 +165,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                 {/* STATS BLOCK: Settlement Flow */}
                 <div className={`flex flex-col rounded-[0.5rem] p-6 border transition-all duration-500 ${theme.card}`}>
                     <div className="flex items-center justify-between mb-4">
-                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme.textMuted}`}>Settlement Flow</p>
+                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme.textMuted}`}>Payment Summary</p>
                         <div className={`h-8 w-8 rounded-lg flex items-center justify-center shadow-sm ${theme.icon}`}>
                             <RefreshCcw className="h-5 w-5" />
                         </div>
@@ -186,12 +186,12 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                                 <span className="text-2xl font-black leading-none">{cappedPercentage}%</span>
-                                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter mt-1 tabular-nums">Cleared</span>
+                                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter mt-1 tabular-nums">Paid</span>
                             </div>
                         </div>
                         <div className="flex-1 w-full space-y-3">
                             <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Settled</span>
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Paid</span>
                                 <span className="text-sm font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_paid)}</span>
                             </div>
                             <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
@@ -199,7 +199,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                                 <span className="text-sm font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_returns)}</span>
                             </div>
                             <div className="flex justify-between pt-1">
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Unpaid</span>
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Remaining</span>
                                 <span className="text-lg font-black text-rose-500 font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_unpaid)}</span>
                             </div>
                         </div>
@@ -211,18 +211,18 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                     <div className="flex items-center justify-between mb-4 relative z-10">
                         <div>
                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center">
-                                <Activity className="h-3 w-3 mr-1 text-orange-500" /> Flux Logistics
+                                <Activity className="h-3 w-3 mr-1 text-orange-500" /> Recent Trends
                             </p>
-                            <p className="text-[8px] font-bold text-muted-foreground uppercase">Purchase vs Payments</p>
+                            <p className="text-[8px] font-bold text-muted-foreground uppercase">Purchases vs Payments</p>
                         </div>
                         <div className="flex flex-col items-end">
                             <div className="flex items-center gap-2">
                                 <div className="h-1.5 w-1.5 rounded-full bg-orange-500 mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Inflow</span>
+                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Purchases</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Outflow</span>
+                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Payments</span>
                             </div>
                         </div>
                     </div>

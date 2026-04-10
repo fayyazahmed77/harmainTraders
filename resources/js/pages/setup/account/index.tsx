@@ -86,16 +86,16 @@ export default function AccountsPage({ accounts, summary, filters, cities, accou
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="mt-6 px-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-2xl font-bold mb-1">Chart of Accounts</h1>
-              <p className="text-sm text-muted-foreground">
-                Manage and view all your accounts here.
+              <h1 className="text-3xl font-black tracking-tight mb-1 text-zinc-900 dark:text-white">Chart of Accounts</h1>
+              <p className="text-sm text-muted-foreground font-medium">
+                Comprehensive financial overview and account management.
               </p>
             </div>
             <Link href={route("account.create")}>
-              <Button className="mb-3">
-                <Plus className="mr-2 h-4 w-4" /> Add Account
+              <Button className="w-full md:w-auto bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold px-6 py-6 rounded-xl shadow-lg shadow-orange-500/20 dark:shadow-none transition-all hover:scale-105 active:scale-95">
+                <Plus className="mr-2 h-5 w-5 stroke-[3px]" /> Add New Account
               </Button>
             </Link>
           </div>

@@ -38,9 +38,18 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu className="gap-2">
         {items.map((item) => {
-          // Check if any child matches current URL
-          const isChildActive = !!item.items?.some((sub) => url.startsWith(sub.url))
-          const isDirectActive = url === item.url
+          // Find the longest matching subItem URL to prevent overlap (e.g. /purchase vs /purchase/create)
+          let activeSubItemUrl = '';
+          if (item.items && item.items.length > 0) {
+             const cleanUrl = url.split('?')[0];
+             const matches = item.items.filter(sub => cleanUrl.startsWith(sub.url));
+             if (matches.length > 0) {
+                matches.sort((a, b) => b.url.length - a.url.length);
+                activeSubItemUrl = matches[0].url;
+             }
+          }
+          const isChildActive = !!activeSubItemUrl;
+          const isDirectActive = url.split('?')[0] === item.url;
 
           if (!item.items || item.items.length === 0) {
             return (
@@ -77,7 +86,7 @@ export function NavMain({
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {item.items?.map((subItem) => {
-                      const isSubActive = url.startsWith(subItem.url)
+                      const isSubActive = subItem.url === activeSubItemUrl;
                       return (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild isActive={isSubActive}>

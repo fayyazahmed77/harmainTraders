@@ -23,6 +23,10 @@ interface Offer {
         id: number;
         title: string;
     };
+    firm: {
+        id: number;
+        name: string;
+    } | null;
     user: {
         id: number;
         name: string;

@@ -95,17 +95,17 @@ export default function DataTable({ data }: DataTableProps) {
         Completed: {
             color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
             icon: CheckCircle,
-            label: "Settled"
+            label: "Completed"
         },
         "Partial Return": {
             color: "text-orange-500 bg-orange-500/10 border-orange-500/20",
             icon: RotateCw,
-            label: "Adjusting"
+            label: "Partial Return"
         },
         Returned: {
             color: "text-rose-500 bg-rose-500/10 border-rose-500/20",
             icon: RefreshCcw,
-            label: "Reversed"
+            label: "Returned"
         },
     };
 
@@ -121,7 +121,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Calendar className="h-3 w-3 text-orange-500" />
-                    <span>Temporal Node</span>
+                    <span>Purchase Date</span>
                 </div>
             ),
             cell: ({ row }) => {
@@ -143,7 +143,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Hash className="h-3 w-3 text-orange-500" />
-                    <span>Reference</span>
+                    <span>Bill No</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -162,7 +162,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3 text-orange-500" />
-                    <span>Provider</span>
+                    <span>Supplier / Vendor</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -181,7 +181,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Package className="h-3 w-3 text-orange-500" />
-                    <span>Units</span>
+                    <span>Items Count</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -195,7 +195,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center justify-end gap-2 w-full">
                     <Wallet className="h-3 w-3 text-orange-500" />
-                    <span>Valuation</span>
+                    <span>Total Amount</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -209,7 +209,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "paid_amount",
-            header: () => <div className="text-right w-full">Cleared</div>,
+            header: () => <div className="text-right w-full">Amount Paid</div>,
             cell: ({ row }) => (
                 <div className="flex flex-col items-end min-w-[70px]">
                     <span className="font-mono text-xs font-black text-emerald-500 tabular-nums">
@@ -220,7 +220,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "remaining_amount",
-            header: () => <div className="text-right w-full">Deficit</div>,
+            header: () => <div className="text-right w-full">Balance Due</div>,
             cell: ({ row }) => (
                 <div className="flex flex-col items-end min-w-[70px] text-right">
                     <span className={cn(
@@ -234,7 +234,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "status",
-            header: "Lifecycle",
+            header: "Status",
             cell: ({ row }) => {
                 const status = row.original.status as PurchaseStatus;
                 const safeStatus = statusMap[status] || statusMap.Completed;
@@ -259,7 +259,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center justify-end gap-2">
                     <Info className="h-3 w-3 text-orange-500" />
-                    <span>Intelligence</span>
+                    <span>Options</span>
                 </div>
             ),
             enableHiding: false,
@@ -275,33 +275,29 @@ export default function DataTable({ data }: DataTableProps) {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56 rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl p-1.5 backdrop-blur-xl bg-white/95 dark:bg-zinc-900/95">
                                 <div className="px-2 py-1.5 mb-1">
-                                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">Registry Protocol</p>
+                                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">Bill Options</p>
                                     <div className="flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                                             <Receipt className="h-4 w-4 text-orange-500" />
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-none truncate w-32">{purchase.invoice}</span>
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Reference ID</span>
+                                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Bill Number</span>
                                         </div>
                                     </div>
                                 </div>
-                                <DropdownMenuItem onClick={() => router.visit(`/purchase-return/create?purchase_id=${purchase.id}`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer focus:bg-orange-500 focus:text-white group">
-                                    <History className="h-3.5 w-3.5 opacity-50 group-focus:opacity-100" />
-                                    Process Return
-                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/view`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
                                     <Eye className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Visual Audit
+                                    View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/edit`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
                                     <Edit className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Modify Record
+                                    Edit Bill
                                 </DropdownMenuItem>
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
                                 <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/delete`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer text-rose-500 focus:bg-rose-500 focus:text-white group">
                                     <Trash2 className="h-3.5 w-3.5 opacity-70 group-focus:opacity-100" />
-                                    Purge Record
+                                    Delete Bill
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -387,8 +383,8 @@ export default function DataTable({ data }: DataTableProps) {
                                                 <Info className="h-8 w-8 text-zinc-300" />
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none">Inert Registry</p>
-                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">No procurement cycles detected in current matrix</p>
+                                                <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none">No Purchases Found</p>
+                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">There are no purchase bills recorded in the system yet.</p>
                                             </div>
                                         </div>
                                     </TableCell>
@@ -404,7 +400,7 @@ export default function DataTable({ data }: DataTableProps) {
                 <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] animate-pulse" />
                     <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
-                        {table.getFilteredRowModel().rows.length} Total Core Threads
+                        {table.getFilteredRowModel().rows.length} Total Purchases
                     </span>
                 </div>
 

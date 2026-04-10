@@ -16,6 +16,8 @@ class SalesReturnItem extends Model
         'item_id',
         'qty_carton',
         'qty_pcs',
+        'bonus_qty_carton',
+        'bonus_qty_pcs',
         'total_pcs',
         'trade_price',
         'discount',

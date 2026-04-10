@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
-import { Search, X } from "lucide-react";
+import { Search, X, Check, ChevronsUpDown } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import {
     Select,
@@ -70,70 +71,63 @@ export default function AccountFilters({ filters, accountTypes, cities }: Filter
     };
 
     return (
-        <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none">
-           {/* Search Input */}
-            <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder="Search code or title..."
-                    className="pl-8"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+        <div className="p-4 rounded-xl border mb-6 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/40 dark:shadow-none">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* Search Input */}
+                <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-orange-500 transition-colors" />
+                    <Input
+                        type="text"
+                        placeholder="Quick search..."
+                        className="pl-9 h-10 border-zinc-200 focus:border-orange-500 focus:ring-orange-500 dark:bg-zinc-800 dark:border-zinc-700 transition-all rounded-lg"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+
+                {/* Type Filter */}
+                <Combobox
+                    options={[
+                        { label: "Every Category", value: "all" },
+                        ...accountTypes.map(t => ({ label: t.name, value: String(t.id) }))
+                    ]}
+                    value={type}
+                    onChange={setType}
+                    placeholder="Account Type"
+                    searchPlaceholder="Search types..."
                 />
-            </div>
-            {/* Type Filter */}
-            <div className="flex-1 min-w-[180px]">
-                <Select value={type} onValueChange={setType}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        {accountTypes.map(t => (
-                            <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
 
-            {/* City Filter */}
-            <div className="flex-1 min-w-[180px]">
-                <Select value={cityId} onValueChange={setCityId}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select City" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Cities</SelectItem>
-                        {cities.map((city) => (
-                            <SelectItem key={city.id} value={String(city.id)}>
-                                {city.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+                {/* City Filter */}
+                <Combobox
+                    options={[
+                        { label: "Global (All Cities)", value: "all" },
+                        ...cities.map(city => ({ label: city.name, value: String(city.id) }))
+                    ]}
+                    value={cityId}
+                    onChange={setCityId}
+                    placeholder="Select City"
+                    searchPlaceholder="Search cities..."
+                />
 
-            {/* Status Filter */}
-            <div className="flex-1 min-w-[150px]">
+                {/* Status Filter */}
                 <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Status" />
+                    <SelectTrigger className="h-10 w-full rounded-lg dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-orange-500 transition-all">
+                        <SelectValue placeholder="Login Status" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="all">All Conditions</SelectItem>
+                        <SelectItem value="active">🟢 Active Only</SelectItem>
+                        <SelectItem value="inactive">🔴 Offline Only</SelectItem>
                     </SelectContent>
                 </Select>
-            </div>
 
-            
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={clearFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                    <X className="mr-2 h-4 w-4" /> Clear
+                {/* Clear Actions */}
+                <Button 
+                    variant="ghost" 
+                    onClick={clearFilters} 
+                    className="h-10 px-4 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border border-dashed border-zinc-200 dark:border-zinc-700 hover:border-rose-300"
+                >
+                    <X className="mr-2 h-4 w-4" /> Reset Filters
                 </Button>
             </div>
         </div>

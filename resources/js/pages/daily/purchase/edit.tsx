@@ -10,10 +10,15 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, ChevronDown, ChevronUp, Wallet, Save, ListOrdered, ListRestart, RotateCcw, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check } from "lucide-react";
+import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt } from "lucide-react";
+import { ItemSelectionDialog } from "./components/ItemSelectionDialog";
+import { PriceUpdateDialog } from "./components/PriceUpdateDialog";
+import { SuccessSummaryDialog } from "./components/SuccessSummaryDialog";
+import { PurchasePaymentDialog } from "./components/PurchasePaymentDialog";
 import { useAppearance } from "@/hooks/use-appearance";
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
     Select,
     SelectContent,
@@ -26,6 +31,7 @@ import {
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
@@ -37,6 +43,7 @@ import {
 } from "@/components/ui/popover"
 import { CalendarIcon } from "lucide-react"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils";
 /**
  * Local screenshot path (you uploaded this file).
  * The system will convert this into a URL if needed.
@@ -50,6 +57,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Purchase", href: "/purchase" },
     { title: "Edit Invoice", href: "" },
 ];
+
+const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600";
 
 // ───────────────────────────────────────────
 // Types
@@ -71,6 +80,7 @@ interface Item {
     stock_2?: number;
     total_stock_pcs?: number;
     category?: string;
+    last_purchase_rate?: number;
     // any other fields you may have
 }
 interface Account {
@@ -91,6 +101,11 @@ interface Account {
         id: number;
         name: string;
         percentage: string | number;
+    };
+    current_balance?: number | string;
+    account_type?: {
+        id: number;
+        name: string;
     };
 }
 interface RowData {
@@ -130,56 +145,42 @@ interface Option {
     label: string;
     code?: string;
 }
-
-interface PurchaseItem {
-    id: number;
-    purchase_id: number;
-    item_id: number;
-    qty_carton: number;
-    qty_pcs: number;
-    total_pcs: number;
-    trade_price: number;
-    discount: number;
-    gst_amount: number;
-    subtotal: number;
-}
-
-interface PurchaseData {
-    id: number;
-    date: string;
-    invoice: string;
-    code: string | null;
-    supplier_id: number;
-    salesman_id: number | null;
-    no_of_items: number;
-    gross_total: number;
-    discount_total: number;
-    tax_total: number;
-    courier_charges: number;
-    net_total: number;
-    paid_amount: number;
-    remaining_amount: number;
-    message_line_id?: number | null;
-    message_line?: MessageLine | null;
-    items: PurchaseItem[];
-    supplier?: Account;
-    salesman?: Saleman;
-    firm_id?: number | null;
+interface SplitPayment {
+    [key: string]: any;
+    id: number | string;
+    payment_account_id: string;
+    amount: number;
+    payment_method: string;
+    cheque_no?: string;
+    cheque_date?: string;
+    clear_date?: string;
+    voucher_no?: string;
 }
 
 interface PurchaseProps {
+    purchase: any;
     items: Item[];
     accounts: Account[];
     salemans: Saleman[];
     firms: Firm[];
-    purchase: PurchaseData;
+    nextInvoiceNo: string;
+    paymentAccounts: Account[];
     messageLines?: MessageLine[];
+    customerCheques?: any[];
+    availableCheques?: any[];
 }
 interface Firm {
     id: number;
     name: string;
     defult: number;
 }
+// ───────────────────────────────────────────
+// Util helpers
+// ───────────────────────────────────────────
+const toNumber = (v: any) => {
+    const n = Number(v);
+    return Number.isNaN(n) ? 0 : n;
+};
 
 const FieldWrapper = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
     <div className={`relative ${className}`}>
@@ -193,23 +194,19 @@ const FieldWrapper = ({ label, children, className = "" }: { label: string; chil
 );
 
 // ───────────────────────────────────────────
-// Util helpers
-// ───────────────────────────────────────────
-const toNumber = (v: any) => {
-    const n = Number(v);
-    return Number.isNaN(n) ? 0 : n;
-};
-
-// ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
 export default function PurchaseEdit({
+    purchase,
     items,
     accounts,
     salemans,
     firms,
-    purchase,
+    nextInvoiceNo,
+    paymentAccounts,
     messageLines,
+    customerCheques = [],
+    availableCheques = []
 }: PurchaseProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === "dark";
@@ -218,7 +215,7 @@ export default function PurchaseEdit({
 
     // Mobile specific states
     const [showMobileDetails, setShowMobileDetails] = useState(false);
-    const [showInfoPanel, setShowInfoPanel] = useState(false);
+    const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [showStickyFooter, setShowStickyFooter] = useState(true);
     const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -239,6 +236,65 @@ export default function PurchaseEdit({
     const [showPriceDialog, setShowPriceDialog] = useState(false);
     const [priceUpdates, setPriceUpdates] = useState<PriceUpdateInfo[]>([]);
 
+    // Item Selection Dialog State
+    const [itemDialogOpen, setItemDialogOpen] = useState(false);
+    const [itemSearch, setItemSearch] = useState("");
+    const [activeRowId, setActiveRowId] = useState<number | null>(null);
+
+    // Pay Now / Settlement States
+    const [isPayNow, setIsPayNow] = useState(false);
+    const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+    const [paymentSplits, setPaymentSplits] = useState<SplitPayment[]>([]);
+    const [updatePricesAfterPayment, setUpdatePricesAfterPayment] = useState(false);
+
+    const handlePostPriceUpdate = (update: boolean) => {
+        setUpdatePricesAfterPayment(update);
+        setShowPriceDialog(false);
+        if (isPayNow) {
+            if (paymentSplits.length === 0) addPaymentSplit();
+            setShowPaymentDialog(true);
+        } else {
+            submitPurchase(update);
+        }
+    };
+
+    const addPaymentSplit = () => {
+        setPaymentSplits((prev) => [
+            ...prev,
+            {
+                id: Date.now() + Math.random(),
+                payment_account_id: "",
+                amount: 0,
+                payment_method: "Cash",
+            },
+        ]);
+    };
+
+    const removePaymentSplit = (id: number | string) => {
+        setPaymentSplits((prev) => prev.filter((s) => s.id !== id));
+    };
+
+    const updatePaymentSplit = (id: number | string, field: string, value: any) => {
+        setPaymentSplits((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+        );
+    };
+
+    // Sidebar & UI Toggles
+    const [showRightSidebar, setShowRightSidebar] = useState(true);
+
+    // Keyboard shortcut for Registry (F2)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "F2") {
+                e.preventDefault();
+                setItemDialogOpen(true);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
     // Filter scroll for sticky footer visibility
     useEffect(() => {
         const handleScroll = () => {
@@ -255,45 +311,39 @@ export default function PurchaseEdit({
         window.addEventListener("scroll", handleScroll, { passive: true });
         return () => window.removeEventListener("scroll", handleScroll);
     }, [lastScrollY]);
+
     // Header / meta fields
     const [open, setOpen] = React.useState(false)
-    const [date, setDate] = React.useState<Date | undefined>(purchase.date ? new Date(purchase.date) : undefined)
-    const [markupPercentage, setMarkupPercentage] = useState<string | number>(purchase.supplier?.account_category?.percentage ?? 0);
-    const [party, setParty] = useState<string>("");
+    const [date, setDate] = React.useState<Date | undefined>(purchase?.date ? new Date(purchase.date) : new Date())
+    const [markupPercentage, setMarkupPercentage] = useState<string | number>(0);
     const [creditLimit, setCreditLimit] = useState<number | "">("");
     const [creditDays, setCreditDays] = useState<number>(0);
-    const [invoiceNo, setInvoiceNo] = useState<string>(purchase.invoice ? String(purchase.invoice) : "");
-    const [salesman, setSalesman] = useState<number | null>(purchase.salesman_id);
-    const [cashCredit, setCashCredit] = useState<string>("CREDIT");
-    const [itemsCount, setItemsCount] = useState<number>(purchase.no_of_items);
-    const [courier, setCourier] = useState<number>(toNumber(purchase.courier_charges));
+    const [invoiceNo, setInvoiceNo] = useState<string>(purchase?.invoice ?? nextInvoiceNo);
+    const [salesman, setSalesman] = useState<number | null>(purchase?.salesman_id ?? null);
+    const [cashCredit, setCashCredit] = useState<string>(purchase?.cash_credit ?? "CREDIT");
+    const [accountType, setAccountType] = useState<Option | null>(() => {
+        if (purchase?.supplier_id && accounts) {
+            const acc = accounts.find(a => a.id === purchase.supplier_id);
+            if (acc) return { value: acc.id, label: acc.title };
+        }
+        return null;
+    });
+    const [courier, setCourier] = useState<number>(toNumber(purchase?.courier_charges));
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
-    const [selectedMessageId, setSelectedMessageId] = useState<string>(purchase.message_line_id?.toString() ?? "0");
-    const [showBonus, setShowBonus] = useState(false);
+    const [selectedMessageId, setSelectedMessageId] = useState<string>(purchase?.message_line_id?.toString() ?? "0");
     const [selectedFirmId, setSelectedFirmId] = useState<string>(() => {
-        if (purchase.firm_id) return purchase.firm_id.toString();
+        if (purchase?.firm_id) return purchase.firm_id.toString();
         const defaultFirm = firms?.find(f => f.defult === 1);
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
-
-    // Initialize account type based on purchase.supplier_id
-    const initialAccount = accounts.find(a => a.id === purchase.supplier_id);
-    const [accountType, setAccountType] = useState<Option | null>(
-        initialAccount ? { value: initialAccount.id, label: initialAccount.title } : null
-    );
-
-    useEffect(() => {
-        if (initialAccount) {
-            setCreditDays(initialAccount.aging_days ?? 0);
-            setCreditLimit(typeof initialAccount.credit_limit === "number" ? initialAccount.credit_limit : (initialAccount.credit_limit ? Number(initialAccount.credit_limit) : ""));
-            setMarkupPercentage(initialAccount.account_category?.percentage ?? 0);
-        }
-    }, [initialAccount]);
-
     const accountTypeOptions: Option[] = accounts.map((a) => ({
         value: a.id,
         label: a.title,
     }));
+
+    // Check if over credit limit
+
+
     const salemanMap = React.useMemo(() => {
         const m = new Map<number, string>();
         salemans?.forEach((s) => {
@@ -310,88 +360,130 @@ export default function PurchaseEdit({
         }));
     }, [items]);
 
-    // Initialize rows from purchase items
-    const initialRows: RowData[] = purchase.items.map((it) => {
-        // Calculate percentages back from amounts if needed, or use stored values if available
-        // Since we don't store percentages directly on PurchaseItem (based on controller), we might need to infer or just use 0 if not critical,
-        // BUT for editing, it's better to calculate them.
-        // taxPercent = (gst_amount / subtotal) * 100? No, subtotal includes tax usually? 
-        // Let's look at controller store: subtotal is passed directly.
-        // In create.tsx: 
-        // tax = (taxPercent / 100) * amount
-        // disc = (discPercent / 100) * amount
-        // subtotal (in controller) seems to be the amount (which is qty * rate). 
-        // Wait, controller store says: 'subtotal' => $it['subtotal'].
-        // In create.tsx payload: subtotal: r.amount.
-        // And r.amount = normalUnits * r.rate.
-        // So subtotal is the GROSS amount for that line (before tax/disc).
+    const filteredItems = React.useMemo(() => {
+        const q = itemSearch.toLowerCase();
 
-        // So:
-        // gst_amount = (taxPercent / 100) * subtotal
-        // => taxPercent = (gst_amount / subtotal) * 100
+        // Filter logic
+        const filtered = items.filter((it) =>
+            it.title.toLowerCase().includes(q) ||
+            (it.short_name?.toLowerCase().includes(q)) ||
+            (it.company?.toLowerCase().includes(q)) ||
+            (it.category?.toLowerCase().includes(q)) ||
+            String(it.id).includes(q)
+        );
 
-        const subtotal = toNumber(it.subtotal);
-        const discPercent = subtotal > 0 ? (toNumber(it.discount) / subtotal) * 100 : 0;
+        // Sort logic: Prioritize startsWidth matches, then alphabetical
+        return filtered.sort((a, b) => {
+            const aTitle = a.title.toLowerCase();
+            const bTitle = b.title.toLowerCase();
 
-        return {
-            id: Date.now() + Math.random(), // unique id
-            item_id: it.item_id,
-            full: toNumber(it.qty_carton),
-            pcs: toNumber(it.qty_pcs),
-            bonus_full: 0, // Not stored in DB currently? Controller doesn't show bonus cols in create/store.
-            bonus_pcs: 0,
-            rate: toNumber(it.trade_price), // Assuming trade_price in DB is the rate used
-            discPercent: discPercent,
-            trade_price: toNumber(it.trade_price),
-            amount: subtotal,
-        };
+            const aStarts = aTitle.startsWith(q);
+            const bStarts = bTitle.startsWith(q);
+
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
+
+            return aTitle.localeCompare(bTitle);
+        });
+    }, [items, itemSearch]);
+
+    // Start with one empty row instead of loading all items
+    const getEmptyRow = (): RowData => ({
+        id: Date.now() + Math.random(),
+        item_id: null,
+        full: 0,
+        pcs: 0,
+        bonus_full: 0,
+        bonus_pcs: 0,
+        rate: 0,
+        discPercent: 0,
+        trade_price: 0,
+        amount: 0,
+        last_purchase_rate: 0, // Store last purchase rate for warning
     });
 
-    const [rows, setRows] = useState<RowData[]>(initialRows.length ? initialRows : [
-        {
-            id: Date.now(),
-            item_id: null,
-            full: 0,
-            pcs: 0,
-            bonus_full: 0,
-            bonus_pcs: 0,
-            rate: 0,
-            discPercent: 0,
-            trade_price: 0,
-            amount: 0,
-        },
-    ]);
-
-    // Effect to set initial credit details when component mounts or account changes
-    useEffect(() => {
-        if (initialAccount) {
-            setCreditDays(initialAccount.aging_days ?? 0);
-            setCreditLimit(typeof initialAccount.credit_limit === "number" ? initialAccount.credit_limit : (initialAccount.credit_limit ? Number(initialAccount.credit_limit) : ""));
+    const [rows, setRows] = useState<RowData[]>(() => {
+        if (purchase && purchase.items && purchase.items.length > 0) {
+            return purchase.items.map((pi: any) => {
+                const item = items.find(it => it.id === pi.item_id);
+                // Recover discount percentage from absolute discount value
+                let discPercent = 0;
+                if (toNumber(pi.subtotal) > 0 && toNumber(pi.discount) > 0) {
+                    discPercent = (toNumber(pi.discount) / (toNumber(pi.subtotal) + toNumber(pi.discount))) * 100;
+                }
+                
+                return {
+                    id: Date.now() + Math.random(),
+                    item_id: pi.item_id,
+                    full: toNumber(pi.qty_carton),
+                    pcs: toNumber(pi.qty_pcs),
+                    bonus_full: toNumber(pi.bonus_qty_carton ?? 0),
+                    bonus_pcs: toNumber(pi.bonus_qty_pcs ?? 0),
+                    rate: toNumber(pi.trade_price),
+                    discPercent: Math.round(discPercent * 100) / 100,
+                    trade_price: toNumber(item?.trade_price ?? pi.trade_price),
+                    amount: toNumber(pi.subtotal) + toNumber(pi.discount), // Base amount before discount
+                    last_purchase_rate: 0
+                };
+            });
         }
-    }, []); // Run once on mount, or rely on the selection handler
+        return [getEmptyRow()];
+    });
+
+    // Function to load all items
+    const loadAllItems = () => {
+        const allItemRows: RowData[] = items.map((it) => {
+            const baseRate = toNumber(it.trade_price ?? it.retail ?? 0);
+            const packing = toNumber(it.packing_full ?? it.packing_qty ?? 1);
+            const amount = 0; // Starts at 0
+
+            return {
+                id: Date.now() + it.id + Math.random(),
+                item_id: it.id,
+                full: 0,
+                pcs: 0,
+                bonus_full: 0,
+                bonus_pcs: 0,
+                rate: baseRate,
+                discPercent: toNumber(it.discount ?? 0),
+                trade_price: toNumber(it.trade_price ?? baseRate),
+                amount: amount,
+            };
+        });
+        setRows(allItemRows);
+    };
+
+    // Function to reset to one empty row
+    const resetRows = () => {
+        setRows([getEmptyRow()]);
+        setSelectedItemId(null);
+    };
 
     // Track the currently selected item for displaying info
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
     const [lastPurchaseInfo, setLastPurchaseInfo] = useState<any>(null);
     const [loadingPurchaseInfo, setLoadingPurchaseInfo] = useState(false);
 
+    const handleProductFocus = (itemId: number) => {
+        if (selectedItemId === itemId) return;
+        
+        setSelectedItemId(itemId);
+        setLoadingPurchaseInfo(true);
+        axios.get(`/api/purchase/last-purchase-info?item_id=${itemId}`)
+            .then(res => setLastPurchaseInfo(res.data))
+            .catch(err => {
+                console.error(err);
+                setLastPurchaseInfo(null);
+            })
+            .finally(() => setLoadingPurchaseInfo(false));
+    };
+
     // ───────────────────────────────────────────
     // Row operations
     // ───────────────────────────────────────────
     const addRow = () => {
         setRows((prev) => [
-            {
-                id: Date.now(),
-                item_id: null,
-                full: 0,
-                pcs: 0,
-                bonus_full: 0,
-                bonus_pcs: 0,
-                rate: 0,
-                discPercent: 0,
-                trade_price: 0,
-                amount: 0,
-            },
+            getEmptyRow(),
             ...prev,
         ]);
     };
@@ -412,10 +504,10 @@ export default function PurchaseEdit({
         if (!selected) return;
 
         const baseRate = toNumber(selected.trade_price ?? selected.retail ?? 0);
-        const tax = toNumber(selected.gst_percent ?? 0);
         const disc = toNumber(selected.discount ?? 0);
         const tradePrice = toNumber(selected.trade_price ?? baseRate);
 
+        // Initial update with base rate
         updateRow(rowId, { item_id: itemId, rate: baseRate, discPercent: disc, trade_price: tradePrice });
 
         // Set this item as the selected one to display info below
@@ -447,14 +539,20 @@ export default function PurchaseEdit({
 
     // Recalculate a row amount whenever rate/full/pcs/bonus changes
     const recalcRowAmount = (row: RowData, item?: Item) => {
-        const packing = toNumber(item?.packing_full || item?.packing_qty || 1);
-        const totalUnits = toNumber(row.full) * packing + toNumber(row.pcs) + toNumber(row.bonus_full) * packing + toNumber(row.bonus_pcs);
-        // Here amount uses rate * normal units (excluding bonus if you want)
-        // Commonly bonus is free, adjust logic if you want to exclude/add differently.
-        const normalUnits = toNumber(row.full) * packing + toNumber(row.pcs);
-        const amount = normalUnits * toNumber(row.rate);
-        return Math.round(amount);
+        const packing = Math.max(1, toNumber(item?.packing_full || item?.packing_qty || 1));
+        const rate = toNumber(row.rate);
+        const pcPrice = Math.ceil(rate / packing);
+
+        // Amount = (Full Items * Full Rate) + (PCS * PC Price)
+        const amount = (toNumber(row.full) * rate) + (toNumber(row.pcs) * pcPrice);
+        return isFinite(amount) ? Math.round(amount) : 0;
     };
+
+    // Get the currently selected item details
+    const selectedItem = useMemo(() => {
+        if (!selectedItemId) return null;
+        return items.find((it) => it.id === selectedItemId) ?? null;
+    }, [selectedItemId, items]);
 
     // update amounts when rows change
     const rowsWithComputed = useMemo(() => {
@@ -464,12 +562,6 @@ export default function PurchaseEdit({
             return { ...r, amount };
         });
     }, [rows, items]);
-
-    // Get the currently selected item details
-    const selectedItem = useMemo(() => {
-        if (!selectedItemId) return null;
-        return items.find((it) => it.id === selectedItemId) ?? null;
-    }, [selectedItemId, items]);
 
     // ───────────────────────────────────────────
     // Totals & Invoice summary
@@ -482,7 +574,6 @@ export default function PurchaseEdit({
         let totalItems = 0;
 
         rowsWithComputed.forEach((r) => {
-            const item = items.find((it) => it.id === r.item_id) ?? undefined;
             const amount = r.amount;
             gross += amount;
 
@@ -507,7 +598,7 @@ export default function PurchaseEdit({
         return {
             gross: roundedGross,
             discTotal: roundedDisc,
-            courier,
+            courier: courier,
             net: Math.round(net),
             previousBalance,
             cashReceived,
@@ -517,7 +608,6 @@ export default function PurchaseEdit({
             totalItems
         };
     }, [rowsWithComputed, items, courier]);
-
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -537,22 +627,27 @@ export default function PurchaseEdit({
             salesman_id: salesman,
             firm_id: selectedFirmId ? Number(selectedFirmId) : null,
             no_of_items: rowsWithComputed.length,
-            print_format: printOption,
-            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
             gross_total: totals.gross,
             discount_total: totals.discTotal,
             courier_charges: totals.courier,
             net_total: totals.net,
-            paid_amount: 0,
-            remaining_amount: totals.net,
+            paid_amount: isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
+            remaining_amount: totals.net - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
             update_prices: updatePrices,
+            print_format: printOption,
+            message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
+
+            // Payment Data
+            is_pay_now: isPayNow,
+            is_multi: true,
+            splits: isPayNow ? paymentSplits : [],
 
             items: rowsWithComputed.filter(r => r.item_id !== null).map((r) => {
                 const item = items.find(i => i.id === r.item_id);
-                const packing = toNumber(item?.packing_full ?? item?.packing_qty ?? 1);
+                const packing = toNumber(item?.packing_full || item?.packing_qty || 1);
 
-                const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs);
+                const totalPCS = ((toNumber(r.full) + toNumber(r.bonus_full || 0)) * packing) + toNumber(r.pcs) + toNumber(r.bonus_pcs || 0);
 
                 return {
                     item_id: r.item_id,
@@ -566,8 +661,11 @@ export default function PurchaseEdit({
                 };
             })
         };
+
         router.put(`/purchase/${purchase.id}`, payload, {
-            onSuccess: () => {
+            onSuccess: (page) => {
+                // Success data for the dialog
+                const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
                     supplierName: accounts.find(a => a.id === accountType?.value)?.title || "N/A",
                     totalItems: totals.totalItems,
@@ -576,14 +674,15 @@ export default function PurchaseEdit({
                     gross: totals.gross,
                     discount: totals.discTotal,
                     net: totals.net,
-                    purchaseId: purchase.id
+                    purchaseId: (page.props as any).flash?.id || purchase.id
                 });
+
                 setShowSuccessDialog(true);
-                setShowPriceDialog(false);
+                setShowPriceDialog(false); // Close price dialog if open
             },
             onError: (errors) => {
                 console.error(errors);
-                alert("Failed to update purchase. Check console for details.");
+                alert("Failed to save purchase. Check console for details.");
             }
         });
     };
@@ -619,7 +718,15 @@ export default function PurchaseEdit({
             setPriceUpdates(updates);
             setShowPriceDialog(true);
         } else {
-            submitPurchase(false);
+            // Check if Pay Now is enabled but no splits
+            if (isPayNow) {
+                if (paymentSplits.length === 0) {
+                    addPaymentSplit(); // Add one default
+                }
+                setShowPaymentDialog(true);
+            } else {
+                submitPurchase(false);
+            }
         }
     };
 
@@ -637,13 +744,13 @@ export default function PurchaseEdit({
             <SidebarInset>
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="w-full pt-0 p-0 md:p-0 flex flex-col gap-1.5 pb-20 md:pb-4">
+                <div className="w-full pt-0 p-2 md:p-6 md:pt-0 flex flex-col gap-1.5 pb-20 md:pb-4">
                     {/* Mobile Header Card (Visible only on mobile) */}
                     <Card className="block md:hidden p-0 overflow-hidden border-none shadow-md bg-white dark:bg-[#0a0a0a]">
                         <div className="p-4 bg-gradient-to-r from-orange-500/10 to-transparent dark:from-orange-500/5">
                             <div className="flex justify-between items-start mb-1">
                                 <div className="space-y-0.5">
-                                    <h2 className="text-xl font-bold tracking-tight dark:text-gray-100 italic">EDIT <span className="text-orange-600 dark:text-orange-500 font-black">PURCHASE</span></h2>
+                                    <h2 className="text-xl font-bold tracking-tight dark:text-gray-100 italic">PURCHASE <span className="text-orange-600 dark:text-orange-500 font-black">INVOICE</span></h2>
                                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                                         {date ? date.toLocaleDateString() : "New Date"} | Inv: {invoiceNo}
@@ -722,22 +829,10 @@ export default function PurchaseEdit({
                     </Card>
 
                     {/* Desktop Header card (Hidden on mobile) */}
-                    <Card className="hidden md:block overflow-hidden border-x-0 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
-                        <div className="px-5 py-3 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent border-b border-gray-100 dark:border-gray-900 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <h2 className="text-lg font-bold tracking-tight dark:text-gray-100 italic">PURCHASE <span className="text-orange-600 dark:text-orange-500 font-black">INVOICE</span></h2>
-                                <span className="text-[10px] px-2 py-0.5 bg-sky-500/10 text-sky-600 rounded-full border border-sky-500/20 font-bold uppercase tracking-wider">EDIT MODE</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs font-semibold">
-                                <span className="text-gray-400 uppercase tracking-widest">Update Entry</span>
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 text-orange-600 rounded-md border border-orange-500/20">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-orange-600 animate-pulse"></div>
-                                    DESKTOP VIEW
-                                </div>
-                            </div>
-                        </div>
+                    <Card className="hidden md:block overflow-hidden border-x-0 mt-3 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
+                       
 
-                        <div className="p-4 grid grid-cols-6 lg:grid-cols-12 gap-x-2 gap-y-5 items-end">
+                        <div className="p-4 grid grid-cols-6  lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
                             {/* Date & Time Picker */}
                             <FieldWrapper label="Date & Time" className="lg:col-span-3">
                                 <div className="flex gap-1">
@@ -745,7 +840,7 @@ export default function PurchaseEdit({
                                         <PopoverTrigger asChild>
                                             <Button
                                                 variant="outline"
-                                                id="date-picker-desktop"
+                                                id="date-picker"
                                                 className="w-[140px] justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
                                             >
                                                 <span className="truncate">{date ? date.toLocaleDateString() : "Date"}</span>
@@ -766,7 +861,7 @@ export default function PurchaseEdit({
                                     </Popover>
                                     <Input
                                         type="time"
-                                        id="time-picker-desktop"
+                                        id="time-picker"
                                         step="1"
                                         defaultValue={new Date().toLocaleTimeString('en-GB', { hour12: false })}
                                         className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors flex-1"
@@ -811,7 +906,8 @@ export default function PurchaseEdit({
                                     </SelectContent>
                                 </Select>
                             </FieldWrapper>
-                            <FieldWrapper label="S %" className="lg:col-span-1">
+
+                            <FieldWrapper label="Supplier %" className="lg:col-span-1">
                                 <Input
                                     placeholder="%"
                                     value={markupPercentage}
@@ -831,7 +927,7 @@ export default function PurchaseEdit({
                             </FieldWrapper>
 
                             {/* Invoice # */}
-                            <FieldWrapper label="Bill #" className="lg:col-span-3">
+                            <FieldWrapper label="Bill #" className="lg:col-span-1">
                                 <Input
                                     placeholder="Invoice #"
                                     value={invoiceNo}
@@ -840,14 +936,13 @@ export default function PurchaseEdit({
                                 />
                             </FieldWrapper>
 
-
                             {/* Salesman */}
                             <FieldWrapper label="Salesman" className="lg:col-span-2">
                                 <Select
                                     value={salesman?.toString() || ""}
                                     onValueChange={(val) => setSalesman(val ? Number(val) : null)}
                                 >
-                                    <SelectTrigger className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left">
+                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left">
                                         <SelectValue placeholder="Select Salesman" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -869,305 +964,382 @@ export default function PurchaseEdit({
                                     className="h-10 bg-slate-50/50 font-bold border-slate-200 text-center"
                                 />
                             </FieldWrapper>
-
-                            {/* Message Line Select */}
-                            <FieldWrapper label="Message Line" className="lg:col-span-2">
-                                <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
-                                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-sky-50/30">
-                                        <SelectValue placeholder="Default" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="0">Default</SelectItem>
-                                        {messageLines?.map((msg) => (
-                                            <SelectItem key={msg.id} value={msg.id.toString()}>
-                                                {msg.messageline}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </FieldWrapper>
                         </div>
                     </Card>
 
 
                     {/* Mobile "Add Item" Button Section */}
                     <div className="block md:hidden pb-2">
-                        <div className="flex justify-between items-center mb-2 px-1">
+                        <div className="flex justify-between items-center mb-2 px-1 text-orange-600">
                             <h3 className="font-semibold text-lg flex items-center gap-2">
-                                <ListOrdered className="text-orange-600" size={18} /> Items List
+                                <ListOrdered size={18} /> Items List
                             </h3>
-                            <Button size="sm" onClick={addRow} className="bg-orange-600 hover:bg-orange-700 text-white h-8 shadow-sm">
-                                <Plus size={16} className="mr-1" /> Add Item
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setItemDialogOpen(true)} className="border-orange-200 text-orange-600 h-8 shadow-sm">
+                                    <Search size={16} className="mr-1" /> Registry
+                                </Button>
+                                <Button size="sm" onClick={addRow} className="bg-orange-600 hover:bg-orange-700 text-white h-10 shadow-sm">
+                                    <Plus size={16} className="mr-1" /> Add
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
                     {/* Items table + right summary */}
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                    <div className="grid grid-cols-1 2xl:grid-cols-12 gap-4 relative">
+                        {/* Right Sidebar Toggle Button - Floating - Centered Vertically */}
+                        <div className={`hidden 2xl:block absolute ${showRightSidebar ? 'right-[24.9%]' : 'right-0'} top-[40%] -translate-y-1/2 z-50 transition-all duration-500 ease-in-out`}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                                className={`h-11 w-6 rounded-l-xl p-0 shadow-[0_4px_20px_rgba(0,0,0,0.1)] border-orange-200 dark:border-orange-800 bg-white/95 dark:bg-zinc-950 text-orange-600 hover:bg-orange-50 transition-all hover:scale-110 flex items-center justify-center border-r-0 ${showRightSidebar ? '' : 'rounded-xl border-r w-10 h-10 -right-2 absolute translate-x-1/2'}`}
+                            >
+                                {showRightSidebar ? <ChevronRight size={20} className="stroke-[3]" /> : <ChevronLeft size={20} className="stroke-[3]" />}
+                            </Button>
+                        </div>
+
                         {/* Table area */}
-                        <div className="col-span-1 xl:col-span-9 pb-24 md:pb-32 xl:pb-4">
+                        <div className={`col-span-1 ${showRightSidebar ? '2xl:col-span-9' : '2xl:col-span-12'} pb-24 md:pb-32 2xl:pb-4 transition-all duration-300`}>
                             <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card">
                                 <div className="overflow-visible md:overflow-x-auto">
                                     <div className="w-full md:min-w-[1200px]">
                                         {/* Table Header (sticky) - Desktop Only */}
-                                        <div className="hidden md:grid grid-cols-12 p-2 text-xs font-semibold border-b sticky top-0 z-10 bg-secondary/50 backdrop-blur-sm">
-
-                                            <div className={`${showBonus ? 'col-span-3' : 'col-span-5'}`}>+ Item Selection</div>
-                                            <div className="col-span-1 text-center">Full</div>
-                                            <div className="col-span-1 text-center flex items-center justify-center gap-1">
-                                                Pcs
+                                        <div className="hidden md:grid grid-cols-12 bg-secondary/50 backdrop-blur-sm p-2 text-xs font-semibold border-b sticky top-0 z-10">
+                                            <div className="col-span-3">
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className={`h-4 w-4 p-0 ${showBonus ? 'text-orange-600 bg-orange-100' : 'text-gray-400'}`}
-                                                    onClick={() => setShowBonus(!showBonus)}
-                                                    title={showBonus ? "Hide Bonus Fields" : "Show Bonus Fields"}
+                                                    size="sm"
+                                                    onClick={() => setItemDialogOpen(true)}
+                                                    className="h-6 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 -ml-2"
                                                 >
-                                                    <MoreVertical size={12} />
+                                                    <Search size={12} />
+                                                    <span>Registry / Search (F2)</span>
                                                 </Button>
                                             </div>
-                                            {showBonus && (
-                                                <>
-                                                    <div className="col-span-1 text-center">B.Full</div>
-                                                    <div className="col-span-1 text-center">B.Pcs</div>
-                                                </>
-                                            )}
-                                            <div className="col-span-1 text-right">Rate</div>
-                                            <div className="col-span-1 text-right">Disc %</div>
-                                            <div className="col-span-1 text-right">After Disc</div>
+                                            <div className="col-span-1 text-center">Full</div>
+                                            <div className="col-span-1 text-center flex items-center justify-center gap-1">Pcs</div>
+                                            <div className="col-span-1 text-center">B.Full</div>
+                                            <div className="col-span-1 text-center">B.Pcs</div>
+                                            <div className="col-span-1 text-center">Rate</div>
+                                            <div className="col-span-1 text-center">Disc %</div>
+                                            <div className="col-span-1 text-center">After Disc</div>
                                             <div className="col-span-1 text-right">Sub Total</div>
-                                            <div className="col-span-1 text-right">Add Or Del</div>
-
+                                            <div className="col-span-1 text-center flex items-center justify-center">
+                                                <div className="text-[9px] font-black uppercase text-zinc-400">Action</div>
+                                            </div>
                                         </div>
 
                                         {/* Rows (scrollable) */}
-                                        <div className="max-h-none md:max-h-[360px] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm">
+                                        <div className="max-h-none md:max-h-[48vh] md:min-h-[50vh] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm">
                                             {rowsWithComputed.map((row) => (
                                                 <React.Fragment key={row.id}>
-                                                    {/* Mobile Card View */}
-                                                    <div
-                                                        className={`block md:hidden rounded-xl border bg-card dark:bg-card shadow-sm relative overflow-hidden transition-all mb-3 border-gray-200 dark:border-gray-700 hover:shadow-md`}
-                                                    >
-                                                        {/* Header Row: Item Name & Delete */}
-                                                        <div className="flex items-start justify-between p-3 pb-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                                                            <div className="w-full pr-8">
-                                                                <div className="flex items-center justify-between mb-1">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="h-6 w-6 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                                                                            <Wallet size={14} />
-                                                                        </div>
-                                                                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 tracking-wider">ITEM</span>
-                                                                    </div>
-                                                                </div>
-                                                                <ReactSelect
-                                                                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                                                                    styles={{
-                                                                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                                                                        container: (base) => ({ ...base, width: '100%' }),
-                                                                        control: (base) => ({
-                                                                            ...base,
-                                                                            backgroundColor: 'transparent',
-                                                                            border: 'none',
-                                                                            boxShadow: 'none',
-                                                                            minHeight: 'auto',
-                                                                            height: 'auto',
-                                                                            padding: 0,
-                                                                            fontWeight: 600,
-                                                                            fontSize: '0.95rem'
-                                                                        }),
-                                                                        valueContainer: (base) => ({ ...base, padding: 0 }),
-                                                                        dropdownIndicator: (base) => ({ ...base, padding: 0, color: '#94a3b8' }),
-                                                                        indicatorSeparator: () => ({ display: 'none' }),
-                                                                        placeholder: (base) => ({ ...base, color: '#cbd5e1', fontWeight: 400 }),
-                                                                        singleValue: (base) => ({ ...base, color: isDark ? '#e2e8f0' : '#0f172a' }),
-                                                                        input: (base) => ({ ...base, color: isDark ? '#e2e8f0' : '#0f172a' }),
-                                                                        menu: (base) => ({ ...base, backgroundColor: isDark ? '#1e293b' : '#ffffff' }),
-                                                                        option: (base, state) => ({
-                                                                            ...base,
-                                                                            backgroundColor: state.isFocused ? (isDark ? '#334155' : '#f1f5f9') : 'transparent',
-                                                                            color: isDark ? '#e2e8f0' : '#0f172a',
-                                                                        })
-                                                                    }}
-                                                                    options={itemOptions.filter(opt =>
-                                                                        !rows.some(r => r.item_id === opt.value && r.id !== row.id)
-                                                                    )}
-                                                                    isDisabled={!accountType}
-                                                                    value={itemOptions.find((opt) => opt.value === row.item_id) || null}
-                                                                    onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
-                                                                    placeholder={!accountType ? "Select Account First" : "Select Item..."}
-                                                                />
-                                                            </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="absolute top-2 right-2 h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
-                                                                onClick={() => removeRow(row.id)}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        </div>
-
-                                                        <div className="p-3 space-y-4">
-                                                            {/* Quantity Section */}
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700">
-                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Full</label>
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <Input
-                                                                            type="number"
-                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
-                                                                            value={row.full || ""}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
-                                                                                updateRow(row.id, { full: num });
-                                                                            }}
-                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                        />
-                                                                        {row.bonus_full > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_full}</span>}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700">
-                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Pieces</label>
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <Input
-                                                                            type="number"
-                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
-                                                                            value={row.pcs || ""}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
-                                                                                updateRow(row.id, { pcs: num });
-                                                                            }}
-                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                        />
-                                                                        {row.bonus_pcs > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_pcs}</span>}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Financials Section */}
-                                                            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
-                                                                <div className="flex flex-col">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Rate</label>
-                                                                    <Input
-                                                                        className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
-                                                                        value={row.rate}
-                                                                        onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
-                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex flex-col">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Disc%</label>
-                                                                    <Input
-                                                                        className="h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center"
-                                                                        value={row.discPercent}
-                                                                        onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
-                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex flex-col items-end justify-end col-span-2">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">SubTotal</label>
-                                                                    <div className="text-base font-black text-orange-600 leading-tight">
-                                                                        {row.amount.toFixed(0)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Desktop Row View (Hidden on mobile) */}
-                                                    <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
-
-
-                                                        <div className={`${showBonus ? 'col-span-3' : 'col-span-5'}`}>
-                                                            <ReactSelect
-                                                                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                                                                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }), container: (base) => ({ ...base, width: '100%' }) }}
-                                                                options={itemOptions.filter(opt =>
-                                                                    !rows.some(r => r.item_id === opt.value && r.id !== row.id)
-                                                                )}
-                                                                isDisabled={!accountType}
-                                                                value={itemOptions.find((opt) => opt.value === row.item_id) || null}
-                                                                onChange={(opt) => handleSelectItem(row.id, Number(opt?.value))}
-                                                                placeholder={!accountType ? "Select Account First" : "Select item"}
-                                                                isClearable
-                                                            />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input className="h-8 px-1 text-center" value={row.full} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input className="h-8 px-1 text-center" value={row.pcs} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                                                        </div>
-
-                                                        {showBonus && (
+                                                    {(() => {
+                                                        const rowItem = items.find(it => it.id === row.item_id);
+                                                        const showLoose = !row.item_id || toNumber(rowItem?.packing_qty || 1) > 1;
+                                                        
+                                                        return (
                                                             <>
-                                                                <div className="col-span-1">
-                                                                    <Input className="h-8 px-1 text-center border-orange-200 bg-orange-50/10" value={row.bonus_full} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} placeholder="B.Full" />
+                                                                {/* Mobile Card View */}
+                                                                <div
+                                                                    className="block md:hidden rounded-xl border bg-card dark:bg-card shadow-sm relative overflow-hidden transition-all mb-3 border-gray-200 dark:border-gray-700 hover:shadow-md"
+                                                                >
+                                                                    {/* Header Row: Item Name & Delete */}
+                                                                    <div className="flex items-start justify-between p-3 pb-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                                                                        <div className="w-full pr-10">
+                                                                            <button
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                className="flex flex-col text-left group/item w-full py-0.5"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <div className="h-5 w-5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                                                                        <Wallet size={12} />
+                                                                                    </div>
+                                                                                    <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 tracking-[0.1em] uppercase">Product Selection</span>
+                                                                                </div>
+                                                                                {row.item_id ? (
+                                                                                    <div className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase italic flex items-center gap-1.5">
+                                                                                        {rowItem?.title}
+                                                                                        <ChevronDown size={14} className="text-orange-500/50" />
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="text-sm font-bold text-zinc-300 italic uppercase flex items-center gap-1.5">
+                                                                                        Tap to Select SKU
+                                                                                        <Plus size={14} className="text-orange-500" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </button>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="absolute top-2 right-2 h-8 w-8 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
+                                                                            onClick={() => removeRow(row.id)}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    <div className="p-3 space-y-4">
+                                                                        {/* Quantity Section */}
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700 ${!showLoose ? 'col-span-2' : 'col-span-1'}`}>
+                                                                                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Full</label>
+                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                    <Input
+                                                                                        type="number"
+                                                                                        className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                                                                        value={row.full || ""}
+                                                                                        onChange={(e) => {
+                                                                                            const val = e.target.value;
+                                                                                            const num = val === "" ? 0 : parseInt(val, 10) || 0;
+                                                                                            updateRow(row.id, { full: num });
+                                                                                        }}
+                                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                    />
+                                                                                    {row.bonus_full > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_full}</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                            {showLoose && (
+                                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700 col-span-1">
+                                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Pieces</label>
+                                                                                    <div className="flex items-center justify-center gap-1">
+                                                                                        <Input
+                                                                                            type="number"
+                                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                                                                            value={row.pcs || ""}
+                                                                                            onChange={(e) => {
+                                                                                                const val = e.target.value;
+                                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
+                                                                                                updateRow(row.id, { pcs: num });
+                                                                                            }}
+                                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                        />
+                                                                                        {row.bonus_pcs > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_pcs}</span>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Financials Section */}
+                                                                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                                                                            <div className="flex flex-col">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Rate</label>
+                                                                                <Input
+                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
+                                                                                    value={row.rate}
+                                                                                    onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="flex flex-col">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Disc%</label>
+                                                                                <Input
+                                                                                    className="h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center"
+                                                                                    value={row.discPercent}
+                                                                                    onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="flex flex-col items-end justify-end col-span-2">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">SubTotal</label>
+                                                                                <div className="text-base font-black text-orange-600 leading-tight">
+                                                                                    {row.amount.toFixed(0)}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
 
-                                                                <div className="col-span-1">
-                                                                    <Input className="h-8 px-1 text-center border-orange-200 bg-orange-50/10" value={row.bonus_pcs} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} placeholder="B.Pcs" />
+                                                                {/* Desktop Row View (Hidden on mobile) */}
+                                                                <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
+                                                                    <div className="col-span-3 h-8 flex items-center">
+                                                                        {row.item_id ? (
+                                                                            <button
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                className="flex flex-col text-left group/item w-full transition-all hover:translate-x-1"
+                                                                            >
+                                                                                <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
+                                                                                    {rowItem?.title || "Unknown Item"}
+                                                                                </span>
+                                                                                <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest leading-none">
+                                                                                    ID: {row.item_id.toString().padStart(5, '0')}
+                                                                                </span>
+                                                                            </button>
+                                                                        ) : (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                className="w-full h-8 px-2 text-[10px] font-black uppercase justify-start rounded-md border-dashed border-zinc-200 dark:border-zinc-800 hover:border-orange-50 dark:hover:bg-orange-950/20 transition-all group-hover:border-orange-200 text-zinc-400"
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                disabled={!accountType}
+                                                                            >
+                                                                                <Plus size={12} className="mr-2 text-orange-500" />
+                                                                                Assign Registry SKU
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center"
+                                                                            value={row.full}
+                                                                            onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        {showLoose && (
+                                                                            <Input
+                                                                                className="h-8 px-1 text-center"
+                                                                                value={row.pcs}
+                                                                                onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
+                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
+                                                                            value={row.bonus_full}
+                                                                            onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            placeholder="B.Full"
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        {showLoose && (
+                                                                            <Input
+                                                                                className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
+                                                                                value={row.bonus_pcs}
+                                                                                onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })}
+                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                placeholder="B.Pcs"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="col-span-1 relative">
+                                                                        <Input
+                                                                            className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
+                                                                            value={row.rate}
+                                                                            onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                        {(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) && (
+                                                                            <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                                                                High Rate! Last: {row.last_purchase_rate}
+                                                                                <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center"
+                                                                            value={row.discPercent}
+                                                                            onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center bg-secondary/20"
+                                                                            value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
+                                                                            readOnly
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-right font-bold text-orange-600 bg-orange-50/10"
+                                                                            value={((row.amount - (row.amount * row.discPercent / 100)) || 0).toFixed(2)}
+                                                                            readOnly
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1 text-center flex items-center justify-center">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
+                                                                            onClick={() => removeRow(row.id)}
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
                                                             </>
-                                                        )}
-
-                                                        <div className="col-span-1 relative">
-                                                            <Input
-                                                                className={`h-8 px-1 text-right ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "border-red-500 bg-red-50 text-red-700" : ""}`}
-                                                                value={row.rate}
-                                                                onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                            {row.last_purchase_rate && row.rate > row.last_purchase_rate && (
-                                                                <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                                                    High Rate! Last: {row.last_purchase_rate}
-                                                                    <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input className="h-8 px-1 text-right" value={row.discPercent} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input className="h-8 px-1 text-right bg-slate-50" value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                                                        </div>
-                                                        <div className="col-span-1">
-                                                            <Input className="h-8 px-1 text-right font-bold text-orange-600 bg-orange-50/10" value={(row.amount - (row.amount * row.discPercent / 100)).toFixed(2)} readOnly onClick={() => row.item_id && setSelectedItemId(row.item_id)} />
-                                                        </div>
-
-
-                                                        <div className="col-span-1 flex items-center gap-1 justify-center">
-                                                            <Button size="icon" variant="outline" className="h-8 w-8 p-1 rounded-sm " onClick={addRow}><Plus size={14} /></Button>
-                                                            <Button variant="outline" size="icon" className="h-8 w-8 p-1 bg-red-500 rounded-sm  text-white hover:bg-red-300" onClick={() => removeRow(row.id)}>
-                                                                <Trash2 />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
+                                                        );
+                                                    })()}
                                                 </React.Fragment>
                                             ))}
                                         </div>
 
-                                        {/* Footer summary for table (quick totals) */}
-                                        <div className="p-3 border-t grid grid-cols-4 gap-4 bg-secondary/20">
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">Rows</div>
-                                                <div className="text-lg font-semibold">{rowsWithComputed.length}</div>
+                                        {/* Footer summary for table (quick totals) - Realigned as per Pro layout */}
+                                        <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/30 p-2 border-t border-zinc-200 dark:border-zinc-800">
+                                            {/* Action Buttons: Moved from Header to Bottom Left */}
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex bg-white dark:bg-zinc-950 p-1 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-800">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={addRow}
+                                                        className="h-8 px-3 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-bold uppercase tracking-[0.15em] text-[10px] gap-2 transition-all active:scale-95"
+                                                    >
+                                                        <Plus size={14} className="stroke-[3]" /> Select Product
+                                                    </Button>
+                                                    <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-800 self-center mx-1" />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={loadAllItems}
+                                                        className="h-8 px-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95"
+                                                    >
+                                                        <PackageSearch size={14} /> Load All
+                                                    </Button>
+                                                    <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-800 self-center mx-1" />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={resetRows}
+                                                        className="h-8 px-3 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40 font-bold uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95"
+                                                    >
+                                                        <RotateCcw size={14} /> Reset
+                                                    </Button>
+                                                </div>
+
+                                                <div className="hidden sm:flex px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-full border border-zinc-200 dark:border-zinc-700 text-[10px] font-black uppercase text-zinc-500 tracking-tighter shadow-inner">
+                                                    Rows: <span className="ml-1 text-zinc-900 dark:text-zinc-100">{rowsWithComputed.length}</span>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">Gross</div>
-                                                <div className="text-lg font-semibold text-green-700">{totals.gross.toFixed(2)}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">Discount</div>
-                                                <div className="text-lg font-semibold text-red-500">{totals.discTotal.toFixed(2)}</div>
+
+                                            {/* Financial Summary: Moved to Bottom Right */}
+                                            <div className="flex items-center gap-8 pr-4">
+                                                <div className="hidden xs:flex flex-col items-end">
+                                                    <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest leading-none mb-1">Gross Amount</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-[10px] font-bold text-zinc-400">Rs</span>
+                                                        <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 leading-none">
+                                                            {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-8">
+                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Disc Total</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-[10px] font-bold text-red-300">-Rs</span>
+                                                        <span className="text-lg font-black text-red-600 dark:text-red-400 leading-none">
+                                                            {totals.discTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1191,153 +1363,159 @@ export default function PurchaseEdit({
                                 </Button>
 
                                 <div className={`${showInfoPanel ? 'block' : 'hidden'} md:block animate-in slide-in-from-bottom-2`}>
-                                    <Card className="border dark:border-gray-800 dark:bg-gray-950 shadow-lg relative overflow-hidden bg-white/50 backdrop-blur-sm p-0">
+                                    <Card className="border dark:border-gray-800 dark:bg-gray-950 shadow-sm relative overflow-hidden bg-white/50 backdrop-blur-sm p-0">
                                         {selectedItem ? (
                                             <div className="p-0 flex flex-col">
-                                                {/* Item Header Bar - Compact */}
-                                                <div className="px-3 py-1 bg-gradient-to-r from-orange-600/5 to-transparent border-b border-border flex flex-wrap items-center justify-between gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.5)]"></div>
-                                                        <h3 className="text-xs font-bold tracking-tight flex items-center gap-2">
+                                                {/* Item Header Bar - Pro-Level Theme */}
+                                                <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white border-b border-orange-600 flex flex-wrap items-center justify-between gap-1 shadow-sm">
+                                                    <div className="flex items-center gap-2 py-1">
+                                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                                                        <h3 className="text-sm font-black tracking-widest flex items-center gap-2 uppercase italic leading-none">
                                                             {selectedItem.title}
                                                             {selectedItem.short_name && (
-                                                                <span className="text-[10px] font-medium text-muted-foreground bg-secondary/50 px-1 py-0.5 rounded leading-none">
+                                                                <span className="text-[10px] font-black text-orange-600 bg-white/95 px-2 py-0.5 rounded leading-none shadow-sm">
                                                                     {selectedItem.short_name}
                                                                 </span>
                                                             )}
                                                         </h3>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground/60">Company:</span>
-                                                        <span className="text-[10px] font-black text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] uppercase tracking-widest font-black text-orange-100/90">Supplier Code:</span>
+                                                        <span className="text-[11px] font-black text-orange-600 bg-white px-3 py-1 rounded shadow-md border border-orange-100">
                                                             {selectedItem.company || 'N/A'}
                                                         </span>
                                                     </div>
                                                 </div>
-
-                                                {/* Metrics Grid - More Compact */}
-                                                <div className="p-1 sm:p-1.5 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 text-orange-600 dark:text-orange-400">
+ 
+                                                {/* Metrics Grid - Pro High-Density Visuals */}
+                                                <div className="p-2 sm:p-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 bg-orange-50/20 dark:bg-orange-950/5">
                                                     {/* Packing */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Packing</span>
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none mb-1.5">Packing</span>
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-base font-black text-gray-700 dark:text-gray-200">{toNumber(selectedItem.packing_full || selectedItem.packing_qty)}</span>
-                                                            <span className="text-[9px] text-muted-foreground font-medium">pc/box</span>
+                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 italic">{toNumber(selectedItem.packing_full || selectedItem.packing_qty)}</span>
+                                                            <span className="text-[10px] text-zinc-500 font-bold">pc/box</span>
                                                         </div>
                                                     </div>
-
+ 
                                                     {/* Stock Full */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Stock Full</span>
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5 opacity-80">Stock Full</span>
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-base font-black">
-                                                                {Math.floor(toNumber(selectedItem.stock_1) / (toNumber(selectedItem.packing_qty) || 1))}
+                                                            <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic">
+                                                                {Math.floor(toNumber(selectedItem.total_stock_pcs) / (toNumber(selectedItem.packing_qty) || 1))}
                                                             </span>
-                                                            <span className="text-[9px] text-muted-foreground font-medium">full</span>
+                                                            <span className="text-[10px] text-zinc-500 font-bold">full</span>
                                                         </div>
                                                     </div>
-
+ 
                                                     {/* Stock Pcs */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Stock Pcs</span>
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5 opacity-80">Stock Pcs</span>
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-base font-black">
-                                                                {toNumber(selectedItem.stock_1) % (toNumber(selectedItem.packing_qty) || 1)}
+                                                            <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic">
+                                                                {toNumber(selectedItem.total_stock_pcs) % (toNumber(selectedItem.packing_qty) || 1)}
                                                             </span>
-                                                            <span className="text-[9px] text-muted-foreground font-medium">pcs</span>
+                                                            <span className="text-[10px] text-zinc-500 font-bold">pcs</span>
                                                         </div>
                                                     </div>
-
-                                                    {/* Total Stock - Professional Visual */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Total Stock</span>
+ 
+                                                    {/* Total Stock */}
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1 bg-orange-500/5">
+                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Total Inventory</span>
                                                         <div className="flex items-baseline gap-1">
-                                                            <span className="text-base font-black">{toNumber(selectedItem.stock_1)}</span>
-                                                            <span className="text-[9px] text-muted-foreground font-medium">pcs</span>
+                                                            <span className="text-xl font-black text-orange-700 dark:text-orange-400 italic font-mono">{toNumber(selectedItem.total_stock_pcs)}</span>
+                                                            <span className="text-[10px] text-zinc-500 font-bold">total</span>
                                                         </div>
                                                     </div>
-
+ 
                                                     {/* Trade Price */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Trade @</span>
-                                                        <div className="flex items-baseline gap-0.5">
-                                                            <span className="text-[10px] font-bold text-orange-600/60">Rs</span>
-                                                            <span className="text-base font-black">{toNumber(selectedItem.trade_price).toFixed(2)}</span>
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Trade @</span>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-[10px] font-bold text-orange-600/60 uppercase">Rs</span>
+                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 font-mono tracking-tighter">{toNumber(selectedItem.trade_price).toFixed(2)}</span>
                                                         </div>
                                                     </div>
-
+ 
                                                     {/* Retail Price */}
-                                                    <div className="flex flex-col border-r border-border/50 px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Retail @</span>
-                                                        <div className="flex items-baseline gap-0.5">
-                                                            <span className="text-[10px] font-bold text-orange-600/60">Rs</span>
-                                                            <span className="text-base font-black">{toNumber(selectedItem.retail).toFixed(2)}</span>
+                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Retail @</span>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-[10px] font-bold text-orange-600/60 uppercase">Rs</span>
+                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 font-mono tracking-tighter">{toNumber(selectedItem.retail).toFixed(2)}</span>
                                                         </div>
                                                     </div>
-
+ 
                                                     {/* Average Price */}
-                                                    <div className="flex flex-col px-1">
-                                                        <span className="text-[10px] font-bold text-orange-500/80 uppercase tracking-tighter">Average</span>
-                                                        <div className="flex items-baseline gap-0.5">
-                                                            <span className="text-[10px] font-bold text-orange-600/60">Rs</span>
-                                                            <span className="text-base font-black">{((toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2).toFixed(2)}</span>
+                                                    <div className="flex flex-col px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
+                                                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1.5">Average</span>
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-[10px] font-bold text-zinc-400 uppercase">Rs</span>
+                                                            <span className="text-xl font-black text-zinc-800 dark:text-zinc-200 font-mono tracking-tighter">{((toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2).toFixed(2)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Horizontal History Row - Elegant & Subtle */}
-                                                {(lastPurchaseInfo || loadingPurchaseInfo) && (
-                                                    <div className="px-4 py-2 bg-secondary/30 border-t border-border flex items-center justify-between gap-4">
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <div className="h-1.5 w-1.5 rounded-full bg-orange-500"></div>
-                                                            <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">History</span>
-                                                        </div>
+                                                {/* Horizontal History Row - Elegant & Professional */}
+                                                <div className="px-6 py-6 bg-orange-50/50 dark:bg-orange-950/20 border-t border-orange-200/50 dark:border-orange-900/50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-2 shrink-0 md:w-36">
+                                                        <div className="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse"></div>
+                                                        <span className="text-xs font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest leading-none">Pricing History</span>
+                                                    </div>
 
-                                                        <div className="flex-1 flex flex-wrap items-center justify-start md:justify-around gap-x-4 gap-y-1 text-[10px] sm:text-[11px]">
-                                                            {loadingPurchaseInfo ? (
-                                                                <div className="w-full flex justify-around animate-pulse">
-                                                                    {[1, 2, 3].map(i => <div key={i} className="h-4 w-16 bg-muted rounded"></div>)}
-                                                                </div>
-                                                            ) : lastPurchaseInfo ? (
-                                                                <>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Prev Qty:</span>
-                                                                        <span className="font-bold">{toNumber(lastPurchaseInfo.previous_qty_carton)}F / {toNumber(lastPurchaseInfo.previous_qty_pcs)}P</span>
-                                                                    </div>
-                                                                    <div className="hidden md:block h-3 w-[1px] bg-border mx-1"></div>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Last Price:</span>
-                                                                        <span className="font-bold text-orange-600">Rs {toNumber(lastPurchaseInfo.previous_retail_price).toFixed(2)}</span>
-                                                                    </div>
-                                                                    <div className="hidden md:block h-3 w-[1px] bg-border mx-1"></div>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Last Date:</span>
-                                                                        <span className="font-bold underline decoration-dotted decoration-orange-300">
-                                                                            {lastPurchaseInfo.last_purchase_date ? new Date(lastPurchaseInfo.last_purchase_date).toLocaleDateString() : 'N/A'}
-                                                                        </span>
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-xs text-muted-foreground/60 italic">No previous history available</span>
-                                                            )}
-                                                        </div>
-
-                                                        {lastPurchaseInfo?.company && (
-                                                            <div className="shrink-0 flex items-center gap-1 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded text-[10px]">
-                                                                <span className="text-muted-foreground">Comp:</span>
-                                                                <span className="font-bold truncate max-w-[80px]">{lastPurchaseInfo.company}</span>
+                                                    <div className="flex-1 flex flex-wrap items-center justify-start md:justify-end gap-3 text-sm">
+                                                        {loadingPurchaseInfo ? (
+                                                            <div className="w-full flex justify-end gap-3 animate-pulse">
+                                                                {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-muted rounded-md"></div>)}
                                                             </div>
+                                                        ) : lastPurchaseInfo && Object.keys(lastPurchaseInfo).length > 0 ? (
+                                                            <>
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Date</span>
+                                                                    <span className="font-bold text-foreground">
+                                                                        {lastPurchaseInfo.last_purchase_date ? new Date(lastPurchaseInfo.last_purchase_date).toLocaleDateString() : 'N/A'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border max-w-[200px]">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Supplier</span>
+                                                                    <span className="font-bold truncate text-sky-600">
+                                                                        {lastPurchaseInfo.supplier_name || 'N/A'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Qty</span>
+                                                                    <span className="font-bold text-foreground">{toNumber(lastPurchaseInfo.previous_qty_carton)}F / {toNumber(lastPurchaseInfo.previous_qty_pcs)}P</span>
+                                                                </div>
+
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-orange-100/50 dark:bg-orange-950/30 shadow-sm px-4 py-1.5 rounded-md border border-orange-200 dark:border-orange-800">
+                                                                    <span className="text-orange-600/70 dark:text-orange-400/70 font-bold text-[11px] uppercase tracking-wider">Rate</span>
+                                                                    <span className="font-black text-orange-600 dark:text-orange-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_retail_price).toFixed(2)}</span>
+                                                                </div>
+
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-emerald-50 dark:bg-emerald-950/20 shadow-sm px-4 py-1.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                                                    <span className="text-emerald-600/70 dark:text-emerald-400/70 font-bold text-[11px] uppercase tracking-wider">Total</span>
+                                                                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_subtotal).toFixed(2)}</span>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-sm font-medium text-muted-foreground/60 italic w-full text-center py-1">No previous history available</span>
                                                         )}
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="text-center py-6 flex flex-col items-center gap-2">
-                                                <div className="p-2 rounded-full bg-secondary/50">
-                                                    <ListOrdered className="w-5 h-5 text-muted-foreground/50" />
+                                            <div className="text-center py-12 flex flex-col items-center gap-3 bg-white/30 dark:bg-black/10">
+                                                <div className="p-3 rounded-full bg-orange-500/10 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-800/30">
+                                                    <ListOrdered className="w-6 h-6 text-orange-400 flex-shrink-0" />
                                                 </div>
-                                                <div className="text-muted-foreground text-sm font-medium italic">
-                                                    Select an item above to view real-time metrics & history
+                                                <div className="text-zinc-500 dark:text-zinc-400 text-sm font-black uppercase tracking-widest opacity-60">
+                                                    Item Intelligence Panel
+                                                </div>
+                                                <div className="text-zinc-400 dark:text-zinc-500 text-[11px] font-medium italic -mt-1">
+                                                    Select an item row to unlock real-time metrics & history
                                                 </div>
                                             </div>
                                         )}
@@ -1346,181 +1524,199 @@ export default function PurchaseEdit({
                             </div>
                         </div>
 
-                        {/* Right summary panel - Visible ONLY on Large Desktop (xl+) */}
-                        <div className="hidden xl:block xl:col-span-3">
-                            <Card className="p-4 space-y-3 sticky top-[120px] gap-0">
-                                {isOverLimit && (
-                                    <div className="p-2 mb-2 bg-red-100 border border-red-400 text-red-700 text-sm font-bold rounded animate-pulse">
-                                        ⚠️ Exceeds Credit Limit!
+                        {/* Right summary panel - Visible ONLY on Large Desktop (2xl+) */}
+                        {showRightSidebar && (
+                            <div className="hidden 2xl:block 2xl:col-span-3 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <Card className="p-0  shadow-2xl shadow-orange-500/5 sticky top-[120px] overflow-hidden  backdrop-blur-sm">
+                                    <div className="p-3 border-b">
+                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center justify-between">
+                                            <span>Invoice Summary</span>
+                                            <Receipt size={14} className="opacity-70" />
+                                        </h3>
                                     </div>
-                                )}
 
-                                <div>
-                                    <div className="text-xs font-semibold">Delivery Challan</div>
-                                    <Input placeholder="" />
-                                </div>
+                                    <div className="p-4 space-y-5">
+                                        {/* Row 1: Item Counts */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Full</span>
+                                                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 leading-none">{totals.totalFull}</div>
+                                            </div>
+                                            <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Pieces</span>
+                                                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 leading-none">{totals.totalPcs}</div>
+                                            </div>
+                                        </div>
 
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <div className="text-xs font-semibold">Invoice Full</div>
-                                        <Input placeholder="" />
+                                        {/* Financials List */}
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-zinc-500">Gross Total</span>
+                                                <span className="text-zinc-900 dark:text-zinc-200">Rs {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-red-500">Disc Amount</span>
+                                                <span className="text-red-600 dark:text-red-400">-Rs {totals.discTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="flex flex-col gap-1.5 pt-1">
+                                                <div className="flex items-center justify-between text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                                                    <span>Extra Courier</span>
+                                                </div>
+                                                <Input
+                                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-bold focus:border-blue-300"
+                                                    placeholder="0.00"
+                                                    value={courier}
+                                                    onChange={(e) => setCourier(toNumber(e.target.value))}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
+
+                                        {/* Net Total - Big & Bold */}
+                                        <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-sm shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
+                                            <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80">Final Net Total</span>
+                                            <div className="text-3xl font-black leading-none drop-shadow-md">
+                                                <span className="text-xs font-bold mr-1 italic">Rs</span>
+                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </div>
+                                        </div>
+
+                                        {/* Selects */}
+                                        <div className="space-y-3 pt-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black uppercase text-zinc-400">Firm / Company</label>
+                                                <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                                    <SelectTrigger className="w-full h-8 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold overflow-hidden">
+                                                        <SelectValue placeholder="Select Firm" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {firms?.map((f) => (
+                                                            <SelectItem key={f.id} value={f.id.toString()} className="text-xs font-bold">
+                                                                {f.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black uppercase text-zinc-400">Message Line</label>
+                                                <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                                    <SelectTrigger className="w-full h-8 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold">
+                                                        <SelectValue placeholder="No Message" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="0" className="text-xs font-bold">No Message Line</SelectItem>
+                                                        {messageLines?.map((msg) => (
+                                                            <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs font-bold">
+                                                                {msg.messageline}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black uppercase text-zinc-400">Output Format</label>
+                                                <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
+                                                    <SelectTrigger className="w-full h-8 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="big" className="text-xs font-bold flex items-center gap-2 italic">A4 Paper Print</SelectItem>
+                                                        <SelectItem value="small" className="text-xs font-bold flex items-center gap-2 italic">80mm Thermal</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+
+                                        {/* Pay Now Toggle */}
+                                        <div className="pt-2">
+                                            <div className="flex items-center justify-between p-3 rounded-sm bg-orange-500/5 border border-orange-500/10 transition-all hover:bg-orange-500/10 group cursor-pointer" onClick={() => setIsPayNow(!isPayNow)}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn(
+                                                        "w-10 h-10 rounded-sm flex items-center justify-center transition-all duration-300",
+                                                        isPayNow ? "bg-orange-500 shadow-lg shadow-orange-500/30 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                                                    )}>
+                                                        <Wallet size={18} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Pay From Here</span>
+                                                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter italic">Optional Settlement</span>
+                                                    </div>
+                                                </div>
+                                                <Checkbox 
+                                                    checked={isPayNow}
+                                                    onCheckedChange={(checked) => setIsPayNow(!!checked)}
+                                                    className="w-5 h-5 rounded-md border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600 shadow-none border-none bg-zinc-200 dark:bg-zinc-800"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Action */}
+                                        <div className="pt-2">
+                                            <Button
+                                                onClick={handleSave}
+                                                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-sm gap-2"
+                                            >
+                                                <Save size={18} className="stroke-[2.5]" />
+                                                Confirm & Save
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="text-xs font-semibold">Invoice Half</div>
-                                        <Input placeholder="" />
-                                    </div>
-                                </div>
-
-                                <div className="pt-2">
-                                    <div className="text-xs font-semibold">Gross Amount</div>
-                                    <div className="text-xl font-bold">{totals.gross.toFixed(2)}</div>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Courier Charges</div>
-                                    <Input
-                                        placeholder="0.00"
-                                        value={courier}
-                                        onChange={(e) => setCourier(toNumber(e.target.value))}
-                                    />
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Net Amount</div>
-                                    <div className="text-xl font-bold">{totals.net.toFixed(2)}</div>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Previous Balance</div>
-                                    <Input placeholder="0.00" />
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Cash Received</div>
-                                    <Input placeholder="0.00" />
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Ledger</div>
-                                    <Select value="">
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                <SelectLabel>Ledger</SelectLabel>
-                                                <SelectItem value="ledger-1">Ledger 1</SelectItem>
-                                                <SelectItem value="ledger-2">Ledger 2</SelectItem>
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Print Option</div>
-                                    <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                                        <SelectTrigger className="w-full h-8">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="big">Print (A4)</SelectItem>
-                                            <SelectItem value="small">Print (Thermal)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold uppercase text-sky-600 dark:text-sky-400 mb-1">Select Message Line</div>
-                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
-                                        <SelectTrigger className="w-full h-9 border-sky-200 dark:border-sky-900/50 bg-sky-50/30 dark:bg-sky-950/20">
-                                            <SelectValue placeholder="No Message Line" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="0">No Message Line (Optional)</SelectItem>
-                                            {messageLines?.map((msg) => (
-                                                <SelectItem key={msg.id} value={msg.id.toString()}>
-                                                    {msg.messageline}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold uppercase text-sky-600 dark:text-sky-400 mb-1">Firm</div>
-                                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                                        <SelectTrigger className="w-full h-9 border-sky-200 dark:border-sky-900/50 bg-sky-50/30 dark:bg-sky-950/20">
-                                            <SelectValue placeholder="Select Firm" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {firms?.map((f) => (
-                                                <SelectItem key={f.id} value={f.id.toString()}>
-                                                    {f.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <div className="text-xs font-semibold">Total Receivable</div>
-                                    <div className="text-xl font-bold">{totals.totalReceivable.toFixed(2)}</div>
-                                </div>
-
-                                <div className="hidden md:flex gap-2 mt-2">
-                                    <Button onClick={handleSave}>Update</Button>
-                                    <Button variant="outline" onClick={() => router.get("/purchase")}>Cancel</Button>
-                                </div>
-                            </Card>
-                        </div>
+                                </Card>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Laptop Sticky Footer (Visible on md and lg, hidden on mobile and xl desktop) */}
-                    <div className="hidden md:flex xl:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-t border-border p-3 px-8 z-40 items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-all duration-300">
-                        <div className="flex gap-8 items-center">
+                    {/* Laptop Sticky Footer (Visible on md and lg, hidden on mobile and 2xl desktop) */}
+                    <div className="hidden md:flex 2xl:hidden sticky bottom-0 -mx-6 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-t border-border p-3 px-8 z-40 items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-all duration-300">
+                        <div className="flex gap-10 items-center">
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Gross Amount</span>
-                                <div className="text-base font-bold text-foreground">Rs {totals.gross.toFixed(2)}</div>
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Gross Billing</span>
+                                <div className="text-base font-bold text-foreground">Rs {totals.gross.toLocaleString()}</div>
                             </div>
 
-                            <div className="flex flex-col w-28">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Courier</span>
+                            <div className="flex flex-col w-32">
+                                <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier Expense</span>
                                 <Input
-                                    className="h-8 bg-secondary/30 border-orange-200/50 focus:border-orange-500 font-bold"
+                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
                                     value={courier}
                                     onChange={(e) => setCourier(toNumber(e.target.value))}
                                 />
                             </div>
 
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Net Total</span>
+                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Confirmed Net Total</span>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
                                     <span className="text-sm font-bold mr-1 italic">Rs</span>
-                                    {totals.net.toFixed(2)}
+                                    {totals.net.toLocaleString()}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4">
                             <div className="flex flex-col w-40">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Print Option</span>
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Print Option</span>
                                 <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                                    <SelectTrigger className="h-8 bg-secondary/30">
+                                    <SelectTrigger className="h-8 bg-zinc-50 dark:bg-zinc-900/50">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="big">A4 Paper</SelectItem>
-                                        <SelectItem value="small">Thermal</SelectItem>
+                                        <SelectItem value="big" className="text-xs font-black uppercase">A4 Format</SelectItem>
+                                        <SelectItem value="small" className="text-xs font-black uppercase">Thermal</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             <div className="flex gap-2">
-                                <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-bold h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all">
-                                    <Save className="mr-2 h-4 w-4" /> Update Invoice
+                                <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2">
+                                    <Save size={18} />
+                                    Process Order
                                 </Button>
-                                <Button variant="outline" className="h-10 border-gray-300" onClick={() => router.get("/purchase")}>
-                                    Cancel
+                                <Button variant="outline" className="h-10 border-zinc-200 dark:border-zinc-800 rounded-xl px-4 hover:bg-red-50 hover:text-red-500 transition-all font-bold uppercase text-[10px]" onClick={() => window.history.back()}>
+                                    Exit
                                 </Button>
                             </div>
                         </div>
@@ -1537,7 +1733,7 @@ export default function PurchaseEdit({
                                 </div>
                             </div>
                             <Button onClick={handleSave} className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/50 rounded-xl font-bold transition-all active:scale-95">
-                                <Save className="mr-2" size={18} /> Update Invoice
+                                <Save className="mr-2" size={18} /> Save Invoice
                             </Button>
                         </div>
 
@@ -1555,230 +1751,57 @@ export default function PurchaseEdit({
                     </div>
                 </div>
 
-                {/* Price Update Confirmation Dialog */}
-                <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
-                    <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none bg-white dark:bg-gray-950 shadow-2xl rounded-2xl">
-                        <div className="bg-orange-600 dark:bg-orange-500 p-6 flex flex-col items-center text-white relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12">
-                                <AlertTriangle size={100} />
-                            </div>
-                            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3 shadow-inner">
-                                <AlertTriangle size={32} className="text-white" />
-                            </div>
-                            <DialogTitle className="text-xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight uppercase">Update Item Trade Prices?</DialogTitle>
-                            <p className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</p>
-                        </div>
-
-                        <div className="p-0 max-h-[400px] overflow-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 z-10">
-                                    <tr className="text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400">
-                                        <th className="py-3 px-4">Item Description</th>
-                                        <th className="py-3 px-2 text-center">Prev Trade</th>
-                                        <th className="py-3 px-2 text-center">Markup (%)</th>
-                                        <th className="py-3 px-2 text-center">New Trade</th>
-                                        <th className="py-3 px-2 text-center">Retail</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
-                                    {priceUpdates.map((upd, idx) => (
-                                        <tr key={idx} className="hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors">
-                                            <td className="py-3 px-4">
-                                                <div className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">{upd.title}</div>
-                                                <div className="text-[10px] text-gray-400 font-medium">ID: #{upd.item_id}</div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <span className="text-xs font-semibold text-gray-500 line-through">Rs {upd.old_trade_price.toFixed(2)}</span>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex flex-col items-center">
-                                                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{upd.markup_percent}%</span>
-                                                    <span className="text-[9px] text-gray-400">+{upd.markup_amount.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex items-center gap-1.5 justify-center bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-lg border border-orange-200/50 dark:border-orange-800/30">
-                                                    <span className="text-xs font-black text-orange-700 dark:text-orange-300">Rs {upd.new_trade_price.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center font-bold text-xs text-slate-600 dark:text-slate-400">
-                                                Rs {upd.retail_price.toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="p-6 bg-gray-50/50 dark:bg-black/20 border-t border-gray-100 dark:border-gray-800">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button
-                                    className="w-full h-12 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group shadow-sm"
-                                    onClick={() => submitPurchase(false)}
-                                >
-                                    <X size={18} className="group-hover:rotate-90 transition-transform" /> No, Only Store Bill
-                                </Button>
-                                <Button
-                                    className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 dark:shadow-orange-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-                                    onClick={() => submitPurchase(true)}
-                                >
-                                    <Check size={18} className="animate-bounce-short" /> Yes, Update Prices
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                {/* Item Selection Dialog */}
+                <ItemSelectionDialog
+                    open={itemDialogOpen}
+                    onOpenChange={setItemDialogOpen}
+                    itemSearch={itemSearch}
+                    setItemSearch={setItemSearch}
+                    filteredItems={filteredItems}
+                    rows={rows}
+                    removeRow={removeRow}
+                    addRow={addRow}
+                    handleSelectItem={handleSelectItem}
+                    setRows={setRows}
+                />
 
                 {/* Price Update Confirmation Dialog */}
-                <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
-                    <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none bg-white dark:bg-gray-950 shadow-2xl rounded-2xl">
-                        <div className="bg-orange-600 dark:bg-orange-500 p-6 flex flex-col items-center text-white relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12">
-                                <AlertTriangle size={100} />
-                            </div>
-                            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3 shadow-inner">
-                                <AlertTriangle size={32} className="text-white" />
-                            </div>
-                            <DialogTitle className="text-xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight uppercase">Update Item Trade Prices?</DialogTitle>
-                            <p className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</p>
-                        </div>
+                <PriceUpdateDialog
+                    open={showPriceDialog}
+                    onOpenChange={setShowPriceDialog}
+                    priceUpdates={priceUpdates}
+                    submitPurchase={handlePostPriceUpdate}
+                />
 
-                        <div className="p-0 max-h-[400px] overflow-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 z-10">
-                                    <tr className="text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400">
-                                        <th className="py-3 px-4">Item Description</th>
-                                        <th className="py-3 px-2 text-center">Prev Trade</th>
-                                        <th className="py-3 px-2 text-center">Markup (%)</th>
-                                        <th className="py-3 px-2 text-center">New Trade</th>
-                                        <th className="py-3 px-2 text-center">Retail</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
-                                    {priceUpdates.map((upd, idx) => (
-                                        <tr key={idx} className="hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors">
-                                            <td className="py-3 px-4">
-                                                <div className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">{upd.title}</div>
-                                                <div className="text-[10px] text-gray-400 font-medium">ID: #{upd.item_id}</div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <span className="text-xs font-semibold text-gray-500 line-through">Rs {upd.old_trade_price.toFixed(2)}</span>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex flex-col items-center">
-                                                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{upd.markup_percent}%</span>
-                                                    <span className="text-[9px] text-gray-400">+{upd.markup_amount.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex items-center gap-1.5 justify-center bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-lg border border-orange-200/50 dark:border-orange-800/30">
-                                                    <span className="text-xs font-black text-orange-700 dark:text-orange-300">Rs {upd.new_trade_price.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center font-bold text-xs text-slate-600 dark:text-slate-400">
-                                                Rs {upd.retail_price.toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="p-6 bg-gray-50/50 dark:bg-black/20 border-t border-gray-100 dark:border-gray-800">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button
-                                    className="w-full h-12 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group shadow-sm"
-                                    onClick={() => submitPurchase(false)}
-                                >
-                                    <X size={18} className="group-hover:rotate-90 transition-transform" /> No, Only Store Bill
-                                </Button>
-                                <Button
-                                    className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 dark:shadow-orange-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-                                    onClick={() => submitPurchase(true)}
-                                >
-                                    <Check size={18} className="animate-bounce-short" /> Yes, Update Prices
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                {/* Purchase Payment Dialog */}
+                <PurchasePaymentDialog
+                    open={showPaymentDialog}
+                    onOpenChange={setShowPaymentDialog}
+                    totals={totals}
+                    splits={paymentSplits}
+                    paymentAccounts={paymentAccounts}
+                    addSplitRow={addPaymentSplit}
+                    removeSplitRow={removePaymentSplit}
+                    updateSplitRow={updatePaymentSplit}
+                    onCommit={() => {
+                        setShowPaymentDialog(false);
+                        submitPurchase(updatePricesAfterPayment);
+                    }}
+                    invoiceNo={invoiceNo}
+                    supplierName={accounts.find(a => a.id === accountType?.value)?.title || "N/A"}
+                    previousBalance={toNumber(accounts.find(a => a.id === accountType?.value)?.current_balance)}
+                    customerCheques={customerCheques}
+                    availableCheques={availableCheques}
+                />
 
                 {/* Success Summary Dialog */}
-                <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-                    <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none bg-white dark:bg-gray-950 shadow-2xl rounded-2xl">
-                        <div className="bg-emerald-600 dark:bg-emerald-500 p-8 flex flex-col items-center text-white relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <CheckCircle2 size={120} />
-                            </div>
-                            <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 shadow-inner">
-                                <CheckCircle2 size={40} className="text-white" />
-                            </div>
-                            <DialogTitle className="text-2xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight">Purchase Updated Successfully!</DialogTitle>
-                            <p className="text-emerald-50/80 text-sm font-medium">Invoice record updated for ID: {successData?.purchaseId}</p>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {successData && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-start pb-4 border-b border-gray-100 dark:border-gray-800">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier</p>
-                                            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{successData.supplierName}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice Amount</p>
-                                            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">Rs {successData.net.toLocaleString()}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Items</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalItems}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">FULL</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalFull}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">PCS</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalPcs}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-center px-4 py-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
-                                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">Total Discount</span>
-                                        <span className="text-lg font-black text-emerald-700 dark:text-emerald-400">Rs {successData.discount.toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 gap-3 pt-2">
-                                <Button
-                                    className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                    onClick={() => {
-                                        if (successData?.purchaseId) {
-                                            window.open(`/purchase/${successData.purchaseId}/print`, '_blank');
-                                        } else {
-                                            alert("Print ID not found. Redirecting to list.");
-                                            router.get("/purchase");
-                                        }
-                                    }}
-                                >
-                                    <Printer size={20} className="mr-2" /> Print this Bill
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="w-full h-12 border-gray-200 dark:border-gray-800 font-bold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all"
-                                    onClick={() => router.get("/purchase")}
-                                >
-                                    <ArrowRight size={20} className="mr-2" /> View Details Page
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            </SidebarInset>
+                <SuccessSummaryDialog
+                    open={showSuccessDialog}
+                    onOpenChange={setShowSuccessDialog}
+                    successData={successData}
+                    mode="edit"
+                />
+            </SidebarInset >
         </SidebarProvider >
     );
 }

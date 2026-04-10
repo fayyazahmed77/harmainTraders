@@ -25,12 +25,13 @@ const formatDate = (dateString: string | null) => {
     });
 };
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: any) => {
+    const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
     return new Intl.NumberFormat("en-PK", {
         style: "currency",
         currency: "PKR",
         minimumFractionDigits: 0,
-    }).format(amount);
+    }).format(numericAmount);
 };
 
 // --- Generic Paginator ---
@@ -228,7 +229,7 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
     if (loading && data.length === 0) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>;
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {/* Left Box: History of Payments */}
             <Card className="shadow-none border border-muted flex flex-col h-full">
                 <CardHeader className="py-4 bg-muted/20 border-b">
@@ -380,51 +381,55 @@ export const BankStatementTab = ({ accountId, accountType }: { accountId: number
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-muted/10">
-                            <TableHead>Date</TableHead>
-                            <TableHead>Ref / Voucher</TableHead>
-                            <TableHead>Party / Dest.</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right text-green-700">Credit (IN)</TableHead>
-                            <TableHead className="text-right text-red-700">Debit (OUT)</TableHead>
+                            <TableHead className="px-4">Date</TableHead>
+                            <TableHead className="px-4">Ref / Voucher</TableHead>
+                            <TableHead className="px-4">Party / Dest.</TableHead>
+                            <TableHead className="px-4">Method</TableHead>
+                            <TableHead className="px-4">Status</TableHead>
+                            <TableHead className="px-4 text-right text-emerald-700">Credit (IN)</TableHead>
+                            <TableHead className="px-4 text-right text-red-700">Debit (OUT)</TableHead>
+                            <TableHead className="px-4 text-right text-slate-700 bg-slate-50 dark:bg-slate-900/50">Ending Balance</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {data.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground italic">No transactions found.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground italic">No transactions found.</TableCell></TableRow>
                         ) : data.map((item: any) => {
                             const isCanceled = item.cheque_status?.toLowerCase().includes('cancel');
                             return (
                                 <TableRow key={item.id} className={cn("cursor-pointer transition-colors", isCanceled ? "bg-red-50/70 hover:bg-red-100/70" : "hover:bg-muted/30")}>
-                                    <TableCell className={cn("text-xs whitespace-nowrap", isCanceled && "text-red-700/80")}>{formatDate(item.date)}</TableCell>
-                                    <TableCell className={cn("text-xs font-semibold", isCanceled ? "text-red-700/80 line-through" : "text-primary")}>{item.voucher_no}</TableCell>
-                                    <TableCell className={cn("text-xs max-w-[200px] truncate", isCanceled && "text-red-700/80")}>{item.account?.title || 'Unknown'}</TableCell>
-                                    <TableCell className={cn("text-xs", isCanceled && "text-red-700/80")}>
+                                    <TableCell className={cn("px-4 text-[11px] whitespace-nowrap", isCanceled ? "text-red-700/60" : "text-muted-foreground")}>{formatDate(item.date)}</TableCell>
+                                    <TableCell className={cn("px-4 text-[11px]", isCanceled ? "text-red-700/60 line-through" : "text-zinc-500 font-medium")}>{item.voucher_no}</TableCell>
+                                    <TableCell className={cn("px-4 text-xs font-bold min-w-[150px]", isCanceled ? "text-red-700/60" : "text-zinc-900 dark:text-zinc-100")}>{item.account?.title || 'Unknown'}</TableCell>
+                                    <TableCell className={cn("px-4 text-[11px] text-zinc-500", isCanceled && "text-red-700/60")}>
                                         {item.payment_method}
                                         {item.cheque_no ? ` : ${item.cheque_no}` : ''}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="px-4">
                                         {(item.payment_method === 'Cheque' || item.payment_method === 'Online') && item.cheque_status ? (
-                                            <Badge variant="outline" className={`text-[10px] 
-                                                ${item.cheque_status === 'Cleared' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                                            <Badge variant="outline" className={`text-[10px] py-0 h-5
+                                                ${item.cheque_status === 'Cleared' || item.cheque_status === 'Clear' ? 'bg-green-50 text-green-700 border-green-200' : ''}
                                                 ${item.cheque_status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
                                                 ${isCanceled ? 'bg-red-100 text-red-800 border-red-300 font-bold' : ''}
                                             `}>
                                                 {item.cheque_status}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="text-[10px] bg-slate-50 border-slate-200">Cleared</Badge>
+                                            <Badge variant="outline" className="text-[10px] py-0 h-5 bg-slate-50 border-slate-200">Cleared</Badge>
                                         )}
                                     </TableCell>
-                                    <TableCell className={cn("text-right font-bold text-xs", 
-                                        isCanceled ? "text-red-400 line-through" : "text-green-600 bg-green-50/10"
+                                    <TableCell className={cn("px-4 text-right font-bold text-xs", 
+                                        isCanceled ? "text-red-300 line-through" : "text-emerald-600 font-black"
                                     )}>
                                         {item.type === 'RECEIPT' ? formatCurrency(item.amount) : '-'}
                                     </TableCell>
-                                    <TableCell className={cn("text-right font-bold text-xs", 
-                                        isCanceled ? "text-red-400 line-through" : "text-red-600 bg-red-50/10"
+                                    <TableCell className={cn("px-4 text-right font-bold text-xs", 
+                                        isCanceled ? "text-red-300 line-through" : "text-red-600 font-black"
                                     )}>
                                         {item.type === 'PAYMENT' ? formatCurrency(item.amount) : '-'}
+                                    </TableCell>
+                                    <TableCell className="px-4 text-right font-black text-xs text-slate-900 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900/30">
+                                        {formatCurrency(item.running_balance)}
                                     </TableCell>
                                 </TableRow>
                             );

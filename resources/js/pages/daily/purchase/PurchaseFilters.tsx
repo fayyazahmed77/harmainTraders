@@ -92,8 +92,8 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
         >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
 
-                {/* 1. Temporal Range */}
-                <FieldWrapper label="Temporal Range" icon={CalendarIcon}>
+                {/* 1. Date Range */}
+                <FieldWrapper label="Date Range" icon={CalendarIcon}>
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button
@@ -112,7 +112,7 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                                         format(date.from, "MMM dd, y")
                                     )
                                 ) : (
-                                    "Select Date Window"
+                                    "Select Dates"
                                 )}
                                 <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
                             </Button>
@@ -131,14 +131,14 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                     </Popover>
                 </FieldWrapper>
 
-                {/* 2. Provider Selection */}
-                <FieldWrapper label="Supplier Entity" icon={User}>
+                {/* 2. Supplier Selection */}
+                <FieldWrapper label="Select Supplier" icon={User}>
                     <Select value={supplierId} onValueChange={setSupplierId}>
                         <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
-                            <SelectValue placeholder="All Providers" />
+                            <SelectValue placeholder="All Suppliers" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                            <SelectItem value="all" className="text-xs font-bold">All Providers</SelectItem>
+                            <SelectItem value="all" className="text-xs font-bold">All Suppliers</SelectItem>
                             {suppliers.map((supplier) => (
                                 <SelectItem key={supplier.id} value={String(supplier.id)} className="text-xs font-bold">
                                     {supplier.title}
@@ -148,14 +148,14 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                     </Select>
                 </FieldWrapper>
 
-                {/* 3. Operational Status */}
-                <FieldWrapper label="Lifecycle Status" icon={ShieldCheck}>
+                {/* 3. Status Filter */}
+                <FieldWrapper label="Status" icon={ShieldCheck}>
                     <Select value={status} onValueChange={setStatus}>
                         <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
-                            <SelectValue placeholder="All States" />
+                            <SelectValue placeholder="All Status" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                            <SelectItem value="all" className="text-xs font-bold lowercase italic opacity-50">Filter by Status</SelectItem>
+                            <SelectItem value="all" className="text-xs font-bold lowercase italic opacity-50">Search Status</SelectItem>
                             {["Completed", "Partial Return", "Returned"].map((s) => (
                                 <SelectItem key={s} value={s} className="text-xs font-bold">
                                     {s}
@@ -166,11 +166,11 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                 </FieldWrapper>
 
                 {/* 4. Document Search */}
-                <FieldWrapper label="Reference Query" icon={Hash}>
+                <FieldWrapper label="Search Bill" icon={Hash}>
                     <div className="relative">
                         <Input
                             type="text"
-                            placeholder="Invoice # / ID"
+                            placeholder="Bill No / ID"
                             className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 focus:border-orange-500/50 focus-visible:ring-0 transition-all text-xs font-bold tabular-nums"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -179,13 +179,13 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                     </div>
                 </FieldWrapper>
 
-                {/* 5. Protocol Actions */}
+                {/* 5. Search Button */}
                 <div className="flex items-end gap-3 lg:col-span-4 xl:col-span-1">
                     <Button
                         onClick={applyFilters}
                         className="flex-1 bg-zinc-900 dark:bg-zinc-100 hover:bg-orange-600 dark:hover:bg-orange-500 text-white dark:text-zinc-900 h-11 rounded-xl shadow-lg shadow-zinc-200 dark:shadow-none font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
                     >
-                        <Filter className="mr-2 h-3 w-3" /> Execute Filter
+                        <Filter className="mr-2 h-3 w-3" /> Search
                     </Button>
                     <Button
                         variant="ghost"

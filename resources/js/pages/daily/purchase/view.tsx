@@ -71,7 +71,7 @@ interface Props {
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Dashboard", href: "/" },
     { title: "Purchases", href: "/purchase" },
-    { title: "Order Detail", href: "#" },
+    { title: "Bill Details", href: "#" },
 ];
 
 export default function View({ purchase }: Props) {
@@ -114,12 +114,12 @@ export default function View({ purchase }: Props) {
                                         {purchase.invoice}
                                     </h1>
                                     <div className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest rounded-full border border-primary/20">
-                                        PROCUREMENT_ORDER
+                                        PURCHASE_BILL
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1.5">
-                                        <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" /> SYSTEM_VERIFIED
+                                        <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" /> VERIFIED
                                     </p>
                                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">INDEX: {purchase.id}</span>
                                 </div>
@@ -144,7 +144,7 @@ export default function View({ purchase }: Props) {
                                 className="h-10 px-6 text-xs font-bold bg-[#FF8904] text-white hover:bg-[#e67a03] rounded-xl shadow-lg shadow-orange-500/10 border-none transition-all group"
                             >
                                 <DownloadIcon className="h-3.5 w-3.5 mr-2 group-hover:-translate-y-0.5 transition-transform" />
-                                EXPORT PDF
+                                SAVE AS PDF
                             </Button>
                         </motion.div>
                     </div>
@@ -168,7 +168,7 @@ export default function View({ purchase }: Props) {
                                                 <Calendar className="h-4 w-4 text-orange-500" />
                                             </div>
                                             <div>
-                                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Entry Date</span>
+                                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Purchase Date</span>
                                                 <p className="text-sm font-black tracking-tight leading-none mt-0.5">{purchase.date}</p>
                                             </div>
                                         </div>
@@ -179,8 +179,8 @@ export default function View({ purchase }: Props) {
                                             <User className="h-4 w-4 text-blue-500" />
                                         </div>
                                         <div className="flex-1">
-                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Source Merchant</span>
-                                            <p className="text-sm font-black tracking-tight leading-none mt-0.5 uppercase">{purchase.supplier?.title || "MARKET_SOURCE"}</p>
+                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Supplier / Vendor</span>
+                                            <p className="text-sm font-black tracking-tight leading-none mt-0.5 uppercase">{purchase.supplier?.title || "SUPPLIER"}</p>
                                             <div className="flex items-center gap-1.5 mt-1 opacity-60">
                                                 <div className="h-1 w-1 rounded-full bg-emerald-500"></div>
                                                 <span className="text-[8px] font-bold uppercase tracking-tighter">Rep: {purchase.salesman?.name || "Direct"}</span>
@@ -192,14 +192,14 @@ export default function View({ purchase }: Props) {
                                 {/* STATS ROW: VOLUMES */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <Card className="p-4 bg-muted/20 border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Invoice Skus</span>
+                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Total Items</span>
                                         <div className="flex items-center justify-between">
                                             <Box className="h-4 w-4 text-muted-foreground" />
                                             <p className="text-lg font-black text-foreground">{purchase.no_of_items}</p>
                                         </div>
                                     </Card>
                                     <Card className="p-4 bg-card border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Total Unit Pcs</span>
+                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Total Pieces</span>
                                         <div className="flex items-center justify-between text-primary">
                                             <TrendingUp className="h-4 w-4" />
                                             <p className="text-lg font-black tabular-nums">{totalPcs}</p>
@@ -217,7 +217,7 @@ export default function View({ purchase }: Props) {
                                                 <Info className="h-4 w-4 text-sky-600" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <span className="text-[8px] font-black text-sky-600/60 uppercase tracking-widest block mb-0.5">Instruction / Message</span>
+                                                <span className="text-[8px] font-black text-sky-600/60 uppercase tracking-widest block mb-0.5">Note / Remarks</span>
                                                 <p className="text-sm font-black text-sky-900 leading-tight break-words px-1 border-l-2 border-sky-200 ml-1 italic group-hover:translate-x-1 transition-transform">
                                                     {purchase.message_line.messageline}
                                                 </p>
@@ -242,17 +242,17 @@ export default function View({ purchase }: Props) {
                                         <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
                                             <CreditCard className="h-3.5 w-3.5" />
                                         </div>
-                                        <span className="text-[9px] font-black uppercase tracking-widest">Financial Summary</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Payment Details</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
                                         <div>
-                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Settled</span>
+                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Paid</span>
                                             <p className="text-sm font-black font-mono">
                                                 {formatCurrency(purchase.paid_amount).replace('PKR', '').trim()} <span className="text-[8px] opacity-40">PKR</span>
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Due</span>
+                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Balance Due</span>
                                             <p className="text-sm font-black text-[#FF8904] font-mono">
                                                 {formatCurrency(purchase.remaining_amount).replace('PKR', '').trim()}
                                             </p>
@@ -272,7 +272,7 @@ export default function View({ purchase }: Props) {
                                         <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
                                             <Receipt className="h-4 w-4 text-primary" />
                                         </div>
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Line Allocation</h3>
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Item Details</h3>
                                     </div>
                                     <div className="hidden sm:flex items-center gap-3 bg-background px-2 py-1 rounded-lg border border-border">
                                         <span className="text-[8px] font-black text-primary px-2 py-0.5 bg-primary/10 rounded">VERIFIED</span>
@@ -284,11 +284,11 @@ export default function View({ purchase }: Props) {
                                     <table className="w-full">
                                         <thead>
                                             <tr className="bg-muted/20 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">
-                                                <th className="px-6 py-3 text-left">Product Spec</th>
-                                                <th className="px-3 py-3 text-center">CTN</th>
-                                                <th className="px-3 py-3 text-center">PCS</th>
-                                                <th className="px-3 py-3 text-center">TOT</th>
-                                                <th className="px-6 py-3 text-right">Price @</th>
+                                                <th className="px-6 py-3 text-left">Product Name</th>
+                                                <th className="px-3 py-3 text-center">Carton</th>
+                                                <th className="px-3 py-3 text-center">Pcs</th>
+                                                <th className="px-3 py-3 text-center">Total Pcs</th>
+                                                <th className="px-6 py-3 text-right">Rate</th>
                                                 <th className="px-6 py-3 text-right">Subtotal</th>
                                             </tr>
                                         </thead>
@@ -348,7 +348,7 @@ export default function View({ purchase }: Props) {
                                 className="grid grid-cols-1 md:grid-cols-3 gap-4"
                             >
                                 <Card className="p-5 bg-card border-border flex flex-col justify-between group hover:border-primary/20 transition-all shadow-sm">
-                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-3">Gross Allocation</p>
+                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-3">Total Amount</p>
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-xl font-black tracking-tight font-mono">{formatCurrency(purchase.gross_total).replace('PKR', '').trim()}</span>
                                         <span className="text-[8px] font-bold opacity-30 uppercase">PKR</span>
@@ -356,7 +356,7 @@ export default function View({ purchase }: Props) {
                                 </Card>
 
                                 <Card className="p-5 bg-rose-500/[0.03] border-rose-500/10 flex flex-col justify-between group hover:bg-rose-500/[0.08] transition-all">
-                                    <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-3">Invoice Savings</p>
+                                    <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-3">Total Discount</p>
                                     <div className="flex items-baseline gap-2 text-rose-600">
                                         <span className="text-xl font-black tracking-tight font-mono">-{formatCurrency(purchase.discount_total).replace('PKR', '').trim()}</span>
                                         <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">DISC</span>
@@ -368,7 +368,7 @@ export default function View({ purchase }: Props) {
                                         <TrendingUp className="h-12 w-12" />
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-80 mb-6">Final Payable Sum</p>
+                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-80 mb-6">Final Amount</p>
                                         <div className="flex items-baseline justify-end gap-2 translate-y-1">
                                             <span className="text-3xl font-black tracking-tighter font-mono tabular-nums leading-none">
                                                 {formatCurrency(purchase.net_total).replace('PKR', '').trim()}

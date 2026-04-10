@@ -1,7 +1,7 @@
-// sales.tsx
 import React, { useState, useMemo, useEffect } from "react";
-import ReactSelect from "react-select";
+import { Combobox } from "@/components/ui/combobox";
 import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
 import { router } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Wallet, Search, ArrowRightLeft, CheckCircle2, Info, Calculator, BadgePercent, ArrowDownToLine, Package, Hash, AlertTriangle, Banknote, Box, PackageSearch } from "lucide-react";
+import { Trash2, Plus, CalendarIcon, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Wallet, Search, ArrowRightLeft, CheckCircle2, Info, Calculator, BadgePercent, ArrowDownToLine, Package, Hash, AlertTriangle, Banknote, Box, PackageSearch, CreditCard } from "lucide-react";
 import { useAppearance } from '@/hooks/use-appearance';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,6 +37,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ItemRegistryDialog } from "./components/ItemRegistryDialog";
+import { CheckoutDialog } from "./components/CheckoutDialog";
+import { SuccessDialog } from "./components/SuccessDialog";
+import { StockWarningDialog } from "./components/StockWarningDialog";
 
 /**
  * Local screenshot path (you uploaded this file).
@@ -133,6 +137,7 @@ interface Account {
   credit_limit?: number | string;
   saleman_id?: number;
   item_category?: string | null;
+  account_type?: { name: string };
 }
 
 interface Saleman {
@@ -147,7 +152,7 @@ interface MessageLine {
 }
 
 interface Option {
-  value: number;
+  value: string;
   label: string;
 }
 
@@ -192,8 +197,6 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 export default function SalesPage({ items, accounts, salemans, paymentAccounts = [], nextInvoiceNo, firms = [], messageLines = [] }: { items: Item[]; accounts: Account[]; salemans: Saleman[]; paymentAccounts: Account[]; nextInvoiceNo: string; firms: { id: number; name: string; defult: boolean }[]; messageLines: MessageLine[] }) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const selectBg = isDark ? '#0a0a0a' : '#ffffff';
-  const selectBorder = isDark ? '#262626' : '#e5e7eb';
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString('en-GB', { hour12: false }));
   const [isTimeLive, setIsTimeLive] = useState(true);
@@ -229,6 +232,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const defaultFirm = firms.find(f => f.defult);
   const [selectedFirmId, setSelectedFirmId] = useState<string>(defaultFirm ? defaultFirm.id.toString() : "0");
   const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successData, setSuccessData] = useState<any>(null);
   // Track expanded mobile rows for item details
   // expandedRows state removed
 
@@ -237,15 +242,64 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   // Pay Now State
   const [isPayNow, setIsPayNow] = useState<boolean>(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState<boolean>(false);
-  const [paymentAccountId, setPaymentAccountId] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
-  const [bankMethod, setBankMethod] = useState<string>("Online");
-  const [chequeNo, setChequeNo] = useState<string>("");
   const [extraDiscount, setExtraDiscount] = useState<number>(0);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [showBottomDetails, setShowBottomDetails] = useState(true);
+
+  // Split Payments State
+  const [isMultiPayment, setIsMultiPayment] = useState<boolean>(true); // Setting default to true for the new workflow
+  const [splits, setSplits] = useState<any[]>([
+    { id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }
+  ]);
+
+  const addSplitRow = () => {
+    setSplits([...splits, { id: Date.now() + Math.random(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }]);
+  };
+
+  const removeSplitRow = (id: number | string) => {
+    if (splits.length > 1) {
+      setSplits(splits.filter(s => s.id !== id));
+    }
+  };
+
+  const updateSplitRow = (id: number | string, field: string, value: any) => {
+    setSplits(prev => prev.map(s => {
+      if (s.id === id) {
+        const updated = { ...s, [field]: value };
+        // If account changes, verify its type to set correct method
+        if (field === 'payment_account_id') {
+          const acc = paymentAccounts.find(a => a.id.toString() === value);
+          const typeName = acc?.account_type?.name;
+
+          if (typeName === 'Bank') {
+            updated.payment_method = 'Online';
+          } else if (typeName === 'Cheque in hand') {
+            updated.payment_method = 'Cheque';
+          } else {
+            updated.payment_method = 'Cash';
+          }
+
+          // Reset cheque details if not a cheque account
+          if (typeName !== 'Cheque in hand') {
+            updated.cheque_no = "";
+            updated.cheque_date = "";
+          }
+        }
+        return updated;
+      }
+      return s;
+    }));
+  };
+
+  // Item Registry Selected Details (For Dialog Entry)
+  const [selectedItemForQty, setSelectedItemForQty] = useState<Item | null>(null);
+  const [dialogFull, setDialogFull] = useState<number>(0);
+  const [dialogPcs, setDialogPcs] = useState<number>(0);
+  const [dialogBonusFull, setDialogBonusFull] = useState<number>(0);
+  const [dialogBonusPcs, setDialogBonusPcs] = useState<number>(0);
+  const [dialogRate, setDialogRate] = useState<number>(0);
 
   // Item Selection Dialog State
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -255,8 +309,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   // Create account options
   const accountTypeOptions: Option[] = useMemo(() => {
     return accounts.map((acc) => ({
-      value: acc.id,
-      label: acc.title,
+      value: String(acc.id),
+      label: `${acc.title}${acc.code ? ` (${acc.code})` : ""}`,
     }));
   }, [accounts]);
 
@@ -343,7 +397,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
         bonus_full: 0,
         bonus_pcs: 0,
         rate: baseRate,
-        taxPercent: toNumber(it.gst_percent ?? 0),
+        taxPercent: 0,
         discPercent: toNumber(it.discount ?? 0),
         trade_price: toNumber(it.retail ?? it.trade_price ?? baseRate), // Use retail for sales
         amount: amount,
@@ -409,7 +463,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       }
     }
 
-    updateRow(rowId, { item_id: itemId, rate: baseRate, taxPercent: tax, discPercent: disc, trade_price: tradePrice });
+    updateRow(rowId, { item_id: itemId, rate: baseRate, taxPercent: 0, discPercent: disc, trade_price: tradePrice });
 
     // Set this item as the selected one to display info below
     setSelectedItemId(itemId);
@@ -482,28 +536,23 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   // ───────────────────────────────────────────
   const totals = useMemo(() => {
     let gross = 0;
-    let taxTotal = 0;
     let discTotal = 0;
 
     rowsWithComputed.forEach((r) => {
-      const item = items.find((it) => it.id === r.item_id) ?? undefined;
       const amount = r.amount;
       gross += amount;
-
-      const tax = (toNumber(r.taxPercent) / 100) * amount;
-      taxTotal += tax;
 
       const disc = (toNumber(r.discPercent) / 100) * amount;
       discTotal += disc;
     });
 
-    const net = Math.round(gross + taxTotal - discTotal + courier);
+    const net = Math.round(gross - discTotal + courier);
     const receivable = Math.round(net + previousBalance);
     const finalAmount = Math.round(receivable - extraDiscount);
 
     return {
       gross: Number(gross.toFixed(2)),
-      taxTotal: Number(taxTotal.toFixed(2)),
+      taxTotal: 0,
       discTotal: Number(discTotal.toFixed(2)),
       courier,
       net,
@@ -545,12 +594,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       print_format: printOption,
       allow_negative_stock: forceSave, // New flag
 
-      // Pay Now Data
+      // Split Payment Data
       is_pay_now: isPayNow,
-      payment_account_id: paymentAccountId,
-      payment_method: paymentMethod,
-      bank_method: bankMethod,
-      cheque_no: chequeNo,
+      is_multi: isMultiPayment,
+      splits: splits,
       message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
       gross_total: totals.gross,
@@ -560,14 +607,14 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       courier_charges: totals.courier,
       net_total: totals.net,
       total_receivable: totals.receivable,
-      paid_amount: cashReceived,
-      remaining_amount: totals.finalAmount - cashReceived,
+      paid_amount: splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
+      remaining_amount: totals.net - splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
 
       items: rowsWithComputed.map((r) => {
         const item = items.find(i => Number(i.id) === Number(r.item_id));
         const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
 
-        const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs) + (toNumber(r.bonus_full) * packing) + toNumber(r.bonus_pcs);
+        const totalPCS = ((toNumber(r.full) + toNumber(r.bonus_full || 0)) * packing) + toNumber(r.pcs) + toNumber(r.bonus_pcs || 0);
 
         return {
           item_id: r.item_id,
@@ -580,7 +627,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           retail_price: r.trade_price,
 
           discount: (r.discPercent / 100) * r.amount,
-          gst_amount: (r.taxPercent / 100) * r.amount,
+          gst_amount: 0,
           subtotal: r.amount
         };
       })
@@ -589,8 +636,20 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     console.log(payload);
     setProcessing(true);
     router.post("/sales", payload, {
-      onSuccess: () => {
-        // alert("Sale saved successfully!"); // Removed to prevent blocking and double-triggering
+      onSuccess: (page) => {
+        const id = (page.props as any).id || (page.props as any).flash?.id;
+
+        setSuccessData({
+          customerName: accountType?.label || "Walking Customer",
+          totalAmount: totals.net,
+          itemCount: rowsWithComputed.length,
+          totalFull: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.full), 0),
+          totalPcs: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.pcs), 0),
+          totalDiscount: totals.discTotal + extraDiscount,
+          saleId: id
+        });
+
+        setShowSuccessDialog(true);
       },
       onError: (errors) => {
         console.error(errors);
@@ -598,6 +657,17 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       },
       onFinish: () => setProcessing(false)
     });
+  };
+
+  const resetForm = () => {
+    setRows([getEmptyRow()]);
+    setAccountType(null);
+    setSalesman(null);
+    setExtraDiscount(0);
+    setSplits([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }]);
+    setIsMultiPayment(true);
+    setIsPayNow(false);
+    setShowSuccessDialog(false);
   };
 
   return (
@@ -636,13 +706,14 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </div>
 
                 <FieldWrapper label="Select Account" className="w-full">
-                  <Select
-                    value={accountType?.value?.toString() ?? ""}
-                    onValueChange={(value) => {
-                      const id = Number(value);
-                      const selectedAccount = accounts.find((a) => a.id === id) ?? null;
-                      const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                  <Combobox
+                    options={accountTypeOptions}
+                    value={accountType?.value || ""}
+                    onChange={(val) => {
+                      const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
                       setAccountType(selectedOption);
+                      const id = selectedOption ? Number(selectedOption.value) : null;
+                      const selectedAccount = id ? accounts.find((a) => a.id === id) ?? null : null;
 
                       if (selectedAccount) {
                         setCreditDays(selectedAccount.aging_days ?? 0);
@@ -659,25 +730,16 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
                       } else {
                         setCreditDays(0);
-
                         setCreditLimit("");
                         setSalesman(null);
                         setPreviousBalance(0);
                         setCustomerCategory(null);
                       }
                     }}
-                  >
-                    <SelectTrigger className="w-full h-11 shadow-sm border-gray-200 bg-background">
-                      <SelectValue placeholder="Select Customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accountTypeOptions.map((s) => (
-                        <SelectItem key={s.value} value={s.value.toString()}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select Customer..."
+                    searchPlaceholder="Search by name or code..."
+                    className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                  />
                 </FieldWrapper>
 
                 <Button
@@ -792,13 +854,14 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </TechLabel>
 
                 <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[200px]">
-                  <Select
-                    value={accountType?.value?.toString() ?? ""}
-                    onValueChange={(value) => {
-                      const id = Number(value);
-                      const selectedAccount = accounts.find((a) => a.id === id) ?? null;
-                      const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                  <Combobox
+                    options={accountTypeOptions}
+                    value={accountType?.value || ""}
+                    onChange={(val) => {
+                      const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
                       setAccountType(selectedOption);
+                      const id = selectedOption ? Number(selectedOption.value) : null;
+                      const selectedAccount = id ? accounts.find((a) => a.id === id) ?? null : null;
 
                       if (selectedAccount) {
                         setCreditDays(selectedAccount.aging_days ?? 0);
@@ -815,18 +878,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         setCustomerCategory(null);
                       }
                     }}
-                  >
-                    <SelectTrigger className={`w-full h-9 text-xs font-bold uppercase tracking-tighter border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
-                      <SelectValue placeholder="Identify Customer..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accountTypeOptions.map((s) => (
-                        <SelectItem key={s.value} value={s.value.toString()} className="text-[10px] font-bold uppercase tracking-widest">
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Identify Customer..."
+                    searchPlaceholder="Search by name or code..."
+                    className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-9 text-xs font-bold uppercase"
+                  />
                 </TechLabel>
 
                 <TechLabel label="Account Code" className="space-y-1.5 shrink-0 hidden lg:block">
@@ -924,13 +979,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   <div className="overflow-visible md:overflow-x-auto">
                     <div className="w-full md:min-w-[1200px]">
                       <div className="hidden md:grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-3 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20">
-                        <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Item Identification</div>
+                        <div className="col-span-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Item Identification</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Full</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Pcs</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">B.Full</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">B.Pcs</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Rate</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Tax</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Disc %</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">After</div>
                         <div className="col-span-1 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Subtotal</div>
@@ -969,20 +1023,19 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 <TechLabel label="Full Qty">
                                   <Input type="number" placeholder="FULL" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
                                 </TechLabel>
-                                <TechLabel label="Pieces">
-                                  <Input type="number" placeholder="PIECES" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
-                                </TechLabel>
+                                {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 && (
+                                  <TechLabel label="Pieces" className="animate-in zoom-in-95 duration-200">
+                                    <Input type="number" placeholder="PIECES" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
+                                  </TechLabel>
+                                )}
                               </div>
 
-                              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 border-dashed grid grid-cols-3 gap-2 items-end">
+                              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 border-dashed grid grid-cols-2 gap-2 items-end">
                                 <TechLabel label="Rate">
                                   <Input type="number" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-9 text-xs font-bold rounded-lg" />
                                 </TechLabel>
                                 <TechLabel label="Disc%">
                                   <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-9 text-xs font-bold rounded-lg" />
-                                </TechLabel>
-                                <TechLabel label="Tax%">
-                                  <Input type="number" value={row.taxPercent || ""} onChange={(e) => updateRow(row.id, { taxPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-9 text-xs font-bold rounded-lg" />
                                 </TechLabel>
                               </div>
 
@@ -1002,7 +1055,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 ? "bg-rose-200 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 shadow-[inset_4px_0_0_0_#f43f5e]"
                                 : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-b-zinc-50 dark:border-b-zinc-900/50"
                             )}>
-                              <div className="col-span-3">
+                              <div className="col-span-4">
                                 {row.item_id ? (
                                   <button
                                     onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
@@ -1030,19 +1083,24 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 <Input type="number" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
                               </div>
                               <div className="col-span-1">
-                                <Input type="number" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 ? (
+                                  <Input type="number" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                ) : (
+                                  <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
+                                )}
                               </div>
                               <div className="col-span-1 border-l border-zinc-100 dark:border-zinc-800">
                                 <Input type="number" value={row.bonus_full || ""} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
                               </div>
                               <div className="col-span-1">
-                                <Input type="number" value={row.bonus_pcs || ""} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
+                                {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 ? (
+                                  <Input type="number" value={row.bonus_pcs || ""} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
+                                ) : (
+                                  <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
+                                )}
                               </div>
                               <div className="col-span-1">
                                 <Input type="number" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-right font-mono text-[10px] border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
-                              </div>
-                              <div className="col-span-1 bg-blue-50/10 dark:bg-blue-900/5 rounded px-1">
-                                <Input type="number" value={row.taxPercent || ""} onChange={(e) => updateRow(row.id, { taxPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
                               </div>
                               <div className="col-span-1 bg-rose-50/10 dark:bg-rose-900/5 rounded px-1">
                                 <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
@@ -1093,20 +1151,6 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     </div>
 
                     <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Gross Amount</span>
-                        <span className="text-md font-black text-zinc-700 dark:text-zinc-300"><span className="text-[10px] text-zinc-400 mr-1 italic font-semibold">Rs</span>{totals.gross.toLocaleString()}</span>
-                      </div>
-
-                      <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
-
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Tax Total</span>
-                        <span className="text-md font-black text-blue-600"><span className="text-[10px] text-blue-400/70 mr-0.5 font-bold">+</span>{totals.taxTotal.toLocaleString()}</span>
-                      </div>
-
-                      <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700"></div>
-
                       <div className="flex items-center gap-3">
                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mt-1">Disc Total</span>
                         <span className="text-md font-black text-rose-600"><span className="text-[10px] text-rose-400/70 mr-0.5 font-bold">-</span>{totals.discTotal.toLocaleString()}</span>
@@ -1595,14 +1639,6 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
               {/* Detail Statistics Bar */}
               <div className="grid grid-cols-3 gap-0 pt-4 border-t border-zinc-800/50">
-                <div className="flex flex-col items-center">
-                  <span className="text-[8px] uppercase text-zinc-500 font-black tracking-widest mb-0.5">Gross</span>
-                  <span className="text-xs font-bold text-zinc-400 font-mono tracking-tighter">{totals.gross.toFixed(0)}</span>
-                </div>
-                <div className="flex flex-col items-center border-l border-zinc-800">
-                  <span className="text-[8px] uppercase text-zinc-500 font-black tracking-widest mb-0.5">Tax</span>
-                  <span className="text-xs font-bold text-zinc-400 font-mono tracking-tighter">{totals.taxTotal.toFixed(0)}</span>
-                </div>
                 <div className="flex flex-col items-center border-l border-zinc-800">
                   <span className="text-[8px] uppercase text-zinc-500 font-black tracking-widest mb-0.5">Disc</span>
                   <span className="text-xs font-bold text-zinc-400 font-mono tracking-tighter">{totals.discTotal.toFixed(0)}</span>
@@ -1611,362 +1647,73 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             </div>
 
           </div>
-          {/* Item Dialog */}
-          <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-            <DialogContent className="max-w-[99vw] md:max-w-5xl w-full md:w-[1000px] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[90vh]">
-              <div className={`p-6 ${ACCENT_GRADIENT} text-white shrink-0`}>
-                <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
-                  <Box className="w-6 h-6" /> Item Registry
-                </DialogTitle>
-                <DialogDescription className="text-orange-100/70 font-bold uppercase text-[10px] tracking-widest mt-1">
-                  Select an active SKU to assign to row sequence
-                </DialogDescription>
+          {/* Shared Modular Item Registry Dialog */}
+          <ItemRegistryDialog
+            open={itemDialogOpen}
+            onOpenChange={setItemDialogOpen}
+            items={items}
+            customerCategory={customerCategory}
+            currentRows={rows}
+            onAddUpdate={(item, data) => {
+              const existingRow = rows.find(r => r.item_id === item.id);
+              if (existingRow) {
+                updateRow(existingRow.id, data);
+              } else {
+                const newRowId = Date.now() + Math.random();
+                setRows((prev) => {
+                  const newItem = {
+                    id: newRowId,
+                    item_id: item.id,
+                    ...data,
+                    taxPercent: toNumber(item.gst_percent),
+                    discPercent: toNumber(item.discount),
+                    trade_price: toNumber(item.trade_price),
+                    amount: 0,
+                  };
+                  if (prev.length === 1 && prev[0].item_id === null) return [newItem];
+                  return [...prev, newItem];
+                });
+              }
+            }}
+          />
 
-                <div className="mt-4 relative group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-white transition-colors" size={18} />
-                  <Input
-                    placeholder="Query by Title, ID, or Category..."
-                    value={itemSearch}
-                    onChange={(e) => setItemSearch(e.target.value)}
-                    className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:ring-0 focus:bg-white/20 transition-all rounded-xl border-2 font-bold"
-                    autoFocus
-                  />
-                </div>
-              </div>
+          <StockWarningDialog
+            open={showStockWarning}
+            onOpenChange={setShowStockWarning}
+            onConfirm={() => saveInvoice(true)}
+          />
 
-              <div className="flex-1 overflow-auto min-h-0">
-                <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
-                  <div className="col-span-1 text-[9px] font-black uppercase text-zinc-500">Code</div>
-                  <div className="col-span-3 text-[9px] font-black uppercase text-zinc-500">Registry Title</div>
-                  <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500">Trade Price</div>
-                  <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500 flex flex-col justify-center">
-                    <span className="text-orange-500 mt-0.5">ACTIVE PRICE TYPE</span>
-                  </div>
-                  <div className="col-span-1 text-center text-[9px] font-black uppercase text-zinc-500">Avg</div>
-                  <div className="col-span-1 text-center text-[9px] font-black uppercase text-zinc-500">Retail</div>
-                  <div className="col-span-2 text-right text-[9px] font-black uppercase text-zinc-500">System Inventory</div>
-                </div>
+          <CheckoutDialog
+            open={checkoutDialogOpen}
+            onOpenChange={setCheckoutDialogOpen}
+            totals={totals}
+            splits={splits}
+            paymentAccounts={paymentAccounts}
+            addSplitRow={addSplitRow}
+            removeSplitRow={removeSplitRow}
+            updateSplitRow={updateSplitRow}
+            onCommit={() => {
+              setCheckoutDialogOpen(false);
+              saveInvoice();
+            }}
+            invoiceNo={invoiceNo}
+            previousBalance={previousBalance}
+          />
 
-                <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filteredItems.length > 0 ? filteredItems.map((item) => {
-                    const packing = toNumber(item.packing_full || item.packing_qty) || 1;
-                    const stock = toNumber(item.total_stock_pcs);
-                    const full = toNumber(item.stock_1);
-                    const pcs = toNumber(item.stock_2);
-
-                    const tradePrice = toNumber(item.trade_price);
-                    let activePriceTypeVal = tradePrice; // Default to trade price if no category or category 1
-                    if (customerCategory && customerCategory !== "1") {
-                      const priceKey = `pt${customerCategory}` as keyof Item;
-                      const percentage = toNumber(item[priceKey as keyof Item]);
-                      if (percentage !== 0) {
-                        activePriceTypeVal = Math.round(tradePrice * (1 + percentage / 100));
-                      }
-                    }
-
-                    const avgPrice = (toNumber(item.trade_price) + toNumber(item.retail)) / 2;
-                    const isSelected = rows.some(r => r.item_id === item.id);
-
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          const existingRow = rows.find(r => r.item_id === item.id);
-                          if (existingRow) {
-                            removeRow(existingRow.id);
-                            if (rows.length <= 1) addRow();
-                          } else {
-                            const emptyRow = rows.find(r => r.item_id === null);
-                            if (emptyRow) {
-                              handleSelectItem(emptyRow.id, item.id);
-                            } else {
-                              const newRowId = Date.now() + Math.random();
-                              setRows((prev) => [
-                                ...prev,
-                                {
-                                  id: newRowId,
-                                  item_id: item.id,
-                                  full: 0,
-                                  pcs: 0,
-                                  bonus_full: 0,
-                                  bonus_pcs: 0,
-                                  rate: activePriceTypeVal,
-                                  taxPercent: toNumber(item.gst_percent),
-                                  discPercent: toNumber(item.discount),
-                                  trade_price: tradePrice,
-                                  amount: 0,
-                                },
-                              ]);
-                            }
-                          }
-                        }}
-                        className={`w-full text-left transition-colors p-3 group border-l-4 ${isSelected
-                          ? "bg-orange-50/50 dark:bg-orange-900/20 border-orange-500"
-                          : "bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-transparent hover:border-orange-300"
-                          }`}
-                      >
-                        <>
-                          {/* Mobile Layout */}
-                          <div className="md:hidden flex flex-col gap-2 relative">
-                            <div className="flex justify-between items-start">
-                              <div className="flex flex-col pr-4">
-                                <div className={`font-black uppercase tracking-tight text-base leading-tight ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
-                                  {item.title}
-                                </div>
-                                <div className="text-[10px] flex items-center gap-2 mt-1">
-                                  <span className={`font-mono font-black ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
-                                    #{String(item.id).padStart(4, '0')}
-                                  </span>
-                                  <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
-                                  {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
-                                </div>
-                              </div>
-                              <div className="text-right flex flex-col items-end shrink-0">
-                                <div className="flex gap-2">
-                                  <div className="flex flex-col items-end">
-                                    <span className={`text-base font-black leading-none ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{full}</span>
-                                    <span className="text-[8px] uppercase font-bold text-zinc-700 tracking-tighter mt-0.5">Full</span>
-                                  </div>
-                                  <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-700 pl-2">
-                                    <span className={`text-base font-black leading-none ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{pcs}</span>
-                                    <span className="text-[8px] uppercase font-bold text-zinc-700 tracking-tighter mt-0.5">Pcs</span>
-                                  </div>
-                                </div>
-                                <div className="text-[9px] font-mono mt-1 text-zinc-700 font-medium">Tot: {stock}</div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-4 gap-2 mt-1 pt-3 border-t border-zinc-100 dark:border-zinc-800/50">
-                              <div className="flex flex-col items-start justify-center">
-                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Trade</span>
-                                <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 text-center leading-none"><span className="text-[8px] text-zinc-400 mr-0.5 font-semibold">Rs</span>{tradePrice.toFixed(2)}</span>
-                              </div>
-                              <div className="flex flex-col items-start justify-center">
-                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Retail</span>
-                                <span className="text-xs font-black text-zinc-800 dark:text-zinc-200 text-center leading-none">{toNumber(item.retail).toFixed(0)}</span>
-                              </div>
-                              <div className="flex flex-col items-start justify-center">
-                                <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest mb-1">Sys Avg</span>
-                                <span className="text-xs font-black text-zinc-500 dark:text-zinc-400 text-center leading-none">{avgPrice.toFixed(0)}</span>
-                              </div>
-                              <div className={`col-span-1 flex flex-col items-center justify-center rounded p-1.5 ${isSelected ? 'bg-orange-500 text-white shadow-sm' : 'bg-orange-50 text-orange-600 border border-orange-100 dark:bg-orange-950/30 dark:border-orange-900/50'}`}>
-                                <span className={`text-[8px] font-black uppercase tracking-widest leading-none mb-1 ${isSelected ? 'text-orange-100' : 'text-orange-500'}`}>T{'>'}P</span>
-                                <span className="text-xs font-black leading-none text-center"><span className="text-[8px] font-semibold mr-0.5">Rs</span>{activePriceTypeVal.toFixed(2)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Desktop Layout */}
-                          <div className="hidden md:grid grid-cols-12  items-center py-1">
-                            <div className="col-span-1 pl-2">
-                              <span className={`font-mono font-black text-xs ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
-                                #{String(item.id).padStart(4, '0')}
-                              </span>
-                            </div>
-                            <div className="col-span-3 flex flex-col justify-center">
-                              <div className={`font-black uppercase tracking-tight truncate text-base md:text-lg ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
-                                {item.title}
-                              </div>
-                              <div className="text-[11px] flex items-center gap-2 mt-0.5">
-                                <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
-                                {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
-                              </div>
-                            </div>
-
-                            {/* Trade Price (TP) */}
-                            <div className="col-span-2 text-center flex flex-col items-center justify-center">
-                              <div className="text-sm md:text-base font-black text-zinc-800 dark:text-zinc-200">
-                                <span className="text-[10px] text-zinc-400 mr-1 font-semibold">Rs</span>
-                                {tradePrice.toFixed(2)}
-                              </div>
-                            </div>
-
-                            {/* Active Price Type (T>P) */}
-                            <div className={`col-span-2 text-center flex flex-col items-center justify-center rounded border p-1 ${isSelected ? 'bg-orange-500 text-white border-orange-600 shadow-sm' : 'bg-orange-50 border-orange-200 text-orange-600 dark:bg-orange-950/30 dark:border-orange-900/50'}`}>
-                              <div className={`text-[10px] font-black uppercase tracking-widest leading-none mb-0.5 ${isSelected ? 'text-orange-100' : 'text-orange-500'}`}></div>
-                              <div className="text-base md:text-lg font-black leading-none">
-                                <span className="text-[10px] font-semibold mr-0.5">Rs</span>
-                                {activePriceTypeVal.toFixed(2)}
-                              </div>
-                            </div>
-
-                            {/* Avg Price */}
-                            <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                              {avgPrice.toFixed(0)}
-                            </div>
-
-                            {/* Retail Price */}
-                            <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                              {toNumber(item.retail).toFixed(0)}
-                            </div>
-
-                            <div className="col-span-2 flex justify-end">
-                              <div className="flex flex-col items-end pr-4">
-                                <div className="flex gap-3">
-                                  <div className="flex flex-col items-end">
-                                    <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{full}</span>
-                                    <span className="text-[10px] uppercase font-bold text-zinc-900 tracking-tighter">Full</span>
-                                  </div>
-                                  <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-700 pl-3">
-                                    <span className={`text-sm font-black ${stock > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{pcs}</span>
-                                    <span className="text-[10px] uppercase font-bold text-zinc-900 tracking-tighter">Pcs</span>
-                                  </div>
-                                </div>
-                                <div className="text-[10px] font-mono mt-1 text-zinc-900">Total: {stock} units</div>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      </button>
-                    );
-                  }) : (
-                    <div className="p-12 text-center flex flex-col items-center gap-3">
-                      <PackageSearch className="w-12 h-12 text-zinc-200" />
-                      <div className="text-sm font-black text-zinc-400 uppercase tracking-widest">No Matches Found</div>
-                      <Button variant="ghost" size="sm" onClick={() => setItemSearch('')} className="text-[10px] font-bold">Clear Filters</Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest shrink-0">
-                <span className="hidden sm:inline">Showing {filteredItems.length} registry entries</span>
-                <span className="sm:hidden">{filteredItems.length} entries</span>
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <span className="hidden sm:flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Sync Enabled
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setItemDialogOpen(false)}
-                    className="h-8 px-4 bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border-transparent font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setItemDialogOpen(false)}
-                    className="h-8 px-6 bg-white dark:bg-zinc-800 border-2 border-zinc-900 dark:border-zinc-100 text-zinc-900 dark:text-zinc-100 font-black text-[10px] uppercase tracking-widest rounded-lg hover:bg-zinc-900 hover:text-white dark:hover:bg-white dark:hover:text-zinc-900 transition-all active:scale-95 shadow-sm"
-                  >
-                    OK
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={showStockWarning} onOpenChange={setShowStockWarning}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Stock Warning</DialogTitle>
-                <DialogDescription>
-                  One or more items exceed available stock (negative stock). Do you want to proceed with saving this invoice anyway?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowStockWarning(false)}>Cancel</Button>
-                <Button onClick={() => { setShowStockWarning(false); saveInvoice(true); }} className="bg-red-600 hover:bg-red-700 text-white">
-                  Proceed Anyway
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-            <DialogContent className="max-w-md bg-white dark:bg-zinc-950 border-none shadow-2xl p-0 overflow-hidden">
-              <div className={`p-6 ${ACCENT_GRADIENT} text-white`}>
-                <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
-                  <Banknote className="w-6 h-6" /> Checkout
-                </DialogTitle>
-                <DialogDescription className="text-orange-100/70 font-bold uppercase text-[10px] tracking-widest mt-1">
-                  Enter instant payment details
-                </DialogDescription>
-              </div>
-              <div className="p-6 flex flex-col gap-6">
-                <div className="flex flex-col gap-2">
-                  <Label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Select Account</Label>
-                  <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                    <SelectTrigger className="h-11 w-full font-black bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
-                      <SelectValue placeholder="Select Account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentAccounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id.toString()} className="font-bold">
-                          {acc.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {(() => {
-                  const selectedAcc = paymentAccounts.find(a => a.id.toString() === paymentAccountId);
-                  const isBank = selectedAcc?.title.toLowerCase().includes('bank');
-
-                  if (!isBank) return null;
-
-                  return (
-                    <div className="flex flex-col gap-4 p-4 rounded-xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="flex flex-col gap-2">
-                        <Label className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest">Payment Method</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant={bankMethod === 'Online' ? 'default' : 'outline'}
-                            onClick={() => setBankMethod('Online')}
-                            className={cn(
-                              "h-10 font-black uppercase tracking-widest text-[10px] transition-all",
-                              bankMethod === 'Online' ? ACCENT_GRADIENT : "border-orange-200 text-orange-600 hover:bg-orange-50"
-                            )}
-                          >
-                            Online
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={bankMethod === 'Cheque' ? 'default' : 'outline'}
-                            onClick={() => setBankMethod('Cheque')}
-                            className={cn(
-                              "h-10 font-black uppercase tracking-widest text-[10px] transition-all",
-                              bankMethod === 'Cheque' ? ACCENT_GRADIENT : "border-orange-200 text-orange-600 hover:bg-orange-50"
-                            )}
-                          >
-                            Cheque
-                          </Button>
-                        </div>
-                      </div>
-
-                      {bankMethod === 'Cheque' && (
-                        <div className="flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
-                          <Label className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest">Cheque Number</Label>
-                          <Input
-                            placeholder="Enter Cheque No..."
-                            value={chequeNo}
-                            onChange={(e) => setChequeNo(e.target.value)}
-                            className="h-10 font-bold bg-white dark:bg-zinc-900 border-orange-200 focus:border-orange-500"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                <div className="flex flex-col gap-2">
-                  <Label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Amount Received</Label>
-                  <Input
-                    placeholder="Amount Received"
-                    value={cashReceived || ""}
-                    onChange={(e) => setCashReceived(toNumber(e.target.value))}
-                    className="h-12 text-xl text-right font-black bg-emerald-50 text-emerald-700 border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-400"
-                  />
-                </div>
-              </div>
-              <DialogFooter className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-                <Button variant="outline" onClick={() => setCheckoutDialogOpen(false)} className="font-bold border-zinc-300 dark:border-zinc-700">Done</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <SuccessDialog
+            open={showSuccessDialog}
+            onOpenChange={setShowSuccessDialog}
+            invoiceNo={invoiceNo}
+            saleId={successData?.saleId || 0}
+            customerName={successData?.customerName}
+            totalAmount={successData?.totalAmount}
+            countItems={successData?.itemCount}
+            countFull={successData?.totalFull}
+            countPcs={successData?.totalPcs}
+            totalDiscount={successData?.totalDiscount}
+            onReturn={resetForm}
+            type="create"
+          />
         </div>
       </SidebarInset >
     </SidebarProvider >

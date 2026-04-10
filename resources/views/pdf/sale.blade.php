@@ -485,7 +485,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                 @endphp
                 <thead>
                     <tr>
-                        <th colspan="{{ $hasBonus ? 4 : 2 }}" style="border-bottom: 1px dashed #000;">Quantity</th>
+                        <th colspan="2" style="border-bottom: 1px dashed #000;">Quantity</th>
                         <th rowspan="2" class="text-left" style="width: 35%; margin-left: 5px;">Description Of Goods</th>
                         <th rowspan="2">Retail</th>
                         <th rowspan="2">Rate</th>
@@ -494,19 +494,15 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <th rowspan="2" class="no-right-border text-right">Net Amount</th>
                     </tr>
                     <tr>
-                        <th style="width: 40px; border-top: 1px dashed #000;">Box</th>
-                        <th style="width: 40px; border-top: 1px dashed #000;">Pcs</th>
-                        @if($hasBonus)
-                        <th style="width: 40px; border-top: 1px dashed #000;">B.Box</th>
-                        <th style="width: 40px; border-top: 1px dashed #000;">B.Pcs</th>
-                        @endif
+                        <th style="width: 50px; border-top: 1px dashed #000;">Box</th>
+                        <th style="width: 50px; border-top: 1px dashed #000;">Pcs</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($sale->items as $item)
                     @php
                     // Calculations
-                    $subtotal_gross = $item->trade_price * $item->total_pcs;
+                    $subtotal_gross = $item->subtotal; // Subtotal stores (Full * Rate) + (Pcs * Rate/Packing)
 
                     $disc_percent = 0;
                     if($subtotal_gross > 0) {
@@ -517,12 +513,18 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                     $after_disc_rate = $item->trade_price * (1 - ($disc_percent / 100));
                     @endphp
                     <tr>
-                        <td>{{ $item->qty_carton }}</td>
-                        <td>{{ $item->qty_pcs }}</td>
-                        @if($hasBonus)
-                        <td>{{ $item->bonus_qty_carton > 0 ? $item->bonus_qty_carton : '-' }}</td>
-                        <td>{{ $item->bonus_qty_pcs > 0 ? $item->bonus_qty_pcs : '-' }}</td>
-                        @endif
+                        <td>
+                            {{ (int)$item->qty_carton }}
+                            @if($item->bonus_qty_carton > 0)
+                               <span style="color: #666; font-size: 8px;">+ {{ (int)$item->bonus_qty_carton }}</span>
+                            @endif
+                        </td>
+                        <td>
+                            {{ (int)$item->qty_pcs }}
+                            @if($item->bonus_qty_pcs > 0)
+                               <span style="color: #666; font-size: 8px;">+ {{ (int)$item->bonus_qty_pcs }}</span>
+                            @endif
+                        </td>
                         <td class="text-left">{{ $item->item->title }}</td>
                         <td>{{ number_format($item->item->retail ?? 0, 2) }}</td>
                         <td>{{ number_format($item->trade_price, 2) }}</td>

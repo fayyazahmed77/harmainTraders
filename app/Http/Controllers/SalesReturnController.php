@@ -44,11 +44,17 @@ class SalesReturnController extends Controller
         $nextId = $lastReturn ? $lastReturn->id + 1 : 1;
         $nextInvoiceNo = 'RET-' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
 
+        // Payment accounts for refunds
+        $paymentAccounts = Account::whereHas('accountType', function($q) {
+            $q->whereIn('name', ['Cash', 'Bank', 'Cheque In Hand']);
+        })->get(['id', 'title', 'code']);
+
         return Inertia::render("daily/sales_return/create", [
-            'accounts'      => $accounts,
-            'salemans'      => $salemans,
-            'messageLines'  => $messageLines,
-            'nextInvoiceNo' => $nextInvoiceNo,
+            'accounts'        => $accounts,
+            'salemans'        => $salemans,
+            'messageLines'    => $messageLines,
+            'nextInvoiceNo'   => $nextInvoiceNo,
+            'paymentAccounts' => $paymentAccounts,
         ]);
     }
 
@@ -67,6 +73,7 @@ class SalesReturnController extends Controller
             'net_total'       => 'required|numeric',
             'paid_amount'     => 'required|numeric',
             'remaining_amount' => 'required|numeric',
+            'payment_account_id' => 'nullable|integer|exists:accounts,id',
 
             // items array validation
             'items'                   => 'required|array',
@@ -106,17 +113,22 @@ class SalesReturnController extends Controller
                     'qty_carton'  => $it['qty_carton'],
                     'qty_pcs'     => $it['qty_pcs'],
                     'total_pcs'   => $it['total_pcs'],
+                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                     'trade_price' => $it['trade_price'],
-                    'discount'    => $it['discount'],
-                    'gst_amount'  => $it['gst_amount'],
+                    'discount'    => $it['discount'] ?? 0,
+                    'gst_amount'  => $it['gst_amount'] ?? 0,
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // INCREASE Stock for Returns
+                // INCREASE Stock for Returns (Corrected Logic)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
-                    $item->save();
+                    $packing = $item->packing_qty ?: 1;
+                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+                    $totalToReturn = $it['total_pcs'] + $bonusUnits;
+                    
+                    $item->updateStockFromPcs($item->total_stock_pcs + $totalToReturn);
                 }
             }
 
@@ -161,8 +173,12 @@ class SalesReturnController extends Controller
 
                     if ($allocation && $allocation->payment) {
                         $payment = $allocation->payment;
-                        $payment->cheque_status = $status;
-                        $payment->save();
+                        // Only set to 'Returned' if the invoice is fully returned.
+                        // 'Partial Return' is not a valid ENUM for cheque_status.
+                        if ($status === 'Returned') {
+                            $payment->cheque_status = 'Returned';
+                            $payment->save();
+                        }
                     }
                 }
             }
@@ -180,7 +196,7 @@ class SalesReturnController extends Controller
                     'date' => $request->date,
                     'voucher_no' => $voucherNo,
                     'account_id' => $request->customer_id,
-                    'payment_account_id' => null, // We don't have this from frontend yet, maybe default or leave null
+                    'payment_account_id' => $request->payment_account_id,
                     'amount' => $request->paid_amount,
                     'net_amount' => $request->paid_amount,
                     'type' => 'PAYMENT', // We are paying the customer
@@ -311,11 +327,17 @@ class SalesReturnController extends Controller
         $salemans = Saleman::get();
         $messageLines = MessageLine::get(['id', 'messageline']);
 
+        // Payment accounts for refunds
+        $paymentAccounts = Account::whereHas('accountType', function($q) {
+            $q->whereIn('name', ['Cash', 'Bank', 'Cheque In Hand']);
+        })->get(['id', 'title', 'code']);
+
         return Inertia::render("daily/sales_return/edit", [
             'returnData'    => $return,
             'accounts'      => $accounts,
             'salemans'      => $salemans,
             'messageLines'  => $messageLines,
+            'paymentAccounts' => $paymentAccounts,
         ]);
     }
 
@@ -379,11 +401,12 @@ class SalesReturnController extends Controller
             SalesReturnItem::where('sales_return_id', $id)->delete();
 
             foreach ($request->items as $it) {
-                SalesReturnItem::create([
-                    'sales_return_id' => $return->id,
+                $return->items()->create([
                     'item_id'     => $it['item_id'],
                     'qty_carton'  => $it['qty_carton'],
                     'qty_pcs'     => $it['qty_pcs'],
+                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                     'total_pcs'   => $it['total_pcs'],
                     'trade_price' => $it['trade_price'],
                     'discount'    => $it['discount'] ?? 0,
@@ -410,8 +433,21 @@ class SalesReturnController extends Controller
                     $allReturnIds = SalesReturn::where('original_invoice', $newSale->invoice)->pluck('id');
                     $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
                     $newSale->status = ($totalReturnedQty >= $totalSoldQty) ? 'Returned' : 'Partial Return';
-
                     $newSale->save();
+
+                    // Update Related Payment Status (for parity with store method)
+                    $allocation = PaymentAllocation::where('bill_type', 'App\Models\Sales')
+                        ->where('bill_id', $newSale->id)
+                        ->first();
+
+                    if ($allocation && $allocation->payment) {
+                        $payment = $allocation->payment;
+                        // Only sync to 'Returned' if the invoice is fully returned.
+                        if ($newSale->status === 'Returned') {
+                            $payment->cheque_status = 'Returned';
+                            $payment->save();
+                        }
+                    }
                 }
             }
 

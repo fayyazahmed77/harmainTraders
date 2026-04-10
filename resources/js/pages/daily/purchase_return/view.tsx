@@ -41,7 +41,6 @@ interface PurchaseReturnItem {
     total_pcs: number;
     trade_price: number;
     discount: number;
-    gst_amount: number;
     subtotal: number;
     item: {
         id: number;
@@ -57,7 +56,6 @@ interface PurchaseReturn {
     original_invoice: string;
     gross_total: number;
     discount_total: number;
-    tax_total: number;
     net_total: number;
     remarks?: string;
     supplier: { id: number; title: string };
@@ -85,6 +83,7 @@ export default function View({ returnData }: Props) {
     };
 
     const totalPcs = returnData.items.reduce((acc, curr) => acc + Number(curr.total_pcs), 0);
+    const totalCartons = returnData.items.reduce((acc, curr) => acc + Number(curr.qty_carton), 0);
 
     return (
         <SidebarProvider>
@@ -207,21 +206,20 @@ export default function View({ returnData }: Props) {
                                     )}
                                 </Card>
 
-                                {/* STATS ROW: VOLUMES */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <Card className="p-4 bg-muted/20 border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Impacted Skus</span>
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Reversed Boxes</span>
                                             <Box className="h-4 w-4 text-muted-foreground" />
-                                            <p className="text-lg font-black text-foreground">{returnData.items.length}</p>
                                         </div>
+                                        <p className="text-lg font-black text-foreground">{totalCartons}</p>
                                     </Card>
                                     <Card className="p-4 bg-card border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Reversed Units</span>
-                                        <div className="flex items-center justify-between text-orange-500">
-                                            <TrendingUp className="h-4 w-4" />
-                                            <p className="text-lg font-black tabular-nums">{totalPcs}</p>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Reversed Units</span>
+                                            <TrendingUp className="h-4 w-4 text-orange-500" />
                                         </div>
+                                        <p className="text-lg font-black tabular-nums text-orange-500">{totalPcs}</p>
                                     </Card>
                                 </div>
                             </motion.div>
@@ -317,6 +315,19 @@ export default function View({ returnData }: Props) {
                                                 </tr>
                                             ))}
                                         </tbody>
+                                        <tfoot className="bg-muted/10 border-t-2 border-border/50">
+                                            <tr className="text-[10px] font-black text-foreground uppercase tracking-widest">
+                                                <td className="px-6 py-4 text-right">Inventory Totals:</td>
+                                                <td className="px-3 py-4 text-center font-mono opacity-60">{totalCartons}</td>
+                                                <td className="px-3 py-4 text-center font-mono opacity-60">{returnData.items.reduce((acc, curr) => acc + Number(curr.qty_pcs), 0)}</td>
+                                                <td className="px-3 py-4 text-center">
+                                                    <span className="px-2 py-1 bg-orange-500/10 text-orange-600 rounded-md border border-orange-500/20">
+                                                        {totalPcs}
+                                                    </span>
+                                                </td>
+                                                <td colSpan={2}></td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </Card>
@@ -326,7 +337,7 @@ export default function View({ returnData }: Props) {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
-                                className="grid grid-cols-1 md:grid-cols-4 gap-4"
+                                className="grid grid-cols-1 md:grid-cols-3 gap-4"
                             >
                                 <Card className="p-5 bg-card border-border flex flex-col justify-between group hover:border-orange-500/20 transition-all shadow-sm">
                                     <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-3">Gross Reversal</p>
@@ -336,13 +347,7 @@ export default function View({ returnData }: Props) {
                                     </div>
                                 </Card>
 
-                                <Card className="p-5 bg-blue-500/[0.03] border-blue-500/10 flex flex-col justify-between group hover:bg-blue-500/[0.08] transition-all">
-                                    <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-3">Tax Adjustment</p>
-                                    <div className="flex items-baseline gap-2 text-blue-600">
-                                        <span className="text-xl font-black tracking-tight font-mono">+{returnData.tax_total.toLocaleString()}</span>
-                                        <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">GST_REV</span>
-                                    </div>
-                                </Card>
+
 
                                 <Card className="p-5 bg-rose-500/[0.03] border-rose-500/10 flex flex-col justify-between group hover:bg-rose-500/[0.08] transition-all">
                                     <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-3">Discount Reclaim</p>

@@ -17,7 +17,7 @@ export default function AccountSummary({ summary }: SummaryProps) {
         return new Intl.NumberFormat("en-PK", {
             style: "currency",
             currency: "PKR",
-            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
         }).format(amount);
     };
 
@@ -26,7 +26,8 @@ export default function AccountSummary({ summary }: SummaryProps) {
             title: "Total Accounts",
             value: summary.total_accounts,
             icon: Users,
-            color: "bg-gradient-to-br from-gray-700 to-gray-800",
+            color: "from-zinc-800 to-zinc-950 dark:from-zinc-900 dark:to-black",
+            iconBg: "bg-white/10",
             textColor: "text-white",
             isCurrency: false,
         },
@@ -34,7 +35,8 @@ export default function AccountSummary({ summary }: SummaryProps) {
             title: "Customers",
             value: summary.customers_count,
             icon: UserCheck,
-            color: "bg-gradient-to-br from-blue-500 to-blue-600",
+            color: "from-blue-600 to-blue-800",
+            iconBg: "bg-white/20",
             textColor: "text-white",
             isCurrency: false,
         },
@@ -42,7 +44,8 @@ export default function AccountSummary({ summary }: SummaryProps) {
             title: "Suppliers",
             value: summary.suppliers_count,
             icon: UserMinus,
-            color: "bg-gradient-to-br from-cyan-500 to-blue-600",
+            color: "from-indigo-600 to-indigo-800",
+            iconBg: "bg-white/20",
             textColor: "text-white",
             isCurrency: false,
         },
@@ -50,26 +53,36 @@ export default function AccountSummary({ summary }: SummaryProps) {
             title: "Total Receivables",
             value: summary.total_receivables,
             icon: ArrowDownCircle,
-            color: "bg-gradient-to-br from-emerald-500 to-emerald-600",
+            color: "from-emerald-600 to-emerald-800",
+            iconBg: "bg-white/20",
             textColor: "text-white",
             isCurrency: true,
         },
     ];
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {cards.map((card, index) => (
-                <Card key={index} className={`${card.color} border-none shadow-lg transform transition-all hover:scale-105 duration-300`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className={`text-sm font-medium ${card.textColor} opacity-90`}>
+                <Card 
+                    key={index} 
+                    className={`bg-gradient-to-br ${card.color} border-none shadow-lg overflow-hidden relative group transition-all duration-500 hover:shadow-2xl hover:-translate-y-1`}
+                >
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                        <card.icon className="h-16 w-16" />
+                    </div>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                        <CardTitle className={`text-[10px] md:text-sm font-bold uppercase tracking-widest ${card.textColor} opacity-80`}>
                             {card.title}
                         </CardTitle>
-                        <card.icon className={`h-4 w-4 ${card.textColor} opacity-75`} />
+                        <div className={`p-1.5 rounded-lg ${card.iconBg} backdrop-blur-md`}>
+                            <card.icon className={`h-3 w-3 md:h-4 md:w-4 ${card.textColor}`} />
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${card.textColor}`}>
+                    <CardContent className="pt-0">
+                        <div className={`text-xl md:text-2xl font-black ${card.textColor} tracking-tight`}>
                             {card.isCurrency ? formatCurrency(card.value) : card.value}
                         </div>
+                        <div className={`h-1 w-8 mt-2 rounded-full ${card.iconBg}`} />
                     </CardContent>
                 </Card>
             ))}

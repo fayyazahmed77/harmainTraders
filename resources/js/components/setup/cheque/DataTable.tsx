@@ -21,10 +21,11 @@ import {
   ChevronsRight as IconChevronsRight,
   Eye,
   Trash2,
-  Building2,
   User as UserIcon,
   Calendar as CalendarIcon,
-  Hash
+  Hash,
+  XCircle,
+  Building2
 } from "lucide-react";
 import { router, usePage, Link } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
@@ -102,16 +103,33 @@ export function DataTable({ data }: DataTableProps) {
   const [openDeleteDialog, setOpenDeleteDialog] = React.useState(false);
   const [selectedChequeBook, setSelectedChequeBook] = React.useState<ChequeBook | null>(null);
 
-  // ✅ Delete Cheque Book
+  const [openCancelDialog, setOpenCancelDialog] = React.useState(false);
+  const [selectedChequeToCancel, setSelectedChequeToCancel] = React.useState<ChequeBook | null>(null);
+
   const handleDelete = () => {
     if (!selectedChequeBook) return;
-    router.delete(`/chequebook/${selectedChequeBook.id}`, {
+    router.delete(`/cheque/${selectedChequeBook.id}`, {
       onSuccess: () => {
         toast.success("Cheque book deleted successfully.");
         setOpenDeleteDialog(false);
       },
       onError: () => toast.error("Delete failed"),
     });
+  };
+
+  // ✅ Cancel Cheque
+  const handleCancelCheque = () => {
+    if (!selectedChequeToCancel) return;
+    router.put(`/cheque/${selectedChequeToCancel.id}`, 
+        { status: 'cancelled' }, 
+        {
+          onSuccess: () => {
+            toast.success("Cheque cancelled successfully.");
+            setOpenCancelDialog(false);
+          },
+          onError: () => toast.error("Cancel failed"),
+        }
+    );
   };
 
   // ✅ Columns
@@ -226,6 +244,17 @@ export function DataTable({ data }: DataTableProps) {
                 <DropdownMenuItem asChild className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer">
                   <Link href={`/cheque/${cheque.id}/view`}>View Details</Link>
                 </DropdownMenuItem>
+                {cheque.status === 'unused' && (
+                  <DropdownMenuItem
+                    className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer text-amber-600 focus:text-amber-600 focus:bg-amber-50 dark:focus:bg-amber-500/10"
+                    onClick={() => {
+                      setSelectedChequeToCancel(cheque);
+                      setOpenCancelDialog(true);
+                    }}
+                  >
+                    <XCircle className="mr-2 h-3.5 w-3.5" /> Cancel Cheque
+                  </DropdownMenuItem>
+                )}
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
@@ -281,6 +310,29 @@ export function DataTable({ data }: DataTableProps) {
             </Button>
             <Button variant="destructive" onClick={handleDelete} className="rounded-xl font-bold uppercase tracking-widest text-[10px] bg-rose-600 hover:bg-rose-700">
               Delete Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🚫 Cancel Dialog */}
+      <Dialog open={openCancelDialog} onOpenChange={setOpenCancelDialog}>
+        <DialogContent className="rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <XCircle className="h-5 w-5" />
+              Cancel Cheque
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium text-zinc-500 uppercase tracking-widest py-4">
+              Are you sure you want to cancel this cheque? It will be permanently marked as cancelled.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setOpenCancelDialog(false)} className="rounded-xl font-bold uppercase tracking-widest text-[10px]">
+              Keep Unused
+            </Button>
+            <Button variant="outline" onClick={handleCancelCheque} className="rounded-xl font-bold uppercase tracking-widest text-[10px] text-amber-600 border-amber-600 hover:bg-amber-600 hover:text-white">
+              Yes, Cancel It
             </Button>
           </DialogFooter>
         </DialogContent>

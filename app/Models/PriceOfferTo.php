@@ -10,6 +10,7 @@ class PriceOfferTo extends Model
 
     protected $fillable = [
         "account_id",
+        "firm_id",
         "date",
         "offertype",
         "created_by",
@@ -19,6 +20,11 @@ class PriceOfferTo extends Model
     public function messageLine()
     {
         return $this->belongsTo(MessageLine::class);
+    }
+
+    public function firm()
+    {
+        return $this->belongsTo(Firm::class);
     }
 
     public function account()

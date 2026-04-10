@@ -133,7 +133,19 @@ class ChequebookController extends Controller
         return back()->with('warning', 'No new cheques were created — all already exist.');
     }
     //update
-    public function update() {}
+    public function update(Request $request, Chequebook $cheque) 
+    {
+        if ($request->has('status') && $request->status === 'cancelled') {
+            if ($cheque->status === 'unused') {
+                $cheque->status = 'cancelled';
+                $cheque->save();
+                return back()->with('success', 'Cheque ' . $cheque->cheque_no . ' cancelled successfully.');
+            }
+            return back()->with('error', 'Only unused cheques can be cancelled.');
+        }
+
+        return back();
+    }
     //destory
     public function destory() {}
 }

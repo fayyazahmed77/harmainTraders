@@ -63,6 +63,8 @@ interface RowData {
     discReadOnly?: boolean;
     amount: number;
     packing: number;
+    bonus_full: number;
+    bonus_pcs: number;
 }
 
 interface Account {
@@ -90,6 +92,7 @@ interface SalesReturn {
     customer_id: number;
     salesman_id: number;
     paid_amount: number;
+    payment_account_id?: number | null;
     items: any[];
 }
 
@@ -97,6 +100,7 @@ interface Props {
     returnData: SalesReturn;
     accounts: Account[];
     salemans: { id: number; name: string }[];
+    paymentAccounts: Account[];
 }
 
 const toNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
@@ -138,7 +142,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
-export default function SalesReturnEditPage({ returnData, accounts, salemans }: Props) {
+export default function SalesReturnEditPage({ returnData, accounts, salemans, paymentAccounts }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     // ── Header state ──────────────────────────
@@ -163,6 +167,23 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
     const [mobileAccOpen, setMobileAccOpen] = useState(false);
     const [desktopAccOpen, setDesktopAccOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState<string | null>(returnData.payment_account_id?.toString() || null);
+
+    // Determines if we show cash refund or balance adjustment
+    const isPaidInvoice = useMemo(() => {
+        // If it already has a paid amount, it was allowed
+        if (toNum(returnData.paid_amount) > 0) return true;
+        if (!selectedInvoice) return false;
+        return toNum(selectedInvoice.remaining_amount) <= 0;
+    }, [selectedInvoice, returnData]);
+
+    // Reset refund if invoice type changes
+    useEffect(() => {
+        if (!isPaidInvoice && toNum(returnData.paid_amount) === 0) {
+            setRefundAmount(0);
+            setSelectedPaymentAccountId(null);
+        }
+    }, [isPaidInvoice]);
 
     // ── Method B: Assign Items Dialog state ───
     const [assignItemDialogOpen, setAssignItemDialogOpen] = useState(false);
@@ -191,6 +212,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
         discReadOnly: false,
         amount: 0,
         packing: 1,
+        bonus_full: 0,
+        bonus_pcs: 0,
     });
 
     const [rows, setRows] = useState<RowData[]>([]);
@@ -229,6 +252,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                     discReadOnly: true,
                     amount: toNum(it.subtotal),
                     packing: packing,
+                    bonus_full: toNum(it.bonus_qty_carton),
+                    bonus_pcs: toNum(it.bonus_qty_pcs),
                 };
             });
             setRows(initialRows);
@@ -354,6 +379,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
             taxReadOnly: true,
             discReadOnly: true,
             packing: packing,
+            bonus_full: 0,
+            bonus_pcs: 0,
         } : r));
         setSelectedRowItemId(itemId);
     };
@@ -389,6 +416,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                 discReadOnly: true,
                 amount: 0,
                 packing: packing,
+                bonus_full: 0,
+                bonus_pcs: 0,
             };
         });
 
@@ -405,25 +434,34 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
     // ── Calculations ───────────────────────────
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const baseAmount = units * toNum(r.rate);
+            const packing = toNum(r.packing) || 1;
+            const units = toNum(r.full) * packing + toNum(r.pcs);
+            const rate = toNum(r.rate);
+            
+            const baseAmount = units * rate;
             const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
             const taxableAmount = baseAmount - discAmount;
             const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
-            return { ...r, amount: +(taxableAmount + taxAmount).toFixed(2) };
+            
+            const finalAmount = taxableAmount + taxAmount;
+
+            return { 
+                ...r, 
+                amount: +finalAmount.toFixed(2),
+                computed_units: units,
+                computed_base: baseAmount,
+                computed_tax: taxAmount,
+                computed_disc: discAmount
+            };
         });
     }, [rows]);
 
     const totals = useMemo(() => {
         let gross = 0, tax = 0, disc = 0;
         rowsWithAmount.forEach(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const base = units * toNum(r.rate);
-            const d = (toNum(r.discPercent) / 100) * base;
-            const t = (toNum(r.taxPercent) / 100) * (base - d);
-            gross += base;
-            disc += d;
-            tax += t;
+            gross += r.computed_base;
+            disc += r.computed_disc;
+            tax += r.computed_tax;
         });
         return {
             gross: +gross.toFixed(2),
@@ -464,6 +502,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
             net_total: totals.net,
             paid_amount: refundAmount,
             remaining_amount: totals.net - refundAmount,
+            payment_account_id: selectedPaymentAccountId,
             items: validRows.map(r => {
                 const base = (r.full * r.packing + r.pcs) * r.rate;
                 const d = (toNum(r.discPercent) / 100) * base;
@@ -472,6 +511,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                     item_id: r.item_id,
                     qty_carton: r.full,
                     qty_pcs: r.pcs,
+                    bonus_qty_carton: r.bonus_full,
+                    bonus_qty_pcs: r.bonus_pcs,
                     total_pcs: r.full * r.packing + r.pcs,
                     trade_price: r.rate,
                     discount: +d.toFixed(2),
@@ -593,7 +634,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                                 <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
-                                <div className="col-span-3 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500 pl-4 pr-10">Position Net</div>
+                                <div className="col-span-2 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
+                                <div className="col-span-1" />
                             </div>
 
                             <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -609,13 +651,11 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                                             </div>
                                         </div>
 
-                                        <div className="col-span-1">
+                                        <div className="col-span-2 grid grid-cols-2 gap-1 px-1">
                                             <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
-                                        </div>
-                                        <div className="col-span-1">
+                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="F" title="Full Cartons" />
                                             <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
+                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="P" title="Loose Pieces" />
                                         </div>
 
                                         <div className="col-span-2">
@@ -633,8 +673,11 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                                                 readOnly={row.discReadOnly} className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
                                         </div>
 
-                                        <div className="col-span-3 flex items-center justify-end gap-2 pr-4">
-                                            <div className="text-right font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                        <div className="col-span-2 text-right">
+                                            <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                        </div>
+
+                                        <div className="col-span-1 flex items-center justify-center">
                                             <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
                                                 onClick={() => {
                                                     if (confirm("Purge this line item from return protocol?")) {
@@ -666,18 +709,18 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                             <Card className={`${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 shadow-md relative overflow-hidden flex flex-col ${PREMIUM_ROUNDING_MD}`}>
                                 <div className={`absolute inset-0 opacity-[0.03] dark:opacity-10 ${ACCENT_GRADIENT}`} style={{ mixBlendMode: 'overlay' }} />
 
-                                <div className="p-6 space-y-8 relative z-10">
+                                <div className="p-4 space-y-4 relative z-10">
                                     <div className="flex justify-between items-start">
                                         <h3 className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">
                                             Audit Control
                                         </h3>
                                     </div>
 
-                                    <div className="space-y-6">
-                                        <div className="space-y-1">
+                                    <div className="space-y-4">
+                                        <div className="space-y-0.5">
                                             <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Gross Impact</div>
-                                            <div className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-zinc-400 dark:text-zinc-600 text-lg">Rs</span>
+                                            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
+                                                <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
                                                 {totals.gross.toLocaleString()}
                                             </div>
                                         </div>
@@ -685,36 +728,87 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans }: 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tax Rev.</div>
-                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-300">+ {totals.tax.toLocaleString()}</div>
+                                                <div className="text-xs font-bold text-zinc-800 dark:text-zinc-300">+ {totals.tax.toLocaleString()}</div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Disc Rec.</div>
-                                                <div className="text-sm font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
+                                                <div className="text-xs font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
                                             </div>
                                         </div>
 
-                                        <div className={`bg-orange-600/10 border border-orange-500/20 p-5 space-y-1 ${PREMIUM_ROUNDING_MD}`}>
+                                        <div className={`bg-orange-600/10 border border-orange-500/20 p-4 space-y-0.5 ${PREMIUM_ROUNDING_MD}`}>
                                             <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest">Net Credit Change</div>
-                                            <div className="text-3xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-orange-600 dark:text-orange-500 text-lg opacity-50 font-mono">Rs</span>
+                                            <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
+                                                <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono">Rs</span>
                                                 {totals.net.toLocaleString()}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 pt-4">
-                                        <TechLabel label="Adjusted Cash Repayment" icon={ArrowRightLeft}>
-                                            <div className="relative">
-                                                <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
-                                                    className={`h-12 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-emerald-500`} placeholder="0.00" />
+                                    <div className="space-y-3 pt-2">
+                                        {isPaidInvoice ? (
+                                            <>
+                                                <TechLabel label="Adjusted Cash Repayment" icon={ArrowRightLeft}>
+                                                    <div className="relative">
+                                                        <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
+                                                            className={`h-11 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-lg tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-emerald-500`} placeholder="0.00" />
+                                                    </div>
+                                                </TechLabel>
+
+                                                {refundAmount > 0 && (
+                                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                                                        <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                                            <RotateCcw size={12} /> Refund Disbursement Account
+                                                        </div>
+                                                        <div className="max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                                                            <div className="grid grid-cols-1 gap-2">
+                                                                {paymentAccounts?.map(acc => (
+                                                                    <button
+                                                                        key={acc.id}
+                                                                        onClick={() => setSelectedPaymentAccountId(acc.id.toString())}
+                                                                        className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                                                                            selectedPaymentAccountId === acc.id.toString() 
+                                                                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' 
+                                                                            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                                                                        }`}
+                                                                    >
+                                                                        <span className="text-[11px] font-black uppercase tracking-tight">{acc.title}</span>
+                                                                        <div className={`w-3 h-3 rounded-full border-2 ${
+                                                                            selectedPaymentAccountId === acc.id.toString()
+                                                                            ? 'bg-emerald-500 border-emerald-500'
+                                                                            : 'border-zinc-300 dark:border-zinc-700'
+                                                                        }`} />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl space-y-2">
+                                                <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                                    <Info size={12} className="text-emerald-500" />
+                                                    Credit Balance Protocol
+                                                </div>
+                                                <div className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
+                                                    This invoice is not fully paid. The return value will adjust the ledger balance instead of a cash refund.
+                                                </div>
+                                                <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                                                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Adjustment</span>
+                                                    <span className="text-sm font-mono font-black text-emerald-600">Rs {totals.net.toLocaleString()}</span>
+                                                </div>
                                             </div>
-                                        </TechLabel>
+                                        )}
                                     </div>
 
                                     <div className="pt-2">
-                                        <Button className={`w-full h-14 ${ACCENT_GRADIENT} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 transition-all ${PREMIUM_ROUNDING}`}
+                                        <Button className={`w-full h-14 ${ACCENT_GRADIENT} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
                                             onClick={handleSave} disabled={isSaving}>
-                                            {isSaving ? "UPDATING..." : "COMMIT CHANGES"}
+                                            <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={isSaving ? { opacity: 0.5 } : {}}>
+                                                {isSaving ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                                {isSaving ? "UPDATING..." : "COMMIT CHANGES"}
+                                            </motion.div>
                                         </Button>
                                         <Button variant="ghost" className="w-full h-10 mt-3 text-zinc-500 hover:text-zinc-300 font-black uppercase text-[10px] tracking-widest" onClick={() => router.get("/sales-return")}>
                                             Abort Patch

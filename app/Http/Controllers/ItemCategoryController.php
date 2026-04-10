@@ -36,20 +36,35 @@ class ItemCategoryController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'code' => 'required|unique:item_categories,code',
-            'description' => 'required',
-            'status' => 'required',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'code' => 'nullable|unique:item_categories,code',
+            'description' => 'nullable',
+            'status' => 'nullable',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
-        $image = $request->file('image');
-        $image_name = time() . '.' . $image->getClientOriginalExtension();
-        $image->move(public_path('images'), $image_name);
+
+        $image_name = null;
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $image_name = time() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('images'), $image_name);
+        }
+
         $userId = Auth::user()->id;
+        
+        $code = $request->code;
+        if (!$code) {
+            $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $request->name));
+            // Ensure unique code if name-based code is taken
+            if (ItemCategory::where('code', $code)->exists()) {
+                $code .= '-' . time();
+            }
+        }
+
         ItemCategory::create([
             'name' => $request->name,
-            'code' => strtoupper($request->code),
-            'description' => $request->description,
-            'status' => $request->status,
+            'code' => strtoupper($code),
+            'description' => $request->description ?? '',
+            'status' => $request->status ?? 'active',
             'image' => $image_name,
             'created_by' => $userId,
         ]);
@@ -60,17 +75,17 @@ class ItemCategoryController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'code' => 'required|unique:item_categories,code,' . $id,
-            'description' => 'required',
-            'status' => 'required',
+            'code' => 'nullable|unique:item_categories,code,' . $id,
+            'description' => 'nullable',
+            'status' => 'nullable',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
         $userId = Auth::user()->id;
         $data = [
             'name' => $request->name,
-            'code' => strtoupper($request->code),
-            'description' => $request->description,
-            'status' => $request->status,
+            'code' => strtoupper($request->code ?? ''),
+            'description' => $request->description ?? '',
+            'status' => $request->status ?? 'active',
             'updated_by' => $userId,
         ];
 

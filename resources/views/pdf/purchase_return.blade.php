@@ -360,9 +360,8 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                     <tr>
                         <th style="width: 40px;">Box</th>
                         <th style="width: 40px;">Pcs</th>
-                        <th class="text-left" style="width: 45%;">Description of Goods Returned</th>
+                        <th class="text-left" style="width: 50%;">Description of Goods Returned</th>
                         <th>Rate</th>
-                        <th>Duty %</th>
                         <th>Dec %</th>
                         <th style="border-right: none;" class="text-right">Net Debit</th>
                     </tr>
@@ -375,12 +374,9 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td class="text-left">{{ $item->item->title }}</td>
                         <td>{{ number_format($item->trade_price, 2) }}</td>
                         @php
-                        $base = $item->subtotal - $item->gst_amount;
-                        $taxPer = ($base > 0) ? ($item->gst_amount / $base) * 100 : 0;
-                        $discBase = $base + $item->discount;
-                        $discPer = ($discBase > 0) ? ($item->discount / $discBase) * 100 : 0;
+                        $base = $item->trade_price * $item->total_pcs;
+                        $discPer = ($base > 0) ? ($item->discount / $base) * 100 : 0;
                         @endphp
-                        <td>{{ number_format($taxPer, 2) }}</td>
                         <td>{{ number_format($discPer, 2) }}</td>
                         <td class="text-right" style="border-right: none;">{{ number_format($item->subtotal, 2) }}</td>
                     </tr>
@@ -411,10 +407,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td class="label">Gross Reversal :-</td>
                         <td class="value">{{ number_format($purchaseReturn->gross_total, 2) }}</td>
                     </tr>
-                    <tr>
-                        <td class="label">Tax Adjustment :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->tax_total, 2) }}</td>
-                    </tr>
+
                     <tr>
                         <td class="label">Discount Reclaim :-</td>
                         <td class="value">- {{ number_format($purchaseReturn->discount_total, 2) }}</td>

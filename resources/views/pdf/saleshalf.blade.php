@@ -219,7 +219,7 @@
             <tbody>
                 @foreach($sale->items as $item)
                 @php
-                $subtotal_gross = $item->trade_price * $item->total_pcs;
+                $subtotal_gross = $item->subtotal; 
                 $disc_percent = $subtotal_gross > 0 ? ($item->discount / $subtotal_gross) * 100 : 0;
                 $bonusText = '';
                 if ($item->bonus_qty_carton > 0) $bonusText .= number_format($item->bonus_qty_carton,0).'B ';

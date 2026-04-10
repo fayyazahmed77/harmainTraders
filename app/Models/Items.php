@@ -49,6 +49,7 @@ class Items extends Model
         'pt6',
         'pt7',
         'scheme',
+        'scheme2',
     ];
 
     protected $casts = [

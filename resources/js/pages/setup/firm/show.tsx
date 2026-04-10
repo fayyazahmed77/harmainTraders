@@ -27,12 +27,14 @@ import {
   Eye,
   ShieldAlert,
   Network,
-  Key
+  Key,
+  Code
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { Heading } from "@/components/ui/Heading";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const PREMIUM_ROUNDING = "rounded-2xl";

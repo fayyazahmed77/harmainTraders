@@ -6,8 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\Items;
 use App\Models\ItemCategory;
 use App\Models\Account;
-use App\Models\OfferList;
 use App\Models\PriceOfferTo;
+use App\Models\OfferList;
+use App\Models\Firm;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ class OfferListController extends Controller
     //index
     public function index()
     {
-        $offers = PriceOfferTo::with(['account', 'user', 'messageLine'])->orderBy('id', 'desc')->get();
+        $offers = PriceOfferTo::with(['account', 'firm', 'user', 'messageLine'])->orderBy('id', 'desc')->get();
         return inertia('daily/offerlist/index', [
             'offers' => $offers
         ]);
@@ -37,11 +38,14 @@ class OfferListController extends Controller
             ->where('status', 'active')
             ->get();
 
+        $firms = Firm::where('status', 'active')->get();
+
         return Inertia::render("daily/offerlist/create", [
             'items' => $items,
             'categories' => $categories,
             'accounts' => $accounts,
             'messageLines' => $messageLines,
+            'firms' => $firms,
         ]);
     }
 
@@ -50,6 +54,7 @@ class OfferListController extends Controller
     {
         $request->validate([
             'account_id' => 'nullable|exists:accounts,id',
+            'firm_id' => 'nullable|exists:firms,id',
             'date' => 'required|date',
             'price_type' => 'required',
             'items' => 'required|array|min:1',
@@ -63,6 +68,7 @@ class OfferListController extends Controller
             // Create main offer
             $offer = PriceOfferTo::create([
                 'account_id' => $request->account_id,
+                'firm_id' => $request->firm_id,
                 'date' => $request->date,
                 'offertype' => (string)$request->price_type,
                 'created_by' => Auth::id() ?? 1,
@@ -96,7 +102,7 @@ class OfferListController extends Controller
 
     public function view($id)
     {
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'firm', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
         return inertia('daily/offerlist/view', [
             'offer' => $offer
         ]);
@@ -105,7 +111,7 @@ class OfferListController extends Controller
     public function pdf($id, Request $request)
     {
         $groupBy = $request->query('group_by', 'category');
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'firm', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
         $pdf = Pdf::loadView('pdf.offerlist', compact('offer', 'groupBy'));
         return $pdf->stream('offer-list-' . $offer->id . '.pdf');
     }
@@ -113,7 +119,7 @@ class OfferListController extends Controller
     public function download($id, Request $request)
     {
         $groupBy = $request->query('group_by', 'category');
-        $offer = PriceOfferTo::with(['account', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
+        $offer = PriceOfferTo::with(['account', 'firm', 'items.items.category', 'items.items.companyAccount', 'messageLine'])->findOrFail($id);
         $pdf = Pdf::loadView('pdf.offerlist', compact('offer', 'groupBy'));
         return $pdf->download('offer-list-' . $offer->id . '.pdf');
     }

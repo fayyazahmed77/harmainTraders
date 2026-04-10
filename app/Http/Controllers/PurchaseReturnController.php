@@ -19,7 +19,11 @@ class PurchaseReturnController extends Controller
     //index
     public function index()
     {
-        $returns = PurchaseReturn::with('supplier', 'salesman')->latest()->get();
+        $returns = PurchaseReturn::with('supplier', 'salesman')
+            ->withSum('items as total_cartons', 'qty_carton')
+            ->withSum('items as total_pcs', 'total_pcs')
+            ->latest()
+            ->get();
         return Inertia::render("daily/purchase_return/index", [
             'returns' => $returns,
         ]);
@@ -93,7 +97,6 @@ class PurchaseReturnController extends Controller
                 'remaining_amount' => $request->remaining_amount,
                 'remarks'         => $request->remarks,
             ]);
-
             foreach ($request->items as $it) {
                 PurchaseReturnItem::create([
                     'purchase_return_id' => $return->id,
@@ -101,8 +104,10 @@ class PurchaseReturnController extends Controller
                     'qty_carton'  => $it['qty_carton'],
                     'qty_pcs'     => $it['qty_pcs'],
                     'total_pcs'   => $it['total_pcs'],
+                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                     'trade_price' => $it['trade_price'],
-                    'discount'    => $it['discount'],
+                    'discount'    => $it['discount'] ?? 0,
                     'gst_amount'  => 0,
                     'subtotal'    => $it['subtotal'],
                 ]);
@@ -110,7 +115,9 @@ class PurchaseReturnController extends Controller
                 // DECREASE Stock for Purchase Returns (We are giving items back)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $it['total_pcs'];
+                    $packing = (float)($item->packing_full ?? 1);
+                    $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
+                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalReturnPcs;
                     $item->save();
                 }
             }
@@ -118,35 +125,9 @@ class PurchaseReturnController extends Controller
             // ─────────────────────────────────────────────────────────────────────────────
             // Update Purchase Status & Financials
             // ─────────────────────────────────────────────────────────────────────────────
-            if ($request->original_invoice) {
-                $purchase = Purchase::where('invoice', $request->original_invoice)->first();
-                if ($purchase) {
-                    // Update Remaining Amount (Reduce debt to supplier)
-                    // If we return items, we owe the supplier less.
-                    $purchase->remaining_amount = $purchase->remaining_amount - $request->net_total;
+            $this->updatePurchaseStatusAndBalance($request->original_invoice);
 
-                    // Update Status based on Returns
-                    $currentReturnTotal = \App\Models\PurchaseReturn::where('original_invoice', $request->original_invoice)->sum('net_total');
-                    // Note: $currentReturnTotal includes the current return because it was created at line 83
-
-                    if ($currentReturnTotal >= $purchase->net_total) {
-                        $purchase->status = 'Returned';
-                    } else {
-                        // Only change to Partial Return if not already Returned
-                        if ($purchase->status !== 'Returned') {
-                            $purchase->status = 'Partial Return';
-                        }
-                    }
-
-                    $purchase->save();
-                }
-            }
-
-            // ─────────────────────────────────────────────────────────────────────────────
-            // Handle Cash Refund (Payment Record - Receipt)
-            // ─────────────────────────────────────────────────────────────────────────────
             if ($request->paid_amount > 0) {
-                // Create a Payment record (Type: RECEIPT, as we are receiving money back from supplier)
                 $count = Payment::where('type', 'RECEIPT')->count() + 1;
                 $voucherNo = 'CRV-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
@@ -157,9 +138,10 @@ class PurchaseReturnController extends Controller
                     'payment_account_id' => null,
                     'amount' => $request->paid_amount,
                     'net_amount' => $request->paid_amount,
-                    'type' => 'RECEIPT', // We are receiving money
+                    'type' => 'RECEIPT',
                     'remarks' => 'Refund for Purchase Return Invoice: ' . ($request->invoice ?? 'N/A'),
                     'payment_method' => 'Cash',
+                    'cheque_status' => 'Refund',
                 ]);
             }
 
@@ -170,6 +152,40 @@ class PurchaseReturnController extends Controller
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Update Purchase Status and Balance after Return
+     */
+    private function updatePurchaseStatusAndBalance($invoiceNo)
+    {
+        if (!$invoiceNo) return;
+        
+        $purchase = Purchase::where('invoice', $invoiceNo)->first();
+        if ($purchase) {
+            // Calculate Total Returns for this invoice
+            $totalReturns = PurchaseReturn::where('original_invoice', $invoiceNo)->sum('net_total');
+            
+            // Calculate Total Payments for this invoice
+            $totalPayments = PaymentAllocation::where('bill_id', $purchase->id)
+                ->where('bill_type', 'App\Models\Purchase')
+                ->sum('amount');
+
+            // Remaining = Net - (Payments + Returns)
+            $purchase->remaining_amount = $purchase->net_total - ($totalPayments + $totalReturns);
+            
+            // Status Logic
+            if ($totalReturns >= $purchase->net_total) {
+                $purchase->status = 'Returned';
+            } elseif ($totalReturns > 0) {
+                $purchase->status = 'Partial Return';
+            } else {
+                $purchase->status = 'Active';
+            }
+            
+            $purchase->save();
+        }
+    }
+
 
     // Get supplier's purchase invoices
     public function getSupplierInvoices($supplierId)
@@ -316,19 +332,15 @@ class PurchaseReturnController extends Controller
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $oldItem->total_pcs;
+                    $packing = (float)($item->packing_full ?? 1);
+                    $totalRevertPcs = (float)($oldItem->total_pcs) + ((float)($oldItem->bonus_qty_carton ?? 0) * $packing) + (float)($oldItem->bonus_qty_pcs ?? 0);
+                    $item->stock_1 = ($item->stock_1 ?? 0) + $totalRevertPcs;
                     $item->save();
                 }
             }
 
             // 2. Revert Original Invoice Balance & Status
-            if ($oldOriginalInvoice) {
-                $purchase = Purchase::where('invoice', $oldOriginalInvoice)->first();
-                if ($purchase) {
-                    $purchase->remaining_amount += $oldNetTotal;
-                    $purchase->save();
-                }
-            }
+            $this->updatePurchaseStatusAndBalance($oldOriginalInvoice);
 
             // 3. Update Return Record
             $return->update([
@@ -340,6 +352,7 @@ class PurchaseReturnController extends Controller
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
+                'tax_total'       => 0,
                 'net_total'       => $request->net_total,
                 'remarks'         => $request->remarks,
             ]);
@@ -354,6 +367,8 @@ class PurchaseReturnController extends Controller
                     'qty_carton'  => $it['qty_carton'],
                     'qty_pcs'     => $it['qty_pcs'],
                     'total_pcs'   => $it['total_pcs'],
+                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                     'trade_price' => $it['trade_price'],
                     'discount'    => $it['discount'] ?? 0,
                     'gst_amount'  => 0,
@@ -363,25 +378,48 @@ class PurchaseReturnController extends Controller
                 // Update Stock (Decrease for Purchase Return)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $it['total_pcs'];
+                    $packing = (float)($item->packing_full ?? 1);
+                    $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
+                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalReturnPcs;
                     $item->save();
                 }
             }
 
             // 5. Update New Original Invoice Balance & Status
-            if ($request->original_invoice) {
-                $purchase = Purchase::where('invoice', $request->original_invoice)->first();
-                if ($purchase) {
-                    $purchase->remaining_amount -= $request->net_total;
+            $this->updatePurchaseStatusAndBalance($request->original_invoice);
 
-                    $currentReturnTotal = PurchaseReturn::where('original_invoice', $request->original_invoice)->sum('net_total');
-                    if ($currentReturnTotal >= $purchase->net_total) {
-                        $purchase->status = 'Returned';
-                    } else {
-                        $purchase->status = 'Partial Return';
-                    }
-                    $purchase->save();
+            // 6. Sync Refund Payment
+            $refundPayment = Payment::where('remarks', 'like', "%Refund for Purchase Return Invoice: {$return->invoice}%")
+                ->where('account_id', $return->supplier_id)
+                ->first();
+
+            if ($request->paid_amount > 0) {
+                if ($refundPayment) {
+                    $refundPayment->update([
+                        'amount' => $request->paid_amount,
+                        'net_amount' => $request->paid_amount,
+                        'date' => $request->date,
+                        'cheque_status' => 'Refund',
+                    ]);
+                } else {
+                    $count = Payment::where('type', 'RECEIPT')->count() + 1;
+                    $voucherNo = 'CRV-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                    Payment::create([
+                        'date' => $request->date,
+                        'voucher_no' => $voucherNo,
+                        'account_id' => $request->supplier_id,
+                        'payment_account_id' => null,
+                        'amount' => $request->paid_amount,
+                        'net_amount' => $request->paid_amount,
+                        'type' => 'RECEIPT',
+                        'remarks' => 'Refund for Purchase Return Invoice: ' . ($return->invoice ?? 'N/A'),
+                        'payment_method' => 'Cash',
+                        'cheque_status' => 'Refund',
+                    ]);
                 }
+            } elseif ($refundPayment) {
+                // If paid_amount is now 0, cancel the old refund
+                $refundPayment->update(['cheque_status' => 'Canceled']);
             }
 
             DB::commit();
@@ -402,40 +440,31 @@ class PurchaseReturnController extends Controller
             $netTotal = $return->net_total;
             $originalInvoice = $return->original_invoice;
 
-            // 1. Revert Stock (Increase because purchase return decreased stock)
-            $items = PurchaseReturnItem::where('purchase_return_id', $id)->get();
-            foreach ($items as $si) {
-                $product = Items::find($si->item_id);
-                if ($product) {
-                    $product->stock_1 = ($product->stock_1 ?? 0) + $si->total_pcs;
-                    $product->save();
+            // 2. Revert Stock for Items
+            $returnItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
+            foreach ($returnItems as $ri) {
+                $item = Items::find($ri->item_id);
+                if ($item) {
+                    $packing = (float)($item->packing_full ?? 1);
+                    $totalRevertPcs = (float)($ri->total_pcs) + ((float)($ri->bonus_qty_carton ?? 0) * $packing) + (float)($ri->bonus_qty_pcs ?? 0);
+                    $item->stock_1 = ($item->stock_1 ?? 0) + $totalRevertPcs;
+                    $item->save();
                 }
             }
 
-            // 2. Revert Original Invoice Balance & Status
-            if ($originalInvoice) {
-                $purchase = Purchase::where('invoice', $originalInvoice)->first();
-                if ($purchase) {
-                    $purchase->remaining_amount += $netTotal;
+            // 3. Revert Original Invoice Balance & Status
+            $this->updatePurchaseStatusAndBalance($originalInvoice);
 
-                    // Recalculate Status
-                    $allReturns = PurchaseReturn::where('original_invoice', $originalInvoice)
-                        ->where('id', '!=', $id)
-                        ->sum('net_total');
+            // 4. Sync Refund Payment (Cancel it)
+            $refundPayment = Payment::where('remarks', 'like', "%Refund for Purchase Return Invoice: {$return->invoice}%")
+                ->where('account_id', $return->supplier_id)
+                ->first();
 
-                    if ($allReturns <= 0) {
-                        $purchase->status = 'Active';
-                    } elseif ($allReturns < $purchase->net_total) {
-                        $purchase->status = 'Partial Return';
-                    } else {
-                        $purchase->status = 'Returned';
-                    }
-
-                    $purchase->save();
-                }
+            if ($refundPayment) {
+                $refundPayment->update(['cheque_status' => 'Canceled']);
             }
 
-            // 3. Delete Return Items & Return
+            // 5. Delete Return Items & Return
             PurchaseReturnItem::where('purchase_return_id', $id)->delete();
             $return->delete();
 

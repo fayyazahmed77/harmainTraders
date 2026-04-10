@@ -12,8 +12,8 @@ import DataTable from "./DataTable";
 import { BreadcrumbItem } from "@/types";
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Procurement", href: "#" },
-    { title: "Purchase Return", href: "/purchase-return" },
+    { title: "Buying", href: "#" },
+    { title: "Returns", href: "/purchase-return" },
 ];
 
 interface PurchaseReturn {
@@ -63,8 +63,8 @@ export default function Index({ returns }: Props) {
                             className="flex flex-col md:flex-row md:items-end justify-between gap-6"
                         >
                             <Heading
-                                title="Financial Recovery Ledger"
-                                description="Secure archive of purchase return protocols and credit adjustments"
+                                title="Purchase Returns"
+                                description="View and manage all items returned to suppliers"
                             />
 
                             <div className="flex items-center gap-3">
@@ -74,7 +74,7 @@ export default function Index({ returns }: Props) {
                                 >
                                     <Link href="/purchase-return/create">
                                         <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
-                                        Initialize Return
+                                        Create New Return
                                     </Link>
                                 </Button>
                             </div>
@@ -84,9 +84,9 @@ export default function Index({ returns }: Props) {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             {[
                                 { label: "Total Returns", value: returns.length, icon: HistoryIcon, color: "orange" },
-                                { label: "Net Adjustment", value: `₨ ${returns.reduce((acc, r) => acc + (Number(r.net_total) || 0), 0).toLocaleString()}`, icon: Receipt, color: "zinc" },
+                                { label: "Total Refunded", value: `₨ ${returns.reduce((acc, r) => acc + (Number(r.net_total) || 0), 0).toLocaleString()}`, icon: Receipt, color: "zinc" },
                                 { label: "Total Items", value: returns.reduce((acc, r) => acc + (Number(r.no_of_items) || 0), 0), icon: Activity, color: "orange" },
-                                { label: "Registry Health", value: "99.8%", icon: Sparkles, color: "emerald" },
+                                { label: "System Status", value: "99.8%", icon: Sparkles, color: "emerald" },
                             ].map((stat, i) => (stat &&
                                 <motion.div
                                     key={stat.label}

@@ -78,15 +78,63 @@ class AccountHistoryController extends Controller
 
     public function getBankStatement(Request $request, Account $account)
     {
+        $perPage = 20;
+        $page = (int) $request->get('page', 1);
+
         // For Bank / Cash, transactions are where they are the intermediate paying/receiving account
         $transactions = Payment::where('payment_account_id', $account->id)
             ->with(['account', 'cheque'])
             ->latest('date')
             ->latest('id')
-            ->paginate(15);
+            ->paginate($perPage);
+
+        // Calculate the balance at the start of this page (descending order)
+        // We start from current total and subtract/add transactions that appeared in previous pages
+        $runningBalance = $account->current_balance;
+
+        if ($page > 1) {
+            // Impact of transactions on pages BEFORE this one
+            $offset = ($page - 1) * $perPage;
             
+            // Replicate current_balance logic exclude cancel
+            $previousTransactions = Payment::where('payment_account_id', $account->id)
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhere('cheque_status', '')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                })
+                ->latest('date')
+                ->latest('id')
+                ->limit($offset)
+                ->get(['type', 'amount']);
+
+            foreach ($previousTransactions as $t) {
+                if ($t->type === 'RECEIPT') $runningBalance -= $t->amount;
+                else $runningBalance += $t->amount;
+            }
+        }
+
+        // Attach running balance to each item
+        $items = collect($transactions->items())->map(function ($item) use (&$runningBalance) {
+            $data = $item->toArray();
+            $data['running_balance'] = (float)$runningBalance;
+            
+            // Re-attach relationship data that toArray might have handled differently or if we need specific keys
+            $data['account'] = $item->account;
+
+            // For next row (older), we reverse the current transaction ONLY if it is cleared (or is a direct Cash method)
+            $isBypassedMethod = !in_array($item->payment_method, ['Cheque', 'Online']);
+            $isCleared = $isBypassedMethod || empty($item->cheque_status) || in_array($item->cheque_status, ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+            if ($isCleared) {
+                if ($item->type === 'RECEIPT') $runningBalance -= (float)$item->amount;
+                else $runningBalance += (float)$item->amount;
+            }
+            return $data;
+        });
+
         return response()->json([
-            'data' => $transactions->items(),
+            'data' => $items,
             'current_page' => $transactions->currentPage(),
             'last_page' => $transactions->lastPage(),
             'total' => $transactions->total(),

@@ -72,10 +72,11 @@ interface PurchaseReturn {
     no_of_items: number;
     gross_total: number;
     discount_total: number;
-    tax_total: number;
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
+    total_cartons?: number;
+    total_pcs?: number;
     supplier: {
         id: number;
         title: string;
@@ -92,6 +93,11 @@ interface DataTableProps {
 
 const PREMIUM_ROUNDING = "rounded-xl";
 
+const toNum = (v: any) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+};
+
 export default function DataTable({ data }: DataTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -105,7 +111,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: ({ column }) => (
                 <div className="flex items-center gap-2 cursor-pointer select-none hover:text-orange-500 transition-colors" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
                     <Calendar className="h-3 w-3" />
-                    <span>Registry Date</span>
+                    <span>Return Date</span>
                     <ArrowUpDown className="h-3 w-3 opacity-50" />
                 </div>
             ),
@@ -126,7 +132,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: ({ column }) => (
                 <div className="flex items-center gap-2">
                     <Hash className="h-3 w-3" />
-                    <span>Protocol ID</span>
+                    <span>Return No</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -135,7 +141,7 @@ export default function DataTable({ data }: DataTableProps) {
                         {row.original.invoice}
                     </span>
                     <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">
-                        Origin: {row.original.original_invoice}
+                        Original Bill: {row.original.original_invoice}
                     </span>
                 </div>
             ),
@@ -145,7 +151,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: ({ column }) => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3" />
-                    <span>Entity Counterparty</span>
+                    <span>Supplier / Vendor</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -154,20 +160,25 @@ export default function DataTable({ data }: DataTableProps) {
                         {row.original.supplier.title}
                     </span>
                     <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest opacity-60 italic">
-                        Node: #{row.original.supplier.id.toString().padStart(4, '0')}
+                        ID: #{row.original.supplier.id.toString().padStart(4, '0')}
                     </span>
                 </div>
             ),
         },
         {
             accessorKey: "no_of_items",
-            header: "Payload",
+            header: "Items Info",
             cell: ({ row }) => (
-                <div className="flex items-center gap-2">
-                    <Package className="h-3 w-3 text-zinc-400" />
-                    <span className="text-[10px] font-black text-zinc-500 uppercase">
-                        {row.original.no_of_items} Units
-                    </span>
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                        <Package className="h-3 w-3 text-zinc-400" />
+                        <span className="text-[10px] font-black text-zinc-500 uppercase">
+                            {row.original.no_of_items} Products
+                        </span>
+                    </div>
+                    <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest mt-1">
+                        {toNum(row.original.total_cartons)} Full / {toNum(row.original.total_pcs)} Pcs
+                    </div>
                 </div>
             ),
         },
@@ -176,7 +187,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: ({ column }) => (
                 <div className="flex items-center gap-2 cursor-pointer select-none hover:text-orange-500 transition-colors" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
                     <Wallet className="h-3 w-3" />
-                    <span>Currency Value</span>
+                    <span>Total Amount</span>
                     <ArrowUpDown className="h-3 w-3 opacity-50" />
                 </div>
             ),
@@ -189,7 +200,7 @@ export default function DataTable({ data }: DataTableProps) {
                         </span>
                         <div className="flex items-center gap-1.5">
                             <div className="h-1 w-1 rounded-full bg-emerald-500" />
-                            <span className="text-[8px] font-bold text-emerald-600/70 uppercase tracking-widest font-mono">Verified Creditor</span>
+                            <span className="text-[8px] font-bold text-emerald-600/70 uppercase tracking-widest font-mono">Verified Refund</span>
                         </div>
                     </div>
                 );
@@ -207,7 +218,7 @@ export default function DataTable({ data }: DataTableProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
-                            <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-3 py-2">Return Protocols</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-3 py-2">Select Action</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
                             <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
                                 onClick={() => window.open(`/purchase-return/${doc.id}/pdf`, '_blank')}
@@ -234,7 +245,7 @@ export default function DataTable({ data }: DataTableProps) {
                                 }}
                             >
                                 <Trash2 className="h-3.5 w-3.5 text-zinc-400 group-hover:text-rose-500 transition-colors" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Purge Protocol</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Delete Return</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -267,7 +278,7 @@ export default function DataTable({ data }: DataTableProps) {
                 <div className="relative max-w-sm w-full group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
                     <Input
-                        placeholder="Filter ledger indices..."
+                        placeholder="Search returns..."
                         className="h-10 pl-10 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 focus:ring-orange-500/20 text-[10px] uppercase font-bold tracking-widest transition-all"
                         value={globalFilter}
                         onChange={(e) => setGlobalFilter(e.target.value)}
@@ -275,7 +286,7 @@ export default function DataTable({ data }: DataTableProps) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" className="rounded-lg h-10 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-orange-500 transition-colors">
-                        <Filter className="mr-2 h-3.5 w-3.5" /> Advance Logic
+                        <Filter className="mr-2 h-3.5 w-3.5" /> Filters
                     </Button>
                     <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-2" />
                     <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
@@ -316,7 +327,7 @@ export default function DataTable({ data }: DataTableProps) {
                                 <TableCell colSpan={columns.length} className="h-32 text-center">
                                     <div className="flex flex-col items-center justify-center gap-2 opacity-50">
                                         <HistoryIcon className="h-8 w-8 text-zinc-300" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Zero Ledger Entries</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">No returns found</span>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -337,7 +348,7 @@ export default function DataTable({ data }: DataTableProps) {
                         onClick={() => table.previousPage()}
                         disabled={!table.getCanPreviousPage()}
                     >
-                        Prev Sector
+                        Previous
                     </Button>
                     <Button
                         variant="ghost"
@@ -346,7 +357,7 @@ export default function DataTable({ data }: DataTableProps) {
                         onClick={() => table.nextPage()}
                         disabled={!table.getCanNextPage()}
                     >
-                        Next Sector
+                        Next
                     </Button>
                 </div>
             </div>
@@ -357,17 +368,17 @@ export default function DataTable({ data }: DataTableProps) {
                     <DialogHeader>
                         <DialogTitle className="text-sm font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                             <ShieldAlert className="h-4 w-4 text-rose-500" />
-                            Purge Registry Entry
+                            Confirm Delete
                         </DialogTitle>
                         <DialogDescription className="text-xs font-bold text-zinc-500 uppercase tracking-widest leading-relaxed pt-2">
-                            Are you absolutely sure you want to delete return protocol <span className="text-rose-500 font-black tracking-tighter text-sm italic">{returnToDelete?.invoice}</span>?
+                            Are you absolutely sure you want to delete this return <span className="text-rose-500 font-black tracking-tighter text-sm italic">{returnToDelete?.invoice}</span>?
                             <br /><br />
                             This action will <span className="text-zinc-900 dark:text-zinc-100 font-black">REVERT STOCK LEVELS</span> and <span className="text-zinc-900 dark:text-zinc-100 font-black">RESTORE INVOICE BALANCE</span>. This process cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0 pt-4">
                         <Button variant="ghost" className="rounded-lg h-10 px-6 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" onClick={() => setIsDeleteDialogOpen(false)}>
-                            Cancel Session
+                            Cancel
                         </Button>
                         <Button
                             className="rounded-lg h-10 px-6 bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
@@ -376,13 +387,13 @@ export default function DataTable({ data }: DataTableProps) {
                                     router.delete(`/purchase-return/${returnToDelete.id}`, {
                                         onSuccess: () => {
                                             setIsDeleteDialogOpen(false);
-                                            toast.success("Ledger Entry Purged Successfully");
+                                            toast.success("Return deleted successfully");
                                         }
                                     });
                                 }
                             }}
                         >
-                            Execute Purge
+                            Delete Now
                         </Button>
                     </DialogFooter>
                 </DialogContent>

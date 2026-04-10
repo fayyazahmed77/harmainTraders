@@ -85,6 +85,7 @@ interface Item {
     pt6?: number;
     pt7?: number;
     scheme?: string;
+    scheme2?: string;
 }
 
 interface Category {
@@ -120,15 +121,25 @@ interface MessageLine {
     messageline: string;
 }
 
-export default function OfferListing({ items, categories, accounts, messageLines }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[] }) {
+interface Firm {
+    id: number;
+    name: string;
+    logo?: string;
+}
+
+export default function OfferListing({ items, categories, accounts, messageLines, firms }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[]; firms: Firm[] }) {
     const [date] = useState(new Date().toLocaleDateString('en-GB'));
     const [selectedAccount, setSelectedAccount] = useState<string>("");
+    const [selectedFirm, setSelectedFirm] = useState<string>("");
     const [customerCategory, setCustomerCategory] = useState<string | null>(null);
     const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
     // Offer Types: 1 = One Customer Group, 2 = Market Offer
     const [offerType, setOfferType] = useState<"1" | "2">("1");
+    const [cartonPriceTier, setCartonPriceTier] = useState<string>("1");
+    const [loosePriceTier, setLoosePriceTier] = useState<string>("2");
+    const [marketPriceTier, setMarketPriceTier] = useState<string>("7");
 
     // Item Registry Dialog State
     const [isRegistryOpen, setIsRegistryOpen] = useState(false);
@@ -167,32 +178,39 @@ export default function OfferListing({ items, categories, accounts, messageLines
             if (!item) return row;
 
             const baseTP = Number(item.trade_price ?? 0);
-            const pt2Total = calculatePrice(item, null, 2);
-            const pt7Total = calculatePrice(item, null, 7);
             const packingQty = Number(item.packing_qty) || 1;
-
+            
             let offerPrice = baseTP;
-            let loosePrice = pt2Total;
+            let packPrice = baseTP;
+            let loosePrice = baseTP;
+            let tp6Price = baseTP;
+            let selectedPercentage = 0;
 
             if (offerType === "1") {
-                offerPrice = pt2Total;
-                loosePrice = pt2Total;
+                packPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                offerPrice = loosePrice; 
+                selectedPercentage = Number(item[`pt${loosePriceTier}` as keyof Item] ?? 0);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier)); // fallback
             } else if (offerType === "2") {
-                offerPrice = pt7Total;
-                loosePrice = Math.round(pt7Total / packingQty);
-            } else {
-                offerPrice = calculatePrice(item, customerCategory);
-                loosePrice = Math.round(offerPrice / packingQty);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier));
+                offerPrice = tp6Price;
+                loosePrice = Math.round(tp6Price / packingQty);
+                selectedPercentage = Number(item[`pt${marketPriceTier}` as keyof Item] ?? 0);
+                packPrice = 0;
             }
 
             return {
                 ...row,
                 trade_price: offerPrice,
-                pack_ctn: offerType === "1" ? baseTP : row.pack_ctn,
-                loos_ctn: offerType === "1" ? loosePrice : row.loos_ctn
+                pack_ctn: offerType === "1" ? packPrice : row.pack_ctn,
+                loos_ctn: offerType === "1" ? loosePrice : row.loos_ctn,
+                tp6: tp6Price,
+                pt7: selectedPercentage,
+                scheme: (offerType === "2" ? item.scheme2 : item.scheme) ?? ""
             };
         }));
-    }, [selectedAccount, customerCategory, offerType]);
+    }, [selectedAccount, customerCategory, offerType, cartonPriceTier, loosePriceTier, marketPriceTier, items]);
 
     const getEmptyRow = (): RowData => ({
         id: Date.now() + Math.random(),
@@ -233,38 +251,42 @@ export default function OfferListing({ items, categories, accounts, messageLines
             const catName = cat ? cat.name : "Uncategorized";
             
             const baseTP = Number(item.trade_price ?? 0);
-            const pt2Total = calculatePrice(item, null, 2);
-            const pt7Total = calculatePrice(item, null, 7);
             const packingQty = Number(item.packing_qty) || 1;
-
+            
             let offerPrice = baseTP;
-            let loosePrice = pt2Total;
+            let packPrice = baseTP;
+            let loosePrice = baseTP;
+            let tp6Price = baseTP;
+            let selectedPercentage = 0;
 
             if (offerType === "1") {
-                offerPrice = pt2Total;
-                loosePrice = pt2Total;
+                packPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                offerPrice = loosePrice; 
+                selectedPercentage = Number(item[`pt${loosePriceTier}` as keyof Item] ?? 0);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier)); // fallback
             } else if (offerType === "2") {
-                offerPrice = pt7Total;
-                loosePrice = Math.round(pt7Total / packingQty);
-            } else {
-                offerPrice = calculatePrice(item, customerCategory);
-                loosePrice = Math.round(offerPrice / packingQty);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier));
+                offerPrice = tp6Price;
+                loosePrice = Math.round(tp6Price / packingQty);
+                selectedPercentage = Number(item[`pt${marketPriceTier}` as keyof Item] ?? 0);
+                packPrice = 0;
             }
 
             const newRow: RowData = {
                 id: Date.now() + item.id + Math.random(),
                 item_id: item.id,
                 title: item.title,
-                pack_ctn: offerType === "1" ? baseTP : 0,
+                pack_ctn: offerType === "1" ? packPrice : 0,
                 loos_ctn: offerType === "1" ? loosePrice : 0,
                 trade_price: offerPrice,
                 retail: item.retail,
                 category_name: catName,
                 discount: item.discount?.toString() ?? "",
-                scheme: item.scheme ?? "",
+                scheme: (offerType === "2" ? item.scheme2 : item.scheme) ?? "",
                 mrp: item.retail,
-                tp6: Math.round(baseTP * (1 + Number(item.pt7 ?? 0) / 100)),
-                pt7: Number(offerType === "2" ? item.pt7 : (offerType === "1" ? item.pt2 : item.pt7)),
+                tp6: tp6Price,
+                pt7: selectedPercentage,
                 company: item.company
             };
 
@@ -294,38 +316,42 @@ export default function OfferListing({ items, categories, accounts, messageLines
             const catName = cat ? cat.name : "Uncategorized";
 
             const baseTP = Number(item.trade_price ?? 0);
-            const pt2Total = calculatePrice(item, null, 2);
-            const pt7Total = calculatePrice(item, null, 7);
             const packingQty = Number(item.packing_qty) || 1;
-
+            
             let offerPrice = baseTP;
-            let loosePrice = pt2Total;
+            let packPrice = baseTP;
+            let loosePrice = baseTP;
+            let tp6Price = baseTP;
+            let selectedPercentage = 0;
 
             if (offerType === "1") {
-                offerPrice = pt2Total;
-                loosePrice = pt2Total;
+                packPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                offerPrice = loosePrice; 
+                selectedPercentage = Number(item[`pt${loosePriceTier}` as keyof Item] ?? 0);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier)); // fallback
             } else if (offerType === "2") {
-                offerPrice = pt7Total;
-                loosePrice = Math.round(pt7Total / packingQty);
-            } else {
-                offerPrice = calculatePrice(item, customerCategory);
-                loosePrice = Math.round(offerPrice / packingQty);
+                tp6Price = calculatePrice(item, null, Number(marketPriceTier));
+                offerPrice = tp6Price;
+                loosePrice = Math.round(tp6Price / packingQty);
+                selectedPercentage = Number(item[`pt${marketPriceTier}` as keyof Item] ?? 0);
+                packPrice = 0;
             }
 
             return {
                 id: Date.now() + item.id + Math.random(),
                 item_id: item.id,
                 title: item.title,
-                pack_ctn: offerType === "1" ? baseTP : 0,
+                pack_ctn: offerType === "1" ? packPrice : 0,
                 loos_ctn: offerType === "1" ? loosePrice : 0,
                 trade_price: offerPrice,
                 retail: item.retail,
                 category_name: catName,
                 discount: item.discount?.toString() ?? "",
-                scheme: item.scheme ?? "",
+                scheme: (offerType === "2" ? item.scheme2 : item.scheme) ?? "",
                 mrp: item.retail,
-                tp6: Math.round(baseTP * (1 + Number(item.pt7 ?? 0) / 100)),
-                pt7: Number(offerType === "2" ? item.pt7 : (offerType === "1" ? item.pt2 : item.pt7)),
+                tp6: tp6Price,
+                pt7: selectedPercentage,
                 company: item.company
             };
         });
@@ -350,6 +376,22 @@ export default function OfferListing({ items, categories, accounts, messageLines
 
         const cat = categories.find(c => String(c.id) === String(selected.category));
         const catName = cat ? cat.name : "Uncategorized";
+        
+        const packingQty = Number(selected.packing_qty) || 1;
+        let offerPrice = Number(selected.trade_price ?? 0);
+        let tp6Price = offerPrice;
+        let selectedPercentage = 0;
+
+        if (offerType === "1") {
+            const loosePrice = calculatePrice(selected, null, Number(loosePriceTier));
+            offerPrice = loosePrice;
+            selectedPercentage = Number(selected[`pt${loosePriceTier}` as keyof Item] ?? 0);
+            tp6Price = calculatePrice(selected, null, Number(marketPriceTier)); // fallback
+        } else if (offerType === "2") {
+            tp6Price = calculatePrice(selected, null, Number(marketPriceTier));
+            offerPrice = tp6Price;
+            selectedPercentage = Number(selected[`pt${marketPriceTier}` as keyof Item] ?? 0);
+        }
 
         setRows((prev) =>
             prev.map((row) =>
@@ -358,16 +400,16 @@ export default function OfferListing({ items, categories, accounts, messageLines
                         ...row,
                         item_id: itemId,
                         title: selected.title,
-                        pack_ctn: 0,
-                        loos_ctn: 0,
-                        trade_price: calculatePrice(selected, customerCategory),
+                        pack_ctn: offerType === "1" ? calculatePrice(selected, null, Number(cartonPriceTier)) : 0,
+                        loos_ctn: offerType === "1" ? calculatePrice(selected, null, Number(loosePriceTier)) : Math.round(tp6Price / packingQty),
+                        trade_price: offerPrice,
                         retail: selected.retail,
                         category_name: catName,
                         discount: selected.discount?.toString() ?? "",
-                        scheme: selected.scheme ?? "",
+                        scheme: (offerType === "2" ? selected.scheme2 : selected.scheme) ?? "",
                         mrp: selected.retail,
-                        tp6: Math.round(Number(selected.trade_price ?? 0) * (1 + Number(selected.pt7 ?? 0) / 100)),
-                        pt7: Number(selected.pt7 ?? 0),
+                        tp6: tp6Price,
+                        pt7: selectedPercentage,
                         company: selected.company
                     }
                     : row
@@ -399,6 +441,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
 
         router.post('/offer-list', {
             account_id: null,
+            firm_id: selectedFirm && selectedFirm !== "0" ? Number(selectedFirm) : null,
             date: formattedDate,
             price_type: offerType, // 1 or 2
             message_line_id: null,
@@ -496,8 +539,90 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                     />
                                 </div>
 
-                                <div className="col-span-1 md:col-span-12 lg:col-span-2 space-y-2">
-                                    {/* Select Customer area removed */}
+                                {offerType === "1" ? (
+                                    <>
+                                        <div className="col-span-1 md:col-span-4 lg:col-span-2 space-y-2">
+                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                                <PercentCircle className="h-3 w-3" />
+                                                Carton Tier
+                                            </div>
+                                            <Select value={cartonPriceTier} onValueChange={setCartonPriceTier}>
+                                                <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                                    <SelectValue placeholder="Select Tier" />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="col-span-1 md:col-span-4 lg:col-span-2 space-y-2">
+                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                                <PercentCircle className="h-3 w-3" />
+                                                Loose Ctn Tier
+                                            </div>
+                                            <Select value={loosePriceTier} onValueChange={setLoosePriceTier}>
+                                                <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                                    <SelectValue placeholder="Select Tier" />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="col-span-1 md:col-span-6 lg:col-span-2 space-y-2">
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                            <PercentCircle className="h-3 w-3" />
+                                            Market Tier
+                                        </div>
+                                        <Select value={marketPriceTier} onValueChange={setMarketPriceTier}>
+                                            <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                                <SelectValue placeholder="Select Tier" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                                <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                                <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
+                                                <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
+                                                <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
+                                                <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
+                                                <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
+                                                <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                <div className="col-span-1 md:col-span-12 lg:col-span-4 space-y-2">
+                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
+                                        <Briefcase className="h-3 w-3" />
+                                        Select Firm
+                                    </div>
+                                    <Select value={selectedFirm} onValueChange={setSelectedFirm}>
+                                        <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                            <SelectValue placeholder="General / Harmain" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                            <SelectItem value="0" className="text-xs font-bold">Default (Harmain)</SelectItem>
+                                            {firms.map((firm) => (
+                                                <SelectItem key={firm.id} value={firm.id.toString()} className="text-xs font-bold">
+                                                    {firm.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </Card>
@@ -736,7 +861,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                 </div>
 
                 <Dialog open={isRegistryOpen} onOpenChange={setIsRegistryOpen}>
-                    <DialogContent className="sm:max-w-[95vw] w-[95vw] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[98vh]">
+                    <DialogContent className="sm:max-w-[60vw] w-[60vw] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[85vh]">
                         <div className="p-6 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shrink-0">
                             <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
                                 <Box className="w-6 h-6 text-orange-500" /> Item Registry
@@ -771,13 +896,13 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                     const isSelected = rows.some(r => r.item_id === item.id);
                                     
                                     const getPrices = () => {
-                                        const baseTP = Number(item.trade_price ?? 0);
-                                        const pt2Total = calculatePrice(item, null, 2);
-                                        const pt7Total = calculatePrice(item, null, 7);
                                         if (offerType === "1") {
-                                            return { pack: baseTP, loose: pt2Total };
+                                            const cartonPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                                            const loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                                            return { pack: cartonPrice, loose: loosePrice };
                                         }
-                                        return { pack: pt7Total, loose: Math.round(pt7Total / (item.packing_qty || 1)) };
+                                        const marketPrice = calculatePrice(item, null, Number(marketPriceTier));
+                                        return { pack: marketPrice, loose: Math.round(marketPrice / (item.packing_qty || 1)) };
                                     };
                                     const prices = getPrices();
                                     
@@ -808,7 +933,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                             <div className="col-span-2 text-center font-black tabular-nums text-zinc-600 dark:text-zinc-400">Rs {prices.loose.toLocaleString()}</div>
                                             <div className="col-span-2 text-center">
                                                 <span className="px-2 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-500/20">
-                                                    {item.scheme || 'NO SCHEME'}
+                                                    {(offerType === "2" ? item.scheme2 : item.scheme) || 'NO SCHEME'}
                                                 </span>
                                             </div>
                                             <div className="col-span-2 text-right font-black tabular-nums text-orange-600 dark:text-orange-500">Rs {item.retail.toLocaleString()}</div>

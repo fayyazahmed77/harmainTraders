@@ -97,6 +97,7 @@ interface Props {
     accounts: Account[];
     salemans: { id: number; name: string }[];
     nextInvoiceNo: string;
+    paymentAccounts: { id: number; title: string; code: string }[];
 }
 
 const toNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
@@ -272,7 +273,7 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
-export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceNo }: Props) {
+export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceNo, paymentAccounts }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     // ── Header state ──────────────────────────
@@ -282,6 +283,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(0);
+    const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState<string | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState("");
 
@@ -291,12 +293,27 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const [invoiceSearch, setInvoiceSearch] = useState("");
     const [loadingInvoices, setLoadingInvoices] = useState(false);
 
+    const [desktopAccOpen, setDesktopAccOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
     // ── Mobile specific states ────────────────
     const [showStickyFooter, setShowStickyFooter] = useState(true);
     const lastScrollY = React.useRef(0);
     const [mobileAccOpen, setMobileAccOpen] = useState(false);
-    const [desktopAccOpen, setDesktopAccOpen] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+
+    // Determines if we show cash refund or balance adjustment
+    const isPaidInvoice = useMemo(() => {
+        if (!selectedInvoice) return false;
+        return toNum(selectedInvoice.remaining_amount) <= 0;
+    }, [selectedInvoice]);
+
+    // Reset refund if invoice type changes
+    useEffect(() => {
+        if (!isPaidInvoice) {
+            setRefundAmount(0);
+            setSelectedPaymentAccountId(null);
+        }
+    }, [isPaidInvoice]);
 
     // ── Method B: Assign Items Dialog state ───
     const [assignItemDialogOpen, setAssignItemDialogOpen] = useState(false);
@@ -575,12 +592,26 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     // ── Calculations ───────────────────────────
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const baseAmount = units * toNum(r.rate);
-            const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
+            const packing = toNum(r.packing) || 1;
+            const units = toNum(r.full) * packing + toNum(r.pcs);
+            const rate = toNum(r.rate);
+            const baseAmount = units * rate;
+            const discPercent = toNum(r.discPercent);
+            const taxPercent = toNum(r.taxPercent);
+            
+            const discAmount = (discPercent / 100) * baseAmount;
             const taxableAmount = baseAmount - discAmount;
-            const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
-            return { ...r, amount: +(taxableAmount + taxAmount).toFixed(2) };
+            const taxAmount = (taxPercent / 100) * taxableAmount;
+            const finalAmount = taxableAmount + taxAmount;
+
+            return { 
+                ...r, 
+                amount: +finalAmount.toFixed(2),
+                computed_units: units,
+                computed_base: baseAmount,
+                computed_tax: taxAmount,
+                computed_disc: discAmount
+            };
         });
     }, [rows]);
 
@@ -589,13 +620,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const totals = useMemo(() => {
         let gross = 0, tax = 0, disc = 0;
         rowsWithAmount.forEach(r => {
-            const units = toNum(r.full) * toNum(r.packing) + toNum(r.pcs);
-            const base = units * toNum(r.rate);
-            const d = (toNum(r.discPercent) / 100) * base;
-            const t = (toNum(r.taxPercent) / 100) * (base - d);
-            gross += base;
-            disc += d;
-            tax += t;
+            gross += r.computed_base;
+            disc += r.computed_disc;
+            tax += r.computed_tax;
         });
         return {
             gross: +gross.toFixed(2),
@@ -637,6 +664,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             tax_total: totals.tax,
             net_total: totals.net,
             paid_amount: refundAmount,
+            payment_account_id: selectedPaymentAccountId,
             remaining_amount: totals.net - refundAmount,
             items: validRows.map(r => {
                 const base = (r.full * r.packing + r.pcs) * r.rate;
@@ -646,6 +674,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     item_id: r.item_id,
                     qty_carton: r.full,
                     qty_pcs: r.pcs,
+                    bonus_qty_carton: r.bonus_full,
+                    bonus_qty_pcs: r.bonus_pcs,
                     total_pcs: r.full * r.packing + r.pcs,
                     trade_price: r.rate,
                     discount: +d.toFixed(2),
@@ -825,7 +855,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         <div className={`hidden md:flex flex-1 overflow-hidden flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
                             <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-4 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20`}>
                                 <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Inventory Identification</div>
-                                <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-2'} text-center text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100/30 dark:bg-zinc-950/50 -mx-1 py-1`}>Manifest Qty</div>
+                                <div className={hasAnyBonus ? 'col-span-1' : 'col-span-2' + " text-center text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-100/30 dark:bg-zinc-950/50 -mx-1 py-1"}>Manifest Qty</div>
                                 {hasAnyBonus && (
                                     <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-500/5 dark:bg-green-500/10 -mx-1 py-1">Bonus Qty</div>
                                 )}
@@ -833,7 +863,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
                                 <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
-                                <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-1'} text-right text-[10px] font-black uppercase tracking-widest text-zinc-500`}>Position Net</div>
+                                <div className="col-span-1 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
+                                <div className="col-span-1" /> {/* Action Column placeholder */}
                             </div>
 
                             {/* Main Item Table Section */}
@@ -924,8 +955,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             </div>
 
                                             {/* Total Position */}
-                                            <div className="col-span-1 flex items-center justify-end gap-2 group-hover:pr-1 transition-all">
-                                                <div className="text-right font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                            <div className="col-span-1 text-right">
+                                                <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                            </div>
+
+                                            {/* Action Column */}
+                                            <div className="col-span-1 flex items-center justify-center">
                                                 <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
                                                     onClick={() => setRows(p => p.filter(r => r.id !== row.id))}>
                                                     <Trash2 size={12} />
@@ -988,7 +1023,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                 </div>
                             </div>
 
-                            {rows.map((row, idx) => (
+                            {rowsWithAmount.map((row, idx) => (
                                 <Card key={row.id} onClick={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
                                     className={`${CARD_BASE} ${PREMIUM_ROUNDING_MD} p-4 space-y-3 relative overflow-hidden ${focusedRowId === row.id ? 'ring-2 ring-orange-500/50 border-orange-500/50' : ''}`}>
                                     {row.item_id ? (
@@ -1132,7 +1167,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     <Calculator size={120} className="text-zinc-900 dark:text-white" strokeWidth={1} />
                                 </div>
 
-                                <div className="p-6 space-y-8 relative z-10">
+                                <div className="p-4 space-y-4 relative z-10">
                                     <div className="flex justify-between items-start">
                                         <h3 className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-2">
                                             <Calculator size={10} className="text-orange-500" />
@@ -1140,14 +1175,14 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         </h3>
                                     </div>
 
-                                    <div className="space-y-6">
-                                        <div className="space-y-1 group">
+                                    <div className="space-y-4">
+                                        <div className="space-y-0.5 group">
                                             <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-between">
                                                 Gross Position
                                                 <Info size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
-                                            <div className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-zinc-400 dark:text-zinc-600 text-lg">Rs</span>
+                                            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
+                                                <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
                                                 {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </div>
                                         </div>
@@ -1155,52 +1190,100 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 pt-1">
+                                            <div className="space-y-0.5">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
                                                     <BadgePercent size={10} />
                                                     Tax Impact
                                                 </div>
-                                                <div className="text-base font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
                                                     + {totals.tax.toLocaleString()}
                                                 </div>
                                             </div>
-                                            <div className="space-y-1 text-right">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5 pt-1">
+                                            <div className="space-y-0.5 text-right">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5">
                                                     <ArrowDownToLine size={10} className="text-rose-500" />
                                                     Disc. Total
                                                 </div>
-                                                <div className="text-base font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
+                                                <div className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
                                                     - {totals.disc.toLocaleString()}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className={`bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 p-5 space-y-1 relative ${PREMIUM_ROUNDING_MD}`}>
+                                        <div className={`bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 p-4 space-y-1 relative ${PREMIUM_ROUNDING_MD}`}>
                                             <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest flex justify-between">
                                                 Net Disbursement
                                                 <Calculator size={10} className="opacity-50" />
                                             </div>
-                                            <div className="text-3xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-orange-600 dark:text-orange-500 text-lg opacity-50 font-mono font-normal">Rs</span>
+                                            <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
+                                                <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono font-normal">Rs</span>
                                                 {totals.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4 pt-4">
-                                        <TechLabel label="Immediate Cash Refund" icon={ArrowRightLeft}>
-                                            <div className="relative">
-                                                <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
-                                                    className={`h-12 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-600 text-xs font-mono">PKR</div>
-                                            </div>
-                                        </TechLabel>
+                                    <div className="space-y-3 pt-2">
+                                        {isPaidInvoice ? (
+                                            <>
+                                                <TechLabel label="Immediate Cash Refund" icon={ArrowRightLeft}>
+                                                    <div className="relative">
+                                                        <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
+                                                            className={`h-11 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-lg tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-600 text-[10px] font-mono">PKR</div>
+                                                    </div>
+                                                </TechLabel>
 
-                                        <div className={`bg-zinc-50 dark:bg-zinc-800/50 p-3 flex justify-between items-center ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800`}>
-                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
-                                            <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - refundAmount).toLocaleString()}</div>
-                                        </div>
+                                                <div className="flex flex-col items-end">
+                                                    <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
+                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - refundAmount).toLocaleString()}</div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="bg-zinc-100 dark:bg-zinc-800/100 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl space-y-2">
+                                                <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <ShieldCheck size={12} className="text-orange-500" />
+                                                    Balance Adjustment Protocol
+                                                </div>
+                                                <div className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
+                                                    Source document has outstanding balance. Return value will be credited to ledger instead of cash refund.
+                                                </div>
+                                                <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                                                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Update</span>
+                                                    <span className="text-sm font-mono font-black text-orange-500">Rs {totals.net.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {refundAmount > 0 && (
+                                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                                <RotateCcw size={12} /> Refund Disbursement Account
+                                            </div>
+                                            <div className="max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {paymentAccounts?.map(acc => (
+                                                        <button
+                                                            key={acc.id}
+                                                            onClick={() => setSelectedPaymentAccountId(acc.id.toString())}
+                                                            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                                                                selectedPaymentAccountId === acc.id.toString() 
+                                                                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' 
+                                                                : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                                                            }`}
+                                                        >
+                                                            <span className="text-[11px] font-black uppercase tracking-tight">{acc.title}</span>
+                                                            <div className={`w-3 h-3 rounded-full border-2 ${
+                                                                selectedPaymentAccountId === acc.id.toString()
+                                                                ? 'bg-emerald-500 border-emerald-500'
+                                                                : 'border-zinc-300 dark:border-zinc-700'
+                                                            }`} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
 
                                     <div className="pt-2">
                                         <Button className={`w-full h-14 ${ACCENT_GRADIENT} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}

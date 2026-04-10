@@ -35,7 +35,7 @@ class SalesController extends Controller
         }
 
         // Filter by Status
-        if ($request->has('status') && $request->status) {
+        if ($request->has('status') && $request->status && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
@@ -91,9 +91,8 @@ class SalesController extends Controller
             })
             ->get();
         $salemans = Saleman::get();
-        // Only load items that are in stock
+        // Load all items (including out of stock)
         $items = Items::with('lastPurchaseItem.purchase.supplier')
-            ->where('stock_1', '>', 0)
             ->get()
             ->map(function ($item) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
@@ -115,9 +114,9 @@ class SalesController extends Controller
             $nextInvoiceNo = 'SLS-' . str_pad($number + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        // Fetch Payment Accounts (Cash/Bank)
-        $paymentAccounts = Account::whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Cash', 'Bank']);
+        // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
+        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+            $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
         // Fetch Firms for invoice branding
@@ -192,14 +191,35 @@ class SalesController extends Controller
             $paidAmount = $request->paid_amount ?? 0;
             $remainingAmount = ($netTotal - $extraDiscount) - $paidAmount;
 
-            $actualPaidOnThisBill = $paidAmount;
-            $surplusAmount = 0;
+            // --- Multi-Method Split Payments & Allocation Logic ---
+            $isMulti = (bool) $request->input('is_multi', false);
+            $splitsData = $isMulti ? $request->input('splits', []) : [];
 
-            if ($paidAmount > $netTotal) {
-                $actualPaidOnThisBill = $netTotal;
-                $remainingAmount = 0;
-                $surplusAmount = $paidAmount - $netTotal;
+            // Calculate total paid from all splits
+            $totalPaidAmount = 0;
+            if ($isMulti) {
+                foreach ($splitsData as $split) {
+                    $totalPaidAmount += (float) ($split['amount'] ?? 0);
+                }
+            } else {
+                $totalPaidAmount = (float) ($request->paid_amount ?? 0);
+                // Normalize single payment to split format for unified processing
+                if ($request->is_pay_now && $totalPaidAmount > 0 && $request->payment_account_id) {
+                    $splitsData = [[
+                        'payment_account_id' => $request->payment_account_id,
+                        'amount' => $totalPaidAmount,
+                        'payment_method' => $request->payment_method ?? 'Cash',
+                        'cheque_no' => $request->cheque_no,
+                        'cheque_date' => $request->cheque_date,
+                        'clear_date' => $request->clear_date,
+                    ]];
+                }
             }
+
+            // Calculate how much goes to THIS bill vs Surplus (Previous Balance)
+            $actualPaidOnThisBill = min($totalPaidAmount, $request->net_total);
+            $surplusAmount = max(0, $totalPaidAmount - $request->net_total);
+            $remainingAmount = max(0, $request->net_total - $actualPaidOnThisBill);
 
             $sale = Sales::create([
                 'date'            => $request->date,
@@ -228,7 +248,6 @@ class SalesController extends Controller
                     $commissionAmount = round(($sale->net_total * $salesman->commission_percentage) / 100);
 
                     if ($commissionAmount > 0) {
-                        // Create Credit Transaction
                         \App\Models\WalletTransaction::create([
                             'salesman_id' => $salesman->id,
                             'sale_id'     => $sale->id,
@@ -238,92 +257,139 @@ class SalesController extends Controller
                             'status'      => 'unpaid',
                         ]);
 
-                        // Update Salesman Wallet Balance
                         $salesman->wallet_balance += $commissionAmount;
                         $salesman->save();
                     }
                 }
             }
-            // ---------------------------------
 
-            // If is_pay_now is true, create a Payment record
-            if ($request->is_pay_now && $paidAmount > 0 && $request->payment_account_id) {
-                // Generate Voucher No
-                $prefix = 'CRV-';
-                $count = Payment::where('type', 'RECEIPT')->count() + 1;
-                $voucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+            // --- Auto-Allocate Existing Advances (Unallocated Receipts) ---
+            $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
+                ->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNull('cheque_status')
+                      ->orWhere('cheque_status', '!=', 'Canceled');
+                })
+                ->get()
+                ->filter(function($p) {
+                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                    return $p->net_amount > $allocated;
+                })
+                ->sortBy('date');
 
-                $payment = Payment::create([
-                    'date' => $request->date,
-                    'voucher_no' => $voucherNo,
-                    'account_id' => $request->customer_id,
-                    'payment_account_id' => $request->payment_account_id,
-                    'amount' => $paidAmount,
-                    'net_amount' => $paidAmount,
-                    'type' => 'RECEIPT',
-                    'payment_method' => $request->payment_method ?? 'Cash',
-                    'remarks' => 'Auto-generated from Sale ' . $sale->invoice,
-                ]);
-
-                // Allocation for current bill
-                if ($actualPaidOnThisBill > 0) {
+            foreach ($unallocatedPayments as $p) {
+                if ($sale->remaining_amount <= 0) break;
+                
+                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                $avail = $p->net_amount - $allocated;
+                $allocationAmount = min($sale->remaining_amount, $avail);
+                
+                if ($allocationAmount > 0) {
                     PaymentAllocation::create([
-                        'payment_id' => $payment->id,
+                        'payment_id' => $p->id,
                         'bill_id' => $sale->id,
                         'bill_type' => 'App\Models\Sales',
-                        'amount' => $actualPaidOnThisBill,
+                        'amount' => $allocationAmount,
                     ]);
+                    
+                    $sale->paid_amount += $allocationAmount;
+                    $sale->remaining_amount -= $allocationAmount;
+                }
+            }
+            $sale->save();
+
+            // --- Process Payments & Allocations ---
+            if (count($splitsData) > 0) {
+                $prefix = 'CRV-';
+                $count = Payment::where('type', 'RECEIPT')->count() + 1;
+                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $groupId = null;
+                $createdPayments = [];
+
+                foreach ($splitsData as $index => $split) {
+                    if (($split['amount'] ?? 0) <= 0) continue;
+
+                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    
+                    $payment = Payment::create([
+                        'date' => $request->date,
+                        'voucher_no' => $voucherNo,
+                        'account_id' => $request->customer_id,
+                        'payment_account_id' => $split['payment_account_id'],
+                        'amount' => $split['amount'],
+                        'net_amount' => $split['amount'],
+                        'type' => 'RECEIPT',
+                        'payment_method' => $split['payment_method'] ?? 'Cash',
+                        'cheque_no' => $split['cheque_no'] ?? null,
+                        'cheque_date' => $split['cheque_date'] ?? null,
+                        'clear_date' => $split['clear_date'] ?? null,
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Pending',
+                        'remarks' => 'Auto-generated from Sale ' . $sale->invoice,
+                    ]);
+
+                    if ($index === 0) $groupId = $payment->id;
+                    $payment->update(['group_id' => $groupId]);
+                    $createdPayments[] = $payment;
                 }
 
-                // If there is surplus, allocate to older bills
-                if ($surplusAmount > 0 && $request->customer_id) {
-                    $olderBills = Sales::where('customer_id', $request->customer_id)
-                        ->where('id', '!=', $sale->id)
-                        ->where('remaining_amount', '>', 0)
-                        ->orderBy('date', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
+                // Distribution Logic
+                $remainingToAllocate = $totalPaidAmount;
 
-                    foreach ($olderBills as $oldBill) {
-                        if ($surplusAmount <= 0) break;
-
-                        $allocation = min($surplusAmount, $oldBill->remaining_amount);
-
-                        // Create Allocation Record
-                        PaymentAllocation::create([
-                            'payment_id' => $payment->id,
-                            'bill_id' => $oldBill->id,
-                            'bill_type' => 'App\Models\Sales',
-                            'amount' => $allocation,
-                        ]);
-
-                        $oldBill->paid_amount += $allocation;
-                        $oldBill->remaining_amount -= $allocation;
-                        $oldBill->save();
-
-                        $surplusAmount -= $allocation;
+                if ($remainingToAllocate > 0) {
+                    // 1. Current Bill Allocation (Respecting existing advance allocations)
+                    $toThisBill = min($remainingToAllocate, $sale->remaining_amount);
+                    if ($toThisBill > 0) {
+                        $tempThis = $toThisBill;
+                        foreach ($createdPayments as $p) {
+                            if ($tempThis <= 0) break;
+                            $canTake = min($tempThis, $p->net_amount);
+                            PaymentAllocation::create([
+                                'payment_id' => $p->id,
+                                'bill_id' => $sale->id,
+                                'bill_type' => 'App\Models\Sales',
+                                'amount' => $canTake,
+                            ]);
+                            $tempThis -= $canTake;
+                        }
+                        $remainingToAllocate -= $toThisBill;
                     }
-                }
-            } else {
-                // Standard Auto-allocation logic without creating a Payment record (if needed, but usually we should create a payment)
-                // If there is surplus, allocate to older bills
-                if ($surplusAmount > 0 && $request->customer_id) {
-                    $olderBills = Sales::where('customer_id', $request->customer_id)
-                        ->where('id', '!=', $sale->id)
-                        ->where('remaining_amount', '>', 0)
-                        ->orderBy('date', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
 
-                    foreach ($olderBills as $oldBill) {
-                        if ($surplusAmount <= 0) break;
+                    // 2. Surplus -> Older Bills (FIFO)
+                    if ($remainingToAllocate > 0 && $request->customer_id) {
+                        $olderBills = Sales::where('customer_id', $request->customer_id)
+                            ->where('id', '!=', $sale->id)
+                            ->where('remaining_amount', '>', 0)
+                            ->orderBy('date', 'asc')
+                            ->orderBy('id', 'asc')
+                            ->get();
 
-                        $allocation = min($surplusAmount, $oldBill->remaining_amount);
-                        $oldBill->paid_amount += $allocation;
-                        $oldBill->remaining_amount -= $allocation;
-                        $oldBill->save();
+                        foreach ($olderBills as $oldBill) {
+                            if ($remainingToAllocate <= 0) break;
+                            $allocation = min($remainingToAllocate, $oldBill->remaining_amount);
+                            $tempOld = $allocation;
 
-                        $surplusAmount -= $allocation;
+                            foreach ($createdPayments as $p) {
+                                if ($tempOld <= 0) break;
+                                $alreadyAlloc = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                                $avail = $p->net_amount - $alreadyAlloc;
+
+                                if ($avail > 0) {
+                                    $step = min($tempOld, $avail);
+                                    PaymentAllocation::create([
+                                        'payment_id' => $p->id,
+                                        'bill_id' => $oldBill->id,
+                                        'bill_type' => 'App\Models\Sales',
+                                        'amount' => $step,
+                                    ]);
+                                    $tempOld -= $step;
+                                }
+                            }
+                            
+                            $oldBill->paid_amount += $allocation;
+                            $oldBill->remaining_amount -= $allocation;
+                            $oldBill->save();
+                            $remainingToAllocate -= $allocation;
+                        }
                     }
                 }
             }
@@ -368,13 +434,13 @@ class SalesController extends Controller
             DB::commit();
 
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                // Redirect to index with PDF URL in session
-                return redirect()->route('sale.index')
+                return redirect()->back()
                     ->with('success', 'Sale saved successfully!')
+                    ->with('id', $sale->id)
                     ->with('pdf_url', route('sale.pdf', ['sale' => $sale->id, 'format' => $request->print_format]));
             }
 
-            return redirect()->route('sale.index')->with('success', 'Sale saved successfully!');
+            return redirect()->back()->with('success', 'Sale saved successfully!')->with('id', $sale->id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -384,7 +450,12 @@ class SalesController extends Controller
     //edit
     public function edit($id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items')->find($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item')->find($id);
+
+        // Fetch associated payments (splits) linked to this sale via allocations
+        $sale->splits = Payment::whereHas('allocations', function($q) use ($id) {
+            $q->where('bill_id', $id)->where('bill_type', 'App\Models\Sales');
+        })->get();
 
         $accounts = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
@@ -405,9 +476,9 @@ class SalesController extends Controller
                 return $item;
             });
 
-        // Fetch Payment Accounts (Cash/Bank)
-        $paymentAccounts = Account::whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Cash', 'Bank']);
+        // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
+        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+            $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
         // Fetch Firms for invoice branding
@@ -439,6 +510,10 @@ class SalesController extends Controller
             'discount_total'  => 'required|numeric',
             'tax_total'       => 'required|numeric',
             'net_total'       => 'required|numeric',
+            'courier_charges' => 'nullable|numeric',
+            'extra_discount'  => 'nullable|numeric',
+            'total_receivable' => 'nullable|numeric',
+            'paid_amount'     => 'nullable|numeric',
 
             // items array validation
             'items'                   => 'required|array',
@@ -451,13 +526,49 @@ class SalesController extends Controller
             'items.*.discount'        => 'required|numeric',
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
+            'items.*.bonus_qty_carton' => 'nullable|numeric',
+            'items.*.bonus_qty_pcs'    => 'nullable|numeric',
             'message_line_id'          => 'nullable|integer|exists:message_lines,id',
+            'allow_negative_stock'     => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
 
         try {
-            $sale = Sales::find($id);
+            $sale = Sales::findOrFail($id);
+
+            // --- Multi-Method Split Payments & Allocation Logic ---
+            $isMulti = (bool) $request->input('is_multi', false);
+            $splitsData = $isMulti ? $request->input('splits', []) : [];
+            $totalNewPaid = 0;
+
+            if ($isMulti) {
+                foreach ($splitsData as $split) {
+                    $totalNewPaid += (float) ($split['amount'] ?? 0);
+                }
+            } else if ($request->is_pay_now && (float)$request->paid_amount > 0) {
+                $totalNewPaid = (float)$request->paid_amount;
+                $splitsData = [[
+                    'payment_account_id' => $request->payment_account_id,
+                    'amount' => $totalNewPaid,
+                    'payment_method' => $request->payment_method ?? 'Cash',
+                    'cheque_no' => $request->cheque_no,
+                    'cheque_date' => $request->cheque_date,
+                    'clear_date' => $request->clear_date,
+                ]];
+            }
+
+            // Calculate updated totals
+            $netTotal = (float) $request->net_total;
+            $extraDiscount = (float) ($request->extra_discount ?? 0);
+            $existingPaid = (float) $sale->paid_amount;
+            
+            // Increment paid amount with NEW payments made during this edit
+            $newTotalPaid = $existingPaid + $totalNewPaid;
+            
+            $actualPaidOnThisBill = min($newTotalPaid, $netTotal);
+            $remainingAmount = max(0, $netTotal - $actualPaidOnThisBill);
+
             $sale->update([
                 'date'            => $request->date,
                 'invoice'         => $request->invoice,
@@ -474,9 +585,139 @@ class SalesController extends Controller
                 'net_total'       => $request->net_total,
                 'extra_discount'  => $request->extra_discount ?? 0,
                 'total_receivable' => $request->total_receivable ?? $sale->total_receivable,
-                'paid_amount'     => $request->paid_amount ?? $sale->paid_amount,
-                'remaining_amount' => ($request->net_total - ($request->extra_discount ?? 0)) - ($request->paid_amount ?? $sale->paid_amount),
+                'paid_amount'     => $actualPaidOnThisBill,
+                'remaining_amount' => $remainingAmount,
             ]);
+
+            // --- Auto-Allocate Existing Advances (Unallocated Receipts) ---
+            $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
+                ->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNull('cheque_status')
+                      ->orWhere('cheque_status', '!=', 'Canceled');
+                })
+                ->get()
+                ->filter(function($p) {
+                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                    return $p->net_amount > $allocated;
+                })
+                ->sortBy('date');
+
+            foreach ($unallocatedPayments as $p) {
+                if ($sale->remaining_amount <= 0) break;
+                
+                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                $avail = $p->net_amount - $allocated;
+                $allocationAmount = min($sale->remaining_amount, $avail);
+                
+                if ($allocationAmount > 0) {
+                    PaymentAllocation::create([
+                        'payment_id' => $p->id,
+                        'bill_id' => $sale->id,
+                        'bill_type' => 'App\Models\Sales',
+                        'amount' => $allocationAmount,
+                    ]);
+                    
+                    $sale->paid_amount += $allocationAmount;
+                    $sale->remaining_amount -= $allocationAmount;
+                }
+            }
+            $sale->save();
+
+            // --- Process New Payments & Allocations (Similar to store) ---
+            if (count($splitsData) > 0 && $totalNewPaid > 0) {
+                $prefix = 'CRV-';
+                $count = Payment::where('type', 'RECEIPT')->count() + 1;
+                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $groupId = null;
+                $createdPayments = [];
+
+                foreach ($splitsData as $index => $split) {
+                    if (($split['amount'] ?? 0) <= 0) continue;
+                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    
+                    $payment = Payment::create([
+                        'date' => $request->date,
+                        'voucher_no' => $voucherNo,
+                        'account_id' => $sale->customer_id,
+                        'payment_account_id' => $split['payment_account_id'],
+                        'amount' => $split['amount'],
+                        'net_amount' => $split['amount'],
+                        'type' => 'RECEIPT',
+                        'payment_method' => $split['payment_method'] ?? 'Cash',
+                        'cheque_no' => $split['cheque_no'] ?? null,
+                        'cheque_date' => $split['cheque_date'] ?? null,
+                        'clear_date' => $split['clear_date'] ?? null,
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Pending',
+                        'remarks' => 'Auto-generated from Edition of Sale ' . $sale->invoice,
+                    ]);
+
+                    if ($index === 0) $groupId = $payment->id;
+                    $payment->update(['group_id' => $groupId]);
+                    $createdPayments[] = $payment;
+                }
+
+                // Distribute NEW payments (surplus allocation)
+                $remainingToAllocate = $totalNewPaid;
+                if ($remainingToAllocate > 0) {
+                    // 1. Current Bill Allocation (Respecting existing advance allocations)
+                    $canTakeToThis = max(0, $sale->remaining_amount);
+                    $toThisBill = min($remainingToAllocate, $canTakeToThis);
+                    
+                    if ($toThisBill > 0) {
+                        $tempThis = $toThisBill;
+                        foreach ($createdPayments as $p) {
+                            if ($tempThis <= 0) break;
+                            $canTake = min($tempThis, $p->net_amount);
+                            PaymentAllocation::create([
+                                'payment_id' => $p->id,
+                                'bill_id' => $sale->id,
+                                'bill_type' => 'App\Models\Sales',
+                                'amount' => $canTake,
+                            ]);
+                            $tempThis -= $canTake;
+                        }
+                        $remainingToAllocate -= $toThisBill;
+                    }
+
+                    // 2. Surplus -> Older Bills (FIFO)
+                    if ($remainingToAllocate > 0 && $sale->customer_id) {
+                        $olderBills = Sales::where('customer_id', $sale->customer_id)
+                            ->where('id', '!=', $sale->id)
+                            ->where('remaining_amount', '>', 0)
+                            ->orderBy('date', 'asc')
+                            ->orderBy('id', 'asc')
+                            ->get();
+
+                        foreach ($olderBills as $oldBill) {
+                            if ($remainingToAllocate <= 0) break;
+                            $allocation = min($remainingToAllocate, $oldBill->remaining_amount);
+                            $tempOld = $allocation;
+
+                            foreach ($createdPayments as $p) {
+                                if ($tempOld <= 0) break;
+                                $alreadyAlloc = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                                $avail = $p->net_amount - $alreadyAlloc;
+                                if ($avail > 0) {
+                                    $step = min($tempOld, $avail);
+                                    PaymentAllocation::create([
+                                        'payment_id' => $p->id,
+                                        'bill_id' => $oldBill->id,
+                                        'bill_type' => 'App\Models\Sales',
+                                        'amount' => $step,
+                                    ]);
+                                    $tempOld -= $step;
+                                }
+                            }
+                            
+                            $oldBill->paid_amount += $allocation;
+                            $oldBill->remaining_amount -= $allocation;
+                            $oldBill->save();
+                            $remainingToAllocate -= $allocation;
+                        }
+                    }
+                }
+            }
 
             // Revert Stock for old items (Increase back including bonus)
             $oldItems = SalesItem::where('sale_id', $id)->get();
@@ -486,7 +727,6 @@ class SalesController extends Controller
                     $packing = $product->packing_qty ?: 1;
                     $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
                     $totalToRevert = $oldItem->total_pcs + $bonusUnits;
-
                     $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
                 }
             }
@@ -494,10 +734,9 @@ class SalesController extends Controller
             // Delete old items
             SalesItem::where('sale_id', $id)->delete();
 
-            \Illuminate\Support\Facades\Log::info("SalesController@update: Processing stock for sale " . $id);
+            \Illuminate\Support\Facades\Log::info("SalesController@update: Processing new stock for sale " . $id);
             // Insert new items and update stock (Decrease)
             foreach ($request->items as $it) {
-                \Illuminate\Support\Facades\Log::info("Processing new item ID: " . $it['item_id'] . " Total PCS: " . $it['total_pcs']);
                 SalesItem::create([
                     'sale_id'     => $sale->id,
                     'item_id'     => $it['item_id'],
@@ -519,13 +758,12 @@ class SalesController extends Controller
                     $packing = $item->packing_qty ?: 1;
                     $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
                     $totalToDeduct = $it['total_pcs'] + $bonusUnits;
-
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
                 }
             }
 
             DB::commit();
-            return redirect()->route('sale.index')->with('success', 'Sale updated successfully!');
+            return redirect()->back()->with('success', 'Sale updated successfully!')->with('id', $id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());

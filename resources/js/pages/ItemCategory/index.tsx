@@ -159,7 +159,7 @@ export default function Index({ categories, filters }: PageProps) {
       </SidebarProvider>
 
       <Dialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}>
-        <DialogContent className="max-w-2xl rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl">
+        <DialogContent className="max-w-md rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl">
           <DialogHeader className="border-b border-zinc-100 dark:border-zinc-800 pb-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
@@ -173,87 +173,20 @@ export default function Index({ categories, filters }: PageProps) {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="py-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Name</Label>
-                  <div className="relative">
-                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                    <Input
-                      required
-                      value={form.name}
-                      onChange={(e) => setForm("name", e.target.value)}
-                      placeholder="e.g. Beverages"
-                      className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
-                    />
-                  </div>
-                  {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.name}</p>}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Name</Label>
+                <div className="relative">
+                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                  <Input
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm("name", e.target.value)}
+                    placeholder="e.g. Beverages"
+                    className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
+                  />
                 </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Code</Label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                    <Input
-                      required
-                      value={form.code}
-                      onChange={(e) => setForm("code", e.target.value.toUpperCase())}
-                      placeholder="e.g. BEV"
-                      className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
-                    />
-                  </div>
-                  {errors.code && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.code}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 text-left block">Category Icon</Label>
-                  <div className="group relative aspect-square w-32 mx-auto rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden transition-all hover:border-orange-500/50 bg-zinc-50 dark:bg-zinc-900">
-                    {imagePreview ? (
-                      <img src={imagePreview} className="h-full w-full object-cover" alt="Preview" />
-                    ) : (
-                      <div className="text-center p-4">
-                        <ImageIcon className="h-6 w-6 text-zinc-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-                        <span className="text-[8px] font-black uppercase text-zinc-400">Upload Icon</span>
-                      </div>
-                    )}
-                    <Input
-                      type="file"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={handleImageChange}
-                      accept="image/*"
-                    />
-                  </div>
-                  {errors.image && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.image}</p>}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Description</Label>
-                  <div className="relative">
-                    <Textarea
-                      value={form.description}
-                      onChange={(e) => setForm("description", e.target.value)}
-                      placeholder="Enter category details..."
-                      className="min-h-[150px] border-zinc-200 dark:border-zinc-800 rounded-xl font-medium text-sm"
-                    />
-                  </div>
-                  {errors.description && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.description}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Status</Label>
-                  <Select value={form.status} onValueChange={(v: "active" | "inactive") => setForm("status", v)}>
-                    <SelectTrigger className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[10px]">
-                      <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="active" className="font-bold">Active</SelectItem>
-                      <SelectItem value="inactive" className="font-bold">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.status && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.status}</p>}
-                </div>
+                {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.name}</p>}
               </div>
             </div>
 

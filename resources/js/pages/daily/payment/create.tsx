@@ -38,6 +38,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
 // ───────────────────────────────────────────
 // Style Constants (Perfect UI Aesthetic)
@@ -47,7 +48,6 @@ const PREMIUM_ROUNDING_MD = "rounded-md";
 const MONO_FONT = "font-mono tracking-tighter";
 
 const PREMIUM_GRADIENT = "bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900";
-const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
 const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
 const PREMIUM_TRANSITION = "transition-all duration-300 ease-in-out";
 
@@ -69,7 +69,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
   const colors = {
     green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+    orange: "bg-orange-500/10 ${t.text} border-orange-500/20",
     blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
   };
   return (
@@ -140,7 +140,59 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     }
   }, [errors]);
 
+  const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">("RECEIPT");
   const [paymentAccountId, setPaymentAccountId] = useState<string>(""); // Cash/Bank
+
+  const t = useMemo(() => {
+    return paymentType === 'RECEIPT' ? {
+      text: "text-emerald-600 dark:text-emerald-500",
+      textLight: "text-emerald-500",
+      textDark: "text-emerald-600",
+      bgHover: "hover:bg-emerald-50 dark:hover:bg-emerald-500/10",
+      bgHoverRow: "hover:bg-emerald-50/30 dark:hover:bg-emerald-500/5",
+      bgSelectedRow: "bg-emerald-500/5",
+      borderHover: "hover:border-emerald-500",
+      borderHoverAlpha: "hover:border-emerald-500/30",
+      border: "border-emerald-500",
+      groupHoverBg: "group-hover:bg-emerald-500",
+      gradient: "bg-gradient-to-r from-emerald-500 to-teal-500",
+      gradientShadow: "shadow-emerald-500/20",
+      checkboxChecked: "data-[state=checked]:bg-emerald-500",
+      focusRing: "focus-visible:ring-emerald-500",
+      blob: "bg-emerald-500/5",
+      alphaBox: "bg-emerald-500/5 border border-emerald-500/10",
+      borderAlpha: "border-emerald-500/30",
+      borderLight: "border-emerald-200 dark:border-emerald-500/20",
+      btnBg: "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20",
+      badgeBox: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500",
+      groupHoverBorder: "border-emerald-500/20 group-hover:border-emerald-500",
+      scrollbarHover: "#10b981", // emerald-500
+    } : {
+      text: "text-rose-600 dark:text-rose-500",
+      textLight: "text-rose-500",
+      textDark: "text-rose-600",
+      bgHover: "hover:bg-rose-50 dark:hover:bg-rose-500/10",
+      bgHoverRow: "hover:bg-rose-50/30 dark:hover:bg-rose-500/5",
+      bgSelectedRow: "bg-rose-500/5",
+      borderHover: "hover:border-rose-500",
+      borderHoverAlpha: "hover:border-rose-500/30",
+      border: "border-rose-500",
+      groupHoverBg: "group-hover:bg-rose-500",
+      gradient: "bg-gradient-to-r from-rose-500 to-red-500",
+      gradientShadow: "shadow-rose-500/20",
+      checkboxChecked: "data-[state=checked]:bg-rose-500",
+      focusRing: "focus-visible:ring-rose-500",
+      blob: "bg-rose-500/5",
+      alphaBox: "bg-rose-500/5 border border-rose-500/10",
+      borderAlpha: "border-rose-500/30",
+      borderLight: "border-rose-200 dark:border-rose-500/20",
+      btnBg: "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20",
+      badgeBox: "bg-rose-500/10 text-rose-600 dark:text-rose-500",
+      groupHoverBorder: "border-rose-500/20 group-hover:border-rose-500",
+      scrollbarHover: "#f43f5e", // rose-500
+    };
+  }, [paymentType]);
+
 
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [balanceOrientation, setBalanceOrientation] = useState<string>("dr");
@@ -156,16 +208,51 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [chequeDate, setChequeDate] = useState<string>("");
   const [clearDate, setClearDate] = useState<string>("");
   const [remarks, setRemarks] = useState<string>("");
-  const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">("RECEIPT");
+
   const [paymentMethod, setPaymentMethod] = useState<string>(""); // Online Transfer, Card, Cheque
   const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
   const [isMultiPayment, setIsMultiPayment] = useState<boolean>(false);
   const [multiDialogOpen, setMultiDialogOpen] = useState<boolean>(false);
   const [splitPayments, setSplitPayments] = useState<any[]>([
-    { id: Date.now(), payment_account_id: "", amount: 0, discount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }
+    { id: Date.now(), payment_account_id: "", amount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }
   ]);
   const [customerCheques, setCustomerCheques] = useState<any[]>([]);
   const [originalChequeId, setOriginalChequeId] = useState<string>("");
+  const [chequeSelectorOpen, setChequeSelectorOpen] = useState(false);
+  const [chequeSearch, setChequeSearch] = useState("");
+  const [chequeSelectorTarget, setChequeSelectorTarget] = useState<'single' | number | null>(null);
+
+  const filteredCustomerCheques = useMemo(() => {
+    if (!chequeSearch) return customerCheques;
+    const searchLow = chequeSearch.toLowerCase();
+    return customerCheques.filter(chq => 
+      chq.cheque_no?.toLowerCase().includes(searchLow) ||
+      chq.customer_name?.toLowerCase().includes(searchLow) ||
+      toNum(chq.amount).toString().includes(searchLow)
+    );
+  }, [customerCheques, chequeSearch]);
+
+  const handleChequeSelect = (chq: any) => {
+    if (chequeSelectorTarget === 'single') {
+      setOriginalChequeId(chq.id.toString());
+      setChequeNo(chq.cheque_no);
+      setChequeDate(chq.cheque_date);
+      setClearDate(chq.clear_date || "");
+      setAmount(toNum(chq.amount));
+    } else if (typeof chequeSelectorTarget === 'number') {
+      setSplitPayments(prev => prev.map(p => p.id === chequeSelectorTarget ? {
+        ...p,
+        original_cheque_id: chq.id.toString(),
+        cheque_no: chq.cheque_no,
+        cheque_date: chq.cheque_date,
+        clear_date: chq.clear_date || "",
+        amount: toNum(chq.amount)
+      } : p));
+    }
+    setChequeSelectorOpen(false);
+    setChequeSearch("");
+    setChequeSelectorTarget(null);
+  };
 
   // Bill Detail Modal State
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -452,7 +539,6 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       if (!isValid) return;
 
       const splitsTotal = cleanedSplits.reduce((s, p) => s + Number(p.amount), 0);
-      const splitsDiscount = cleanedSplits.reduce((s, p) => s + Number(p.discount), 0);
 
       finalPayload = {
         is_multi: true,
@@ -464,7 +550,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
         allocations: allocationPayload,
         splits: cleanedSplits,
         amount: splitsTotal, // Master sum
-        discount: splitsDiscount
+        discount: discount // Using global discount
       };
     } else {
       // Single Payment Validation
@@ -516,7 +602,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   };
 
   const addSplitRow = () => {
-    setSplitPayments([...splitPayments, { id: Date.now(), payment_account_id: "", amount: 0, discount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
+    setSplitPayments([...splitPayments, { id: Date.now(), payment_account_id: "", amount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
   };
 
   const removeSplitRow = (id: number) => {
@@ -662,14 +748,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
                   <div className="text-right space-y-0.5">
                     <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Ref Code</div>
-                    <div className="text-sm font-black text-orange-600 font-mono tracking-tighter uppercase">#{selectedAccountId || '---'}</div>
+                    <div className={`text-sm font-black ${t.textDark} font-mono tracking-tighter uppercase`}>#{selectedAccountId || '---'}</div>
                   </div>
                 </div>
 
                 <TechLabel label="Ledger Party" icon={UserIcon}>
                   <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
+                      <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} shadow-sm`}>
                         <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party..."}</span>
                         <Search size={14} className="text-zinc-400 flex-shrink-0 ml-2" />
                       </Button>
@@ -680,9 +766,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       </div>
                       <div className="max-h-[60vh] overflow-auto py-1">
                         {filteredAccounts.map(acc => (
-                          <button key={acc.id} className="w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-3 group border-l-2 border-transparent hover:border-orange-500"
+                          <button key={acc.id} className={`w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex items-center gap-3 group border-l-2 border-transparent ${t.borderHover}`}
                             onClick={() => handleAccountSelect(acc.id)}>
-                            <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
+                            <div className={`w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg} flex-shrink-0`} />
                             <span className="truncate">{acc.title}</span>
                           </button>
                         ))}
@@ -695,14 +781,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
             {/* Control Header (Desktop Only) */}
             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING} grid grid-cols-12 gap-6 items-end relative overflow-hidden`}>
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT}`} />
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-6 items-end relative overflow-hidden`}>
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${t.gradient}`} />
 
                 <div className="col-span-3">
                   <TechLabel label="Entry Date" icon={CalendarIcon}>
                     <Popover open={calOpen} onOpenChange={setCalOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
                           {fmtDate(date)}
                           <CalendarIcon size={14} className="text-zinc-400" />
                         </Button>
@@ -718,21 +804,36 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <TechLabel label="Ledger Party" icon={UserIcon}>
                     <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
                           {selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}
                           <Search size={14} className="text-zinc-400" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                      <PopoverContent className="w-100 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
                         <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
                           <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-9 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                         </div>
                         <div className="max-h-64 overflow-auto py-1">
                           {filteredAccounts.map(acc => (
-                            <button key={acc.id} className="w-full text-left px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
+                            <button key={acc.id} className={`w-full text-left px-4 py-2  text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex items-center gap-2 group border-l-2 border-transparent ${t.borderHover}`}
                               onClick={() => handleAccountSelect(acc.id)}>
-                              <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
-                              {acc.title}
+                              <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
+                              <div className="flex justify-between w-full pr-2">
+                                <div>{acc.title}</div>
+                                <div
+                                  className={cn(
+                                    "text-[8px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
+                                    (() => {
+                                      const name = acc.account_type?.name?.toLowerCase() || "";
+                                      if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 opacity-100";
+                                      if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400 opacity-100";
+                                      return "text-zinc-400 dark:text-zinc-500 opacity-40";
+                                    })()
+                                  )}
+                                >
+                                  {acc.account_type?.name || "---"}
+                                </div>
+                              </div>
                             </button>
                           ))}
                         </div>
@@ -745,12 +846,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="flex-1">
                     <TechLabel label="Payout Routing" icon={Navigation}>
                       <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
-                        <SelectTrigger className={`h-10 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-xs`}>
+                        <SelectTrigger className={cn(
+                          `h-10 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300`,
+                          paymentType === 'RECEIPT' 
+                            ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                            : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
+                        )}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="RECEIPT">INCOME (IN/CR)</SelectItem>
-                          <SelectItem value="PAYMENT">EXPENSE (OUT/DR)</SelectItem>
+                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">INCOME (IN/CR)</SelectItem>
+                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">EXPENSE (OUT/DR)</SelectItem>
                         </SelectContent>
                       </Select>
                     </TechLabel>
@@ -808,12 +914,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       ) : (
                         unpaidBills.map((bill, idx) => (
                           <motion.tr key={`${bill.type}-${bill.id}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
-                            className={`group hover:bg-orange-50/30 dark:hover:bg-orange-500/5 transition-colors cursor-default ${selectedBillIds.has(bill.id.toString()) ? 'bg-orange-500/5' : ''}`}>
+                            className={`group ${t.bgHoverRow} transition-colors cursor-default ${selectedBillIds.has(bill.id.toString()) ? '${t.blob}' : ''}`}>
                             <td className="p-4 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                              <Checkbox checked={selectedBillIds.has(bill.id.toString())} onCheckedChange={() => toggleBill(bill.id, Number(bill.remaining_amount))} className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500" />
+                              <Checkbox checked={selectedBillIds.has(bill.id.toString())} onCheckedChange={() => toggleBill(bill.id, Number(bill.remaining_amount))} className={`border-zinc-300 dark:border-zinc-700 ${t.checkboxChecked}`} />
                             </td>
                             <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                              <button onClick={() => fetchBillDetail(bill)} className="text-xs font-black text-orange-600 dark:text-orange-500 hover:underline uppercase tracking-tighter flex items-center gap-1.5 group/btn">
+                              <button onClick={() => fetchBillDetail(bill)} className={`text-xs font-black ${t.text} hover:underline uppercase tracking-tighter flex items-center gap-1.5 group/btn`}>
                                 <FileText size={12} className="opacity-50" />
                                 {bill.invoice_no}
                                 <ArrowUpRight size={10} className="opacity-0 group-hover/btn:opacity-100 transition-all -translate-x-1 group-hover/btn:translate-x-0" />
@@ -836,7 +942,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       type="number"
                                       value={allocations[bill.id.toString()] || ""}
                                       onChange={(e) => handleAllocationChange(bill.id.toString(), e.target.value)}
-                                      className={`h-8 text-right font-mono font-black text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 p-2 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD}`}
+                                      className={`h-8 text-right font-mono font-black text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 p-2 ${t.focusRing} ${PREMIUM_ROUNDING_MD}`}
                                       placeholder="0.00"
                                     />
                                   </motion.div>
@@ -880,11 +986,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Effective Payout</div>
-                        <div className="text-xl font-mono font-black text-orange-600 dark:text-orange-500 tracking-tighter">
+                        <div className={`text-xl font-mono font-black ${t.text} tracking-tighter`}>
                           Rs {totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </div>
-                      <div className={`w-10 h-10 ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD} flex items-center justify-center text-white shadow-lg shadow-orange-500/20`}>
+                      <div className={`w-10 h-10 ${t.gradient} ${PREMIUM_ROUNDING_MD} flex items-center justify-center text-white shadow-lg ${t.gradientShadow}`}>
                         <Calculator size={20} className="opacity-80" />
                       </div>
                     </div>
@@ -900,11 +1006,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             {/* Executive Summary Card */}
             <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-shrink-0">
               <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none`}>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none" />
+                <div className={`absolute top-0 right-0 w-32 h-32 ${t.blob} rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none`} />
 
                 <div className="flex justify-between items-center mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4 relative z-10">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${ACCENT_GRADIENT}`} />
+                    <div className={`w-2 h-2 rounded-full ${t.gradient}`} />
                     <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">PAYMENT</h3>
                   </div>
                   <div className="flex items-center gap-3">
@@ -920,12 +1026,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="flex justify-between items-end gap-4">
                     <div className="flex-1">
                       {isMultiPayment ? (
-                        <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl flex items-center justify-between">
+                        <div className={`p-3 ${t.alphaBox} rounded-xl flex items-center justify-between`}>
                           <div className="space-y-0.5">
-                            <div className="text-[8px] font-black text-orange-500 uppercase tracking-widest">Aggregate Total</div>
+                            <div className={`text-[8px] font-black ${t.textLight} uppercase tracking-widest`}>Aggregate Total</div>
                             <div className="text-xl font-black text-zinc-800 dark:text-white font-mono leading-none">Rs {splitPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}</div>
                           </div>
-                          <Button onClick={() => setMultiDialogOpen(true)} variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase tracking-tighter bg-white dark:bg-zinc-800 border-orange-500/30 text-orange-600">
+                          <Button onClick={() => setMultiDialogOpen(true)} variant="outline" size="sm" className={`h-8 text-[10px] font-black uppercase tracking-tighter bg-white dark:bg-zinc-800 ${t.borderAlpha} ${t.textDark}`}>
                             Manage Splits
                           </Button>
                         </div>
@@ -933,7 +1039,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                         <TechLabel label="Primary Disbursement" icon={ArrowRightLeft}>
                           <div className="relative">
                             <Input type="number" value={amount || ""} onChange={e => setAmount(toNum(e.target.value))}
-                              className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-2xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500 shadow-inner`} />
+                              className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-2xl tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} ${t.focusRing} shadow-inner`} />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 font-mono text-[10px]">PKR</div>
                           </div>
                         </TechLabel>
@@ -975,13 +1081,18 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                           {paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name !== 'Cheque in hand' && (
                             <TechLabel label="Bank Method" icon={Navigation}>
                               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 border-orange-200 dark:border-orange-500/20 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
+                                <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 ${t.borderLight} font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
                                   <SelectValue placeholder="Select Method..." />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-xl text-xs">
-                                  <SelectItem value="Online Transfer">Online Transfer</SelectItem>
-                                  <SelectItem value="Card">Card Payment</SelectItem>
-                                  <SelectItem value="Cheque">Cheque Release</SelectItem>
+                                  {paymentType === 'RECEIPT' ? (
+                                    <SelectItem value="Online Transfer">Online Transfer</SelectItem>
+                                  ) : (
+                                    <>
+                                      <SelectItem value="Online Transfer">Online Transfer</SelectItem>
+                                      <SelectItem value="Cheque">Cheque Release</SelectItem>
+                                    </>
+                                  )}
                                 </SelectContent>
                               </Select>
                             </TechLabel>
@@ -991,34 +1102,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                               <TechLabel label="Cheque No">
                                 {paymentType === 'PAYMENT' ? (
                                   paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand' ? (
-                                    <Select value={originalChequeId} onValueChange={(v) => {
-                                      const chq = customerCheques.find(c => c.id.toString() === v);
-                                      if (chq) {
-                                        setOriginalChequeId(v);
-                                        setChequeNo(chq.cheque_no);
-                                        setChequeDate(chq.cheque_date);
-                                        setClearDate(chq.clear_date || "");
-                                        setAmount(toNum(chq.amount));
-                                      }
-                                    }}>
-                                      <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!originalChequeId && 'border-orange-500'}`}>
-                                        <SelectValue placeholder="Select In Hand..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {customerCheques.length > 0 ? (
-                                          customerCheques.map((chq: any) => (
-                                            <SelectItem key={chq.id} value={chq.id.toString()} className="text-xs font-mono">
-                                              {chq.cheque_no} - {chq.customer_name} (Rs {toNum(chq.amount).toLocaleString()})
-                                            </SelectItem>
-                                          ))
-                                        ) : (
-                                          <SelectItem value="none" disabled className="text-xs italic text-rose-500">No cheques in hand</SelectItem>
-                                        )}
-                                      </SelectContent>
-                                    </Select>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setChequeSelectorTarget('single');
+                                        setChequeSelectorOpen(true);
+                                      }}
+                                      className={`h-9 w-full justify-between font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!originalChequeId && t.border}`}
+                                    >
+                                      <span className="truncate">{originalChequeId ? customerCheques.find(c => c.id.toString() === originalChequeId)?.cheque_no : "Select In Hand..."}</span>
+                                      <Search size={12} className="text-zinc-400 ml-2" />
+                                    </Button>
                                   ) : (
                                     <Select value={chequeNo} onValueChange={setChequeNo}>
-                                      <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!chequeNo && 'border-orange-500'}`}>
+                                      <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!chequeNo && t.border}`}>
                                         <SelectValue placeholder="Select Cheque..." />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -1061,7 +1158,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
 
                   <div className="pt-4">
-                    <Button className={`w-full h-14 ${ACCENT_GRADIENT} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
+                    <Button className={`w-full h-14 ${t.gradient} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg ${t.gradientShadow} transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
                       onClick={handleSave} disabled={loading}>
                       <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={loading ? { opacity: 0.5 } : {}}>
                         {loading ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
@@ -1113,12 +1210,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           <div className="flex items-center justify-between gap-4 mb-3">
             <div className="flex flex-col">
               <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider mb-0.5">Net Disbursement</div>
-              <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none tracking-tighter">
+              <div className={`text-2xl font-black ${t.text} leading-none tracking-tighter`}>
                 <span className="text-sm font-bold mr-1 font-mono">Rs</span>
                 {(amount - discount).toLocaleString()}
               </div>
             </div>
-            <Button onClick={handleSave} className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95" disabled={loading}>
+            <Button onClick={handleSave} className={`h-12 px-6 ${t.btnBg} text-white shadow-lg ${t.gradientShadow} rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95`} disabled={loading}>
               {loading ? <RotateCcw size={16} className="mr-2 animate-spin" /> : <CheckCircle2 size={16} className="mr-2" />}
               {loading ? "..." : (paymentType === 'RECEIPT' ? "RECEIVE" : "PAY")}
             </Button>
@@ -1141,7 +1238,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             <DialogHeader className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
               <div className="flex justify-between items-start">
                 <div className="space-y-1 text-left">
-                  <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-[0.4em]">Registry Analysis</span>
+                  <span className={`text-[10px] font-black ${t.text} uppercase tracking-[0.4em]`}>Registry Analysis</span>
                   <DialogTitle className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">
                     {selectedBillForDetail?.invoice_no || "Source Document"}
                   </DialogTitle>
@@ -1175,14 +1272,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <div className="py-20 text-center text-zinc-400 font-black text-[10px] uppercase tracking-[0.2em] italic">No transaction metadata available</div>
                     ) : (
                       billItems.map((item, idx) => (
-                        <div key={idx} className={`flex justify-between items-center p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 hover:border-orange-500/30 transition-all ${PREMIUM_ROUNDING_MD}`}>
+                        <div key={idx} className={`flex justify-between items-center p-4 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 ${t.borderHoverAlpha} transition-all ${PREMIUM_ROUNDING_MD}`}>
                           <div className="space-y-1">
                             <span className="block text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">{item.title}</span>
                             <span className="text-[10px] font-mono font-bold text-zinc-400">Rate: Rs {toNum(item.rate).toLocaleString()}</span>
                           </div>
                           <div className="text-right">
                             <span className="block text-sm font-mono font-black text-zinc-900 dark:text-white">x{item.qty}</span>
-                            <span className="text-xs font-mono font-black text-orange-600 dark:text-orange-500">Rs {toNum(item.subtotal).toLocaleString()}</span>
+                            <span className={`text-xs font-mono font-black ${t.text}`}>Rs {toNum(item.subtotal).toLocaleString()}</span>
                           </div>
                         </div>
                       ))
@@ -1209,14 +1306,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
               <div className="flex justify-between items-center">
                 <div className="space-y-1 text-left">
                   <div className="flex items-center gap-2">
-                    <ClipboardList size={16} className="text-orange-600" />
-                    <span className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest px-2 py-0.5 bg-orange-500/10 rounded-md">
+                    <ClipboardList size={16} className={`${t.textDark}`} />
+                    <span className={`text-[10px] font-black ${t.text} uppercase tracking-widest px-2 py-0.5 bg-orange-500/10 rounded-md`}>
                       {selectedAccountId ? `${accounts.find(a => a.id.toString() === selectedAccountId)?.title} (${accounts.find(a => a.id.toString() === selectedAccountId)?.account_type?.name})` : "No Party Selected"}
                     </span>
                   </div>
                   <DialogTitle className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">Payment Details</DialogTitle>
                 </div>
-                <Button onClick={addSplitRow} size="sm" className={`${ACCENT_GRADIENT} text-white font-bold text-[10px] uppercase h-8 px-4`}>
+                <Button onClick={addSplitRow} size="sm" className={`${t.gradient} text-white font-bold text-[10px] uppercase h-8 px-4`}>
                   <Plus size={14} className="mr-1.5" /> Add Split Method
                 </Button>
               </div>
@@ -1232,14 +1329,13 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     <th className="px-4 text-left w-48">Chq Date</th>
                     <th className="px-4 text-left w-48">Clear Date</th>
                     <th className="px-4 text-right w-48">Amount</th>
-                    <th className="px-4 text-right w-32">Discount</th>
                     <th className="px-4 text-center w-16"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {splitPayments.map((row, idx) => (
                     <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-lg group shadow-sm">
-                      <td className="p-4 border-l-4 border-orange-500/20 group-hover:border-orange-500 transition-all rounded-l-xl bg-white dark:bg-zinc-900 shadow-sm">
+                      <td className={`p-4 border-l-4 border-orange-500/20 group-${t.borderHover} transition-all rounded-l-xl bg-white dark:bg-zinc-900 shadow-sm`}>
                         <Select value={row.payment_account_id} onValueChange={v => updateSplitRow(row.id, 'payment_account_id', v)}>
                           <SelectTrigger className="h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-sm font-bold font-mono uppercase">
                             <SelectValue placeholder="Account..." />
@@ -1262,8 +1358,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                             ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Bank' ? (
                               <>
                                 <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
-                                <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
-                                <SelectItem value="Card" className="text-xs font-bold">Card</SelectItem>
+                                {paymentType === 'PAYMENT' && (
+                                  <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                )}
                               </>
                             ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
                               <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
@@ -1272,7 +1369,6 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                 <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                 <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
                                 <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
-                                <SelectItem value="Card" className="text-xs font-bold">Card</SelectItem>
                               </>
                             )}
                           </SelectContent>
@@ -1281,37 +1377,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                         {paymentType === 'PAYMENT' && row.payment_method === 'Cheque' ? (
                           paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
-                            <Select value={row.original_cheque_id} onValueChange={(v) => {
-                              const chq = customerCheques.find(c => c.id.toString() === v);
-                              if (chq) {
-                                setSplitPayments(splitPayments.map(p => p.id === row.id ? {
-                                  ...p,
-                                  original_cheque_id: v,
-                                  cheque_no: chq.cheque_no,
-                                  cheque_date: chq.cheque_date,
-                                  clear_date: chq.clear_date || "",
-                                  amount: toNum(chq.amount)
-                                } : p));
-                              }
-                            }}>
-                              <SelectTrigger disabled={!row.payment_account_id} className={`h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.original_cheque_id && 'border-orange-500'}`}>
-                                <SelectValue placeholder="Select In Hand..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {customerCheques.length > 0 ? (
-                                  customerCheques.map((chq: any) => (
-                                    <SelectItem key={chq.id} value={chq.id.toString()} className="text-xs font-mono">
-                                      {chq.cheque_no} - {chq.customer_name} (Rs {toNum(chq.amount).toLocaleString()})
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="none" disabled className="text-xs italic text-rose-500">No cheques in hand</SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setChequeSelectorTarget(row.id);
+                                setChequeSelectorOpen(true);
+                              }}
+                              className={`h-12 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.original_cheque_id && t.border}`}
+                            >
+                              <span className="truncate">{row.original_cheque_id ? customerCheques.find(c => c.id.toString() === row.original_cheque_id)?.cheque_no : "Select In Hand..."}</span>
+                              <Search size={14} className="text-zinc-400 ml-2" />
+                            </Button>
                           ) : (
                             <Select value={row.cheque_no} onValueChange={v => updateSplitRow(row.id, 'cheque_no', v)}>
-                              <SelectTrigger disabled={!row.payment_account_id} className={`h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.cheque_no && 'border-orange-500'}`}>
+                              <SelectTrigger disabled={!row.payment_account_id} className={`h-12 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.cheque_no && t.border}`}>
                                 <SelectValue placeholder="Select Cheque..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -1336,10 +1415,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                         <Input value={row.clear_date} onChange={e => updateSplitRow(row.id, 'clear_date', e.target.value)} type="date" className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs" />
                       </td>
                       <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                        <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-orange-500/30 text-right font-mono text-sm font-black" placeholder="0.00" />
-                      </td>
-                      <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                        <Input type="number" value={row.discount || ""} onChange={e => updateSplitRow(row.id, 'discount', toNum(e.target.value))} className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-right font-mono text-sm" placeholder="0.00" />
+                        <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 ${t.borderAlpha} text-right font-mono text-sm font-black`} placeholder="0.00" />
                       </td>
                       <td className="p-4 text-center rounded-r-xl bg-white dark:bg-zinc-900 shadow-sm">
                         <Button variant="ghost" size="icon" onClick={() => removeSplitRow(row.id)} className="h-10 w-10 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">
@@ -1359,15 +1435,30 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="text-sm font-black text-zinc-500 font-mono">Rs {totalAllocated.toLocaleString()}</div>
                 </div>
                 <div className="space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-8">
-                  <div className="text-[9px] font-black text-orange-500 uppercase tracking-widest">Aggregate Split Total</div>
+                  <div className={`text-[9px] font-black ${t.textLight} uppercase tracking-widest`}>Aggregate Split Total</div>
                   <div className={`text-xl font-black font-mono tracking-tighter ${Math.abs(splitPayments.reduce((s, p) => s + Number(p.amount), 0) - totalAllocated) < 1 ? 'text-emerald-600' : 'text-zinc-600 dark:text-zinc-300'}`}>
                     Rs {splitPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}
                   </div>
                 </div>
                 <div className="space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-8">
+                  <div className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <BadgePercent size={10} /> Total Discount
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-zinc-400">Rs</span>
+                    <Input 
+                      type="number" 
+                      value={discount || ""} 
+                      onChange={e => setDiscount(toNum(e.target.value))}
+                      className="h-8 w-24 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-right font-mono text-xs font-black p-2"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-0.5 border-l border-zinc-200 dark:border-zinc-800 pl-8">
                   <div className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Balance Required</div>
-                  <div className={`text-xl font-black font-mono tracking-tighter ${Math.abs(totalAllocated - splitPayments.reduce((s, p) => s + Number(p.amount), 0)) < 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    Rs {(totalAllocated - splitPayments.reduce((s, p) => s + Number(p.amount), 0)).toLocaleString()}
+                  <div className={`text-xl font-black font-mono tracking-tighter ${Math.abs(totalAllocated - (splitPayments.reduce((s, p) => s + Number(p.amount), 0) + discount)) < 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    Rs {(totalAllocated - (splitPayments.reduce((s, p) => s + Number(p.amount), 0) + discount)).toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -1380,11 +1471,77 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           </DialogContent>
         </Dialog>
 
+        {/* Cheque Selector Smart Dialog */}
+        <Dialog open={chequeSelectorOpen} onOpenChange={setChequeSelectorOpen}>
+          <DialogContent className={`sm:max-w-2xl w-full ${PREMIUM_ROUNDING} border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-0 overflow-hidden shadow-2xl`}>
+            <DialogHeader className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="flex justify-between items-center">
+                <div className="space-y-1 text-left">
+                  <span className={`text-[10px] font-black ${t.text} uppercase tracking-[0.4em]`}>Portfolio Selection</span>
+                  <DialogTitle className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase">Customer Cheques In Hand</DialogTitle>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="p-4 border-b border-zinc-50 dark:border-zinc-900 bg-zinc-50/30 dark:bg-zinc-900/10">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                <Input 
+                  placeholder="SEARCH CHEQUE #, CUSTOMER OR AMOUNT..." 
+                  value={chequeSearch} 
+                  onChange={e => setChequeSearch(e.target.value)} 
+                  className={`pl-10 h-11 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
+                />
+              </div>
+            </div>
+
+            <div className="max-h-[50vh] overflow-auto custom-scrollbar p-2">
+              <table className="w-full border-separate border-spacing-y-1">
+                <thead>
+                  <tr className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">
+                    <th className="px-4 py-2 text-left">Customer Name</th>
+                    <th className="px-4 py-2 text-left">Cheque #</th>
+                    <th className="px-4 py-2 text-right">Amount</th>
+                    <th className="px-4 py-2 text-center">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
+                  {filteredCustomerCheques.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-20 text-center text-zinc-400 font-bold text-[10px] uppercase tracking-widest italic">No matching cheques found</td>
+                    </tr>
+                  ) : (
+                    filteredCustomerCheques.map((chq: any) => (
+                      <tr 
+                        key={chq.id} 
+                        onClick={() => handleChequeSelect(chq)}
+                        className={`group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all rounded-lg overflow-hidden ${originalChequeId === chq.id.toString() || splitPayments.some(p => p.original_cheque_id === chq.id.toString()) ? 'bg-zinc-50 dark:bg-zinc-900' : ''}`}
+                      >
+                        <td className="px-4 py-3 text-[11px] font-bold text-zinc-900 dark:text-zinc-100 group-hover:pl-5 transition-all">{chq.customer_name}</td>
+                        <td className="px-4 py-3 text-[11px] font-mono font-black text-zinc-500">{chq.cheque_no}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`text-[11px] font-mono font-black ${t.text}`}>Rs {toNum(chq.amount).toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-[10px] font-mono text-zinc-400 font-bold uppercase">{fmtDate(chq.cheque_date)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex justify-between items-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">
+              <span>Total Available: {customerCheques.length}</span>
+              <span>Matched: {filteredCustomerCheques.length}</span>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 4px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: ${t.scrollbarHover}; }
         `}</style>
       </SidebarInset>
     </SidebarProvider>

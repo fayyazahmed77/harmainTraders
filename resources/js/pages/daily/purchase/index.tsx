@@ -13,8 +13,8 @@ import PurchaseSummary from "./PurchaseSummary";
 import PurchaseFilters from "./PurchaseFilters";
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Procurement", href: "#" },
-    { title: "Purchase Registry", href: "/purchase" },
+    { title: "Purchase", href: "#" },
+    { title: "Purchases", href: "/purchase" },
 ];
 
 interface FilterData {
@@ -84,7 +84,7 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
 
     return (
         <SidebarProvider>
-            <Head title="Procurement Registry | Business Intelligence" />
+            <Head title="Purchases | Harnain Traders" />
             <AppSidebar variant="inset" />
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
                 <SiteHeader breadcrumbs={breadcrumbs} />
@@ -98,8 +98,8 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
                             className="flex flex-col md:flex-row md:items-end justify-between gap-6"
                         >
                             <Heading
-                                title="Purchase Analytics Dashboard"
-                                description="Strategic oversight of supply chain acquisition and financial trade commitments"
+                                title="Purchases"
+                                description="View and manage all items bought from suppliers"
                             />
 
                             <div className="flex items-center gap-3">
@@ -109,7 +109,7 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
                                 >
                                     <Link href="/purchase/create">
                                         <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
-                                        Initialize Procurement
+                                        New Purchase
                                     </Link>
                                 </Button>
                             </div>

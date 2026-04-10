@@ -1,6 +1,5 @@
-// sales.tsx
 import React, { useState, useMemo, useEffect } from "react";
-import ReactSelect from "react-select";
+import { Combobox } from "@/components/ui/combobox";
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,10 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
 import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt } from "lucide-react";
+import { ItemSelectionDialog } from "./components/ItemSelectionDialog";
+import { PriceUpdateDialog } from "./components/PriceUpdateDialog";
+import { SuccessSummaryDialog } from "./components/SuccessSummaryDialog";
+import { PurchasePaymentDialog } from "./components/PurchasePaymentDialog";
 import { useAppearance } from "@/hooks/use-appearance";
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -39,6 +42,7 @@ import {
 } from "@/components/ui/popover"
 import { CalendarIcon } from "lucide-react"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils";
 /**
  * Local screenshot path (you uploaded this file).
  * The system will convert this into a URL if needed.
@@ -50,7 +54,7 @@ import { Label } from "@/components/ui/label"
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Purchase", href: "/purchase" },
-    { title: "New Invoice", href: "/purchase/create" },
+    { title: "New Purchase", href: "/purchase/create" },
 ];
 
 const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600";
@@ -75,6 +79,7 @@ interface Item {
     stock_2?: number;
     total_stock_pcs?: number;
     category?: string;
+    last_purchase_rate?: number;
     // any other fields you may have
 }
 interface Account {
@@ -95,6 +100,11 @@ interface Account {
         id: number;
         name: string;
         percentage: string | number;
+    };
+    current_balance?: number | string;
+    account_type?: {
+        id: number;
+        name: string;
     };
 }
 interface RowData {
@@ -129,27 +139,39 @@ interface MessageLine {
     id: number;
     messageline: string;
 }
-interface Option {
-    value: number;
-    label: string;
-    code?: string;
+interface SplitPayment {
+    [key: string]: any;
+    id: number | string;
+    payment_account_id: string;
+    amount: number;
+    payment_method: string;
+    cheque_no?: string;
+    cheque_date?: string;
+    clear_date?: string;
+    voucher_no?: string;
 }
+
 interface PurchaseProps {
     items: Item[];
     accounts: Account[];
     salemans: Saleman[];
     firms: Firm[];
     nextInvoiceNo: string;
+    paymentAccounts: Account[];
     messageLines?: MessageLine[];
+    customerCheques?: any[];
+    availableCheques?: any[];
 }
 interface Firm {
     id: number;
     name: string;
     defult: number;
 }
-// ───────────────────────────────────────────
-// Util helpers
-// ───────────────────────────────────────────
+interface Option {
+    value: string;
+    label: string;
+}
+
 const toNumber = (v: any) => {
     const n = Number(v);
     return Number.isNaN(n) ? 0 : n;
@@ -175,7 +197,10 @@ export default function Purchase({
     salemans,
     firms,
     nextInvoiceNo,
+    paymentAccounts,
     messageLines,
+    customerCheques = [],
+    availableCheques = []
 }: PurchaseProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === "dark";
@@ -209,6 +234,45 @@ export default function Purchase({
     const [itemDialogOpen, setItemDialogOpen] = useState(false);
     const [itemSearch, setItemSearch] = useState("");
     const [activeRowId, setActiveRowId] = useState<number | null>(null);
+
+    // Pay Now / Settlement States
+    const [isPayNow, setIsPayNow] = useState(false);
+    const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+    const [paymentSplits, setPaymentSplits] = useState<SplitPayment[]>([]);
+    const [updatePricesAfterPayment, setUpdatePricesAfterPayment] = useState(false);
+
+    const handlePostPriceUpdate = (update: boolean) => {
+        setUpdatePricesAfterPayment(update);
+        setShowPriceDialog(false);
+        if (isPayNow) {
+            if (paymentSplits.length === 0) addPaymentSplit();
+            setShowPaymentDialog(true);
+        } else {
+            submitPurchase(update);
+        }
+    };
+
+    const addPaymentSplit = () => {
+        setPaymentSplits((prev) => [
+            ...prev,
+            {
+                id: Date.now() + Math.random(),
+                payment_account_id: "",
+                amount: 0,
+                payment_method: "Cash",
+            },
+        ]);
+    };
+
+    const removePaymentSplit = (id: number | string) => {
+        setPaymentSplits((prev) => prev.filter((s) => s.id !== id));
+    };
+
+    const updatePaymentSplit = (id: number | string, field: string, value: any) => {
+        setPaymentSplits((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+        );
+    };
 
     // Sidebar & UI Toggles
     const [showRightSidebar, setShowRightSidebar] = useState(true);
@@ -259,10 +323,12 @@ export default function Purchase({
         const defaultFirm = firms?.find(f => f.defult === 1);
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
-    const accountTypeOptions: Option[] = accounts.map((a) => ({
-        value: a.id,
-        label: a.title,
-    }));
+    const accountTypeOptions: Option[] = useMemo(() => {
+        return accounts.map((a) => ({
+            value: String(a.id),
+            label: `${a.title}${a.code ? ` (${a.code})` : ""}`,
+        }));
+    }, [accounts]);
 
     // Check if over credit limit
 
@@ -360,6 +426,20 @@ export default function Purchase({
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
     const [lastPurchaseInfo, setLastPurchaseInfo] = useState<any>(null);
     const [loadingPurchaseInfo, setLoadingPurchaseInfo] = useState(false);
+
+    const handleProductFocus = (itemId: number) => {
+        if (selectedItemId === itemId) return;
+        
+        setSelectedItemId(itemId);
+        setLoadingPurchaseInfo(true);
+        axios.get(`/api/purchase/last-purchase-info?item_id=${itemId}`)
+            .then(res => setLastPurchaseInfo(res.data))
+            .catch(err => {
+                console.error(err);
+                setLastPurchaseInfo(null);
+            })
+            .finally(() => setLoadingPurchaseInfo(false));
+    };
 
     // ───────────────────────────────────────────
     // Row operations
@@ -515,17 +595,22 @@ export default function Purchase({
             discount_total: totals.discTotal,
             courier_charges: totals.courier,
             net_total: totals.net,
-            paid_amount: 0,
-            remaining_amount: totals.net,
+            paid_amount: isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
+            remaining_amount: totals.net - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
             update_prices: updatePrices,
             print_format: printOption,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
+
+            // Payment Data
+            is_pay_now: isPayNow,
+            is_multi: true,
+            splits: isPayNow ? paymentSplits : [],
 
             items: rowsWithComputed.filter(r => r.item_id !== null).map((r) => {
                 const item = items.find(i => i.id === r.item_id);
                 const packing = toNumber(item?.packing_full || item?.packing_qty || 1);
 
-                const totalPCS = (toNumber(r.full) * packing) + toNumber(r.pcs);
+                const totalPCS = ((toNumber(r.full) + toNumber(r.bonus_full || 0)) * packing) + toNumber(r.pcs) + toNumber(r.bonus_pcs || 0);
 
                 return {
                     item_id: r.item_id,
@@ -545,7 +630,7 @@ export default function Purchase({
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
-                    supplierName: accounts.find(a => a.id === accountType?.value)?.title || "N/A",
+                    supplierName: accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A",
                     totalItems: totals.totalItems,
                     totalFull: totals.totalFull,
                     totalPcs: totals.totalPcs,
@@ -567,6 +652,11 @@ export default function Purchase({
                 setCourier(0);
                 setDate(new Date());
                 setSelectedMessageId("0");
+                
+                // Reset Payment
+                setIsPayNow(false);
+                setPaymentSplits([]);
+                setShowPaymentDialog(false);
 
                 setShowSuccessDialog(true);
                 setShowPriceDialog(false); // Close price dialog if open
@@ -609,10 +699,18 @@ export default function Purchase({
             setPriceUpdates(updates);
             setShowPriceDialog(true);
         } else {
-            submitPurchase(false);
+            // Check if Pay Now is enabled but no splits
+            if (isPayNow) {
+                if (paymentSplits.length === 0) {
+                    addPaymentSplit(); // Add one default
+                }
+                setShowPaymentDialog(true);
+            } else {
+                submitPurchase(false);
+            }
         }
     };
-
+console.log(lastPurchaseInfo);
     return (
         <SidebarProvider
             defaultOpen={false}
@@ -633,10 +731,10 @@ export default function Purchase({
                         <div className="p-4 bg-gradient-to-r from-orange-500/10 to-transparent dark:from-orange-500/5">
                             <div className="flex justify-between items-start mb-1">
                                 <div className="space-y-0.5">
-                                    <h2 className="text-xl font-bold tracking-tight dark:text-gray-100 italic">PURCHASE <span className="text-orange-600 dark:text-orange-500 font-black">INVOICE</span></h2>
+                                    <h2 className="text-xl font-bold tracking-tight dark:text-gray-100 italic">NEW <span className="text-orange-600 dark:text-orange-500 font-black">PURCHASE</span></h2>
                                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                        {date ? date.toLocaleDateString() : "New Date"} | Inv: {invoiceNo}
+                                        {date ? date.toLocaleDateString() : "New Date"} | Bill: {invoiceNo}
                                     </div>
                                 </div>
                                 <Button
@@ -651,13 +749,14 @@ export default function Purchase({
 
                             {/* Essential Main Info (Always visible on mobile) */}
                             <div className="mt-3">
-                                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Supplier Party</label>
-                                <Select
-                                    value={accountType?.value?.toString() ?? ""}
-                                    onValueChange={(value) => {
+                                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Select Supplier</label>
+                                <Combobox
+                                    options={accountTypeOptions}
+                                    value={accountType?.value || ""}
+                                    onChange={(value) => {
                                         const id = Number(value);
                                         const selectedAccount = accounts.find((a) => a.id === id) ?? null;
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
                                         if (selectedAccount) {
@@ -671,33 +770,25 @@ export default function Purchase({
                                             setSalesman(null);
                                         }
                                     }}
-                                >
-                                    <SelectTrigger className="w-full h-11 border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-black/20 text-md font-bold rounded-xl focus:ring-orange-500">
-                                        <SelectValue placeholder="Tap to Select Supplier" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accountTypeOptions.map((s) => (
-                                            <SelectItem key={s.value} value={s.value.toString()}>
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    placeholder="Select Supplier..."
+                                    searchPlaceholder="Search by name or code..."
+                                    className="w-full bg-white/50 dark:bg-black/20 text-md font-bold rounded-xl h-11 border-gray-200 dark:border-gray-800"
+                                />
                             </div>
                         </div>
 
                         {/* Expandable Details (Collapsible on mobile) */}
                         <div className={`${showMobileDetails ? 'max-h-[500px] opacity-100 p-4 border-t border-gray-100 dark:border-gray-900' : 'max-h-0 opacity-0'} overflow-hidden transition-all duration-300 grid grid-cols-2 gap-3 bg-gray-50/50 dark:bg-black/10`}>
-                            <FieldWrapper label="Supplier %" className="col-span-1">
+                            <FieldWrapper label="Disc %" className="col-span-1">
                                 <Input value={markupPercentage} readOnly className="h-9 bg-transparent border-gray-200 dark:border-gray-800 font-mono text-xs" />
                             </FieldWrapper>
-                            <FieldWrapper label="Credit Days" className="col-span-1">
+                            <FieldWrapper label="Payment Days" className="col-span-1">
                                 <Input value={creditDays} readOnly className="h-9 bg-transparent border-gray-200 dark:border-gray-800 font-mono text-center text-xs" />
                             </FieldWrapper>
-                            <FieldWrapper label="Firm" className="col-span-2">
+                            <FieldWrapper label="Company" className="col-span-2">
                                 <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
                                     <SelectTrigger className="w-full h-9 bg-transparent border-gray-200 dark:border-gray-800 text-xs text-left">
-                                        <SelectValue placeholder="Select Firm" />
+                                        <SelectValue placeholder="Select Company" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {firms?.map((f) => (
@@ -712,21 +803,12 @@ export default function Purchase({
                     </Card>
 
                     {/* Desktop Header card (Hidden on mobile) */}
-                    <Card className="hidden md:block overflow-hidden border-x-0 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
-                        <div className="py-3 px-3 bg-gradient-to-r from-orange-500/10 via-orange-500/5 to-transparent border-b border-gray-100 dark:border-gray-900 flex justify-between items-center">
-                            <h2 className="text-lg font-bold tracking-tight dark:text-gray-100">PURCHASE <span className="text-orange-600 dark:text-orange-500 font-black"> INVOICE</span></h2>
-                            <div className="flex items-center gap-4 text-xs font-semibold">
-                                <span className="text-gray-400 uppercase tracking-widest">Entry Mode</span>
-                                <div className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 text-orange-600 rounded-md border border-orange-500/20">
-                                    <div className="h-1.5 w-1.5 rounded-full bg-orange-600 animate-pulse"></div>
-                                    DESKTOP VIEW
-                                </div>
-                            </div>
-                        </div>
+                    <Card className="hidden md:block overflow-hidden border-x-0 mt-3 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
+                       
 
-                        <div className="p-4 grid grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
+                        <div className="p-4 grid grid-cols-6  lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
                             {/* Date & Time Picker */}
-                            <FieldWrapper label="Date & Time" className="lg:col-span-3">
+                            <FieldWrapper label="Purchase Date" className="lg:col-span-3">
                                 <div className="flex gap-1">
                                     <Popover open={open} onOpenChange={setOpen}>
                                         <PopoverTrigger asChild>
@@ -762,14 +844,15 @@ export default function Purchase({
                             </FieldWrapper>
 
                             {/* Account Select */}
-                            <FieldWrapper label="Select Account" className="lg:col-span-2">
-                                <Select
-                                    value={accountType?.value?.toString() ?? ""}
-                                    onValueChange={(value) => {
+                            <FieldWrapper label="Select Supplier" className="lg:col-span-2">
+                                <Combobox
+                                    options={accountTypeOptions}
+                                    value={accountType?.value || ""}
+                                    onChange={(value) => {
                                         const id = Number(value);
                                         const selectedAccount = accounts.find((a) => a.id === id) ?? null;
 
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
                                         if (selectedAccount) {
@@ -785,21 +868,13 @@ export default function Purchase({
                                             setSalesman(null);
                                         }
                                     }}
-                                >
-                                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                                        <SelectValue placeholder="Account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accountTypeOptions.map((s) => (
-                                            <SelectItem key={s.value} value={s.value.toString()}>
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    placeholder="Supplier"
+                                    searchPlaceholder="Search by name or code..."
+                                    className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-white dark:bg-zinc-900"
+                                />
                             </FieldWrapper>
 
-                            <FieldWrapper label="Supplier %" className="lg:col-span-1">
+                            <FieldWrapper label="Disc %" className="lg:col-span-1">
                                 <Input
                                     placeholder="%"
                                     value={markupPercentage}
@@ -819,9 +894,9 @@ export default function Purchase({
                             </FieldWrapper>
 
                             {/* Invoice # */}
-                            <FieldWrapper label="Bill #" className="lg:col-span-1">
+                            <FieldWrapper label="Bill No" className="lg:col-span-1">
                                 <Input
-                                    placeholder="Invoice #"
+                                    placeholder="Bill No"
                                     value={invoiceNo}
                                     onChange={(e) => setInvoiceNo(e.target.value)}
                                     className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors text-center"
@@ -829,13 +904,13 @@ export default function Purchase({
                             </FieldWrapper>
 
                             {/* Salesman */}
-                            <FieldWrapper label="Salesman" className="lg:col-span-2">
+                            <FieldWrapper label="Employee / Contact" className="lg:col-span-2">
                                 <Select
                                     value={salesman?.toString() || ""}
                                     onValueChange={(val) => setSalesman(val ? Number(val) : null)}
                                 >
                                     <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left">
-                                        <SelectValue placeholder="Select Salesman" />
+                                        <SelectValue placeholder="Select Employee" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {salemans.map((s) => (
@@ -848,9 +923,9 @@ export default function Purchase({
                             </FieldWrapper>
 
                             {/* Items # */}
-                            <FieldWrapper label="Qty" className="lg:col-span-1">
+                            <FieldWrapper label="Items" className="lg:col-span-1">
                                 <Input
-                                    placeholder="Qty"
+                                    placeholder="Items"
                                     value={rowsWithComputed.length}
                                     readOnly
                                     className="h-10 bg-slate-50/50 font-bold border-slate-200 text-center"
@@ -864,11 +939,11 @@ export default function Purchase({
                     <div className="block md:hidden pb-2">
                         <div className="flex justify-between items-center mb-2 px-1 text-orange-600">
                             <h3 className="font-semibold text-lg flex items-center gap-2">
-                                <ListOrdered size={18} /> Items List
+                                <ListOrdered size={18} /> Product List
                             </h3>
                             <div className="flex gap-2">
                                 <Button size="sm" variant="outline" onClick={() => setItemDialogOpen(true)} className="border-orange-200 text-orange-600 h-8 shadow-sm">
-                                    <Search size={16} className="mr-1" /> Registry
+                                    <Search size={16} className="mr-1" /> Search
                                 </Button>
                                 <Button size="sm" onClick={addRow} className="bg-orange-600 hover:bg-orange-700 text-white h-10 shadow-sm">
                                     <Plus size={16} className="mr-1" /> Add
@@ -906,7 +981,7 @@ export default function Purchase({
                                                     className="h-6 gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 -ml-2"
                                                 >
                                                     <Search size={12} />
-                                                    <span>Registry / Search (F2)</span>
+                                                    <span>Search Product (F2)</span>
                                                 </Button>
                                             </div>
                                             <div className="col-span-1 text-center">Full</div>
@@ -915,8 +990,8 @@ export default function Purchase({
                                             <div className="col-span-1 text-center">B.Pcs</div>
                                             <div className="col-span-1 text-center">Rate</div>
                                             <div className="col-span-1 text-center">Disc %</div>
-                                            <div className="col-span-1 text-center">After Disc</div>
-                                            <div className="col-span-1 text-right">Sub Total</div>
+                                            <div className="col-span-1 text-center">Net Rate</div>
+                                            <div className="col-span-1 text-right">Subtotal</div>
                                             <div className="col-span-1 text-center flex items-center justify-center">
                                                 <div className="text-[9px] font-black uppercase text-zinc-400">Action</div>
                                             </div>
@@ -926,239 +1001,249 @@ export default function Purchase({
                                         <div className="max-h-none md:max-h-[48vh] md:min-h-[50vh] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm">
                                             {rowsWithComputed.map((row) => (
                                                 <React.Fragment key={row.id}>
-                                                    {/* Mobile Card View */}
-                                                    <div
-                                                        className={`block md:hidden rounded-xl border bg-card dark:bg-card shadow-sm relative overflow-hidden transition-all mb-3 border-gray-200 dark:border-gray-700 hover:shadow-md`}
-                                                    >
-                                                        {/* Header Row: Item Name & Delete */}
-                                                        <div className="flex items-start justify-between p-3 pb-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                                                            <div className="w-full pr-10">
-                                                                <button
-                                                                    onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
-                                                                    className="flex flex-col text-left group/item w-full py-0.5"
+                                                    {(() => {
+                                                        const rowItem = items.find(it => it.id === row.item_id);
+                                                        const showLoose = !row.item_id || toNumber(rowItem?.packing_qty || 1) > 1;
+                                                        
+                                                        return (
+                                                            <>
+                                                                {/* Mobile Card View */}
+                                                                <div
+                                                                    className="block md:hidden rounded-xl border bg-card dark:bg-card shadow-sm relative overflow-hidden transition-all mb-3 border-gray-200 dark:border-gray-700 hover:shadow-md"
                                                                 >
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <div className="h-5 w-5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                                                                            <Wallet size={12} />
+                                                                    {/* Header Row: Item Name & Delete */}
+                                                                    <div className="flex items-start justify-between p-3 pb-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                                                                        <div className="w-full pr-10">
+                                                                            <button
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                className="flex flex-col text-left group/item w-full py-0.5"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <div className="h-5 w-5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                                                                        <Wallet size={12} />
+                                                                                    </div>
+                                                                                    <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 tracking-[0.1em] uppercase">Product Selection</span>
+                                                                                </div>
+                                                                                {row.item_id ? (
+                                                                                    <div className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase italic flex items-center gap-1.5">
+                                                                                        {rowItem?.title}
+                                                                                        <ChevronDown size={14} className="text-orange-500/50" />
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="text-sm font-bold text-zinc-300 italic uppercase flex items-center gap-1.5">
+                                                                                        Tap to Select SKU
+                                                                                        <Plus size={14} className="text-orange-500" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </button>
                                                                         </div>
-                                                                        <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 tracking-[0.1em] uppercase">Product Selection</span>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="absolute top-2 right-2 h-8 w-8 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
+                                                                            onClick={() => removeRow(row.id)}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </Button>
                                                                     </div>
-                                                                    {row.item_id ? (
-                                                                        <div className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase italic flex items-center gap-1.5">
-                                                                            {items.find(it => it.id === row.item_id)?.title}
-                                                                            <ChevronDown size={14} className="text-orange-500/50" />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-sm font-bold text-zinc-300 italic uppercase flex items-center gap-1.5">
-                                                                            Tap to Select SKU
-                                                                            <Plus size={14} className="text-orange-500" />
-                                                                        </div>
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="absolute top-2 right-2 h-8 w-8 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
-                                                                onClick={() => removeRow(row.id)}
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </Button>
-                                                        </div>
 
-                                                        <div className="p-3 space-y-4">
-                                                            {/* Quantity Section */}
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700">
-                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Full</label>
-                                                                    <div className="flex items-center justify-center gap-1">
+                                                                    <div className="p-3 space-y-4">
+                                                                        {/* Quantity Section */}
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700 ${!showLoose ? 'col-span-2' : 'col-span-1'}`}>
+                                                                                <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Carton</label>
+                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                    <Input
+                                                                                        type="number"
+                                                                                        className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                                                                        value={row.full || ""}
+                                                                                        onChange={(e) => {
+                                                                                            const val = e.target.value;
+                                                                                            const num = val === "" ? 0 : parseInt(val, 10) || 0;
+                                                                                            updateRow(row.id, { full: num });
+                                                                                        }}
+                                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                    />
+                                                                                    {row.bonus_full > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_full}</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                            {showLoose && (
+                                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700 col-span-1">
+                                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Pcs</label>
+                                                                                    <div className="flex items-center justify-center gap-1">
+                                                                                        <Input
+                                                                                            type="number"
+                                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
+                                                                                            value={row.pcs || ""}
+                                                                                            onChange={(e) => {
+                                                                                                const val = e.target.value;
+                                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
+                                                                                                updateRow(row.id, { pcs: num });
+                                                                                            }}
+                                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                        />
+                                                                                        {row.bonus_pcs > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_pcs}</span>}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Financials Section */}
+                                                                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                                                                            <div className="flex flex-col">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Rate</label>
+                                                                                <Input
+                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
+                                                                                    value={row.rate}
+                                                                                    onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="flex flex-col">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Disc%</label>
+                                                                                <Input
+                                                                                    className="h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center"
+                                                                                    value={row.discPercent}
+                                                                                    onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                                    onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="flex flex-col items-end justify-end col-span-2">
+                                                                                <label className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">Subtotal</label>
+                                                                                <div className="text-base font-black text-orange-600 leading-tight">
+                                                                                    {row.amount.toFixed(0)}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Desktop Row View (Hidden on mobile) */}
+                                                                <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
+                                                                    <div className="col-span-3 h-8 flex items-center">
+                                                                        {row.item_id ? (
+                                                                            <button
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                className="flex flex-col text-left group/item w-full transition-all hover:translate-x-1"
+                                                                            >
+                                                                                <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
+                                                                                    {rowItem?.title || "Unknown Item"}
+                                                                                </span>
+                                                                                <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest leading-none">
+                                                                                    ID: {row.item_id.toString().padStart(5, '0')}
+                                                                                </span>
+                                                                            </button>
+                                                                        ) : (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                className="w-full h-8 px-2 text-[10px] font-black uppercase justify-start rounded-md border-dashed border-zinc-200 dark:border-zinc-800 hover:border-orange-50 dark:hover:bg-orange-950/20 transition-all group-hover:border-orange-200 text-zinc-400"
+                                                                                onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
+                                                                                disabled={!accountType}
+                                                                            >
+                                                                                <Plus size={12} className="mr-2 text-orange-500" />
+                                                                                Add Product
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
                                                                         <Input
-                                                                            type="number"
-                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
-                                                                            value={row.full || ""}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
-                                                                                updateRow(row.id, { full: num });
-                                                                            }}
-                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                            className="h-8 px-1 text-center"
+                                                                            value={row.full}
+                                                                            onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />
-                                                                        {row.bonus_full > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_full}</span>}
                                                                     </div>
-                                                                </div>
-                                                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-100 dark:border-gray-700">
-                                                                    <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase block mb-1 text-center">Pieces</label>
-                                                                    <div className="flex items-center justify-center gap-1">
+
+                                                                    <div className="col-span-1">
+                                                                        {showLoose && (
+                                                                            <Input
+                                                                                className="h-8 px-1 text-center"
+                                                                                value={row.pcs}
+                                                                                onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
+                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
                                                                         <Input
-                                                                            type="number"
-                                                                            className="h-8 w-full bg-transparent border-none text-center font-bold text-lg p-0 focus-visible:ring-0 shadow-none"
-                                                                            value={row.pcs || ""}
-                                                                            onChange={(e) => {
-                                                                                const val = e.target.value;
-                                                                                const num = val === "" ? 0 : parseInt(val, 10) || 0;
-                                                                                updateRow(row.id, { pcs: num });
-                                                                            }}
-                                                                            onClick={() => row.item_id && setSelectedItemId(row.item_id)}
+                                                                            className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
+                                                                            value={row.bonus_full}
+                                                                            onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            placeholder="B.Full"
                                                                         />
-                                                                        {row.bonus_pcs > 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1 rounded">+{row.bonus_pcs}</span>}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        {showLoose && (
+                                                                            <Input
+                                                                                className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
+                                                                                value={row.bonus_pcs}
+                                                                                onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })}
+                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                placeholder="B.Pcs"
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="col-span-1 relative">
+                                                                        <Input
+                                                                            className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
+                                                                            value={row.rate}
+                                                                            onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                        {(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) && (
+                                                                            <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                                                                High Rate! Last: {row.last_purchase_rate}
+                                                                                <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center"
+                                                                            value={row.discPercent}
+                                                                            onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-center bg-secondary/20"
+                                                                            value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
+                                                                            readOnly
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="col-span-1">
+                                                                        <Input
+                                                                            className="h-8 px-1 text-right font-bold text-orange-600 bg-orange-50/10"
+                                                                            value={((row.amount - (row.amount * row.discPercent / 100)) || 0).toFixed(2)}
+                                                                            readOnly
+                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                        />
+                                                                    </div>
+
+                                                                    <div className="col-span-1 text-center flex items-center justify-center">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
+                                                                            onClick={() => removeRow(row.id)}
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </Button>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-
-                                                            {/* Financials Section */}
-                                                            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
-                                                                <div className="flex flex-col">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Rate</label>
-                                                                    <Input
-                                                                        className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
-                                                                        value={row.rate}
-                                                                        onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
-                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex flex-col">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Disc%</label>
-                                                                    <Input
-                                                                        className="h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center"
-                                                                        value={row.discPercent}
-                                                                        onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
-                                                                        onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                    />
-                                                                </div>
-
-                                                                <div className="flex flex-col items-end justify-end col-span-2">
-                                                                    <label className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">SubTotal</label>
-                                                                    <div className="text-base font-black text-orange-600 leading-tight">
-                                                                        {row.amount.toFixed(0)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Desktop Row View (Hidden on mobile) */}
-                                                    <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
-
-
-                                                        <div className="col-span-3 h-8 flex items-center">
-                                                            {row.item_id ? (
-                                                                <button
-                                                                    onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
-                                                                    className="flex flex-col text-left group/item w-full transition-all hover:translate-x-1"
-                                                                >
-                                                                    <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
-                                                                        {items.find(it => it.id === row.item_id)?.title || "Unknown Item"}
-                                                                    </span>
-                                                                    <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest leading-none">
-                                                                        ID: {row.item_id.toString().padStart(5, '0')}
-                                                                    </span>
-                                                                </button>
-                                                            ) : (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    className={`w-full h-8 px-2 text-[10px] font-black uppercase justify-start rounded-md border-dashed border-zinc-200 dark:border-zinc-800 hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20 transition-all group-hover:border-orange-200 text-zinc-400`}
-                                                                    onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
-                                                                    disabled={!accountType}
-                                                                >
-                                                                    <Plus size={12} className="mr-2 text-orange-500" />
-                                                                    Assign Registry SKU
-                                                                </Button>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center"
-                                                                value={row.full}
-                                                                onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center"
-                                                                value={row.pcs}
-                                                                onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                        </div>
-
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
-                                                                value={row.bonus_full}
-                                                                onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                placeholder="B.Full"
-                                                            />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
-                                                                value={row.bonus_pcs}
-                                                                onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                                placeholder="B.Pcs"
-                                                            />
-                                                        </div>
-                                                        <div className="col-span-1 relative">
-                                                            <Input
-                                                                className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
-                                                                value={row.rate}
-                                                                onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                            {(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) && (
-                                                                <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                                                    High Rate! Last: {row.last_purchase_rate}
-                                                                    <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center"
-                                                                value={row.discPercent}
-                                                                onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                        </div>
-
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-center bg-secondary/20"
-                                                                value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
-                                                                readOnly
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                        </div>
-                                                        <div className="col-span-1">
-                                                            <Input
-                                                                className="h-8 px-1 text-right font-bold text-orange-600 bg-orange-50/10"
-                                                                value={((row.amount - (row.amount * row.discPercent / 100)) || 0).toFixed(2)}
-                                                                readOnly
-                                                                onClick={() => row.item_id && setSelectedItemId(row.item_id)}
-                                                            />
-                                                        </div>
-
-
-                                                        <div className="col-span-1 text-center flex items-center justify-center">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
-                                                                onClick={() => removeRow(row.id)}
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </React.Fragment>
                                             ))}
                                         </div>
@@ -1174,7 +1259,7 @@ export default function Purchase({
                                                         onClick={addRow}
                                                         className="h-8 px-3 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-bold uppercase tracking-[0.15em] text-[10px] gap-2 transition-all active:scale-95"
                                                     >
-                                                        <Plus size={14} className="stroke-[3]" /> Select Product
+                                                        <Plus size={14} className="stroke-[3]" /> Add Item
                                                     </Button>
                                                     <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-800 self-center mx-1" />
                                                     <Button
@@ -1183,7 +1268,7 @@ export default function Purchase({
                                                         onClick={loadAllItems}
                                                         className="h-8 px-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-bold uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95"
                                                     >
-                                                        <PackageSearch size={14} /> Load All
+                                                        <PackageSearch size={14} /> Load All Items
                                                     </Button>
                                                     <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-800 self-center mx-1" />
                                                     <Button
@@ -1204,7 +1289,7 @@ export default function Purchase({
                                             {/* Financial Summary: Moved to Bottom Right */}
                                             <div className="flex items-center gap-8 pr-4">
                                                 <div className="hidden xs:flex flex-col items-end">
-                                                    <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest leading-none mb-1">Gross Amount</span>
+                                                    <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest leading-none mb-1">Total Amount</span>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-[10px] font-bold text-zinc-400">Rs</span>
                                                         <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 leading-none">
@@ -1214,7 +1299,7 @@ export default function Purchase({
                                                 </div>
 
                                                 <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-8">
-                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Disc Total</span>
+                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Total Discount</span>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-[10px] font-bold text-red-300">-Rs</span>
                                                         <span className="text-lg font-black text-red-600 dark:text-red-400 leading-none">
@@ -1238,9 +1323,9 @@ export default function Purchase({
                                     onClick={() => setShowInfoPanel(!showInfoPanel)}
                                 >
                                     {showInfoPanel ? (
-                                        <>Hide Info <ChevronUp className="ml-2 h-3 w-3" /></>
+                                        <>Hide Product Details <ChevronUp className="ml-2 h-3 w-3" /></>
                                     ) : (
-                                        <>View Info <ChevronDown className="ml-2 h-3 w-3" /></>
+                                        <>View Product Details <ChevronDown className="ml-2 h-3 w-3" /></>
                                     )}
                                 </Button>
 
@@ -1262,7 +1347,7 @@ export default function Purchase({
                                                         </h3>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] uppercase tracking-widest font-black text-orange-100/90">Supplier Code:</span>
+                                                        <span className="text-[10px] uppercase tracking-widest font-black text-orange-100/90">Supplier:</span>
                                                         <span className="text-[11px] font-black text-orange-600 bg-white px-3 py-1 rounded shadow-md border border-orange-100">
                                                             {selectedItem.company || 'N/A'}
                                                         </span>
@@ -1340,53 +1425,56 @@ export default function Purchase({
                                                 </div>
 
                                                 {/* Horizontal History Row - Elegant & Professional */}
-                                                {(lastPurchaseInfo || loadingPurchaseInfo) && (
-                                                    <div className="px-4 py-2 bg-orange-50/50 dark:bg-orange-950/20 border-t border-orange-100/50 dark:border-orange-900/50 flex items-center justify-between gap-4">
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]"></div>
-                                                            <span className="text-[10px] font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest">Pricing History</span>
-                                                        </div>
+                                                <div className="px-6 py-6 bg-orange-50/50 dark:bg-orange-950/20 border-t border-orange-200/50 dark:border-orange-900/50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-2 shrink-0 md:w-36">
+                                                        <div className="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse"></div>
+                                                        <span className="text-xs font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest leading-none">Pricing History</span>
+                                                    </div>
 
-                                                        <div className="flex-1 flex flex-wrap items-center justify-start md:justify-around gap-x-4 gap-y-1 text-[10px] sm:text-[11px]">
-                                                            {loadingPurchaseInfo ? (
-                                                                <div className="w-full flex justify-around animate-pulse">
-                                                                    {[1, 2, 3].map(i => <div key={i} className="h-4 w-16 bg-muted rounded"></div>)}
-                                                                </div>
-                                                            ) : lastPurchaseInfo ? (
-                                                                <>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Prev Qty:</span>
-                                                                        <span className="font-bold">{toNumber(lastPurchaseInfo.previous_qty_carton)}F / {toNumber(lastPurchaseInfo.previous_qty_pcs)}P</span>
-                                                                    </div>
-                                                                    <div className="hidden md:block h-3 w-[1px] bg-border mx-1"></div>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Last Price:</span>
-                                                                        <span className="font-bold text-orange-600">Rs {toNumber(lastPurchaseInfo.previous_retail_price).toFixed(2)}</span>
-                                                                    </div>
-                                                                    <div className="hidden md:block h-3 w-[1px] bg-border mx-1"></div>
-                                                                    <div className="flex gap-1.5 whitespace-nowrap">
-                                                                        <span className="text-muted-foreground font-medium">Last Date:</span>
-                                                                        <span className="font-bold underline decoration-dotted decoration-orange-300">
-                                                                            {lastPurchaseInfo.last_purchase_date ? new Date(lastPurchaseInfo.last_purchase_date).toLocaleDateString() : 'N/A'}
-                                                                        </span>
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-xs text-muted-foreground/60 italic">No previous history available</span>
-                                                            )}
-                                                        </div>
-
-                                                        {lastPurchaseInfo?.company && (
-                                                            <div className="shrink-0 flex items-center gap-1 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded text-[10px]">
-                                                                <span className="text-muted-foreground">Comp:</span>
-                                                                <span className="font-bold truncate max-w-[80px]">{lastPurchaseInfo.company}</span>
+                                                    <div className="flex-1 flex flex-wrap items-center justify-start md:justify-end gap-3 text-sm">
+                                                        {loadingPurchaseInfo ? (
+                                                            <div className="w-full flex justify-end gap-3 animate-pulse">
+                                                                {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-muted rounded-md"></div>)}
                                                             </div>
+                                                        ) : lastPurchaseInfo && Object.keys(lastPurchaseInfo).length > 0 ? (
+                                                            <>
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Date</span>
+                                                                    <span className="font-bold text-foreground">
+                                                                        {lastPurchaseInfo.last_purchase_date ? new Date(lastPurchaseInfo.last_purchase_date).toLocaleDateString() : 'N/A'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border max-w-[200px]">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Supplier</span>
+                                                                    <span className="font-bold truncate text-sky-600">
+                                                                        {lastPurchaseInfo.supplier_name || 'N/A'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
+                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Qty</span>
+                                                                    <span className="font-bold text-foreground">{toNumber(lastPurchaseInfo.previous_qty_carton)}F / {toNumber(lastPurchaseInfo.previous_qty_pcs)}P</span>
+                                                                </div>
+
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-orange-100/50 dark:bg-orange-950/30 shadow-sm px-4 py-1.5 rounded-md border border-orange-200 dark:border-orange-800">
+                                                                    <span className="text-orange-600/70 dark:text-orange-400/70 font-bold text-[11px] uppercase tracking-wider">Rate</span>
+                                                                    <span className="font-black text-orange-600 dark:text-orange-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_retail_price).toFixed(2)}</span>
+                                                                </div>
+
+                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-emerald-50 dark:bg-emerald-950/20 shadow-sm px-4 py-1.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                                                    <span className="text-emerald-600/70 dark:text-emerald-400/70 font-bold text-[11px] uppercase tracking-wider">Total</span>
+                                                                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_subtotal).toFixed(2)}</span>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-sm font-medium text-muted-foreground/60 italic w-full text-center py-1">No previous history available</span>
                                                         )}
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="text-center py-8 flex flex-col items-center gap-3 bg-white/30 dark:bg-black/10">
+                                            <div className="text-center py-12 flex flex-col items-center gap-3 bg-white/30 dark:bg-black/10">
                                                 <div className="p-3 rounded-full bg-orange-500/10 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-800/30">
                                                     <ListOrdered className="w-6 h-6 text-orange-400 flex-shrink-0" />
                                                 </div>
@@ -1406,8 +1494,8 @@ export default function Purchase({
                         {/* Right summary panel - Visible ONLY on Large Desktop (2xl+) */}
                         {showRightSidebar && (
                             <div className="hidden 2xl:block 2xl:col-span-3 animate-in fade-in slide-in-from-right-4 duration-300">
-                                <Card className="p-0 border-orange-100 dark:border-orange-900/30 shadow-2xl shadow-orange-500/5 sticky top-[120px] overflow-hidden bg-white/50 backdrop-blur-sm">
-                                    <div className="p-3 bg-gradient-to-r from-orange-600 to-orange-500 text-white">
+                                <Card className="p-0  shadow-2xl shadow-orange-500/5 sticky top-[120px] overflow-hidden  backdrop-blur-sm">
+                                    <div className="p-3 border-b">
                                         <h3 className="text-xs font-black uppercase tracking-widest flex items-center justify-between">
                                             <span>Invoice Summary</span>
                                             <Receipt size={14} className="opacity-70" />
@@ -1418,7 +1506,7 @@ export default function Purchase({
                                         {/* Row 1: Item Counts */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Cartons</span>
+                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Full</span>
                                                 <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 leading-none">{totals.totalFull}</div>
                                             </div>
                                             <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
@@ -1453,7 +1541,7 @@ export default function Purchase({
                                         <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
 
                                         {/* Net Total - Big & Bold */}
-                                        <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-xl shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
+                                        <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-sm shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
                                             <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80">Final Net Total</span>
                                             <div className="text-3xl font-black leading-none drop-shadow-md">
                                                 <span className="text-xs font-bold mr-1 italic">Rs</span>
@@ -1510,11 +1598,34 @@ export default function Purchase({
                                             </div>
                                         </div>
 
+                                        {/* Pay Now Toggle */}
+                                        <div className="pt-2">
+                                            <div className="flex items-center justify-between p-3 rounded-sm bg-orange-500/5 border border-orange-500/10 transition-all hover:bg-orange-500/10 group cursor-pointer" onClick={() => setIsPayNow(!isPayNow)}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn(
+                                                        "w-10 h-10 rounded-sm flex items-center justify-center transition-all duration-300",
+                                                        isPayNow ? "bg-orange-500 shadow-lg shadow-orange-500/30 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                                                    )}>
+                                                        <Wallet size={18} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-100">Pay From Here</span>
+                                                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter italic">Optional Settlement</span>
+                                                    </div>
+                                                </div>
+                                                <Checkbox 
+                                                    checked={isPayNow}
+                                                    onCheckedChange={(checked) => setIsPayNow(!!checked)}
+                                                    className="w-5 h-5 rounded-md border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600 shadow-none border-none bg-zinc-200 dark:bg-zinc-800"
+                                                />
+                                            </div>
+                                        </div>
+
                                         {/* Action */}
                                         <div className="pt-2">
                                             <Button
                                                 onClick={handleSave}
-                                                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2"
+                                                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-sm gap-2"
                                             >
                                                 <Save size={18} className="stroke-[2.5]" />
                                                 Confirm & Save
@@ -1608,314 +1719,54 @@ export default function Purchase({
                 </div>
 
                 {/* Item Selection Dialog */}
-                <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-                    <DialogContent className="max-w-[99vw] md:max-w-5xl w-full md:w-[1000px] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[90vh]">
-                        <div className={`p-6 ${ACCENT_GRADIENT} text-white shrink-0`}>
-                            <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
-                                <Box className="w-6 h-6" /> Item Registry
-                            </DialogTitle>
-                            <DialogDescription className="text-orange-100/70 font-bold uppercase text-[10px] tracking-widest mt-1">
-                                Select an active SKU to assign to row sequence
-                            </DialogDescription>
-
-                            <div className="mt-4 relative group">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-white transition-colors" size={18} />
-                                <Input
-                                    placeholder="Search by Title, ID, or Category..."
-                                    value={itemSearch}
-                                    onChange={(e) => setItemSearch(e.target.value)}
-                                    className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:ring-0 focus:bg-white/20 transition-all rounded-xl border-2 font-bold"
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-auto min-h-0">
-                            <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
-                                <div className="col-span-1 text-[9px] font-black uppercase text-zinc-500">Code</div>
-                                <div className="col-span-5 text-[9px] font-black uppercase text-zinc-500">Registry Title</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500">Trade Price</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-500">Avg Price</div>
-                                <div className="col-span-2 text-right text-[9px] font-black uppercase text-zinc-500">System Inventory</div>
-                            </div>
-
-                            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {filteredItems.length > 0 ? filteredItems.map((item) => {
-                                    const tradePrice = toNumber(item.trade_price);
-                                    const avgPrice = (toNumber(item.trade_price) + toNumber(item.retail)) / 2;
-                                    const isSelected = rows.some(r => r.item_id === item.id);
-
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => {
-                                                const existingRow = rows.find(r => r.item_id === item.id);
-                                                if (existingRow) {
-                                                    removeRow(existingRow.id);
-                                                    if (rows.length <= 1) addRow();
-                                                } else {
-                                                    const emptyRow = rows.find(r => r.item_id === null);
-                                                    if (emptyRow) {
-                                                        handleSelectItem(emptyRow.id, item.id);
-                                                    } else {
-                                                        const newRowId = Date.now() + Math.random();
-                                                        setRows((prev) => [
-                                                            ...prev,
-                                                            {
-                                                                id: newRowId,
-                                                                item_id: item.id,
-                                                                full: 0,
-                                                                pcs: 0,
-                                                                bonus_full: 0,
-                                                                bonus_pcs: 0,
-                                                                rate: tradePrice,
-                                                                discPercent: toNumber(item.discount),
-                                                                trade_price: tradePrice,
-                                                                amount: 0,
-                                                                last_purchase_rate: 0
-                                                            },
-                                                        ]);
-                                                    }
-                                                }
-                                            }}
-                                            className={`w-full text-left transition-colors p-2 group border-l-4 ${isSelected
-                                                ? "bg-orange-50/50 dark:bg-orange-900/20 border-orange-500"
-                                                : "bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-transparent hover:border-orange-300"
-                                                }`}
-                                        >
-                                            <div className="hidden md:grid grid-cols-12 items-center py-1">
-                                                <div className="col-span-1 pl-2">
-                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-orange-600' : 'text-zinc-400'}`}>
-                                                        #{String(item.id).padStart(4, '0')}
-                                                    </span>
-                                                </div>
-                                                <div className="col-span-5 flex flex-col justify-center">
-                                                    <div className={`font-black uppercase tracking-tight truncate text-base ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>
-                                                        {item.title}
-                                                    </div>
-                                                    <div className="text-[11px] flex items-center gap-2 mt-0.5">
-                                                        <span className="text-zinc-500 dark:text-zinc-400 font-mono tracking-tighter truncate">{item.short_name || 'Generic SKU'}</span>
-                                                        {item.category && <span className="px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider">{item.category}</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-2 text-center">
-                                                    <div className="text-sm font-black text-zinc-800 dark:text-zinc-200">
-                                                        <span className="text-[10px] text-zinc-400 mr-1 font-semibold">Rs</span>
-                                                        {tradePrice.toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                                                    {avgPrice.toFixed(0)}
-                                                </div>
-                                                <div className="col-span-2 text-right pr-4 font-mono text-xs font-black text-emerald-600">
-                                                    {item.stock_1 ? `${item.stock_1} units` : '0 units'}
-                                                </div>
-                                            </div>
-
-                                            {/* Mobile View Item */}
-                                            <div className="md:hidden flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <div className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</div>
-                                                    <div className="text-[10px] text-zinc-400">#{item.id} | TP: {tradePrice}</div>
-                                                </div>
-                                                <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-orange-600 border-orange-600 shadow-lg text-white' : 'border-zinc-200 text-zinc-300'}`}>
-                                                    {isSelected ? <Check size={16} /> : <Plus size={16} />}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    );
-                                }) : (
-                                    <div className="p-12 text-center flex flex-col items-center gap-3">
-                                        <PackageSearch className="w-12 h-12 text-zinc-200" />
-                                        <div className="text-sm font-black text-zinc-400 uppercase tracking-widest">No Matches Found</div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-zinc-50 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest shrink-0">
-                            <span>Showing {filteredItems.length} entries</span>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setItemDialogOpen(false)} className="h-8 px-4 font-black text-[10px] uppercase tracking-widest rounded-lg">Cancel</Button>
-                                <Button size="sm" onClick={() => setItemDialogOpen(false)} className={`${ACCENT_GRADIENT} text-white font-black text-[10px] uppercase tracking-widest rounded-lg px-6`}>OK</Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <ItemSelectionDialog
+                    open={itemDialogOpen}
+                    onOpenChange={setItemDialogOpen}
+                    itemSearch={itemSearch}
+                    setItemSearch={setItemSearch}
+                    filteredItems={filteredItems}
+                    rows={rows}
+                    removeRow={removeRow}
+                    addRow={addRow}
+                    handleSelectItem={handleSelectItem}
+                    setRows={setRows}
+                />
 
                 {/* Price Update Confirmation Dialog */}
-                <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
-                    <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none bg-white dark:bg-gray-950 shadow-2xl rounded-2xl">
-                        <div className="bg-orange-600 dark:bg-orange-500 p-6 flex flex-col items-center text-white relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12">
-                                <AlertTriangle size={100} />
-                            </div>
-                            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-3 shadow-inner">
-                                <AlertTriangle size={32} className="text-white" />
-                            </div>
-                            <DialogTitle className="text-xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight uppercase">Update Item Trade Prices?</DialogTitle>
-                            <p className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</p>
-                        </div>
+                <PriceUpdateDialog
+                    open={showPriceDialog}
+                    onOpenChange={setShowPriceDialog}
+                    priceUpdates={priceUpdates}
+                    submitPurchase={handlePostPriceUpdate}
+                />
 
-                        <div className="p-0 max-h-[400px] overflow-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 z-10">
-                                    <tr className="text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400">
-                                        <th className="py-3 px-4">Item Description</th>
-                                        <th className="py-3 px-2 text-center">Prev Trade</th>
-                                        <th className="py-3 px-2 text-center">Markup (%)</th>
-                                        <th className="py-3 px-2 text-center">New Trade</th>
-                                        <th className="py-3 px-2 text-center">Retail</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 dark:divide-gray-900">
-                                    {priceUpdates.map((upd, idx) => (
-                                        <tr key={idx} className="hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors">
-                                            <td className="py-3 px-4">
-                                                <div className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">{upd.title}</div>
-                                                <div className="text-[10px] text-gray-400 font-medium">ID: #{upd.item_id}</div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <span className="text-xs font-semibold text-gray-500 line-through">Rs {upd.old_trade_price.toFixed(2)}</span>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex flex-col items-center">
-                                                    <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{upd.markup_percent}%</span>
-                                                    <span className="text-[9px] text-gray-400">+{upd.markup_amount.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <div className="inline-flex items-center gap-1.5 justify-center bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-lg border border-orange-200/50 dark:border-orange-800/30">
-                                                    <span className="text-xs font-black text-orange-700 dark:text-orange-300">Rs {upd.new_trade_price.toFixed(2)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-2 text-center font-bold text-xs text-slate-600 dark:text-slate-400">
-                                                Rs {upd.retail_price.toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="p-6 bg-gray-50/50 dark:bg-black/20 border-t border-gray-100 dark:border-gray-800">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button
-                                    className="w-full h-12 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group shadow-sm"
-                                    onClick={() => submitPurchase(false)}
-                                >
-                                    <X size={18} className="group-hover:rotate-90 transition-transform" /> No, Only Store Bill
-                                </Button>
-                                <Button
-                                    className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 dark:shadow-orange-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-                                    onClick={() => submitPurchase(true)}
-                                >
-                                    <Check size={18} className="animate-bounce-short" /> Yes, Update Prices
-                                </Button>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                {/* Purchase Payment Dialog */}
+                <PurchasePaymentDialog
+                    open={showPaymentDialog}
+                    onOpenChange={setShowPaymentDialog}
+                    totals={totals}
+                    splits={paymentSplits}
+                    paymentAccounts={paymentAccounts}
+                    addSplitRow={addPaymentSplit}
+                    removeSplitRow={removePaymentSplit}
+                    updateSplitRow={updatePaymentSplit}
+                    onCommit={() => {
+                        setShowPaymentDialog(false);
+                        submitPurchase(updatePricesAfterPayment);
+                    }}
+                    invoiceNo={invoiceNo}
+                    supplierName={accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A"}
+                    previousBalance={toNumber(accounts.find(a => a.id === Number(accountType?.value))?.current_balance)}
+                    customerCheques={customerCheques}
+                    availableCheques={availableCheques}
+                />
 
                 {/* Success Summary Dialog */}
-                <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-                    <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none bg-white dark:bg-gray-950 shadow-2xl rounded-2xl">
-                        <div className="bg-emerald-600 dark:bg-emerald-500 p-8 flex flex-col items-center text-white relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <CheckCircle2 size={120} />
-                            </div>
-                            <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 shadow-inner">
-                                <CheckCircle2 size={40} className="text-white" />
-                            </div>
-                            <DialogTitle className="text-2xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight">Purchase Created Successfully!</DialogTitle>
-                            <p className="text-emerald-50/80 text-sm font-medium">Invoice record saved with ID: {successData?.purchaseId}</p>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {successData && (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-start pb-4 border-b border-gray-100 dark:border-gray-800">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Supplier</p>
-                                            <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{successData.supplierName}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice Amount</p>
-                                            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">Rs {successData.net.toLocaleString()}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Items</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalItems}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">FULL</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalFull}</p>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-col items-center">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">PCS</p>
-                                            <p className="text-lg font-bold text-gray-800 dark:text-gray-200">{successData.totalPcs}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-between items-center px-4 py-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
-                                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 tracking-tight">Total Discount</span>
-                                        <span className="text-lg font-black text-emerald-700 dark:text-emerald-400">Rs {successData.discount.toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="space-y-3 pt-2">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Button
-                                        className="h-12 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl shadow-lg shadow-gray-200 dark:shadow-gray-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                        onClick={() => {
-                                            if (successData?.purchaseId) {
-                                                const url = `/purchase/${successData.purchaseId}/pdf?format=small`;
-                                                window.open(url, '_blank');
-                                            }
-                                        }}
-                                    >
-                                        <Printer size={18} className="mr-2" /> Thermal Print
-                                    </Button>
-                                    <Button
-                                        className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                        onClick={() => {
-                                            if (successData?.purchaseId) {
-                                                const url = `/purchase/${successData.purchaseId}/pdf?format=big`;
-                                                window.open(url, '_blank');
-                                            }
-                                        }}
-                                    >
-                                        <Printer size={18} className="mr-2" /> A4 Print
-                                    </Button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Button
-                                        variant="outline"
-                                        className="h-12 border-gray-200 dark:border-gray-800 font-bold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all"
-                                        onClick={() => {
-                                            if (successData?.purchaseId) {
-                                                router.get(`/purchase/${successData.purchaseId}/view`);
-                                            }
-                                        }}
-                                    >
-                                        <Eye size={18} className="mr-2" /> View Invoice
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="h-12 border-orange-200 dark:border-orange-900/30 font-bold rounded-xl text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all"
-                                        onClick={() => setShowSuccessDialog(false)}
-                                    >
-                                        <Plus size={18} className="mr-2" /> Create New
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <SuccessSummaryDialog
+                    open={showSuccessDialog}
+                    onOpenChange={setShowSuccessDialog}
+                    successData={successData}
+                />
             </SidebarInset >
         </SidebarProvider >
     );

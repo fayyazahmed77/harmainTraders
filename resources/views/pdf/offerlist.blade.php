@@ -106,6 +106,24 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 </head>
 
 <body>
+@php
+    $showDefaultHeader = true;
+    if (isset($offer->firm) && $offer->firm) {
+        $showDefaultHeader = false;
+        $firm = $offer->firm;
+        $firm_logo_base64 = "";
+        if ($firm->logo) {
+            $firm_logo_path = public_path('storage/' . $firm->logo);
+            if (file_exists($firm_logo_path)) {
+                $firm_logo_data = file_get_contents($firm_logo_path);
+                $firm_logo_type = pathinfo($firm_logo_path, PATHINFO_EXTENSION);
+                $firm_logo_base64 = 'data:image/' . $firm_logo_type . ';base64,' . base64_encode($firm_logo_data);
+            }
+        }
+    }
+@endphp
+
+@if($showDefaultHeader)
     <div class="logo-section" style="text-align: center; margin-bottom: 15px;">
         <div class="logo-icon" style="display: inline-block;">
             <img src="{{ $logo_base64 }}" width="40" height="40" alt="Logo">
@@ -119,6 +137,23 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         <span>1st Floor, Marvi Market, Katchi Gali No.1 Denso Hall, Karachi</span><br>
         <span>Phone No. : 0332 3218684 / 021 32401607</span>
     </div>
+@else
+    <div class="logo-section" style="text-align: center; margin-bottom: 15px;">
+        @if($firm_logo_base64)
+            <div class="logo-icon" style="display: inline-block;">
+                <img src="{{ $firm_logo_base64 }}" width="40" height="40" alt="Logo">
+            </div>
+        @endif
+        <div class="brand-text" style="display: inline-block;">
+            <div class="brand-name">{{ $firm->name }}</div>
+            <div class="brand-tagline">{{ $firm->business }}</div>
+        </div>
+    </div>
+    <div style="text-align: center; margin-bottom: 15px;">
+        <span>{{ $firm->address1 }} {{ $firm->address2 }} {{ $firm->address3 }}</span><br>
+        <span>Phone No. : {{ $firm->phone }}</span>
+    </div>
+@endif
     <div class="header">
         <div class="header-left">
             <strong>Name:</strong> {{ $offer->account->title ?? "General Offer" }}<br>

@@ -430,77 +430,20 @@ export function DataTable({ data }: DataTableProps) {
           </DialogHeader>
 
           <form onSubmit={handleUpdate} className="py-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Name</Label>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Name</Label>
+                <div className="relative">
+                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                   <Input
+                    required
                     value={form.name}
                     onChange={(e) => setForm("name", e.target.value)}
-                    className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
+                    placeholder="e.g. Beverages"
+                    className="pl-10 h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
                   />
-                  {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Code</Label>
-                  <Input
-                    value={form.code}
-                    onChange={(e) => setForm("code", e.target.value.toUpperCase())}
-                    className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm uppercase"
-                  />
-                  {errors.code && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.code}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 text-left block">Icon Update</Label>
-                  <div className="group relative aspect-square w-32 mx-auto rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center overflow-hidden transition-all hover:border-orange-500/50 bg-zinc-50 dark:bg-zinc-900 shadow-inner">
-                    {imagePreview ? (
-                      <img src={imagePreview} className="h-full w-full object-cover" alt="Preview" />
-                    ) : (
-                      <div className="text-center p-4">
-                        <ImageIcon className="h-6 w-6 text-zinc-300 mx-auto mb-1 group-hover:scale-110 transition-transform" />
-                        <span className="text-[8px] font-black uppercase text-zinc-400">Replace Icon</span>
-                      </div>
-                    )}
-                    <Input
-                      type="file"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setForm("image", file);
-                          const reader = new FileReader();
-                          reader.onloadend = () => setImagePreview(reader.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </div>
-                  {errors.image && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.image}</p>}
-                </div>
-              </div>
-                <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Description</Label>
-                  <Textarea
-                    value={form.description}
-                    onChange={(e) => setForm("description", e.target.value)}
-                    className="min-h-[150px] border-zinc-200 dark:border-zinc-800 rounded-xl font-medium text-sm"
-                  />
-                  {errors.description && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.description}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Status</Label>
-                  <ShadSelect value={form.status} onValueChange={(v: any) => setForm("status", v)}>
-                    <SelectTrigger className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold uppercase tracking-widest text-[10px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="active" className="font-bold">Active</SelectItem>
-                      <SelectItem value="inactive" className="font-bold">Inactive</SelectItem>
-                    </SelectContent>
-                  </ShadSelect>
-                  {errors.status && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.status}</p>}
-                </div>
+                {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
               </div>
             </div>
 
