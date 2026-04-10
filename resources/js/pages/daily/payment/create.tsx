@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -802,31 +803,45 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
                 <div className="col-span-5">
                   <TechLabel label="Ledger Party" icon={UserIcon}>
-                    <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
-                      <PopoverTrigger asChild>
+                    <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen} >
+                      <DialogTrigger asChild>
                         <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
                           {selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}
                           <Search size={14} className="text-zinc-400" />
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-100 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                        <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                          <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-9 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                        </div>
-                        <div className="max-h-64 overflow-auto py-1">
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
+                        <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
+                          <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100">Select Party Account</DialogTitle>
+                          <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
+                          <div className="pt-2">
+                            <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                          </div>
+                        </DialogHeader>
+                        <div className="max-h-[50vh] overflow-auto py-2 px-2">
                           {filteredAccounts.map(acc => (
-                            <button key={acc.id} className={`w-full text-left px-4 py-2  text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex items-center gap-2 group border-l-2 border-transparent ${t.borderHover}`}
+                            <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
                               onClick={() => handleAccountSelect(acc.id)}>
-                              <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
-                              <div className="flex justify-between w-full pr-2">
-                                <div>{acc.title}</div>
+                              <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
+                                  <span className="text-zinc-800 dark:text-zinc-200 truncate">{acc.title}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 block tracking-tighter">Balance</span>
+                                  <span className={`text-xs font-black tracking-tighter ${typeof (acc as any).current_balance !== 'undefined' ? ((acc as any).current_balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-zinc-500'}`}>
+                                    {typeof (acc as any).current_balance !== 'undefined' ? Math.abs((acc as any).current_balance).toLocaleString('en-US', {minimumFractionDigits: 2}) + ((acc as any).current_balance < 0 ? ' CR' : ' DR') : "---"}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex justify-start pl-3.5">
                                 <div
                                   className={cn(
-                                    "text-[8px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
+                                    "text-[9px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
                                     (() => {
                                       const name = acc.account_type?.name?.toLowerCase() || "";
-                                      if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 opacity-100";
-                                      if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400 opacity-100";
+                                      if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+                                      if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
                                       return "text-zinc-400 dark:text-zinc-500 opacity-40";
                                     })()
                                   )}
@@ -836,9 +851,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                               </div>
                             </button>
                           ))}
+                          {filteredAccounts.length === 0 && (
+                            <div className="p-8 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                              No accounts found matching "{accountSearch}"
+                            </div>
+                          )}
                         </div>
-                      </PopoverContent>
-                    </Popover>
+                      </DialogContent>
+                    </Dialog>
                   </TechLabel>
                 </div>
 
@@ -967,9 +987,47 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     </div>
                     <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
                     <div className="space-y-0.5">
-                      <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Total Outstanding</div>
+                      <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Billed Outstanding</div>
                       <div className="text-xs font-mono font-black text-zinc-500">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
                     </div>
+                    <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
+                    <div className="space-y-0.5">
+                      <div className="text-[9px] font-black text-rose-400 dark:text-rose-500 uppercase tracking-widest">Unbilled Ledger</div>
+                      <div className="text-xs font-mono font-black text-rose-600 dark:text-rose-400">
+                        {(() => {
+                           const totalBilled = unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0);
+                           const unbilled = Math.abs(currentBalance) - totalBilled;
+                           return unbilled > 0.01 ? `Rs ${unbilled.toLocaleString(undefined, {minimumFractionDigits: 2})}` : 'Rs 0.00';
+                        })()}
+                      </div>
+                    </div>
+                    {(() => {
+                        const totalBilled = unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0);
+                        const unbilled = Math.abs(currentBalance) - totalBilled;
+                        if (unbilled > 0.01) {
+                           return (
+                            <div className="pl-4 border-l border-zinc-200 dark:border-zinc-800 ml-2">
+                              <Button variant="outline" size="sm" className={`h-8 text-[10px] font-black uppercase tracking-widest ${t.text} ${t.borderAlpha} ${t.blob} ${t.bgHover} shadow-sm`}
+                                      onClick={() => {
+                                        if (selectedBillIds.size !== unpaidBills.length) {
+                                          const newSet = new Set<string>();
+                                          const newAllocations: Record<string, number> = {};
+                                          unpaidBills.forEach(b => {
+                                            newSet.add(b.id.toString());
+                                            newAllocations[b.id.toString()] = Number(b.remaining_amount);
+                                          });
+                                          setSelectedBillIds(newSet);
+                                          setAllocations(newAllocations);
+                                        }
+                                        setAmount(Math.abs(currentBalance)); 
+                                      }}>
+                                 Settle Full Ledger (Rs {Math.abs(currentBalance).toLocaleString(undefined, {minimumFractionDigits: 2})})
+                              </Button>
+                            </div>
+                           );
+                        }
+                        return null;
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-6">

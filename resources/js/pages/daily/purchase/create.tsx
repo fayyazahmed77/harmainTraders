@@ -9,7 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt } from "lucide-react";
+import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt, TrendingDown } from "lucide-react";
 import { ItemSelectionDialog } from "./components/ItemSelectionDialog";
 import { PriceUpdateDialog } from "./components/PriceUpdateDialog";
 import { SuccessSummaryDialog } from "./components/SuccessSummaryDialog";
@@ -323,6 +323,9 @@ export default function Purchase({
         const defaultFirm = firms?.find(f => f.defult === 1);
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
+
+    const [advanceAvailable, setAdvanceAvailable] = useState<number>(0);
+    const [useAdvance, setUseAdvance] = useState<boolean>(true);
     const accountTypeOptions: Option[] = useMemo(() => {
         return accounts.map((a) => ({
             value: String(a.id),
@@ -556,13 +559,22 @@ export default function Purchase({
         const roundedGross = Math.round(gross);
         const roundedDisc = Math.round(discTotal);
 
-        const net = roundedGross - roundedDisc + courier;
+        const net = Math.round(roundedGross - roundedDisc + courier);
+
+        // Advance Logic:
+        // In this system, a negative balance for a supplier means they owe us (Advance).
+        // e.g. -103,768 means we have 103,768 in advance.
+        const absAdvance = Math.max(0, -advanceAvailable);
+        const appliedAdvance = useAdvance ? Math.min(net, absAdvance) : 0;
+        const netSettlement = Math.max(0, net - appliedAdvance);
 
         return {
             gross: roundedGross,
             discTotal: roundedDisc,
             courier: courier,
-            net: Math.round(net),
+            net: net,
+            appliedAdvance,
+            netSettlement,
             previousBalance,
             cashReceived,
             totalReceivable: Math.round(net + previousBalance - cashReceived),
@@ -570,7 +582,7 @@ export default function Purchase({
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier]);
+    }, [rowsWithComputed, items, courier, advanceAvailable, useAdvance]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -595,8 +607,9 @@ export default function Purchase({
             discount_total: totals.discTotal,
             courier_charges: totals.courier,
             net_total: totals.net,
-            paid_amount: isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
-            remaining_amount: totals.net - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            paid_amount: (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            remaining_amount: totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            applied_advance: totals.appliedAdvance,
             update_prices: updatePrices,
             print_format: printOption,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
@@ -759,16 +772,23 @@ console.log(lastPurchaseInfo);
                                         const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
-                                        if (selectedAccount) {
-                                            setCreditDays(selectedAccount.aging_days ?? 0);
-                                            setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                                            const salemanId = selectedAccount.saleman_id ?? null;
-                                            setSalesman(salemanId);
-                                        } else {
-                                            setCreditDays(0);
-                                            setCreditLimit("");
-                                            setSalesman(null);
-                                        }
+                                            if (selectedAccount) {
+                                                setCreditDays(selectedAccount.aging_days ?? 0);
+                                                setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
+                                                const salemanId = selectedAccount.saleman_id ?? null;
+                                                setSalesman(salemanId);
+                                                
+                                                // Set Advance
+                                                const balance = toNumber(selectedAccount.current_balance);
+                                                setAdvanceAvailable(balance);
+                                                setUseAdvance(balance < 0);
+                                            } else {
+                                                setCreditDays(0);
+                                                setCreditLimit("");
+                                                setSalesman(null);
+                                                setAdvanceAvailable(0);
+                                                setUseAdvance(false);
+                                            }
                                     }}
                                     placeholder="Select Supplier..."
                                     searchPlaceholder="Search by name or code..."
@@ -861,11 +881,18 @@ console.log(lastPurchaseInfo);
                                             setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
                                             const salemanId = selectedAccount.saleman_id ?? null;
                                             setSalesman(salemanId);
+                                            
+                                            // Set Advance
+                                            const balance = toNumber(selectedAccount.current_balance);
+                                            setAdvanceAvailable(balance);
+                                            setUseAdvance(balance < 0);
                                         } else {
                                             setCreditDays(0);
                                             setCreditLimit("");
                                             setMarkupPercentage(0);
                                             setSalesman(null);
+                                            setAdvanceAvailable(0);
+                                            setUseAdvance(false);
                                         }
                                     }}
                                     placeholder="Supplier"
@@ -1540,12 +1567,54 @@ console.log(lastPurchaseInfo);
 
                                         <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
 
+                                        {/* Advance Information */}
+                                        {advanceAvailable < 0 && (
+                                            <div className="space-y-3 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
+                                                        <TrendingDown size={12} /> Available Advance
+                                                    </span>
+                                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                                        Rs {Math.abs(advanceAvailable).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox 
+                                                            id="use-advance" 
+                                                            checked={useAdvance} 
+                                                            onCheckedChange={(v) => setUseAdvance(!!v)}
+                                                            className="w-4 h-4 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
+                                                        />
+                                                        <label htmlFor="use-advance" className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                                                            Apply to this bill
+                                                        </label>
+                                                    </div>
+                                                    <span className="text-xs font-black text-emerald-600">
+                                                        -Rs {totals.appliedAdvance.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
+
                                         {/* Net Total - Big & Bold */}
-                                        <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-sm shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
-                                            <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80">Final Net Total</span>
-                                            <div className="text-3xl font-black leading-none drop-shadow-md">
+                                        <div className={cn(
+                                            "flex flex-col p-3 rounded-sm shadow-lg transition-all duration-500",
+                                            totals.netSettlement === 0 && totals.appliedAdvance > 0 
+                                                ? "bg-emerald-600 dark:bg-emerald-700 shadow-emerald-500/20" 
+                                                : "bg-orange-600 dark:bg-orange-700 shadow-orange-500/20"
+                                        )}>
+                                            <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80 decoration-white/30 decoration-1 flex items-center justify-between">
+                                                <span>Net Settlement</span>
+                                                {totals.netSettlement === 0 && totals.appliedAdvance > 0 && (
+                                                    <span className="bg-white/20 px-2 py-0.5 rounded-full text-[8px] animate-pulse">AUTO-SETTLED</span>
+                                                )}
+                                            </span>
+                                            <div className="text-3xl font-black leading-none drop-shadow-md text-white">
                                                 <span className="text-xs font-bold mr-1 italic">Rs</span>
-                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {totals.netSettlement.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </div>
                                         </div>
 
@@ -1654,13 +1723,21 @@ console.log(lastPurchaseInfo);
                                 />
                             </div>
 
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Confirmed Net Total</span>
+                            <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6">
+                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Net Settlement</span>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
                                     <span className="text-sm font-bold mr-1 italic">Rs</span>
-                                    {totals.net.toLocaleString()}
+                                    {totals.netSettlement.toLocaleString()}
                                 </div>
                             </div>
+                            {totals.appliedAdvance > 0 && (
+                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6 animate-in slide-in-from-left-4">
+                                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Paid via Advance</span>
+                                    <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                                        Rs {totals.appliedAdvance.toLocaleString()}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -1693,11 +1770,18 @@ console.log(lastPurchaseInfo);
                     <div className={`md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/60 dark:border-gray-700/60 p-4 z-50 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] transition-transform duration-300 ${showStickyFooter ? 'translate-y-0' : 'translate-y-full'}`}>
                         <div className="flex items-center justify-between gap-4 mb-3">
                             <div className="flex flex-col">
-                                <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-0.5">Net Total</div>
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider mb-0.5">
+                                    {totals.appliedAdvance > 0 ? "Net Settlement" : "Net Total"}
+                                </div>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
                                     <span className="text-sm font-semibold mr-1">Rs</span>
-                                    {Math.round(totals.net).toFixed(2)}
+                                    {Math.round(totals.netSettlement).toLocaleString()}
                                 </div>
+                                {totals.appliedAdvance > 0 && (
+                                    <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                        <TrendingDown size={10} /> -{Math.round(totals.appliedAdvance).toLocaleString()} Adv.
+                                    </div>
+                                )}
                             </div>
                             <Button onClick={handleSave} className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/50 rounded-xl font-bold transition-all active:scale-95">
                                 <Save className="mr-2" size={18} /> Save Invoice

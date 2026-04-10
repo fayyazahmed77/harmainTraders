@@ -289,7 +289,7 @@ class PaymentController extends Controller
     {
         try {
             $accountId = $request->input('account_id');
-            $account = Account::find($accountId);
+            $account = Account::with('accountType')->find($accountId);
 
             if (!$account) {
                 return response()->json([]);
@@ -345,27 +345,10 @@ class PaymentController extends Controller
 
             $bills = array_merge($sales, $purchases);
 
-            // Fetch Full Ledger Balance
-            $totalSales = \App\Models\Sales::where('customer_id', $accountId)->sum('net_total');
-            $totalSalesReturns = \App\Models\SalesReturn::where('customer_id', $accountId)->sum('net_total');
-            $totalPurchases = \App\Models\Purchase::where('supplier_id', $accountId)->sum('net_total');
-            $totalPurchaseReturns = \App\Models\PurchaseReturn::where('supplier_id', $accountId)->sum('net_total');
-            $totalReceipts = \App\Models\Payment::where('account_id', $accountId)->where('type', 'RECEIPT')->sum('amount');
-            $totalPayments = \App\Models\Payment::where('account_id', $accountId)->where('type', 'PAYMENT')->sum('amount');
-
-            // Debit = Sales + Payments (OUT) + PurchaseReturns
-            // Credit = Purchases + Receipts (IN) + SalesReturns
-            $totalDebit = $totalSales + $totalPayments + $totalPurchaseReturns;
-            $totalCredit = $totalPurchases + $totalReceipts + $totalSalesReturns;
-
-            // Respect Orientation (dr/cr) like ReportBuilder
+            // Use the centralized current_balance logic from Account model
+            // This correctly handles discounts, canceled cheques, and orientations
+            $netLedgerBalance = $account->current_balance;
             $orientation = $account->purchase == 1 ? 'cr' : 'dr';
-
-            if ($orientation === 'cr') {
-                $netLedgerBalance = ($account->opening_balance) + ($totalCredit - $totalDebit);
-            } else {
-                $netLedgerBalance = ($account->opening_balance) + ($totalDebit - $totalCredit);
-            }
 
             // Calculate Unpaid Billed Balance (Sum of remaining amounts on invoices)
             $totalUnpaidBilled = collect($bills)->sum('remaining_amount');

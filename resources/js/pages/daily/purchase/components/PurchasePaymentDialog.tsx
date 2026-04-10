@@ -52,6 +52,7 @@ interface PurchasePaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   totals: {
     net: number;
+    appliedAdvance?: number;
     [key: string]: any;
   };
   splits: SplitPayment[];
@@ -92,7 +93,9 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
   };
 
   const totalPaid = splits.reduce((acc, s) => acc + toNumber(s.amount), 0);
-  const totalPayable = totals.net + previousBalance;
+  const appliedAdvance = toNumber(totals.appliedAdvance);
+  const netSettlement = totals.net - appliedAdvance;
+  const totalPayable = netSettlement + Math.max(0, previousBalance); // Only add if positive outstanding
   const remaining = totalPayable - totalPaid;
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
@@ -140,22 +143,19 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
         {/* Dynamic Balance Tracker */}
         <div className="grid grid-cols-4 divide-x divide-zinc-200 dark:divide-white/5 bg-zinc-50 dark:bg-[#161925] border-b border-zinc-200 dark:border-white/5">
           <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono">Invoice</span>
+            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono text-center">Net Total</span>
             <span className="text-xl font-black text-zinc-900 dark:text-white font-mono tracking-tighter">Rs {totals.net.toLocaleString()}</span>
           </div>
-          <div className="p-6 flex flex-col items-center border-l-0">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono">Prev. Balance</span>
-            <span className={cn(
-              "text-xl font-black font-mono tracking-tighter",
-              previousBalance > 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-            )}>Rs {previousBalance.toLocaleString()}</span>
+          <div className="p-6 flex flex-col items-center">
+            <span className="text-[9px] font-black uppercase text-emerald-500 tracking-[0.2em] mb-2 font-mono text-center">Advance Used</span>
+            <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tighter">-Rs {appliedAdvance.toLocaleString()}</span>
           </div>
           <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono">Paying</span>
-            <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tighter">Rs {totalPaid.toLocaleString()}</span>
+            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono text-center">Paying Now</span>
+            <span className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono tracking-tighter">Rs {totalPaid.toLocaleString()}</span>
           </div>
           <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono">Remaining</span>
+            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2 font-mono text-center">Remaining</span>
             <span className={cn(
               "text-xl font-black font-mono tracking-tighter",
               remaining > 0 ? "text-orange-600 dark:text-orange-500" : "text-emerald-600 dark:text-emerald-400"
