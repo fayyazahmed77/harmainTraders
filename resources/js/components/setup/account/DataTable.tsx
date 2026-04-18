@@ -20,7 +20,9 @@ import {
     Landmark,
     Banknote,
     Ticket,
-    ShieldCheck
+    ShieldCheck,
+    Link as LinkIcon,
+    RefreshCw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { router, usePage, Link } from "@inertiajs/react";
@@ -67,6 +69,8 @@ interface Account {
     credit_limit?: number;
     current_balance?: number;
     status?: boolean;
+    guest_token?: string;
+    guest_link?: string;
 }
 
 interface DataTableProps {
@@ -310,6 +314,40 @@ export function DataTable({ data }: DataTableProps) {
                                 >
                                     View Details
                                 </DropdownMenuItem>
+                                
+                                {/* ✅ Guest Link (only for customers) */}
+                                {account.type.toString().toLowerCase().includes('customer') && (
+                                    <>
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (account.guest_link) {
+                                                    navigator.clipboard.writeText(account.guest_link);
+                                                    toast.success("Guest link copied to clipboard!");
+                                                } else {
+                                                    toast.error("No guest link generated yet.");
+                                                }
+                                            }}
+                                            className="cursor-pointer font-medium text-orange-600 focus:text-orange-600"
+                                            disabled={!account.guest_link}
+                                        >
+                                            <LinkIcon className="mr-2 h-4 w-4" />
+                                            Copy Guest Link
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                router.post(`/account/${account.id}/reset-guest-token`, {}, {
+                                                    onSuccess: () => toast.success("Guest link generated successfully!"),
+                                                    onError: () => toast.error("Failed to generate guest link")
+                                                });
+                                            }}
+                                            className="cursor-pointer font-medium"
+                                        >
+                                            <RefreshCw className="mr-2 h-4 w-4" />
+                                            {account.guest_token ? "Reset Guest Link" : "Generate Guest Link"}
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
 
                                 {/* ✅ Edit (only if user can edit) */}
                                 {canEdit && (

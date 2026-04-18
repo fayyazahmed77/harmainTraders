@@ -46,9 +46,10 @@ class Account extends Model
         'cnic',
         'status',
         'account_category_id',
+        'guest_token',
     ];
 
-    protected $appends = ['current_balance'];
+    protected $appends = ['current_balance', 'guest_link'];
 
     protected $casts = [
         'purchase' => 'boolean',
@@ -176,5 +177,12 @@ class Account extends Model
         }
         
         return (float)$this->opening_balance;
+    }
+    public function getGuestLinkAttribute()
+    {
+        if (!$this->guest_token) {
+            return null;
+        }
+        return url("/g/{$this->guest_token}");
     }
 }

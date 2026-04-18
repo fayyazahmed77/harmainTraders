@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 
 @import 'tw-animate-css';
 
@@ -8,10 +10,23 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-    --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+    --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-mono-jet: 'JetBrains Mono', monospace;
+
+    --color-surface-0: var(--surface-0);
+    --color-surface-1: var(--surface-1);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+    --color-surface-4: var(--surface-4);
+
+    --color-amber: #E8941A;
+    --color-amber-dim: #9B5F09;
+    --color-amber-bright: #FFBA47;
+
+    --color-text-primary: var(--text-primary);
+    --color-text-secondary: var(--text-secondary);
+    --color-text-muted: var(--text-muted);
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -59,12 +74,41 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    @keyframes ticker {
+        from { transform: translateX(0); }
+        to   { transform: translateX(-50%); }
+    }
+    --animate-ticker: ticker 40s linear infinite;
+
+    @keyframes shimmer {
+        0% { transform: translateX(-100%) skewX(-30deg); }
+        100% { transform: translateX(200%) skewX(-30deg); }
+    }
+    --animate-shimmer: shimmer 2s infinite;
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+        50%       { opacity: 0.6; box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+    }
+    --animate-pulse-dot: pulse-dot 2s infinite;
 }
 
 :root {
     --radius: 0.65rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.141 0.005 285.823);
+    --background: #FFFFFF;
+    --foreground: #080706;
+
+    --surface-0: #FFFFFF;
+    --surface-1: #F9F8F6;
+    --surface-2: #F1EFEA;
+    --surface-3: #E9E6DF;
+    --surface-4: #E1DDD4;
+
+    --text-primary: #080706;
+    --text-secondary: #5C534A;
+    --text-muted: #9E9186;
+
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.141 0.005 285.823);
     --popover: oklch(1 0 0);
@@ -97,8 +141,19 @@
 }
 
 .dark {
-    --background: oklch(0.03 0.001 285.885);
-    --foreground: oklch(0.985 0 0);
+    --background: #080706;
+    --foreground: #F5F0E8;
+
+    --surface-0: #080706;
+    --surface-1: #0F0E0D;
+    --surface-2: #181614;
+    --surface-3: #221E1B;
+    --surface-4: #2D2824;
+
+    --text-primary: #F5F0E8;
+    --text-secondary: #9E9186;
+    --text-muted: #5C534A;
+
     --card: oklch(0.21 0.006 285.885);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.21 0.006 285.885);
@@ -136,8 +191,16 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-[#080706] text-[#F5F0E8] antialiased;
+        font-family: 'Barlow', sans-serif;
     }
+
+    .font-display { font-family: 'Barlow Condensed', sans-serif; }
+    .font-mono-jet { font-family: 'JetBrains Mono', monospace; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #080706; }
+    ::-webkit-scrollbar-thumb { background: #2D2824; border-radius: 4px; }
 }
 
 @theme inline {

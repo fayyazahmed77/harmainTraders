@@ -28,19 +28,32 @@ import {
 } from "@/components/ui/select";
 
 import {
-    MoreHorizontal,
-    CheckCircle,
-    RotateCw,
-    RefreshCcw,
-    ChevronUp,
-    ChevronDown,
-    ChevronLeft as IconChevronLeft,
-    ChevronRight as IconChevronRight,
-    ChevronsLeft as IconChevronsLeft,
-    ChevronsRight as IconChevronsRight,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from "@/components/ui/table";
+import { 
+    Eye, 
+    Edit2, 
+    Trash2, 
+    MoreHorizontal, 
+    CheckCircle, 
+    RotateCw, 
+    RefreshCcw, 
+    ChevronUp, 
+    ChevronDown, 
+    ChevronLeft as IconChevronLeft, 
+    ChevronRight as IconChevronRight, 
+    ChevronsLeft as IconChevronsLeft, 
+    ChevronsRight as IconChevronsRight, 
+    Clock, 
+    AlertCircle 
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { router } from "@inertiajs/react";
@@ -63,7 +76,7 @@ import {
 /* ------------------------------
    ✔️ Status Type (Fixes All TS Errors)
 --------------------------------- */
-export type SaleStatus = "Completed" | "Partial Return" | "Returned";
+export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled";
 
 /* ------------------------------
    ✔️ Main Interface
@@ -74,6 +87,7 @@ interface Sales {
     invoice: string;
     code: string;
     status: SaleStatus; // <-- FIXED HERE
+    is_online: boolean;
     customer_id: number;
     salesman_id: number;
     no_of_items: number;
@@ -120,6 +134,14 @@ export default function DataTable({ data }: DataTableProps) {
             color: "bg-red-100 text-red-800",
             icon: <RefreshCcw size={14} />,
         },
+        "Pending Order": {
+            color: "bg-orange-100 text-orange-800",
+            icon: <Clock size={14} />,
+        },
+        Canceled: {
+            color: "bg-gray-100 text-gray-800",
+            icon: <AlertCircle size={14} />,
+        },
     };
 
     /* ------------------------------
@@ -156,8 +178,15 @@ export default function DataTable({ data }: DataTableProps) {
             accessorKey: "invoice",
             header: "Invoice",
             cell: ({ row }) => (
-                <div>
-                    <div>{row.original.invoice}</div>
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold">{row.original.invoice}</span>
+                        {row.original.is_online && (
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-blue-200 bg-blue-50 text-blue-700 font-bold uppercase tracking-widest">
+                                Online
+                            </Badge>
+                        )}
+                    </div>
                     <div className="text-xs text-muted-foreground">Code: {row.original.code}</div>
                 </div>
             )
@@ -176,7 +205,6 @@ export default function DataTable({ data }: DataTableProps) {
         { accessorKey: "no_of_items", header: "Items" },
         { accessorKey: "gross_total", header: "Gross Total" },
         { accessorKey: "discount_total", header: "Discount" },
-        { accessorKey: "tax_total", header: "Tax Total" },
         { accessorKey: "net_total", header: "Net Total" },
         { accessorKey: "paid_amount", header: "Paid" },
         { accessorKey: "remaining_amount", header: "Remaining" },
@@ -226,24 +254,45 @@ export default function DataTable({ data }: DataTableProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => router.visit(`/sales-return/create?sale_id=${sale.id}`)}>
-                                Sales Return
+                            {sale.status === "Pending Order" && (
+                                <>
+                                    <DropdownMenuItem 
+                                        className="text-green-600 font-bold focus:text-green-700 focus:bg-green-50"
+                                        onClick={() => router.post(`/sales/${sale.id}/confirm`)}
+                                    >
+                                        <CheckCircle size={14} className="mr-2" /> Confirm Order
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                        className="text-orange-600 font-bold focus:text-orange-700 focus:bg-orange-50"
+                                        onClick={() => router.post(`/sales/${sale.id}/cancel`)}
+                                    >
+                                        <AlertCircle size={14} className="mr-2" /> Cancel Order
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            
+                            
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-slate-50"
+                                onClick={() => router.visit(`/sales/${sale.id}/view`)}
+                            >
+                                <Eye size={14} className="mr-2 text-slate-500" /> View Invoice
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => router.visit(`/sales/${sale.id}/view`)}>
-                                View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => router.visit(`/sales/${sale.id}/edit`)}>
-                                Edit
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-slate-50"
+                                onClick={() => router.visit(`/sales/${sale.id}/edit`)}
+                            >
+                                <Edit2 size={14} className="mr-2 text-slate-500" /> Edit Invoice
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
+                                className="text-rose-600 font-bold focus:text-rose-700 focus:bg-rose-50"
                                 onSelect={(e) => {
                                     e.preventDefault();
                                     setSaleToDelete(sale);
                                     setIsDeleteDialogOpen(true);
                                 }}
                             >
-                                Delete
+                                <Trash2 size={14} className="mr-2" /> Delete Permanent
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

@@ -137,7 +137,7 @@ class ItemsController extends Controller
             // Inventory & Packing
             'reorder_level' => 'required|numeric',
             'packing_qty' => 'required|numeric',
-            'packing_size' => 'nullable|string|max:255',
+            'packing_size' => 'required|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects
@@ -237,7 +237,7 @@ class ItemsController extends Controller
             // Inventory & Packing
             'reorder_level' => 'required|numeric',
             'packing_qty' => 'required|numeric',
-            'packing_size' => 'nullable|string|max:255',
+            'packing_size' => 'required|string|max:255',
             'pcs' => 'nullable|numeric',
 
             // Selects

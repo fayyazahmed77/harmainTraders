@@ -226,7 +226,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
     retail_tp_diff: item.retail_tp_diff ?? "",
     reorder_level: item.reorder_level ?? "",
     packing_qty: item.packing_qty ?? "",
-    packing_size: item.packing_size ?? "",
+    packing_size: item.packing_size ?? "1",
     pcs: item.pcs ?? "",
     formation: item.formation ?? "",
     type: item.type ?? "",
@@ -651,7 +651,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="w-full">
-                              <TechLabel label="Carton Size" icon={Ruler} error={errors.packing_size}>
+                              <TechLabel label="Carton Size" icon={Ruler} required error={errors.packing_size}>
                                 <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>

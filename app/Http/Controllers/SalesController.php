@@ -39,6 +39,11 @@ class SalesController extends Controller
             $query->where('status', $request->status);
         }
 
+        // Filter by Online status
+        if ($request->has('is_online') && $request->is_online === 'true') {
+            $query->where('is_online', true);
+        }
+
         // Filter by Search (Invoice or Code)
         if ($request->has('search') && $request->search) {
             $query->where(function ($q) use ($request) {
@@ -78,7 +83,7 @@ class SalesController extends Controller
         return Inertia::render("daily/sales/index", [
             'sales' => $sales,
             'summary' => $summary,
-            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'search']),
+            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'search', 'is_online']),
             'customers' => $customers,
         ]);
     }
@@ -872,5 +877,58 @@ class SalesController extends Controller
             DB::rollBack();
             return redirect()->back()->with('error', 'Error deleting sale: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Confirm a pending guest order
+     */
+    public function confirm($id)
+    {
+        DB::beginTransaction();
+        try {
+            $sale = Sales::with('items')->findOrFail($id);
+            
+            if ($sale->status !== 'Pending Order') {
+                return redirect()->back()->with('error', 'Only pending orders can be confirmed.');
+            }
+
+            // Deduct Stock
+            foreach ($sale->items as $item) {
+                $product = Items::find($item->item_id);
+                if ($product) {
+                    $packing = $product->packing_qty ?: 1;
+                    $bonusUnits = (($item->bonus_qty_carton ?? 0) * $packing) + ($item->bonus_qty_pcs ?? 0);
+                    $totalToDeduct = $item->total_pcs + $bonusUnits;
+
+                    $product->updateStockFromPcs($product->total_stock_pcs - $totalToDeduct);
+                }
+            }
+
+            $sale->status = 'Completed';
+            $sale->save();
+
+            DB::commit();
+            return redirect()->back()->with('success', "Order #{$sale->invoice} confirmed successfully. Balance has been updated.");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error confirming order: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Cancel a pending guest order
+     */
+    public function cancel($id)
+    {
+        $sale = Sales::findOrFail($id);
+        
+        if ($sale->status !== 'Pending Order') {
+            return redirect()->back()->with('error', 'Only pending orders can be canceled.');
+        }
+
+        $sale->status = 'Canceled';
+        $sale->save();
+
+        return redirect()->back()->with('success', "Order #{$sale->invoice} has been canceled.");
     }
 }

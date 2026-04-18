@@ -14,13 +14,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Sales", href: "/sales" },
     { title: "New Invoice", href: "/sales/create" },
 ];
-export type SaleStatus = "Completed" | "Partial Return" | "Returned";
+export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled";
 interface Sales {
     id: number;
     date: string;
     invoice: string;
     code: string;
     status: SaleStatus;
+    is_online: boolean;
     customer_id: number;
     salesman_id: number;
     no_of_items: number;

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Link, router } from "@inertiajs/react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SalesHistoryTab, PurchasesHistoryTab, PaymentsLedgerTab, BankStatementTab, ChequesTab } from "./history-tabs";
 import {
@@ -26,7 +27,9 @@ import {
     Building2,
     Tag,
     TrendingUp,
-    Wallet
+    Wallet,
+    Link as LinkIcon,
+    RefreshCw
 } from "lucide-react";
 import { BreadcrumbItem } from "@/types";
 import { cn } from "@/lib/utils";
@@ -62,6 +65,8 @@ interface Account {
     ats_percentage: number | null;
     ats_type: string | null;
     status: boolean;
+    guest_token: string | null;
+    guest_link: string | null;
     country?: { id: number; name: string };
     province?: { id: number; name: string };
     city?: { id: number; name: string };
@@ -278,6 +283,38 @@ export default function AccountView({ account, financial_summary }: Props) {
                             <Button onClick={() => router.visit(`/account/${account.id}/edit`)} className="gap-2">
                                 <Edit className="h-4 w-4" /> Edit Account
                             </Button>
+
+                            {typeLower === 'customers' && (
+                                <div className="flex items-center gap-2 ml-2 border-l pl-4 border-slate-200 dark:border-zinc-800">
+                                    <Button 
+                                        variant="outline" 
+                                        className={cn("gap-2", !account.guest_link && "opacity-50")}
+                                        disabled={!account.guest_link}
+                                        onClick={() => {
+                                            if (account.guest_link) {
+                                                navigator.clipboard.writeText(account.guest_link);
+                                                toast.success("Guest link copied to clipboard!");
+                                            }
+                                        }}
+                                    >
+                                        <LinkIcon className="h-4 w-4 text-orange-500" /> Copy Guest Link
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-9 w-9 rounded-full"
+                                        onClick={() => {
+                                            router.post(`/account/${account.id}/reset-guest-token`, {}, {
+                                                onSuccess: () => toast.success("Guest link generated successfully!"),
+                                                onError: () => toast.error("Failed to generate guest link")
+                                            });
+                                        }}
+                                        title={account.guest_token ? "Reset Link" : "Generate Link"}
+                                    >
+                                        <RefreshCw className={cn("h-4 w-4", account.guest_token ? "text-slate-400" : "text-orange-500 animate-pulse")} />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
 

@@ -35,6 +35,7 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SalesMapReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\AccountCategoryController;
+use App\Http\Controllers\GuestController;
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -93,6 +94,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{id}/balance', [AccountController::class, 'getBalance'])->name('account.balance');
         Route::get('/next-code', [AccountController::class, 'getNextCode'])->name('account.next-code');
         Route::patch('/{account}/toggle-status', [AccountController::class, 'toggleStatus'])->name('account.toggle-status');
+        Route::post('/{id}/reset-guest-token', [GuestController::class, 'resetToken'])->name('account.reset-guest-token');
 
         // History Data Routes
         Route::get('/{account}/history/sales', [AccountHistoryController::class, 'getSales'])->name('account.history.sales');
@@ -259,6 +261,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{offerlist}/pdf', [OfferListController::class, 'pdf'])->name('offerlist.pdf');
         Route::get('/{offerlist}/download', [OfferListController::class, 'download'])->name('offerlist.download');
         Route::put('/{offerlist}', [OfferListController::class, 'update'])->name('offerlist.update');
+        Route::post('/{id}/toggle-live', [OfferListController::class, 'toggleLive'])->name('offer-list.toggle-live');
         Route::delete('/{id}', [OfferListController::class, 'destroy'])->name('offerlist.destroy');
     });
     //--------------------------------------------Sales-----------------------------------------------
@@ -269,6 +272,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{sale}/edit', [SalesController::class, 'edit'])->name('sale.edit');
         Route::get('/{sale}/view', [SalesController::class, 'view'])->name('sale.view');
         Route::get('/{sale}/pdf', [SalesController::class, 'pdf'])->name('sale.pdf');
+        Route::post('/{sale}/confirm', [SalesController::class, 'confirm'])->name('sale.confirm');
+        Route::post('/{sale}/cancel', [SalesController::class, 'cancel'])->name('sale.cancel');
         Route::get('/{sale}/download', [SalesController::class, 'download'])->name('sale.download');
         Route::put('/{sale}', [SalesController::class, 'update'])->name('sale.update');
         Route::delete('/{id}/delete', [SalesController::class, 'destroy'])->name('sale.destroy');
@@ -344,6 +349,37 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/accounts/ledger', [ReportsController::class, 'accountLedger'])->name('reports.accounts.ledger');
         Route::get('/accounts/ledger/export/pdf', [ReportsController::class, 'accountLedgerExportPdf'])->name('reports.accounts.ledger.export.pdf');
         Route::get('/accounts/ledger/print', [ReportsController::class, 'accountLedgerPrint'])->name('reports.accounts.ledger.print');
+        Route::get('/accounts/aging/export/pdf', [ReportsController::class, 'accountAgingExportPdf'])->name('reports.accounts.aging.export.pdf');
+        Route::get('/accounts/aging/print', [ReportsController::class, 'accountAgingPrint'])->name('reports.accounts.aging.print');
+        Route::get('/accounts/due-bills/export/pdf', [ReportsController::class, 'dueBillsExportPdf'])->name('reports.accounts.due_bills.export.pdf');
+        Route::get('/accounts/due-bills/print', [ReportsController::class, 'dueBillsPrint'])->name('reports.accounts.due_bills.print');
+        Route::get('/accounts/outstanding-billwise/export/pdf', [ReportsController::class, 'outstandingBillWiseExportPdf'])->name('reports.accounts.outstanding_billwise.export.pdf');
+        Route::get('/accounts/outstanding-billwise/print', [ReportsController::class, 'outstandingBillWisePrint'])->name('reports.accounts.outstanding_billwise.print');
+        Route::get('/accounts/day-book/export/pdf', [ReportsController::class, 'dayBookExportPdf'])->name('reports.accounts.day_book.export.pdf');
+        Route::get('/accounts/day-book/print', [ReportsController::class, 'dayBookPrint'])->name('reports.accounts.day_book.print');
+        Route::get('/accounts/payment-detail/export/pdf', [ReportsController::class, 'paymentDetailExportPdf'])->name('reports.accounts.payment_detail.export.pdf');
+        Route::get('/accounts/payment-detail/print', [ReportsController::class, 'paymentDetailPrint'])->name('reports.accounts.payment_detail.print');
+        Route::get('/accounts/receiving-detail/export/pdf', [ReportsController::class, 'receivingDetailExportPdf'])->name('reports.accounts.receiving_detail.export.pdf');
+        Route::get('/accounts/receiving-detail/print', [ReportsController::class, 'receivingDetailPrint'])->name('reports.accounts.receiving_detail.print');
+        
+        Route::get('/accounts/receivable/export/pdf', [ReportsController::class, 'receivableExportPdf'])->name('reports.accounts.receivable.export.pdf');
+        Route::get('/accounts/receivable/print', [ReportsController::class, 'receivablePrint'])->name('reports.accounts.receivable.print');
+        
+        Route::get('/accounts/payable/export/pdf', [ReportsController::class, 'payableExportPdf'])->name('reports.accounts.payable.export.pdf');
+        Route::get('/accounts/payable/print', [ReportsController::class, 'payablePrint'])->name('reports.accounts.payable.print');
+        
+        Route::get('/accounts/roznamcha/export/pdf', [ReportsController::class, 'roznamchaExportPdf'])->name('reports.accounts.roznamcha.export.pdf');
+        Route::get('/accounts/roznamcha/print', [ReportsController::class, 'roznamchaPrint'])->name('reports.accounts.roznamcha.print');
+        
+        Route::get('/accounts/summary/export/pdf', [ReportsController::class, 'summaryExportPdf'])->name('reports.accounts.summary.export.pdf');
+        Route::get('/accounts/summary/print', [ReportsController::class, 'summaryPrint'])->name('reports.accounts.summary.print');
+        
+        Route::get('/accounts/trial-balance-2col/export/pdf', [ReportsController::class, 'trialBalance2ColExportPdf'])->name('reports.accounts.trial_balance_2col.export.pdf');
+        Route::get('/accounts/trial-balance-2col/print', [ReportsController::class, 'trialBalance2ColPrint'])->name('reports.accounts.trial_balance_2col.print');
+        
+        Route::get('/accounts/trial-balance-6col/export/pdf', [ReportsController::class, 'trialBalance6ColExportPdf'])->name('reports.accounts.trial_balance_6col.export.pdf');
+        Route::get('/accounts/trial-balance-6col/print', [ReportsController::class, 'trialBalance6ColPrint'])->name('reports.accounts.trial_balance_6col.print');
+        
         Route::get('/stock/status', [ReportsController::class, 'stockStatus'])->name('reports.stock.status');
         Route::get('/stock/ledger', [ReportsController::class, 'stockLedger'])->name('reports.stock.ledger');
         Route::get('/profit', [ReportsController::class, 'profit'])->name('reports.profit');
@@ -374,5 +410,26 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payment/available-customer-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCustomerCheques'])->name('payment.available-customer-cheques');
     Route::get('/payment/bill-items', [App\Http\Controllers\PaymentController::class, 'getBillItems'])->name('payment.bill-items');
 });
+
+// ============================================================================
+// PUBLIC GUEST ROUTES
+// ============================================================================
+Route::prefix('g')->group(function () {
+    Route::get('/{token}', [GuestController::class, 'dashboard'])->name('guest.dashboard');
+    Route::get('/{token}/catalog', [GuestController::class, 'catalog'])->name('guest.catalog');
+    Route::post('/{token}/order', [GuestController::class, 'placeOrder'])->name('guest.order');
+    
+    // Details & Slips
+    Route::get('/{token}/invoice/{invoice}', [GuestController::class, 'orderDetail'])->name('guest.order-detail');
+    Route::get('/{token}/receipt/{voucher}', [GuestController::class, 'paymentDetail'])->name('guest.payment-detail');
+    Route::get('/{token}/invoice/{invoice}/pdf', [GuestController::class, 'invoicePdf'])->name('guest.invoice-pdf');
+    Route::get('/{token}/receipt/{voucher}/pdf', [GuestController::class, 'receiptPdf'])->name('guest.payment-pdf');
+});
+
+// ============================================================================
+// LIVE OFFER PUBLIC ROUTES
+// ============================================================================
+Route::get('/live-offers', [App\Http\Controllers\PublicOfferController::class, 'index'])->name('public.live-offers');
+Route::post('/api/access-my-offer', [App\Http\Controllers\PublicOfferController::class, 'accessMyOffer'])->name('public.access-my-offer');
 
 require __DIR__ . '/settings.php';

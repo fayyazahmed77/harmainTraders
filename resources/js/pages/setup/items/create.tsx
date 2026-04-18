@@ -213,7 +213,7 @@ export default function Page({ categories, companies }: { categories: any, compa
     retail_tp_diff: "",
     reorder_level: "",
     packing_qty: "1",
-    packing_size: "",
+    packing_size: "1",
     pcs: "",
     formation: "",
     type: "",
@@ -613,8 +613,8 @@ export default function Page({ categories, companies }: { categories: any, compa
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="w-full">
-                              <TechLabel label="Carton Size" icon={Ruler} error={errors.packing_size}>
-                                <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="175gm" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                              <TechLabel label="Carton Size" icon={Ruler} required error={errors.packing_size}>
+                                <Input value={data.packing_size} onChange={(e) => onInputChange("packing_size", e.target.value)} placeholder="12" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_size && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
                               </TechLabel>
                             </div>
                           </TooltipTrigger>

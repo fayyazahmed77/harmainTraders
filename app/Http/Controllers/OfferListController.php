@@ -131,4 +131,13 @@ class OfferListController extends Controller
         $offer->delete();
         return redirect()->back()->with('success', 'Offer deleted successfully');
     }
+
+    public function toggleLive($id)
+    {
+        $offer = PriceOfferTo::findOrFail($id);
+        $offer->is_live = !$offer->is_live;
+        $offer->save();
+
+        return redirect()->back()->with('success', 'Offer status updated successfully!');
+    }
 }

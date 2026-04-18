@@ -32,6 +32,7 @@ class Sales extends Model
         'paid_amount',
         'remaining_amount',
         'status',
+        'is_online',
     ];
 
     public function customer()

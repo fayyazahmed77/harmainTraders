@@ -15,6 +15,11 @@ class PriceOfferTo extends Model
         "offertype",
         "created_by",
         "message_line_id",
+        "is_live",
+    ];
+
+    protected $casts = [
+        'is_live' => 'boolean',
     ];
 
     public function messageLine()
