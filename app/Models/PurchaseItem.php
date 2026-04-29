@@ -20,6 +20,8 @@ class PurchaseItem extends Model
         'trade_price',
         'discount',
         'gst_amount',
+        'free_pcs',
+        'free_carton',
 
         'subtotal',
     ];

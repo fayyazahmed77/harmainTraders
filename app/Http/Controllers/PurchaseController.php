@@ -164,6 +164,8 @@ class PurchaseController extends Controller
             'items.*.total_pcs'       => 'required|numeric',
             'items.*.trade_price'     => 'required|numeric',
             'items.*.discount'        => 'required|numeric',
+            'items.*.bonus_full'      => 'nullable|numeric',
+            'items.*.bonus_pcs'       => 'nullable|numeric',
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
             'print_format'            => 'nullable|in:big,small',
@@ -383,6 +385,8 @@ class PurchaseController extends Controller
                     'total_pcs'   => $it['total_pcs'],
                     'trade_price' => $it['trade_price'],
                     'discount'    => $it['discount'],
+                    'free_carton' => $it['bonus_full'] ?? 0,
+                    'free_pcs'    => $it['bonus_pcs'] ?? 0,
                     'gst_amount'  => 0,
                     'subtotal'    => $it['subtotal'],
                 ]);
@@ -390,7 +394,10 @@ class PurchaseController extends Controller
                 // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs']);
+                    $packing = $item->packing ?? 1;
+                    $freeUnits = (($it['bonus_full'] ?? 0) * $packing) + (($it['bonus_pcs'] ?? 0));
+                    
+                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs'] + $freeUnits);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {
@@ -487,6 +494,8 @@ class PurchaseController extends Controller
             'items.*.total_pcs'       => 'required|numeric',
             'items.*.trade_price'     => 'required|numeric',
             'items.*.discount'        => 'required|numeric',
+            'items.*.bonus_full'      => 'nullable|numeric',
+            'items.*.bonus_pcs'       => 'nullable|numeric',
             'items.*.gst_amount'      => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
             'message_line_id'         => 'nullable|integer',
@@ -697,7 +706,9 @@ class PurchaseController extends Controller
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs - $oldItem->total_pcs);
+                    $packing = $item->packing ?? 1;
+                    $freeUnits = (($oldItem->free_carton ?? 0) * $packing) + ($oldItem->free_pcs ?? 0);
+                    $item->updateStockFromPcs($item->total_stock_pcs - $oldItem->total_pcs - $freeUnits);
                     $item->save();
                 }
             }
@@ -722,6 +733,8 @@ class PurchaseController extends Controller
                     'total_pcs'   => $it['total_pcs'],
                     'trade_price' => $it['trade_price'],
                     'discount'    => $it['discount'],
+                    'free_carton' => $it['bonus_full'] ?? 0,
+                    'free_pcs'    => $it['bonus_pcs'] ?? 0,
                     'gst_amount'  => 0,
                     'subtotal'    => $it['subtotal'],
                 ]);
@@ -729,7 +742,10 @@ class PurchaseController extends Controller
                 // Increase Stock & Update Trade Price
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs']);
+                    $packing = $item->packing ?? 1;
+                    $freeUnits = (($it['bonus_full'] ?? 0) * $packing) + (($it['bonus_pcs'] ?? 0));
+                    
+                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs'] + $freeUnits);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {

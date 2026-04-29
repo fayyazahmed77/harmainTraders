@@ -1,209 +1,235 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ChartCard } from '@/components/Reports/ChartCard';
-import { DateRangePicker } from '@/components/Reports/DateRangePicker';
-import { DateRange } from 'react-day-picker';
-import { subDays, format } from 'date-fns';
+import { subMonths, format } from 'date-fns';
 import axios from 'axios';
-import { route } from 'ziggy-js';
 import { toast } from 'sonner';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
-import { DataTable } from '@/components/Reports/DataTable';
-import { ColumnDef, PaginationState } from '@tanstack/react-table';
+import { route } from 'ziggy-js';
 import { BreadcrumbItem } from '@/types';
-import { DollarSign, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RefreshCcw, Search, LayoutDashboard } from 'lucide-react';
+import { ProfitParameterForm } from './components/ProfitParameterForm';
+import { ProfitReportView } from './components/reports/ProfitReportView';
 
-interface ProfitData {
-    summary: {
-        revenue: number;
-        cogs: number;
-        profit: number;
-        margin: number;
-    };
-    trend: {
-        date: string;
-        revenue: number;
-        cogs: number;
-        profit: number;
-    }[];
-    top_items: {
-        name: string;
-        profit: number;
-        revenue: number;
-    }[];
+interface PageProps {
+    accounts: any[];
+    items: any[];
+    firms: any[];
+    salesmen: any[];
+    areas: any[];
+    subareas: any[];
+    account_types: any[];
+    account_categories: any[];
+    item_categories: any[];
+    users: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Dashboard", href: "/dashboard" },
     { title: "Reports", href: "/reports" },
-    { title: "Profit & Loss", href: "/reports/profit" },
+    { title: "Profit Playground", href: "/reports/profit" },
 ];
 
-export default function ProfitReport() {
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
+import { useAppearance } from '@/hooks/use-appearance';
+
+export default function ProfitReports({ 
+    accounts, items, firms, salesmen, areas, subareas, 
+    account_types, account_categories, item_categories, users 
+}: PageProps) {
+    const { appearance } = useAppearance();
+    const isDark = appearance === 'dark';
+
+    const [params, setParams] = useState({
+        fromDate: subMonths(new Date(), 1),
+        toDate: new Date(),
+        accountId: 'ALL',
+        itemId: 'ALL',
+        reportId: 'transaction',
+        firmId: 'ALL',
+        salemanId: 'ALL',
+        areaId: 'ALL',
+        subareaId: 'ALL',
+        type: 'ALL',
+        nature: 'ALL',
+        shelfId: 'ALL',
+        supplierId: 'ALL',
+        itemAccountId: 'ALL',
+        godownId: 'ALL',
+        itemType: 'ALL',
+        itemCategoryId: 'ALL',
+        sortBy: 'DATE',
+        formation: 'Standard',
+        userId: 'ALL',
+        printOn: 'screen',
+        showOptions: 'all',
+        invoiceCol: 'inv',
     });
-    const [data, setData] = useState<ProfitData | null>(null);
+
+    const [reportData, setReportData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
 
     const fetchData = async () => {
+        setHasSearched(true);
+        
+        // Handle PDF / Print Redirects from sidebar form
+        if (params.printOn === 'pdf' || params.printOn === 'printer') {
+            handleExport(params.printOn === 'pdf' ? 'pdf' : 'print');
+            return;
+        }
+
         setLoading(true);
         try {
-            const response = await axios.get(route('reports.profit'), {
+            const endpoint = route('reports.profit.data');
+            const response = await axios.get(endpoint, {
                 params: {
-                    from: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
-                    to: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+                    ...params,
+                    fromDate: format(params.fromDate, 'yyyy-MM-dd'),
+                    toDate: format(params.toDate, 'yyyy-MM-dd'),
                 },
                 headers: { 'Accept': 'application/json' }
             });
-            setData(response.data);
-        } catch (error) {
-            console.error("Failed to fetch profit data", error);
-            toast.error("Failed to load profit report");
+
+            setReportData(response.data?.data || []);
+            toast.success("Analysis Complete", {
+                description: `${(response.data?.data || []).length} financial records processed.`
+            });
+        } catch (error: any) {
+            console.error("Failed to fetch profit report", error);
+            const message = error.response?.data?.message || "Failed to load profit data";
+            toast.error(message);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [dateRange]);
+    const handleExport = (type: 'pdf' | 'excel' | 'print') => {
+        let baseUrl = '';
+        switch(type) {
+            case 'pdf': baseUrl = route('reports.profit.export'); break;
+            case 'excel': baseUrl = route('reports.profit.excel'); break;
+            case 'print': baseUrl = route('reports.profit.print'); break;
+        }
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('en-PK', {
-            style: 'currency',
-            currency: 'PKR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(value);
+        const queryParams = new URLSearchParams({
+            ...params as any,
+            fromDate: params.fromDate.toISOString(),
+            toDate: params.toDate.toISOString(),
+        });
+
+        window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
     };
 
-    if (!data && loading) return <div className="p-6">Loading...</div>;
-    if (!data) return null;
+    const getCriteriaString = () => {
+        const parts = [];
+        parts.push(`${format(params.fromDate, 'dd/MM/yyyy')} TO ${format(params.toDate, 'dd/MM/yyyy')}`);
+        
+        if (params.accountId !== 'ALL') {
+            const acc = accounts.find(a => a.id.toString() === params.accountId);
+            if (acc) parts.push(`PARTY: ${acc.title}`);
+        }
+        
+        if (params.salemanId !== 'ALL') {
+            const s = salesmen.find(a => a.id.toString() === params.salemanId);
+            if (s) parts.push(`SALESMAN: ${s.name}`);
+        }
+
+        return parts.join(' | ');
+    }
 
     return (
         <>
-            <Head title="Profit & Loss" />
+            <Head title="Profit Analysis Playground" />
             <SidebarProvider>
                 <AppSidebar />
-                <SidebarInset>
+                <SidebarInset className="bg-background selection:bg-indigo-500/30">
                     <SiteHeader breadcrumbs={breadcrumbs} />
-                    <div className="p-6 space-y-6 min-h-screen">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Profit & Loss</h1>
-                                <p className="text-slate-500">Financial performance overview</p>
-                            </div>
-                            <DateRangePicker date={dateRange} setDate={setDateRange} />
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-4">
-                            <Card className="border-l-4 border-l-blue-500 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                                    <DollarSign className="h-4 w-4 text-blue-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{formatCurrency(data.summary.revenue)}</div>
-                                    <p className="text-xs text-muted-foreground">Total sales in period</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-orange-500 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">COGS</CardTitle>
-                                    <Activity className="h-4 w-4 text-orange-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{formatCurrency(data.summary.cogs)}</div>
-                                    <p className="text-xs text-muted-foreground">Cost of goods sold</p>
-                                </CardContent>
-                            </Card>
-                            <Card className={`border-l-4 shadow-sm ${data.summary.profit >= 0 ? 'border-l-green-500' : 'border-l-red-500'}`}>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                                    {data.summary.profit >= 0 ?
-                                        <TrendingUp className="h-4 w-4 text-green-500" /> :
-                                        <TrendingDown className="h-4 w-4 text-red-500" />
-                                    }
-                                </CardHeader>
-                                <CardContent>
-                                    <div className={`text-2xl font-bold ${data.summary.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {formatCurrency(data.summary.profit)}
+                    
+                    <div className="relative min-h-screen bg-transparent transition-colors duration-500">
+                        {/* Background Decor - Adaptive to Theme */}
+                        <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-indigo-600/5 to-transparent pointer-events-none" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-full max-w-[1600px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                        
+                        <div className="relative p-6 md:p-10 max-w-[1640px] mx-auto space-y-8">
+                            
+                            {/* Page Title Section */}
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="h-[2px] w-6 bg-indigo-500 rounded-full" />
+                                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Live Financial Audit</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Revenue - COGS</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-purple-500 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-                                    <Activity className="h-4 w-4 text-purple-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{data.summary.margin}%</div>
-                                    <p className="text-xs text-muted-foreground">Net profit ratio</p>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <ChartCard title="Profit Trend">
-                                <div className="h-[350px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data.trend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                            <defs>
-                                                <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                                </linearGradient>
-                                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <XAxis
-                                                dataKey="date"
-                                                tickFormatter={(str) => format(new Date(str), 'dd MMM')}
-                                                tick={{ fontSize: 12 }}
-                                            />
-                                            <YAxis tick={{ fontSize: 12 }} />
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <Tooltip
-                                                labelFormatter={(str) => format(new Date(str), 'dd MMM yyyy')}
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRevenue)" name="Revenue" />
-                                            <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProfit)" name="Profit" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                                    <h1 className="text-4xl md:text-5xl font-black text-text-primary tracking-tighter uppercase italic drop-shadow-sm">
+                                        Profit <span className="text-indigo-500">Playground</span>
+                                    </h1>
+                                    <p className="text-text-secondary/60 text-[10px] font-black uppercase tracking-[0.15em] mt-3 flex items-center gap-2">
+                                        <div className="h-1 w-1 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(79,70,229,1)]" />
+                                        Deep Visibility into your margins and trade efficiency
+                                    </p>
                                 </div>
-                            </ChartCard>
+                            </div>
 
-                            <ChartCard title="Top 10 Profitable Items">
-                                <div className="h-[350px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={data.top_items} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                            <XAxis type="number" hide />
-                                            <YAxis
-                                                dataKey="name"
-                                                type="category"
-                                                width={150}
-                                                tick={{ fontSize: 11 }}
-                                            />
-                                            <Tooltip
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Bar dataKey="profit" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Profit" barSize={20} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
+                            {/* Main Parameter Form */}
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                <ProfitParameterForm 
+                                    data={params} 
+                                    setData={setParams} 
+                                    onExecute={fetchData}
+                                    bootstrap={{
+                                        accounts, items, firms, salesmen, areas, subareas,
+                                        accountTypes: account_types, 
+                                        accountCategories: account_categories, 
+                                        itemCategories: item_categories,
+                                        users
+                                    }} 
+                                />
+                            </motion.div>
+
+                            {/* Report Results */}
+                            <AnimatePresence mode="wait">
+                                {!hasSearched ? (
+                                    <motion.div 
+                                        key="empty"
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                        className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                    >
+                                        <div className="h-20 w-20 bg-surface-1 rounded-sm flex items-center justify-center mb-6 shadow-inner ring-1 ring-border/5">
+                                            <Search className="h-8 w-8 text-text-muted/20" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-text-muted uppercase tracking-tighter">Ready to Analyze</h3>
+                                        <p className="text-[9px] font-bold text-text-muted/40 mt-2 uppercase tracking-[0.2em] max-w-sm text-center">Configure your dimensions and triggers above to generate insights</p>
+                                    </motion.div>
+                                ) : loading ? (
+                                    <motion.div 
+                                        key="loading"
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                        className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                    >
+                                        <div className="relative">
+                                            <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full" />
+                                            <RefreshCcw className="h-10 w-10 text-indigo-500 animate-spin relative z-10" />
+                                        </div>
+                                        <p className="text-[10px] font-black text-indigo-500 uppercase mt-8 tracking-[0.4em] animate-pulse">Aggregating Financial Dimensions...</p>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div 
+                                        key="data" 
+                                        initial={{ opacity: 0, y: 10 }} 
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="space-y-8 pb-20"
+                                    >
+                                        <ProfitReportView 
+                                            data={reportData} 
+                                            type={params.reportId} 
+                                            criteria={getCriteriaString()} 
+                                            onExport={handleExport}
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                         </div>
                     </div>
                 </SidebarInset>

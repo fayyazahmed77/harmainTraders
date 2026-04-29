@@ -46,8 +46,6 @@ class PaymentController extends Controller
             ->withQueryString();
 
         // Calculate Summary (Based on current filters)
-        // We clone the query to avoid modifying the main pagination query
-        $summaryQuery = clone $query;
         // Remove pagination/ordering for summary stats if needed, or re-apply filters to a fresh query
         // Re-applying is safer to avoid pagination interference
         $summaryQueryBase = Payment::query();
@@ -66,17 +64,18 @@ class PaymentController extends Controller
 
         $totalReceipts = (clone $summaryQueryBase)->where('type', 'RECEIPT')
             ->where(function ($q) {
-                $q->where('cheque_status', '!=', 'Canceled')->orWhereNull('cheque_status');
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
             })
-            ->sum('amount');
+            ->selectRaw('COALESCE(SUM(amount + COALESCE(discount, 0)), 0) as total')->value('total');
+
         $totalPayments = (clone $summaryQueryBase)->where('type', 'PAYMENT')
             ->where(function ($q) {
-                $q->where('cheque_status', '!=', 'Canceled')->orWhereNull('cheque_status');
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
             })
-            ->sum('amount');
+            ->selectRaw('COALESCE(SUM(amount + COALESCE(discount, 0)), 0) as total')->value('total');
 
-        $canceledReceipts = (clone $summaryQueryBase)->where('type', 'RECEIPT')->where('cheque_status', 'Canceled')->sum('amount');
-        $canceledPayments = (clone $summaryQueryBase)->where('type', 'PAYMENT')->where('cheque_status', 'Canceled')->sum('amount');
+        $canceledReceipts = (clone $summaryQueryBase)->where('type', 'RECEIPT')->whereIn('cheque_status', ['Canceled', 'Cancelled'])->sum('amount');
+        $canceledPayments = (clone $summaryQueryBase)->where('type', 'PAYMENT')->whereIn('cheque_status', ['Canceled', 'Cancelled'])->sum('amount');
 
         $summary = [
             'total_receipts' => $totalReceipts,
@@ -85,9 +84,9 @@ class PaymentController extends Controller
             'canceled_amount' => $canceledReceipts + $canceledPayments,
             'count' => $summaryQueryBase->count(),
             'active_count' => (clone $summaryQueryBase)->where(function ($q) {
-                $q->where('cheque_status', '!=', 'Canceled')->orWhereNull('cheque_status');
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
             })->count(),
-            'canceled_count' => (clone $summaryQueryBase)->where('cheque_status', 'Canceled')->count(),
+            'canceled_count' => (clone $summaryQueryBase)->whereIn('cheque_status', ['Canceled', 'Cancelled'])->count(),
         ];
 
         // ───────────────────────────────────────────
@@ -143,14 +142,19 @@ class PaymentController extends Controller
         $diff = $startDate->diffInDays($endDate);
         if ($diff > 30) $startDate = (clone $endDate)->subDays(30);
 
+        $salesTotals = Sales::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+        $purchasesTotals = Purchase::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+        $receiptsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'RECEIPT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+        $paymentsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'PAYMENT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+
         for ($date = clone $startDate; $date->lte($endDate); $date->addDay()) {
             $currentDate = $date->toDateString();
             $analytics[] = [
                 'date' => $date->format('M d'),
-                'sales' => Sales::where('date', $currentDate)->sum('net_total'),
-                'purchases' => Purchase::where('date', $currentDate)->sum('net_total'),
-                'receipts' => Payment::where('date', $currentDate)->where('type', 'RECEIPT')->sum('amount'),
-                'payments' => Payment::where('date', $currentDate)->where('type', 'PAYMENT')->sum('amount'),
+                'sales' => $salesTotals[$currentDate] ?? 0,
+                'purchases' => $purchasesTotals[$currentDate] ?? 0,
+                'receipts' => $receiptsTotals[$currentDate] ?? 0,
+                'payments' => $paymentsTotals[$currentDate] ?? 0,
             ];
         }
 
@@ -229,6 +233,85 @@ class PaymentController extends Controller
         return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
     }
 
+    private function getTotalReturns($bill, string $billType): float
+    {
+        if ($billType === 'App\Models\Sales') {
+            return (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+        } else {
+            return (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+        }
+    }
+
+    public function destroy($id)
+    {
+        if (! \Illuminate\Support\Facades\Gate::allows('delete-payment')) {
+            abort(403);
+        }
+        $payment = Payment::with('allocations')->findOrFail($id);
+
+        if ($payment->cheque_status === 'Cancelled' || $payment->cheque_status === 'Canceled') {
+            return back()->with('error', 'Payment is already canceled.');
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($payment->allocations as $allocation) {
+                $bill = $allocation->bill_type === 'App\Models\Sales'
+                    ? Sales::find($allocation->bill_id)
+                    : Purchase::find($allocation->bill_id);
+
+                if ($bill) {
+                    $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
+                    $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
+                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+
+                    // Re-evaluate status
+                    if ($bill->remaining_amount <= 0 && $bill->paid_amount > 0) {
+                        $bill->status = 'Paid';
+                    } elseif ($bill->remaining_amount > 0 && $bill->paid_amount > 0) {
+                        $bill->status = 'Partial';
+                    } else {
+                        $bill->status = 'Unpaid';
+                    }
+                    $bill->save();
+                }
+            }
+
+            // If payment has a cheque_id, sets that Chequebook record back to 'unused'
+            if ($payment->cheque_id) {
+                $cheque = \App\Models\Chequebook::find($payment->cheque_id);
+                if ($cheque) {
+                    $cheque->update(['status' => 'unused']);
+                }
+            }
+
+            // If payment was a distributed cheque-in-hand, restores the source receipt's cheque_status to 'In Hand'
+            if ($payment->type === 'PAYMENT' && $payment->payment_method === 'Cheque') {
+                $paymentAccount = Account::with('accountType')->find($payment->payment_account_id);
+                if ($paymentAccount && $paymentAccount->accountType && $paymentAccount->accountType->name === 'Cheque in hand') {
+                    $source = Payment::where('type', 'RECEIPT')
+                        ->where('cheque_no', $payment->cheque_no)
+                        ->where('cheque_status', 'Distributed')
+                        ->first();
+                    if ($source) {
+                        $source->update(['cheque_status' => 'In Hand']);
+                    }
+                }
+            }
+
+            // Soft-cancels the payment (sets cheque_status = 'Cancelled') and deletes its allocations
+            $payment->update(['cheque_status' => 'Cancelled']);
+            PaymentAllocation::where('payment_id', $payment->id)->delete();
+
+            DB::commit();
+            return back()->with('success', 'Payment deleted and allocations reversed.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Payment Delete Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return back()->withErrors(['error' => 'Failed to delete payment: ' . $e->getMessage()]);
+        }
+    }
+
     // Generate PDF (Print View)
     public function pdf($id)
     {
@@ -238,7 +321,7 @@ class PaymentController extends Controller
             $groupPayments = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine'])
                 ->where('group_id', $payment->group_id)
                 ->get();
-            
+
             // For combined slip, we pass the collection
             $pdf = PDF::loadView('pdf.payment-voucher', [
                 'payment' => $payment,
@@ -458,7 +541,7 @@ class PaymentController extends Controller
             ->select('id', 'cheque_no', 'cheque_date', 'amount', 'clear_date', 'account_id')
             ->with(['account:id,title'])
             ->get()
-            ->map(function($c) {
+            ->map(function ($c) {
                 return [
                     'id' => $c->id,
                     'cheque_no' => $c->cheque_no,
@@ -493,12 +576,16 @@ class PaymentController extends Controller
             $totalAmount = collect($splitsData)->sum('amount');
             $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
             $netPaid = $totalAmount + $totalDiscount;
-            
+
             $account = Account::findOrFail($request->account_id);
             // ... (keep ledger balance checks if necessary, but use totalAmount)
-            
+
             // Simplified sum logic for performance or use existing if reliable
             $totalAllocated = collect($request->allocations)->sum('amount');
+            if ($totalAllocated > ($netPaid + 0.01)) {
+                DB::rollBack();
+                return back()->withErrors(['error' => 'Allocation total exceeds net payment.']);
+            }
 
             // Generate Base Voucher No
             $prefix = $request->type === 'RECEIPT' ? 'CRV-' : 'CPV-';
@@ -517,7 +604,7 @@ class PaymentController extends Controller
                 if ($isMulti && $split['amount'] <= 0 && $currentSplitDiscount <= 0) continue;
 
                 $voucherNo = $isMulti ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
-                
+
                 // Handle Cheque for this split
                 $chequeId = null;
                 if (($split['payment_method'] ?? null) === 'Cheque' && ($split['payment_account_id'] ?? null)) {
@@ -566,12 +653,11 @@ class PaymentController extends Controller
                         if (isset($split['original_cheque_id']) && $split['original_cheque_id']) {
                             Payment::where('id', $split['original_cheque_id'])->update(['cheque_status' => 'Distributed']);
                             // Also record which original cheque this payment is linked to
-                            $payment->update(['cheque_status' => 'Distributed']); // This payment itself represents a distributed cheque
                         }
                     }
                 }
 
-                if ($index === 0) {
+                if (!$groupId) {
                     $groupId = $payment->id;
                 }
                 $payment->update(['group_id' => $groupId]);
@@ -588,9 +674,9 @@ class PaymentController extends Controller
                 while ($pRemaining > 0 && count($allocationQueue) > 0) {
                     $allocIdx = array_key_first($allocationQueue);
                     $alloc = $allocationQueue[$allocIdx];
-                    
+
                     $canAllocate = min($pRemaining, $alloc['amount']);
-                    
+
                     if ($canAllocate > 0) {
                         PaymentAllocation::create([
                             'payment_id' => $payment->id,
@@ -600,13 +686,22 @@ class PaymentController extends Controller
                         ]);
 
                         // Update the bill itself only once or carefully
-                        $bill = ($alloc['bill_type'] === 'App\Models\Sales') 
-                            ? Sales::find($alloc['bill_id']) 
+                        $bill = ($alloc['bill_type'] === 'App\Models\Sales')
+                            ? Sales::find($alloc['bill_id'])
                             : Purchase::find($alloc['bill_id']);
 
                         if ($bill) {
-                            $bill->paid_amount += $canAllocate;
+                            $bill->paid_amount      += $canAllocate;
                             $bill->remaining_amount -= $canAllocate;
+
+                            if ($bill->remaining_amount <= 0) {
+                                $bill->status = 'Paid';
+                            } elseif ($bill->paid_amount > 0) {
+                                $bill->status = 'Partial';
+                            } else {
+                                $bill->status = 'Unpaid';
+                            }
+
                             $bill->save();
                         }
 
@@ -621,8 +716,9 @@ class PaymentController extends Controller
                 }
             }
 
-            $savedPaymentsDetails = collect($createdPayments)->map(function($p) {
+            $savedPaymentsDetails = collect($createdPayments)->map(function ($p) {
                 return [
+                    'id' => $p->id,
                     'voucher_no' => $p->voucher_no,
                     'account' => $p->paymentAccount->title ?? 'Cash',
                     'amount' => $p->amount

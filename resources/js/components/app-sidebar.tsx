@@ -234,6 +234,7 @@ const data = {
       title: "Administration",
       url: "#",
       icon: Users,
+      roles: ['admin'],
       items: [
         {
           title: "Staff",
@@ -243,6 +244,46 @@ const data = {
           title: "Roles & Permission",
           url: "/roles/permissions",
         }
+      ],
+    },
+    {
+      title: "Investor Panel",
+      url: "#",
+      icon: PieChart,
+      roles: ['investor'],
+      items: [
+        {
+          title: "Dashboard",
+          url: "/investor/dashboard",
+        },
+        {
+          title: "Profit History",
+          url: "/investor/profit/history",
+        },
+        {
+          title: "Transactions",
+          url: "/investor/transactions",
+        },
+        {
+          title: "Requests",
+          url: "/investor/requests",
+        },
+      ],
+    },
+    {
+      title: "Investor Management",
+      url: "#",
+      icon: BookKey,
+      roles: ['admin'],
+      items: [
+        {
+          title: "Investors",
+          url: "/admin/investors",
+        },
+        {
+          title: "Profit Distribution",
+          url: "/admin/profit/distribute",
+        },
       ],
     },
   ],

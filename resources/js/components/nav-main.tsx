@@ -25,19 +25,27 @@ export function NavMain({
     url: string
     icon?: LucideIcon
     isActive?: boolean
+    roles?: string[]
     items?: {
       title: string
       url: string
     }[]
   }[]
 }) {
-  const { url } = usePage()
+  const { url, props } = usePage()
+  const auth = props.auth as any;
+  const userRoles = auth.roles || [];
+
+  const filteredItems = items.filter(item => {
+    if (!item.roles) return true;
+    return item.roles.some(role => userRoles.includes(role));
+  });
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu className="gap-2">
-        {items.map((item) => {
+        {filteredItems.map((item) => {
           // Find the longest matching subItem URL to prevent overlap (e.g. /purchase vs /purchase/create)
           let activeSubItemUrl = '';
           if (item.items && item.items.length > 0) {

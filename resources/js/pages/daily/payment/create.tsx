@@ -70,7 +70,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
   const colors = {
     green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-    orange: "bg-orange-500/10 ${t.text} border-orange-500/20",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
     blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
   };
   return (
@@ -140,6 +140,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       Object.values(errors).forEach((err: any) => toast.error(err));
     }
   }, [errors]);
+
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (flash?.success) {
+      setSuccessDialogOpen(true);
+    }
+  }, [flash?.success]);
 
   const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">("RECEIPT");
   const [paymentAccountId, setPaymentAccountId] = useState<string>(""); // Cash/Bank
@@ -678,63 +686,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           {/* ── WORKSPACE ── */}
           <div className="flex-1 flex flex-col gap-4 md:gap-6 md:overflow-hidden">
 
-            {/* Success Alert with Print Option */}
-            <AnimatePresence>
-              {flash?.success && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <div className="flex justify-between items-center w-full">
-                      <div className="ml-2">
-                        <AlertTitle className="text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-tighter text-xs">Transaction success</AlertTitle>
-                        <AlertDescription className="text-emerald-700 dark:text-emerald-400 text-[11px] font-medium space-y-3">
-                          <p>{flash.success}</p>
-                          {flash.saved_payments && (
-                            <div className="bg-white/50 dark:bg-black/20 rounded-lg border border-emerald-200/50 dark:border-emerald-500/10 overflow-hidden">
-                              <table className="w-full text-left border-collapse">
-                                <thead className="bg-emerald-100/50 dark:bg-emerald-500/5">
-                                  <tr>
-                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest">Voucher</th>
-                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest">Account</th>
-                                    <th className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60 tracking-widest text-right">Amount</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-emerald-200/30 dark:divide-emerald-500/10">
-                                  {flash.saved_payments.map((p: any, i: number) => (
-                                    <tr key={i} className="hover:bg-emerald-100/30 dark:hover:bg-emerald-500/5 transition-colors">
-                                      <td className="px-3 py-1.5 font-mono text-[10px] font-bold text-emerald-900 dark:text-emerald-200">{p.voucher_no}</td>
-                                      <td className="px-3 py-1.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">{p.account}</td>
-                                      <td className="px-3 py-1.5 text-right font-mono text-[10px] font-black text-emerald-900 dark:text-emerald-100">Rs {p.amount.toLocaleString()}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot className="bg-emerald-100/30 dark:bg-emerald-500/5 border-t border-emerald-200/50 dark:border-emerald-500/10">
-                                  <tr>
-                                    <td colSpan={2} className="px-3 py-1.5 text-[9px] font-black uppercase text-emerald-800/60">Aggregate Total</td>
-                                    <td className="px-3 py-1.5 text-right font-mono text-[10px] font-black text-emerald-900 dark:text-emerald-100">
-                                      Rs {flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0).toLocaleString()}
-                                    </td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                          )}
-                        </AlertDescription>
-                      </div>
-                      {flash.print_id && (
-                        <Button
-                          onClick={() => window.open(`/payments/${flash.print_id}/pdf`, '_blank')}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase h-8 px-4 rounded-lg shadow-lg shadow-emerald-500/20"
-                        >
-                          <Printer className="w-3.5 h-3.5 mr-2" />
-                          Print Combined Slip
-                        </Button>
-                      )}
-                    </div>
-                  </Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Success State handled via SuccessDialog component at bottom */}
 
             {/* Mobile Header (Control Deck) */}
             <div className="md:hidden space-y-3">
@@ -934,7 +886,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       ) : (
                         unpaidBills.map((bill, idx) => (
                           <motion.tr key={`${bill.type}-${bill.id}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }}
-                            className={`group ${t.bgHoverRow} transition-colors cursor-default ${selectedBillIds.has(bill.id.toString()) ? '${t.blob}' : ''}`}>
+                            className={`group ${t.bgHoverRow} transition-colors cursor-default ${selectedBillIds.has(bill.id.toString()) ? t.blob : ''}`}>
                             <td className="p-4 border-b border-zinc-50/50 dark:border-zinc-800/30">
                               <Checkbox checked={selectedBillIds.has(bill.id.toString())} onCheckedChange={() => toggleBill(bill.id, Number(bill.remaining_amount))} className={`border-zinc-300 dark:border-zinc-700 ${t.checkboxChecked}`} />
                             </td>
@@ -993,18 +945,30 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
                     <div className="space-y-0.5">
                       <div className="text-[9px] font-black text-rose-400 dark:text-rose-500 uppercase tracking-widest">Unbilled Ledger</div>
-                      <div className="text-xs font-mono font-black text-rose-600 dark:text-rose-400">
+                      <div className="text-xs font-mono font-black">
                         {(() => {
                            const totalBilled = unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0);
-                           const unbilled = Math.abs(currentBalance) - totalBilled;
-                           return unbilled > 0.01 ? `Rs ${unbilled.toLocaleString(undefined, {minimumFractionDigits: 2})}` : 'Rs 0.00';
+                           
+                           // Unbilled Debt = Ledger Debt without an invoice (e.g., Opening Balance)
+                           const unbilledDebt = Math.max(0, currentBalance - totalBilled);
+                           
+                           // Advance = Unallocated overpayments
+                           const advance = Math.max(0, totalBilled - currentBalance);
+
+                           if (advance > 0.01) {
+                               return <span className="text-emerald-500 dark:text-emerald-400">Advance: Rs {advance.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>;
+                           } else if (unbilledDebt > 0.01) {
+                               return <span className="text-rose-600 dark:text-rose-400">Unbilled: Rs {unbilledDebt.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>;
+                           } else {
+                               return <span className="text-zinc-500">Rs 0.00</span>;
+                           }
                         })()}
                       </div>
                     </div>
                     {(() => {
                         const totalBilled = unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0);
-                        const unbilled = Math.abs(currentBalance) - totalBilled;
-                        if (unbilled > 0.01) {
+                        const isLedgerGreaterThanBills = Math.abs(currentBalance) - totalBilled > 0.01;
+                        if (isLedgerGreaterThanBills) {
                            return (
                             <div className="pl-4 border-l border-zinc-200 dark:border-zinc-800 ml-2">
                               <Button variant="outline" size="sm" className={`h-8 text-[10px] font-black uppercase tracking-widest ${t.text} ${t.borderAlpha} ${t.blob} ${t.bgHover} shadow-sm`}
@@ -1117,7 +1081,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-3 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800">
                       <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Net Settlement</div>
-                      <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-500">Rs {(amount - discount).toLocaleString()}</div>
+                      <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-500">
+                        Rs {( (isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : amount) - discount ).toLocaleString()}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -1270,7 +1236,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
               <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider mb-0.5">Net Disbursement</div>
               <div className={`text-2xl font-black ${t.text} leading-none tracking-tighter`}>
                 <span className="text-sm font-bold mr-1 font-mono">Rs</span>
-                {(amount - discount).toLocaleString()}
+                {( (isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : amount) - discount ).toLocaleString()}
               </div>
             </div>
             <Button onClick={handleSave} className={`h-12 px-6 ${t.btnBg} text-white shadow-lg ${t.gradientShadow} rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95`} disabled={loading}>
@@ -1591,6 +1557,143 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex justify-between items-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">
               <span>Total Available: {customerCheques.length}</span>
               <span>Matched: {filteredCustomerCheques.length}</span>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── PREMIUM SUCCESS DIALOG ── */}
+        <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+          <DialogContent className="sm:max-w-[450px] p-0 border-none bg-white dark:bg-zinc-950 shadow-2xl rounded-[2rem] overflow-hidden">
+            <div className={`relative h-56 ${t.gradient} flex flex-col items-center justify-center text-white p-8 text-center overflow-hidden`}>
+              {/* Animated Background Blobs */}
+              <motion.div 
+                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
+              />
+              <motion.div 
+                animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
+                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
+              />
+
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="flex gap-3 mb-6">
+                  <motion.div 
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+                    className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30"
+                  >
+                    <CheckCircle2 size={32} className="text-white drop-shadow-md" />
+                  </motion.div>
+                  <motion.div 
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.2 }}
+                    className="w-14 h-14 bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-xl"
+                  >
+                    <CheckCircle2 size={32} className="text-white" />
+                  </motion.div>
+                </div>
+                
+                <motion.h2 
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-2xl font-black tracking-tight mb-2"
+                >
+                  Payment Completed Successfully!
+                </motion.h2>
+                <motion.p 
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 0.8 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-sm font-medium tracking-wide uppercase opacity-80"
+                >
+                  Voucher record saved with ID: {flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---'}
+                </motion.p>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="flex justify-between items-start pt-2">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Ledger Account</span>
+                  <h3 className="text-lg font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter leading-none">
+                    {accounts.find(a => a.id.toString() === selectedAccountId)?.title || "General Party"}
+                  </h3>
+                </div>
+                <div className="text-right space-y-1">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Settlement Amount</span>
+                  <div className={`text-2xl font-mono font-black ${t.text} items-center flex gap-1 justify-end leading-none`}>
+                    <span className="text-xs opacity-50 font-bold">Rs</span>
+                    {flash?.saved_payments 
+                      ? (flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0)).toLocaleString()
+                      : ((isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : (amount || 0)) - (discount || 0)).toLocaleString()
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Invoices</span>
+                  <span className="text-xl font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{selectedBillIds.size}</span>
+                </div>
+                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Method</span>
+                  <span className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate w-full pt-1">
+                    {isMultiPayment ? "Multi" : (paymentMethod || "Cash")}
+                  </span>
+                </div>
+                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Total Adj</span>
+                  <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{discount?.toLocaleString() || '0'}</span>
+                </div>
+              </div>
+
+              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 flex justify-between items-center">
+                <span className="text-xs font-black text-emerald-600/60 uppercase tracking-widest">Total Discount</span>
+                <div className="text-lg font-mono font-black text-emerald-600 flex items-center gap-1">
+                  <span className="text-[10px] font-bold">Rs</span>
+                  {discount?.toLocaleString() || '0'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <Button 
+                  onClick={() => {
+                    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
+                    if (printId) {
+                      window.open(`/payments/${printId}/pdf`, '_blank');
+                    } else {
+                      toast.error("Voucher ID not found. Please check reports.");
+                    }
+                  }} 
+                  className={`h-14 ${t.gradient} text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl ${t.gradientShadow} flex items-center justify-center gap-2 group transition-all active:scale-[0.98] hover:opacity-90`}
+                >
+                  <Printer size={18} className="group-hover:scale-110 transition-transform" />
+                  Print Voucher
+                </Button>
+                <Button 
+                  onClick={() => {
+                     setSuccessDialogOpen(false);
+                     setAmount(0);
+                     setDiscount(0);
+                     setSelectedBillIds(new Set());
+                     setAllocations({});
+                     setRemarks("");
+                     setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
+                     setSelectedAccountId("");
+                  }} 
+                  variant="outline"
+                  className="h-14 border-orange-200 dark:border-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-orange-50 dark:hover:bg-orange-500/10"
+                >
+                  <Plus size={18} />
+                  Create New
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

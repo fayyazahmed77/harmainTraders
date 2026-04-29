@@ -1071,140 +1071,217 @@ class ReportBuilder
         $fromDate = $fromDate ?? date('Y-m-d');
         $toDate = $toDate ?? date('Y-m-d');
 
-        // 1. Stock Summary
-        $openingStock = $this->calculateStockOpeningAll($fromDate);
+        // 1. Weighted Average Cost per item from purchase_items
+        $avgCosts = DB::table('purchase_items')
+            ->select(
+                'item_id',
+                DB::raw('SUM(subtotal) / NULLIF(SUM(total_pcs), 0) as avg_cost')
+            )
+            ->groupBy('item_id')
+            ->pluck('avg_cost', 'item_id');
+
+        // 2. Stock Summary
+        $openingStock = (float)$this->calculateStockOpeningAll($fromDate);
         
         // Sum of inward (Purchase + Sales Return)
-        $inward = DB::table('purchase_items')
+        $inward = (float)(DB::table('purchase_items')
             ->join('purchases', 'purchase_items.purchase_id', '=', 'purchases.id')
             ->whereBetween('purchases.date', [$fromDate, $toDate])
             ->sum('total_pcs') +
             DB::table('sales_return_items')
             ->join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
             ->whereBetween('sales_returns.date', [$fromDate, $toDate])
-            ->sum('total_pcs');
+            ->sum('total_pcs'));
 
         // Sum of outward (Sales + Purchase Return)
-        $outward = DB::table('sales_items')
+        $outward = (float)(DB::table('sales_items')
             ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
             ->whereBetween('sales.date', [$fromDate, $toDate])
             ->sum('total_pcs') +
             DB::table('purchase_return_items')
             ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
             ->whereBetween('purchase_returns.date', [$fromDate, $toDate])
-            ->sum('total_pcs');
+            ->sum('total_pcs'));
 
         $closingStockQty = $openingStock + $inward - $outward;
         
-        // Items and their current value
-        $items = $this->stockStatus(new Request());
-        $totalStockValue = $items->sum(function($item) {
-            return $item['current_stock'] * $item['price_loose'];
+        // Closing stock value using avg cost at toDate
+        $purchasedSub = DB::table('purchase_items')
+            ->join('purchases', 'purchase_items.purchase_id', '=', 'purchases.id')
+            ->where('date', '<=', $toDate)
+            ->select('item_id', DB::raw('SUM(total_pcs) as total_purchased'))
+            ->groupBy('item_id');
+
+        $soldSub = DB::table('sales_items')
+            ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
+            ->where('date', '<=', $toDate)
+            ->select('item_id', DB::raw('SUM(total_pcs) as total_sold'))
+            ->groupBy('item_id');
+
+        $pRetSub = DB::table('purchase_return_items')
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->where('date', '<=', $toDate)
+            ->select('item_id', DB::raw('SUM(total_pcs) as total_purchase_returned'))
+            ->groupBy('item_id');
+
+        $sRetSub = DB::table('sales_return_items')
+            ->join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+            ->where('date', '<=', $toDate)
+            ->select('item_id', DB::raw('SUM(total_pcs) as total_sales_returned'))
+            ->groupBy('item_id');
+
+        $closingStockRows = DB::table('items')
+            ->leftJoinSub($purchasedSub, 'p', 'items.id', '=', 'p.item_id')
+            ->leftJoinSub($soldSub, 's', 'items.id', '=', 's.item_id')
+            ->leftJoinSub($pRetSub, 'pr', 'items.id', '=', 'pr.item_id')
+            ->leftJoinSub($sRetSub, 'sr', 'items.id', '=', 'sr.item_id')
+            ->select(
+                'items.id as item_id',
+                DB::raw('(COALESCE(p.total_purchased, 0) - COALESCE(pr.total_purchase_returned, 0)) - (COALESCE(s.total_sold, 0) - COALESCE(sr.total_sales_returned, 0)) as qty')
+            )
+            ->get();
+
+        $totalStockValue = $closingStockRows->sum(function ($row) use ($avgCosts) {
+            $cost = $avgCosts[$row->item_id] ?? 0;
+            return $cost * $row->qty;
         });
 
-        // 2. Cash Summary (AccountType 1)
+        // 3. Cash Summary (AccountType 1)
         $cashAccounts = Account::where('type', 1)->pluck('id');
         $cashSummary = $this->getAccountGroupSummary($cashAccounts, $fromDate, $toDate, 'dr');
 
-        // 3. Cheque Summary (AccountType 14)
+        // 4. Cheque Summary (AccountType 14)
         $chequeAccounts = Account::where('type', 14)->pluck('id');
         $chequeSummary = $this->getAccountGroupSummary($chequeAccounts, $fromDate, $toDate, 'dr');
 
-        // 4. Bank Summary (AccountType 2)
+        // 5. Bank Summary (AccountType 2)
         $bankAccounts = Account::where('type', 2)->get();
         $bankDetails = [];
         foreach ($bankAccounts as $bank) {
             $summary = $this->getAccountGroupSummary([$bank->id], $fromDate, $toDate, 'dr');
             $bankDetails[] = [
                 'name' => $bank->title,
-                'opening' => $summary['opening'],
-                'receipts' => $summary['receiving'],
-                'payments' => $summary['payment'],
-                'closing' => $summary['closing']
+                'opening' => (float)$summary['opening'],
+                'receipts' => (float)$summary['receiving'],
+                'payments' => (float)$summary['payment'],
+                'closing' => (float)$summary['closing']
             ];
         }
         $bankSummaryOverall = $this->getAccountGroupSummary($bankAccounts->pluck('id'), $fromDate, $toDate, 'dr');
 
-        // 5. Receivables/Payables (Type 3 and 6)
+        // 6. Receivables/Payables (Type 3 and 6)
         $customerAccounts = Account::where('type', 3)->pluck('id');
         $supplierAccounts = Account::where('type', 6)->pluck('id');
         
         $receivableSummary = $this->getAccountGroupSummary($customerAccounts, $fromDate, $toDate, 'dr');
         $payableSummary = $this->getAccountGroupSummary($supplierAccounts, $fromDate, $toDate, 'cr');
 
-        // 6. Purchases/Sales
-        $salesSum = DB::table('sales')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
-        $salesReturnSum = DB::table('sales_returns')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
-        $purchasesSum = DB::table('purchases')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
-        $purchaseReturnSum = DB::table('purchase_returns')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        // 7. Purchases/Sales
+        $grossSales = (float)DB::table('sales')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        $salesReturnSum = (float)DB::table('sales_returns')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        $netSales = $grossSales - $salesReturnSum;
 
-        // 7. Profit Calculation
-        $profitData = $this->profit(new Request(['from' => $fromDate, 'to' => $toDate]));
-        $profit = $profitData['summary']['profit'] ?? 0;
+        $grossPurchase = (float)DB::table('purchases')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        $purchaseReturnSum = (float)DB::table('purchase_returns')->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        $netPurchase = $grossPurchase - $purchaseReturnSum;
 
-        // Capital (Type 9)
+        // 8. COGS and Gross Profit
+        $purchaseCostsSub = DB::table('purchase_items')
+            ->select('item_id', DB::raw('SUM(subtotal) / NULLIF(SUM(total_pcs), 0) as avg_cost'))
+            ->groupBy('item_id');
+
+        $cogs = (float)DB::table('sales_items')
+            ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
+            ->leftJoinSub($purchaseCostsSub, 'pc', 'sales_items.item_id', '=', 'pc.item_id')
+            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->selectRaw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, 0)) as total_cogs')
+            ->value('total_cogs') ?? 0;
+
+        $grossProfit = $netSales - $cogs;
+
+        // 9. Operating Expenses (Type 4)
+        $totalExpenses = (float)DB::table('payments')
+            ->join('accounts', 'payments.account_id', '=', 'accounts.id')
+            ->where('accounts.type', 4)
+            ->where('payments.type', 'PAYMENT')
+            ->whereBetween('payments.date', [$fromDate, $toDate])
+            ->selectRaw('SUM(payments.amount + payments.discount) as total')
+            ->value('total') ?? 0;
+
+        $netProfit = $grossProfit - $totalExpenses;
+        $netMargin = $netSales > 0 ? round(($netProfit / $netSales) * 100, 2) : 0;
+        $grossMargin = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
+        $roi = $totalStockValue > 0 ? round(($netProfit / $totalStockValue) * 100, 2) : 0;
+
+        // 10. Capital (Type 9)
         $capitalAccounts = Account::where('type', 9)->pluck('id');
         $capitalSummary = $this->getAccountGroupSummary($capitalAccounts, $fromDate, $toDate, 'cr');
 
-        // Total DR / Total CR (Optimized Trial Balance calculation)
+        // 11. Total DR / Total CR
         $trialBalance = $this->calculateTrialBalanceTotals($toDate);
         $totalDR = $trialBalance['dr'];
         $totalCR = $trialBalance['cr'];
 
-
         return [
             'stock' => [
-                'opening' => (float)$openingStock,
-                'in' => (float)$inward,
-                'out' => (float)$outward,
-                'closing' => (float)$closingStockQty,
-                'closing_amt' => (float)$totalStockValue
+                'opening' => (int)$openingStock,
+                'in' => (int)$inward,
+                'out' => (int)$outward,
+                'closing' => (int)$closingStockQty,
+                'closing_amt' => round($totalStockValue, 2)
             ],
             'cash' => [
-                'opening' => (float)$cashSummary['opening'],
-                'receiving' => (float)$cashSummary['receiving'],
-                'payment' => (float)$cashSummary['payment'],
-                'closing' => (float)$cashSummary['closing']
+                'opening' => round((float)$cashSummary['opening'], 2),
+                'receiving' => round((float)$cashSummary['receiving'], 2),
+                'payment' => round((float)$cashSummary['payment'], 2),
+                'closing' => round((float)$cashSummary['closing'], 2)
             ],
             'cheque' => [
-                'opening' => (float)$chequeSummary['opening'],
-                'receiving' => (float)$chequeSummary['receiving'],
-                'payment' => (float)$chequeSummary['payment'],
-                'closing' => (float)$chequeSummary['closing']
+                'opening' => round((float)$chequeSummary['opening'], 2),
+                'receiving' => round((float)$chequeSummary['receiving'], 2),
+                'payment' => round((float)$chequeSummary['payment'], 2),
+                'closing' => round((float)$chequeSummary['closing'], 2)
             ],
             'bank' => [
                 'details' => $bankDetails,
                 'summary' => [
-                    'opening' => (float)$bankSummaryOverall['opening'],
-                    'receiving' => (float)$bankSummaryOverall['receiving'],
-                    'payment' => (float)$bankSummaryOverall['payment'],
-                    'closing' => (float)$bankSummaryOverall['closing']
+                    'opening' => round((float)$bankSummaryOverall['opening'], 2),
+                    'receiving' => round((float)$bankSummaryOverall['receiving'], 2),
+                    'payment' => round((float)$bankSummaryOverall['payment'], 2),
+                    'closing' => round((float)$bankSummaryOverall['closing'], 2)
                 ]
             ],
-            'financial' => [
-                'day_receivable' => (float)($salesSum - $salesReturnSum),
-                'total_receivable' => (float)$receivableSummary['closing'],
-                'total_dr' => (float)$totalDR,
-                'day_payable' => (float)($purchasesSum - $purchaseReturnSum),
-                'total_payable' => (float)$payableSummary['closing'],
-                'capital' => (float)$capitalSummary['closing'],
-                'total_cr' => (float)$totalCR,
-                'profit' => (float)$profit,
-                'roi' => $totalStockValue > 0 ? (float)round(($profit / $totalStockValue) * 100, 2) : 0
-            ],
-
             'trade' => [
-                'purchase' => (float)$purchasesSum,
-                'purchase_return' => (float)$purchaseReturnSum,
-                'net_purchase' => (float)($purchasesSum - $purchaseReturnSum),
-                'sale' => (float)$salesSum,
-                'sales_return' => (float)$salesReturnSum,
-                'net_sale' => (float)($salesSum - $salesReturnSum)
+                'purchase' => round($grossPurchase, 2),
+                'purchase_return' => round($purchaseReturnSum, 2),
+                'net_purchase' => round($netPurchase, 2),
+                'sale' => round($grossSales, 2),
+                'sales_return' => round($salesReturnSum, 2),
+                'net_sale' => round($netSales, 2)
+            ],
+            'financial' => [
+                'day_receivable' => round($netSales, 2),
+                'total_receivable' => round((float)$receivableSummary['closing'], 2),
+                'day_payable' => round($netPurchase, 2),
+                'total_payable' => round((float)$payableSummary['closing'], 2),
+                'capital' => round((float)$capitalSummary['closing'], 2),
+                'total_dr' => round((float)$totalDR, 2),
+                'total_cr' => round((float)$totalCR, 2),
+
+                'cogs' => round($cogs, 2),
+                'gross_profit' => round($grossProfit, 2),
+                'gross_margin' => (float)$grossMargin,
+                'total_expenses' => round($totalExpenses, 2),
+                'net_profit' => round($netProfit, 2),
+                'net_margin' => (float)$netMargin,
+                'roi' => (float)$roi,
+                'profit' => round($netProfit, 2)
             ],
             'from' => $fromDate,
             'to' => $toDate
         ];
     }
+
 
     private function calculateStockOpeningAll($date)
     {

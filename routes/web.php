@@ -32,10 +32,20 @@ use App\Http\Controllers\ClearingChequeController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\PurchaseReportsController;
 use App\Http\Controllers\SalesMapReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\AccountCategoryController;
 use App\Http\Controllers\GuestController;
+use App\Http\Controllers\ProfitReportsController;
+use App\Http\Controllers\Investor\DashboardController as InvestorDashboardController;
+use App\Http\Controllers\Investor\RequestController as InvestorRequestController;
+use App\Http\Controllers\Investor\ForecastController as InvestorForecastController;
+use App\Http\Controllers\Admin\InvestorManagementController;
+use App\Http\Controllers\Admin\ProfitDistributionController;
+use App\Http\Controllers\PurchaseReturnReportsController;
+use App\Http\Controllers\SalesReportsController;   
+use App\Http\Controllers\StockReportsController;
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -380,24 +390,62 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/accounts/trial-balance-6col/export/pdf', [ReportsController::class, 'trialBalance6ColExportPdf'])->name('reports.accounts.trial_balance_6col.export.pdf');
         Route::get('/accounts/trial-balance-6col/print', [ReportsController::class, 'trialBalance6ColPrint'])->name('reports.accounts.trial_balance_6col.print');
         
+        // Stock Reports (Modularized Playground)
+        Route::prefix('/stock')->group(function () {
+            Route::get('/', [StockReportsController::class, 'index'])->name('reports.stock.index');
+            Route::get('/data', [StockReportsController::class, 'data'])->name('reports.stock.data');
+            Route::get('/export', [StockReportsController::class, 'exportPdf'])->name('reports.stock.export');
+            Route::get('/excel', [StockReportsController::class, 'exportExcel'])->name('reports.stock.excel');
+            Route::get('/print', [StockReportsController::class, 'exportPdf'])->name('reports.stock.print');
+        });
+
         Route::get('/stock/status', [ReportsController::class, 'stockStatus'])->name('reports.stock.status');
         Route::get('/stock/ledger', [ReportsController::class, 'stockLedger'])->name('reports.stock.ledger');
-        Route::get('/profit', [ReportsController::class, 'profit'])->name('reports.profit');
         Route::get('/audit', [ReportsController::class, 'audit'])->name('reports.audit');
         Route::get('/purchase', [ReportsController::class, 'purchase'])->name('reports.purchase');
         Route::get('/purchase/export/pdf', [ReportsController::class, 'purchaseExportPdf'])->name('reports.purchase.export.pdf');
         Route::get('/purchase/export/excel', [ReportsController::class, 'purchaseExportExcel'])->name('reports.purchase.export.excel');
-        Route::get('/purchase-return', [ReportsController::class, 'purchaseReturn'])->name('reports.purchase-return');
-        Route::get('/purchase-return/export/pdf', [ReportsController::class, 'purchaseReturnExportPdf'])->name('reports.purchase-return.export.pdf');
-        Route::get('/purchase-return/export/excel', [ReportsController::class, 'purchaseReturnExportExcel'])->name('reports.purchase-return.export.excel');
-        Route::get('/sales', [ReportsController::class, 'sales'])->name('reports.sales');
-        Route::get('/sales/export/pdf', [ReportsController::class, 'salesExportPdf'])->name('reports.sales.export.pdf');
-        Route::get('/sales/export/excel', [ReportsController::class, 'salesExportExcel'])->name('reports.sales.export.excel');
+        // Purchase Return Reports (Modularized)
+        Route::prefix('/purchase-return')->group(function () {
+            Route::get('/', [PurchaseReturnReportsController::class, 'index'])->name('reports.purchase-return.index');
+            Route::get('/data', [PurchaseReturnReportsController::class, 'getData'])->name('reports.purchase-return.data');
+            Route::get('/export', [PurchaseReturnReportsController::class, 'exportPdf'])->name('reports.purchase-return.export');
+            Route::get('/excel', [PurchaseReturnReportsController::class, 'exportExcel'])->name('reports.purchase-return.excel');
+            Route::get('/print', [PurchaseReturnReportsController::class, 'print'])->name('reports.purchase-return.print');
+        });
+
+        // Old sales routes removed
         Route::get('/sales-return', [ReportsController::class, 'salesReturn'])->name('reports.sales-return');
         Route::get('/sales-return/export/pdf', [ReportsController::class, 'salesReturnExportPdf'])->name('reports.sales-return.export.pdf');
         Route::get('/sales-return/export/excel', [ReportsController::class, 'salesReturnExportExcel'])->name('reports.sales-return.export.excel');
         Route::get('/sales-map', [SalesMapReportController::class, 'index'])->name('reports.sales-map');
         Route::get('/sales-map/data', [SalesMapReportController::class, 'getData'])->name('reports.sales-map.data');
+         // Purchase Reports (Modularized Playground)
+         Route::prefix('/purchase')->group(function () {
+              Route::get('/', [PurchaseReportsController::class, 'index'])->name('reports.purchase.index');
+              Route::get('/data', [PurchaseReportsController::class, 'getData'])->name('reports.purchase.data');
+              Route::get('/export', [PurchaseReportsController::class, 'exportPdf'])->name('reports.purchase.export');
+              Route::get('/print', [PurchaseReportsController::class, 'print'])->name('reports.purchase.print');
+              Route::get('/excel', [PurchaseReportsController::class, 'exportExcel'])->name('reports.purchase.excel');
+         });
+
+         // Profit Reports (Modularized)
+         Route::prefix('/profit')->group(function () {
+             Route::get('/', [ProfitReportsController::class, 'index'])->name('reports.profit.index');
+             Route::get('/data', [ProfitReportsController::class, 'getData'])->name('reports.profit.data');
+             Route::get('/export', [ProfitReportsController::class, 'exportPdf'])->name('reports.profit.export');
+             Route::get('/print', [ProfitReportsController::class, 'print'])->name('reports.profit.print');
+             Route::get('/excel', [ProfitReportsController::class, 'exportExcel'])->name('reports.profit.excel');
+        });
+
+        // Sales Reports (Modularized)
+        Route::prefix('/sales')->group(function () {
+            Route::get('/', [SalesReportsController::class, 'index'])->name('reports.sales');
+            Route::get('/data', [SalesReportsController::class, 'getData'])->name('reports.sales.data');
+            Route::get('/export', [SalesReportsController::class, 'exportPdf'])->name('reports.sales.export');
+            Route::get('/excel', [SalesReportsController::class, 'exportExcel'])->name('reports.sales.excel');
+            Route::get('/print', [SalesReportsController::class, 'exportPdf'])->name('reports.sales.print');
+        });
     });
 
     // Payment Routes (Additional)
@@ -409,7 +457,41 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payment/available-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCheques'])->name('payment.available-cheques');
     Route::get('/payment/available-customer-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCustomerCheques'])->name('payment.available-customer-cheques');
     Route::get('/payment/bill-items', [App\Http\Controllers\PaymentController::class, 'getBillItems'])->name('payment.bill-items');
+
+    // ============================================================================
+    // INVESTOR PANEL ROUTES
+    // ============================================================================
+    Route::middleware(['role:investor'])->prefix('investor')->group(function () {
+        Route::get('/dashboard', [InvestorDashboardController::class, 'index'])->name('investor.dashboard');
+        Route::get('/profit/history', [InvestorDashboardController::class, 'profitHistory'])->name('investor.profit.history');
+        Route::get('/transactions', [InvestorDashboardController::class, 'transactions'])->name('investor.transactions');
+        Route::get('/requests', [InvestorRequestController::class, 'index'])->name('investor.requests');
+        Route::get('/forecast', [InvestorForecastController::class, 'data'])->name('investor.forecast');
+        
+        Route::post('/requests/reinvest', [InvestorRequestController::class, 'reinvest'])->name('investor.requests.reinvest');
+        Route::post('/requests/withdraw-profit', [InvestorRequestController::class, 'withdrawProfit'])->name('investor.requests.withdraw-profit');
+        Route::post('/requests/withdraw-capital', [InvestorRequestController::class, 'withdrawCapital'])->name('investor.requests.withdraw-capital');
+        Route::delete('/requests/{id}', [InvestorRequestController::class, 'cancel'])->name('investor.requests.cancel');
+        Route::get('/transactions/export-pdf', [InvestorDashboardController::class, 'exportPdf'])->name('investor.transactions.export-pdf');
+    });
+
+    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
+        Route::get('/investors', [InvestorManagementController::class, 'index'])->name('admin.investors.index');
+        Route::get('/investors/export-excel', [InvestorManagementController::class, 'exportExcel'])->name('admin.investors.export-excel');
+        Route::get('/investors/{id}', [InvestorManagementController::class, 'show'])->name('admin.investors.show');
+        Route::get('/investors/{id}/export-pdf', [InvestorManagementController::class, 'exportPdf'])->name('admin.investors.export-pdf');
+        Route::post('/investors/{id}/adjust-capital', [InvestorManagementController::class, 'adjustCapital'])->name('admin.investors.adjust-capital');
+        Route::post('/recalculate-ownership', [InvestorManagementController::class, 'recalculateOwnership'])->name('admin.recalculate-ownership');
+        
+        Route::post('/requests/{id}/approve', [InvestorManagementController::class, 'approveRequest'])->name('admin.requests.approve');
+        Route::post('/requests/{id}/reject', [InvestorManagementController::class, 'rejectRequest'])->name('admin.requests.reject');
+        
+        Route::get('/profit/distribute', [ProfitDistributionController::class, 'index'])->name('admin.profit.distribute.index');
+        Route::post('/profit/distribute/preview', [ProfitDistributionController::class, 'preview'])->name('admin.profit.distribute.preview');
+        Route::post('/profit/distribute', [ProfitDistributionController::class, 'distribute'])->name('admin.profit.distribute.store');
+    });
 });
+
 
 // ============================================================================
 // PUBLIC GUEST ROUTES

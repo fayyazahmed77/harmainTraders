@@ -1,370 +1,202 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DataTable } from '@/components/Reports/DataTable';
-import { DateRangePicker } from '@/components/Reports/DateRangePicker';
-import { ChartCard } from '@/components/Reports/ChartCard';
-import { ColumnDef, PaginationState } from '@tanstack/react-table';
-import { DateRange } from 'react-day-picker';
-import { format, subDays } from 'date-fns';
+import { subMonths, format } from 'date-fns';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { route } from 'ziggy-js';
 import { BreadcrumbItem } from '@/types';
-import { RotateCcw, Package, Users, TrendingDown } from 'lucide-react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Badge } from '@/components/ui/badge';
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { FileText, FileSpreadsheet } from "lucide-react";
-interface Supplier {
-    id: number;
-    title: string;
-}
+import { motion, AnimatePresence } from 'framer-motion';
+import { RefreshCcw, Search, Undo2 } from 'lucide-react';
+import { ReturnParameterForm } from '@/pages/reports/purchase-return/components/ReturnParameterForm';
+import { ReturnReportView } from '@/pages/reports/purchase-return/components/reports/ReturnReportView';
+import { useAppearance } from '@/hooks/use-appearance';
 
-interface PurchaseReturn {
-    id: number;
-    date: string;
-    invoice: string;
-    supplier_name: string;
-    no_of_items: number;
-    gross_total: number;
-    discount_total: number;
-    net_total: number;
-}
-
-interface PurchaseReturnData {
-    summary: {
-        total_returns: number;
-        total_items: number;
-        supplier_count: number;
-        average_return: number;
-        return_count: number;
-    };
-    daily_trend: {
-        date: string;
-        total: number;
-        count: number;
-    }[];
-    top_suppliers: {
-        name: string;
-        total: number;
-        count: number;
-    }[];
-    returns: PurchaseReturn[];
-}
-
-interface Props {
-    suppliers: Supplier[];
+interface PageProps {
+    accounts: any[];
+    items: any[];
+    firms: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Dashboard", href: "/dashboard" },
     { title: "Reports", href: "/reports" },
-    { title: "Purchase Return Reports", href: "/reports/purchase-return" },
+    { title: "Purchase Return Analysis", href: "/reports/purchase-return" },
 ];
 
-export default function PurchaseReturnReport({ suppliers }: Props) {
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    });
-    const [data, setData] = useState<PurchaseReturnData | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
-    const [pagination, setPagination] = useState<PaginationState>({
-        pageIndex: 0,
-        pageSize: 50,
+export default function PurchaseReturnReports({ accounts, items, firms }: PageProps) {
+    const { appearance } = useAppearance();
+    const isDark = appearance === 'dark';
+
+    const [params, setParams] = useState({
+        fromDate: subMonths(new Date(), 1),
+        toDate: new Date(),
+        accountId: 'ALL',
+        itemId: 'ALL',
+        reportId: 'bill',
+        firmId: 'ALL',
+        printOn: 'screen',
     });
 
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+
     const fetchData = async () => {
+        setHasSearched(true);
+        
+        if (params.printOn === 'pdf' || params.printOn === 'printer') {
+            handleExport(params.printOn === 'pdf' ? 'pdf' : 'print');
+            return;
+        }
+
         setLoading(true);
         try {
-            const response = await axios.get(route('reports.purchase-return'), {
+            const endpoint = route('reports.purchase-return.data');
+            const response = await axios.get(endpoint, {
                 params: {
-                    from: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
-                    to: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
-                    supplier_id: selectedSupplier !== 'all' ? selectedSupplier : null,
+                    ...params,
+                    fromDate: format(params.fromDate, 'yyyy-MM-dd'),
+                    toDate: format(params.toDate, 'yyyy-MM-dd'),
                 },
                 headers: { 'Accept': 'application/json' }
             });
-            setData(response.data);
-        } catch (error) {
-            console.error("Failed to fetch purchase return data", error);
-            toast.error("Failed to load purchase return report");
+
+            setReportData(response.data?.data || []);
+            toast.success("Analysis Complete", {
+                description: `${(response.data?.data || []).length} return records processed.`
+            });
+        } catch (error: any) {
+            console.error("Failed to fetch purchase return report", error);
+            const message = error.response?.data?.message || "Failed to load return data";
+            toast.error(message);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [dateRange, selectedSupplier]);
+    const handleExport = (type: 'pdf' | 'excel' | 'print') => {
+        let baseUrl = '';
+        switch(type) {
+            case 'pdf': baseUrl = route('reports.purchase-return.export'); break;
+            case 'excel': baseUrl = route('reports.purchase-return.excel'); break;
+            case 'print': baseUrl = route('reports.purchase-return.print'); break;
+        }
 
-    const paginatedData = useMemo(() => {
-        if (!data) return [];
-        const start = pagination.pageIndex * pagination.pageSize;
-        return data.returns.slice(start, start + pagination.pageSize);
-    }, [data, pagination]);
+        if (!baseUrl) {
+             toast.error("Export type not supported yet");
+             return;
+        }
 
-    const pageCount = data ? Math.ceil(data.returns.length / pagination.pageSize) : 0;
+        const queryParams = new URLSearchParams({
+            ...params as any,
+            fromDate: params.fromDate.toISOString(),
+            toDate: params.toDate.toISOString(),
+        });
 
-    const columns: ColumnDef<PurchaseReturn>[] = [
-        {
-            accessorKey: 'date',
-            header: 'Date',
-            cell: ({ row }) => format(new Date(row.original.date), 'dd MMM yyyy'),
-        },
-        {
-            accessorKey: 'invoice',
-            header: 'Invoice',
-            cell: ({ row }) => (
-                <Badge variant="outline" className="font-mono bg-red-50 text-red-700 border-red-200">
-                    {row.original.invoice}
-                </Badge>
-            )
-        },
-        {
-            accessorKey: 'supplier_name',
-            header: 'Supplier',
-        },
-        {
-            accessorKey: 'no_of_items',
-            header: 'Items',
-            cell: ({ row }) => (
-                <span className="text-blue-600 font-semibold">
-                    {row.original.no_of_items}
-                </span>
-            )
-        },
-        {
-            accessorKey: 'gross_total',
-            header: 'Gross Total',
-            cell: ({ row }) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.gross_total),
-        },
-        {
-            accessorKey: 'discount_total',
-            header: 'Discount',
-            cell: ({ row }) => row.original.discount_total > 0 ? (
-                <span className="text-green-600">
-                    {new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.discount_total)}
-                </span>
-            ) : '-',
-        },
-        {
-            accessorKey: 'net_total',
-            header: 'Net Total',
-            cell: ({ row }) => (
-                <span className="font-bold text-red-600">
-                    {new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.net_total)}
-                </span>
-            ),
-        },
-    ];
-
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('en-PK', {
-            style: 'currency',
-            currency: 'PKR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(value);
+        window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
     };
 
-    if (!data && loading) return <div className="p-6">Loading...</div>;
-    if (!data) return null;
+    const getCriteriaString = () => {
+        const parts = [];
+        parts.push(`${format(params.fromDate, 'dd/MM/yyyy')} TO ${format(params.toDate, 'dd/MM/yyyy')}`);
+        
+        if (params.accountId !== 'ALL') {
+            const acc = accounts.find(a => a.id.toString() === params.accountId);
+            if (acc) parts.push(`SUPPLIER: ${acc.title}`);
+        }
+        
+        return parts.join(' | ');
+    }
 
     return (
         <>
-            <Head title="Purchase Return Reports" />
+            <Head title="Purchase Return Analysis" />
             <SidebarProvider>
                 <AppSidebar />
-                <SidebarInset>
+                <SidebarInset className="bg-background selection:bg-rose-500/30">
                     <SiteHeader breadcrumbs={breadcrumbs} />
-                    <div className="p-6 space-y-6 min-h-screen">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Purchase Return Reports</h1>
-                                <p className="text-slate-500">Track and analyze purchase returns</p>
+                    
+                    <div className="relative min-h-screen bg-transparent transition-colors duration-500">
+                        {/* Background Decor - Adaptive to Theme (Using Rose for Returns) */}
+                        <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-rose-600/5 to-transparent pointer-events-none" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-full max-w-[1600px] bg-gradient-to-r from-transparent via-rose-500/20 to-transparent" />
+                        
+                        <div className="relative p-6 md:p-10 max-w-[1640px] mx-auto space-y-8">
+                            
+                            {/* Page Title Section */}
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="h-[2px] w-6 bg-rose-500 rounded-full" />
+                                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">Procurement Reversal</span>
+                                    </div>
+                                    <h1 className="text-4xl md:text-5xl font-black text-text-primary tracking-tighter uppercase italic drop-shadow-sm">
+                                        Purchase <span className="text-rose-500">Returns</span>
+                                    </h1>
+                                    <div className="text-text-secondary/60 text-[10px] font-black uppercase tracking-[0.15em] mt-3 flex items-center gap-2">
+                                        <div className="h-1 w-1 bg-rose-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(225,29,72,1)]" />
+                                        Track and analyze procurement returns and supplier credits
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                {/* Date Range Picker */}
-                                <DateRangePicker date={dateRange} setDate={setDateRange} />
 
-                                {/* Button Group */}
-                                <ButtonGroup>
-                                    {/* PDF Button */}
-                                    <Button
-                                        asChild
-                                        className="bg-red-600 hover:bg-red-700 text-white"
-                                    >
-                                        <a
-                                            href={route("reports.purchase-return.export.pdf", {
-                                                from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
-                                                to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
-                                                supplier_id: selectedSupplier !== "all" ? selectedSupplier : null,
-                                            })}
-                                        >
-                                            <FileText className="w-4 h-4 mr-2" />
-                                            PDF
-                                        </a>
-                                    </Button>
-
-                                    {/* Excel Button */}
-                                    <Button
-                                        asChild
-                                        className="bg-green-600 hover:bg-green-700 text-white"
-                                    >
-                                        <a
-                                            href={route("reports.purchase-return.export.excel", {
-                                                from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
-                                                to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
-                                                supplier_id: selectedSupplier !== "all" ? selectedSupplier : null,
-                                            })}
-                                        >
-                                            <FileSpreadsheet className="w-4 h-4 mr-2" />
-                                            Excel
-                                        </a>
-                                    </Button>
-                                </ButtonGroup>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-4">
-                            <Card className="border-l-4 border-l-red-500 shadow-sm bg-red-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Returns</CardTitle>
-                                    <RotateCcw className="h-4 w-4 text-red-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-red-600">
-                                        {formatCurrency(data.summary.total_returns)}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">{data.summary.return_count} transactions</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-blue-500 shadow-sm bg-blue-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                                    <Package className="h-4 w-4 text-blue-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-blue-600">
-                                        {data.summary.total_items.toLocaleString()}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Items returned</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-green-500 shadow-sm bg-green-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Suppliers</CardTitle>
-                                    <Users className="h-4 w-4 text-green-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-green-600">
-                                        {data.summary.supplier_count}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">With returns</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-orange-500 shadow-sm bg-orange-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Average Return</CardTitle>
-                                    <TrendingDown className="h-4 w-4 text-orange-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-orange-600">
-                                        {formatCurrency(data.summary.average_return)}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Per transaction</p>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <ChartCard title="Daily Return Trend">
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data.daily_trend}>
-                                            <defs>
-                                                <linearGradient id="colorReturnTotal" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis
-                                                dataKey="date"
-                                                tickFormatter={(str) => format(new Date(str), 'dd MMM')}
-                                                tick={{ fontSize: 12 }}
-                                            />
-                                            <YAxis tick={{ fontSize: 12 }} />
-                                            <Tooltip
-                                                labelFormatter={(str) => format(new Date(str), 'dd MMM yyyy')}
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Area type="monotone" dataKey="total" stroke="#ef4444" fillOpacity={1} fill="url(#colorReturnTotal)" name="Total" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
-
-                            <ChartCard title="Top 10 Suppliers by Returns">
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={data.top_suppliers} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                            <XAxis type="number" hide />
-                                            <YAxis
-                                                dataKey="name"
-                                                type="category"
-                                                width={120}
-                                                tick={{ fontSize: 11 }}
-                                            />
-                                            <Tooltip
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} name="Total" barSize={20} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
-                        </div>
-
-                        <Card className="shadow-sm">
-                            <CardHeader>
-                                <CardTitle>Return Transactions</CardTitle>
-                                <CardDescription>Detailed purchase return records</CardDescription>
-                                <div className="mt-4">
-                                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                                        <SelectTrigger className="w-full md:w-[300px]">
-                                            <SelectValue placeholder="All Suppliers" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Suppliers</SelectItem>
-                                            {suppliers.map(s => (
-                                                <SelectItem key={s.id} value={s.id.toString()}>{s.title}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <DataTable
-                                    columns={columns}
-                                    data={paginatedData}
-                                    pageCount={pageCount}
-                                    pagination={pagination}
-                                    onPaginationChange={setPagination}
-                                    isLoading={loading}
+                            {/* Main Parameter Form */}
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                <ReturnParameterForm 
+                                    data={params} 
+                                    setData={setParams} 
+                                    onExecute={fetchData}
+                                    bootstrap={{ accounts, items, firms }} 
                                 />
-                            </CardContent>
-                        </Card>
+                            </motion.div>
+
+                            {/* Report Results */}
+                            <AnimatePresence mode="wait">
+                                {!hasSearched ? (
+                                    <motion.div 
+                                        key="empty"
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                        className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                    >
+                                        <div className="h-20 w-20 bg-surface-1 rounded-sm flex items-center justify-center mb-6 shadow-inner ring-1 ring-border/5">
+                                            <Search className="h-8 w-8 text-text-muted/20" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-text-muted uppercase tracking-tighter">Analysis Ready</h3>
+                                        <p className="text-[9px] font-bold text-text-muted/40 mt-2 uppercase tracking-[0.2em] max-w-sm text-center">Configure return parameters to begin deep audit</p>
+                                    </motion.div>
+                                ) : loading ? (
+                                    <motion.div 
+                                        key="loading"
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                        className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                    >
+                                        <div className="relative">
+                                            <div className="absolute inset-0 bg-rose-500/20 blur-2xl rounded-full" />
+                                            <RefreshCcw className="h-10 w-10 text-rose-500 animate-spin relative z-10" />
+                                        </div>
+                                        <p className="text-[10px] font-black text-rose-500 uppercase mt-8 tracking-[0.4em] animate-pulse">Aggregating Reversal Data...</p>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div 
+                                        key="data" 
+                                        initial={{ opacity: 0, y: 10 }} 
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="space-y-8 pb-20"
+                                    >
+                                        <ReturnReportView 
+                                            data={reportData} 
+                                            type={params.reportId} 
+                                            criteria={getCriteriaString()} 
+                                            onExport={handleExport}
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                        </div>
                     </div>
                 </SidebarInset>
             </SidebarProvider>

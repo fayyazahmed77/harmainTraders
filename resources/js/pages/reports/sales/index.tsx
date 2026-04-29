@@ -1,367 +1,222 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Head } from '@inertiajs/react';
+// Sales Report Engine - Module Sync Trigger
+import React, { useState, useEffect } from 'react';
+import { Head, router } from '@inertiajs/react';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DataTable } from '@/components/Reports/DataTable';
-import { DateRangePicker } from '@/components/Reports/DateRangePicker';
-import { ChartCard } from '@/components/Reports/ChartCard';
-import { ColumnDef, PaginationState } from '@tanstack/react-table';
-import { DateRange } from 'react-day-picker';
-import { format, subDays } from 'date-fns';
+import { BreadcrumbItem } from '@/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RefreshCcw, Search, BarChart3, LayoutDashboard } from 'lucide-react';
+import { ParameterForm } from './components/ParameterForm';
+import { ReportView } from './components/reports/ReportView';
+import { salesReports } from './constants/salesReports';
+import { route } from 'ziggy-js';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { route } from 'ziggy-js';
-import { BreadcrumbItem } from '@/types';
-import { CreditCard, Package, Users, TrendingUp } from 'lucide-react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Badge } from '@/components/ui/badge';
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { FileText, FileSpreadsheet } from "lucide-react"
-interface Customer {
-    id: number;
-    title: string;
-}
+import { format } from 'date-fns';
+import { useAppearance } from '@/hooks/use-appearance';
 
-interface Sale {
-    id: number;
-    date: string;
-    invoice: string;
-    customer_name: string;
-    no_of_items: number;
-    gross_total: number;
-    discount_total: number;
-    net_total: number;
-}
-
-interface SalesData {
-    summary: {
-        total_sales: number;
-        total_items: number;
-        customer_count: number;
-        average_sale: number;
-        sale_count: number;
-    };
-    daily_trend: {
-        date: string;
-        total: number;
-        count: number;
-    }[];
-    top_customers: {
-        name: string;
-        total: number;
-        count: number;
-    }[];
-    sales: Sale[];
-}
-
-interface Props {
-    customers: Customer[];
+interface PageProps {
+    customers: any[];
+    items: any[];
+    firms: any[];
+    salesmen: any[];
+    areas: any[];
+    categories: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Dashboard", href: "/dashboard" },
     { title: "Reports", href: "/reports" },
-    { title: "Sales Reports", href: "/reports/sales" },
+    { title: "Sales Playground", href: "/reports/sales" },
 ];
 
-export default function SalesReport({ customers }: Props) {
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    });
-    const [data, setData] = useState<SalesData | null>(null);
+export default function SalesReportsIndex({ customers, items, firms, salesmen, areas, categories }: PageProps) {
+    const { appearance } = useAppearance();
+    const isDark = appearance === 'dark';
+
     const [loading, setLoading] = useState(false);
-    const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
-    const [pagination, setPagination] = useState<PaginationState>({
-        pageIndex: 0,
-        pageSize: 50,
+    const [hasSearched, setHasSearched] = useState(false);
+    const [reportData, setReportData] = useState<any[]>([]);
+    const [params, setParams] = useState({
+        reportId: 'bill',
+        fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        toDate: new Date().toISOString().split('T')[0],
+        customerId: 'ALL',
+        itemId: 'ALL',
+        salesmanId: 'ALL',
+        areaId: 'ALL',
+        firmId: 'ALL',
+        categoryId: 'ALL',
+        printOn: 'screen'
     });
 
-    const fetchData = async () => {
+    const fetchReportData = async () => {
+        if (params.printOn === 'pdf' || params.printOn === 'excel') {
+            handleExport(params.printOn === 'pdf' ? 'pdf' : 'excel');
+            return;
+        }
+
+        setHasSearched(true);
         setLoading(true);
         try {
-            const response = await axios.get(route('reports.sales'), {
+            const endpoint = route('reports.sales.data');
+            const response = await axios.get(endpoint, {
                 params: {
-                    from: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
-                    to: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
-                    customer_id: selectedCustomer !== 'all' ? selectedCustomer : null,
+                    ...params,
+                    fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
+                    toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
                 },
                 headers: { 'Accept': 'application/json' }
             });
-            setData(response.data);
-        } catch (error) {
-            console.error("Failed to fetch sales data", error);
-            toast.error("Failed to load sales report");
+
+            setReportData(response.data?.data || []);
+            toast.success("Intelligence Aggregated", {
+                description: `${(response.data?.data || []).length} sales matrix points processed.`
+            });
+        } catch (error: any) {
+            console.error("Failed to fetch report data", error);
+            const message = error.response?.data?.message || "Analysis Engine Failure";
+            toast.error(message);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [dateRange, selectedCustomer]);
+    const handleExport = (type: 'pdf' | 'excel') => {
+        let baseUrl = '';
+        switch(type) {
+            case 'pdf': baseUrl = route('reports.sales.export'); break;
+            case 'excel': baseUrl = route('reports.sales.excel'); break;
+        }
 
-    const paginatedData = useMemo(() => {
-        if (!data) return [];
-        const start = pagination.pageIndex * pagination.pageSize;
-        return data.sales.slice(start, start + pagination.pageSize);
-    }, [data, pagination]);
+        const queryParams = new URLSearchParams({
+            ...params as any,
+            fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
+            toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
+        });
 
-    const pageCount = data ? Math.ceil(data.sales.length / pagination.pageSize) : 0;
-
-    const columns: ColumnDef<Sale>[] = [
-        {
-            accessorKey: 'date',
-            header: 'Date',
-            cell: ({ row }) => format(new Date(row.original.date), 'dd MMM yyyy'),
-        },
-        {
-            accessorKey: 'invoice',
-            header: 'Invoice',
-            cell: ({ row }) => (
-                <Badge variant="outline" className="font-mono bg-green-50 text-green-700 border-green-200">
-                    {row.original.invoice}
-                </Badge>
-            )
-        },
-        {
-            accessorKey: 'customer_name',
-            header: 'Customer',
-        },
-        {
-            accessorKey: 'no_of_items',
-            header: 'Items',
-            cell: ({ row }) => (
-                <span className="text-blue-600 font-semibold">
-                    {row.original.no_of_items}
-                </span>
-            )
-        },
-        {
-            accessorKey: 'gross_total',
-            header: 'Gross Total',
-            cell: ({ row }) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.gross_total),
-        },
-        {
-            accessorKey: 'discount_total',
-            header: 'Discount',
-            cell: ({ row }) => row.original.discount_total > 0 ? (
-                <span className="text-green-600">
-                    {new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.discount_total)}
-                </span>
-            ) : '-',
-        },
-        {
-            accessorKey: 'net_total',
-            header: 'Net Total',
-            cell: ({ row }) => (
-                <span className="font-bold text-green-600">
-                    {new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(row.original.net_total)}
-                </span>
-            ),
-        },
-    ];
-
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('en-PK', {
-            style: 'currency',
-            currency: 'PKR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(value);
+        window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
     };
 
-    if (!data && loading) return <div className="p-6">Loading...</div>;
-    if (!data) return null;
+    const getCriteriaString = () => {
+        const parts = [];
+        parts.push(`${format(new Date(params.fromDate), 'dd/MM/yyyy')} TO ${format(new Date(params.toDate), 'dd/MM/yyyy')}`);
+        
+        if (params.customerId !== 'ALL') {
+            const acc = customers.find(a => a.id.toString() === params.customerId);
+            if (acc) parts.push(`CUSTOMER: ${acc.title}`);
+        }
+        
+        return parts.join(' | ');
+    }
 
     return (
-        <>
-            <Head title="Sales Reports" />
-            <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset>
-                    <SiteHeader breadcrumbs={breadcrumbs} />
-                    <div className="p-6 space-y-6 min-h-screen">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset className="bg-background selection:bg-indigo-500/30">
+                <Head title="Sales Analysis Playground" />
+                <SiteHeader breadcrumbs={breadcrumbs} />
+                
+                <div className="relative min-h-screen bg-transparent transition-colors duration-500">
+                    {/* Background Decor - Adaptive to Theme (Using Indigo for Sales) */}
+                    <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-indigo-600/5 to-transparent pointer-events-none" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px] w-full max-w-[1600px] bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+                    
+                    <div className="relative p-6 md:p-10 max-w-[1640px] mx-auto space-y-8">
+                        
+                        {/* Page Title Section */}
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Sales Reports</h1>
-                                <p className="text-slate-500">Track and analyze sales performance</p>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="h-[2px] w-6 bg-indigo-600 rounded-full" />
+                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Sales Audit Module</span>
+                                </div>
+                                <h1 className="text-4xl md:text-5xl font-black text-text-primary tracking-tighter uppercase italic drop-shadow-sm">
+                                    Sales <span className="text-indigo-600">Playground</span>
+                                </h1>
+                                <div className="text-text-secondary/60 text-[10px] font-black uppercase tracking-[0.15em] mt-3 flex items-center gap-2">
+                                    <div className="h-1 w-1 bg-indigo-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(79,70,229,1)]" />
+                                    Deep visibility into revenue performance and territory metrics
+                                </div>
                             </div>
+                            
                             <div className="flex items-center gap-2">
-                                <DateRangePicker date={dateRange} setDate={setDateRange} />
-
-                                <ButtonGroup>
-                                    <Button
-                                        asChild
-                                        className="bg-red-600 hover:bg-red-700 text-white"
-                                    >
-                                        <a
-                                            href={route("reports.sales.export.pdf", {
-                                                from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
-                                                to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
-                                                customer_id: selectedCustomer !== "all" ? selectedCustomer : null,
-                                            })}
-                                        >
-                                            <FileText className="w-4 h-4 mr-1" /> PDF
-                                        </a>
-                                    </Button>
-
-                                    <Button
-                                        asChild
-                                        className="bg-green-600 hover:bg-green-700 text-white"
-                                    >
-                                        <a
-                                            href={route("reports.sales.export.excel", {
-                                                from: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null,
-                                                to: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : null,
-                                                customer_id: selectedCustomer !== "all" ? selectedCustomer : null,
-                                            })}
-                                        >
-                                            <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
-                                        </a>
-                                    </Button>
-                                </ButtonGroup>
+                                <button 
+                                    onClick={fetchReportData}
+                                    disabled={loading}
+                                    className="h-12 px-6 bg-surface-1 border border-border/40 rounded-sm text-text-primary hover:bg-surface-0 transition-all flex items-center gap-2 text-xs font-black uppercase tracking-widest shadow-sm group"
+                                >
+                                    <RefreshCcw className={`h-4 w-4 text-indigo-600 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                                    Sync Intelligence
+                                </button>
                             </div>
                         </div>
 
-                        <div className="grid gap-6 md:grid-cols-4">
-                            <Card className="border-l-4 border-l-green-500 shadow-sm bg-green-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-                                    <CreditCard className="h-4 w-4 text-green-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-green-600">
-                                        {formatCurrency(data.summary.total_sales)}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">{data.summary.sale_count} transactions</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-blue-500 shadow-sm bg-blue-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-                                    <Package className="h-4 w-4 text-blue-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-blue-600">
-                                        {data.summary.total_items.toLocaleString()}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Items sold</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-purple-500 shadow-sm bg-purple-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Customers</CardTitle>
-                                    <Users className="h-4 w-4 text-purple-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-purple-600">
-                                        {data.summary.customer_count}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Active customers</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="border-l-4 border-l-orange-500 shadow-sm bg-orange-100">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Average Sale</CardTitle>
-                                    <TrendingUp className="h-4 w-4 text-orange-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-orange-600">
-                                        {formatCurrency(data.summary.average_sale)}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Per transaction</p>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        {/* Main Parameter Form */}
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <ParameterForm 
+                                params={params} 
+                                setParams={setParams} 
+                                onSearch={fetchReportData}
+                                loading={loading}
+                                customers={customers}
+                                items={items}
+                                firms={firms}
+                                salesmen={salesmen}
+                                areas={areas}
+                                categories={categories}
+                            />
+                        </motion.div>
 
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <ChartCard title="Daily Sales Trend">
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={data.daily_trend}>
-                                            <defs>
-                                                <linearGradient id="colorSalesTotal" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-                                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis
-                                                dataKey="date"
-                                                tickFormatter={(str) => format(new Date(str), 'dd MMM')}
-                                                tick={{ fontSize: 12 }}
-                                            />
-                                            <YAxis tick={{ fontSize: 12 }} />
-                                            <Tooltip
-                                                labelFormatter={(str) => format(new Date(str), 'dd MMM yyyy')}
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Area type="monotone" dataKey="total" stroke="#10b981" fillOpacity={1} fill="url(#colorSalesTotal)" name="Total" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
+                        {/* Report Results */}
+                        <AnimatePresence mode="wait">
+                            {!hasSearched ? (
+                                <motion.div 
+                                    key="empty"
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                >
+                                    <div className="h-20 w-20 bg-surface-1 rounded-sm flex items-center justify-center mb-6 shadow-inner ring-1 ring-border/5">
+                                        <Search className="h-8 w-8 text-text-muted/20" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-text-muted uppercase tracking-tighter italic">Ready to Analyze</h3>
+                                    <p className="text-[9px] font-bold text-text-muted/40 mt-2 uppercase tracking-[0.2em] max-w-sm text-center">Configure your sales dimensions and triggers above to start auditing</p>
+                                </motion.div>
+                            ) : loading ? (
+                                <motion.div 
+                                    key="loading"
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="h-[50vh] flex flex-col items-center justify-center bg-surface-1/40 rounded-sm border border-dashed border-border/50"
+                                >
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-indigo-600/20 blur-2xl rounded-full" />
+                                        <RefreshCcw className="h-10 w-10 text-indigo-600 animate-spin relative z-10" />
+                                    </div>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase mt-8 tracking-[0.4em] animate-pulse">Processing Sales Matrix...</p>
+                                </motion.div>
+                            ) : (
+                                <motion.div 
+                                    key="data" 
+                                    initial={{ opacity: 0, y: 10 }} 
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="space-y-8 pb-20"
+                                >
+                                    <ReportView 
+                                        reportId={params.reportId}
+                                        data={reportData}
+                                        loading={loading}
+                                        onExportPdf={() => handleExport('pdf')}
+                                        onExportExcel={() => handleExport('excel')}
+                                        params={params}
+                                    />
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
-                            <ChartCard title="Top 10 Customers by Sales">
-                                <div className="h-[300px] w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={data.top_customers} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                            <XAxis type="number" hide />
-                                            <YAxis
-                                                dataKey="name"
-                                                type="category"
-                                                width={120}
-                                                tick={{ fontSize: 11 }}
-                                            />
-                                            <Tooltip
-                                                formatter={(value: number) => formatCurrency(value)}
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            />
-                                            <Bar dataKey="total" fill="#10b981" radius={[0, 4, 4, 0]} name="Total" barSize={20} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </ChartCard>
-                        </div>
-
-                        <Card className="shadow-sm">
-                            <CardHeader>
-                                <CardTitle>Sales Transactions</CardTitle>
-                                <CardDescription>Detailed sales records</CardDescription>
-                                <div className="mt-4">
-                                    <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                                        <SelectTrigger className="w-full md:w-[300px]">
-                                            <SelectValue placeholder="All Customers" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Customers</SelectItem>
-                                            {customers.map(c => (
-                                                <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <DataTable
-                                    columns={columns}
-                                    data={paginatedData}
-                                    pageCount={pageCount}
-                                    pagination={pagination}
-                                    onPaginationChange={setPagination}
-                                    isLoading={loading}
-                                />
-                            </CardContent>
-                        </Card>
                     </div>
-                </SidebarInset>
-            </SidebarProvider>
-        </>
+                </div>
+            </SidebarInset>
+        </SidebarProvider>
     );
 }
