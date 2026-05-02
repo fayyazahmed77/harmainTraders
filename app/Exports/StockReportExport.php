@@ -39,6 +39,11 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
             $view = "pdf.stock.types.summary";
         }
 
+        $colspan = 7;
+        if (in_array($this->type, ['available_stock', 'detail', 'price_list'])) {
+            $colspan = 10;
+        }
+
         return view($view, [
             'data' => $this->data,
             'title' => 'Stock Report - ' . strtoupper($this->type),
@@ -46,7 +51,8 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
             'fromDate' => $this->fromDate,
             'toDate' => $this->toDate,
             'params' => $this->params,
-            'is_excel' => true
+            'is_excel' => true,
+            'colspan' => $colspan
         ]);
     }
 

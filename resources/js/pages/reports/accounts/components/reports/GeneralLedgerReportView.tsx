@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Search, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, formatSafeDate } from '@/lib/utils';
 import { PaginationState } from '@tanstack/react-table';
 
 export function GeneralLedgerReportView({ 
@@ -27,19 +26,22 @@ export function GeneralLedgerReportView({
         }).format(amount);
     };
 
-    const formatVoucherNo = (type: string, id: number, credit: number, debit: number) => {
+    const formatVoucherNo = (row: any) => {
+        const { type, id, credit, debit, payment_method } = row;
         const paddedId = String(id).padStart(6, '0');
         if (type === 'Sale') return paddedId;
         if (type === 'Purchase') return paddedId;
         if (type === 'Sales Return') return `SR-${paddedId}`;
         if (type === 'Purchase Return') return `PR-${paddedId}`;
         if (type === 'Payment') {
+            if (payment_method === 'Journal') return `JV-${paddedId}`;
             return Number(credit) > 0 ? `BR-${id}` : `BP-${id}`;
         }
         return String(id);
     };
 
-    const formatRemarks = (type: string, description: string) => {
+    const formatRemarks = (row: any) => {
+        const { type, description, payment_method } = row;
         const descStr = String(description || '').toUpperCase();
         if (descStr.includes('{')) return descStr;
 
@@ -48,6 +50,9 @@ export function GeneralLedgerReportView({
         if (type === 'Sales Return') return 'SALES RETURN { RETURN }';
         if (type === 'Purchase Return') return 'PURCHASE RETURN { RETURN }';
         if (type === 'Payment') {
+            if (payment_method === 'Journal') {
+                return `JOURNAL ENTRY { ${descStr} }`;
+            }
             if (descStr.trim() === 'CASH IN HAND' || !descStr) {
                 return 'CASH IN HAND { BNK_REC }';
             }
@@ -67,8 +72,8 @@ export function GeneralLedgerReportView({
     const filteredData = data.filter((row: any) => {
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
-        const remarks = formatRemarks(row.type, row.description).toLowerCase();
-        const voucher = formatVoucherNo(row.type, row.id, row.credit, row.debit).toLowerCase();
+        const remarks = formatRemarks(row).toLowerCase();
+        const voucher = formatVoucherNo(row).toLowerCase();
         return remarks.includes(term) || voucher.includes(term);
     });
 
@@ -99,13 +104,13 @@ export function GeneralLedgerReportView({
                 <div className="px-5 py-4 border-b border-border/10 flex justify-between items-center bg-surface-1/50">
                     <div>
                         <h3 className="font-bold text-text-primary text-sm flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-indigo-500" /> Transaction Ledger
+                            <BookOpen className="w-4 h-4 text-indigo-500" /> General Ledger
                         </h3>
-                        {criteria && <p className="text-[10px] font-medium text-text-muted mt-1 uppercase tracking-wide">{criteria}</p>}
+                        <p className="text-[10px] font-medium text-text-muted mt-0.5 tracking-wider">Transaction history for selected period</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                            <div className="relative group">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-text-muted" />
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
                             <input
                                 type="text"
                                 placeholder="Search ledger..."
@@ -141,20 +146,20 @@ export function GeneralLedgerReportView({
                                     <tr key={i} className="hover:bg-surface-1 transition-colors bg-card">
                                         <td className="px-4 py-2.5 whitespace-nowrap border-r border-border/10">
                                             <div className="font-bold text-text-secondary tabular-nums">
-                                                {format(new Date(row.date), 'dd-MMM-yy').toUpperCase()}
+                                                {formatSafeDate(row.date).toUpperCase()}
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5 border-r border-border/10 font-bold text-text-muted text-[11px] text-center">
-                                            {formatVoucherNo(row.type, row.id, credit, debit)}
+                                            {formatVoucherNo(row)}
                                         </td>
                                         <td className="px-4 py-2.5 text-text-secondary font-medium border-r border-border/10">
-                                            {formatRemarks(row.type, row.description)}
+                                            {formatRemarks(row)}
                                         </td>
                                         <td className="px-3 py-2.5 text-center text-text-muted border-r border-border/10 tabular-nums">
                                             {row.cheque_no || ''}
                                         </td>
                                         <td className="px-3 py-2.5 text-center text-text-muted border-r border-border/10 tabular-nums">
-                                            {row.cheque_date ? format(new Date(row.cheque_date), 'dd-MM-yy') : ''}
+                                            {formatSafeDate(row.cheque_date, 'dd-MM-yy', '')}
                                         </td>
                                         <td className="px-4 py-2.5 text-right font-bold text-rose-500 border-r border-border/10 tabular-nums">
                                             {debit > 0 ? formatCurrency(debit) : ''}

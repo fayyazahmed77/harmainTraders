@@ -57,6 +57,7 @@ class ProfitDistributionService
     {
         DB::transaction(function () use ($period, $totalProfit) {
             $preview = $this->calculateMonthlyDistribution($period, $totalProfit);
+            $type = $totalProfit >= 0 ? 'profit' : 'loss';
 
             $distribution = ProfitDistribution::create([
                 'distribution_period' => $period,
@@ -65,34 +66,42 @@ class ProfitDistributionService
                 'distributed_at' => now(),
                 'distributed_by' => auth()->id(),
                 'status' => 'distributed',
+                'notes' => $totalProfit < 0 ? 'Business loss distribution' : 'Business profit distribution',
             ]);
 
             foreach ($preview['investors'] as $item) {
                 $investor = Investor::find($item['investor_id']);
                 
-                // 1. Create Profit Share record
+                // 1. Create Profit/Loss Share record
                 $share = InvestorProfitShare::create([
                     'distribution_id' => $distribution->id,
                     'investor_id' => $investor->id,
                     'capital_snapshot' => $item['weighted_capital'],
                     'ownership_snapshot' => $item['ownership_percentage'],
-                    'profit_amount' => $item['profit_share'],
+                    'profit_amount' => $item['profit_share'], // Can be negative
                     'status' => 'credited',
                     'credited_at' => now(),
+                    'calculation_meta' => json_encode([
+                        'formula' => "(InvestorWeightedCapital / TotalWeightedCapital) * TotalProfit",
+                        'investor_weighted' => $item['weighted_capital'],
+                        'total_weighted' => $preview['total_capital'],
+                        'total_profit' => $totalProfit
+                    ])
                 ]);
 
                 // 2. Add to Investor Balance Ledger
                 $balanceBefore = app(InvestorCapitalService::class)->getAvailableBalance($investor->id);
+                $isCredit = $item['profit_share'] >= 0;
                 
                 InvestorTransaction::create([
                     'investor_id' => $investor->id,
-                    'type' => 'profit_credit',
-                    'amount' => $item['profit_share'],
+                    'type' => $isCredit ? 'profit_credit' : 'loss_debit',
+                    'amount' => abs($item['profit_share']),
                     'balance_before' => $balanceBefore,
-                    'balance_after' => $balanceBefore + $item['profit_share'],
+                    'balance_after' => $balanceBefore + $item['profit_share'], // Works for negative share
                     'reference_id' => $share->id,
                     'reference_type' => 'InvestorProfitShare',
-                    'narration' => "Profit credit for period " . $period,
+                    'narration' => ($isCredit ? "Profit credit" : "Loss debit") . " for period " . $period,
                     'created_by' => auth()->id(),
                 ]);
             }

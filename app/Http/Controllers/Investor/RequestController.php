@@ -16,9 +16,15 @@ class RequestController extends Controller
     public function index(Request $request)
     {
         $investor = Investor::where('user_id', $request->user()->id)->firstOrFail();
-        return $investor->financialRequests()
+        
+        $requests = $investor->financialRequests()
             ->orderBy('id', 'desc')
             ->paginate(10);
+
+        return \Inertia\Inertia::render('investor/requests/index', [
+            'requests' => $requests,
+            'investor' => $investor->load('capitalAccount')
+        ]);
     }
 
     public function reinvest(Request $request)

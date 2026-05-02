@@ -14,6 +14,9 @@ import {
   Settings2,
   SquareTerminal,
   Users,
+  History,
+  ArrowRightLeft,
+  MessageSquare,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -26,26 +29,34 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { usePage } from "@inertiajs/react"
+import { User } from "@/types"
 
-// This is sample data.
-const data = {
-  teams: [
-    {
-      name: "Harmain Traders",
-      logo: "/storage/img/user.jpg",
-      plan: "Enterprise",
-    },
-  ],
-  navMain: [
+interface PageProps {
+  auth: {
+    user: User;
+    roles: string[];
+  };
+  [key: string]: unknown;
+}
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { auth } = usePage<PageProps>().props;
+  const user = auth.user;
+  const roles = auth.roles || [];
+  const isInvestor = roles.includes('investor');
+
+  const navMain = [
     {
       title: "Dashboard",
-      url: "/dashboard",
+      url: isInvestor ? "/investor/dashboard" : "/dashboard",
       icon: LayoutGrid,
     },
     {
       title: "Setup",
       url: "#",
       icon: SquareTerminal,
+      roles: ['Admin', 'Sales man'],
       items: [
         {
           title: "Accounts",
@@ -99,6 +110,7 @@ const data = {
       title: "Daily",
       url: "#",
       icon: Bot,
+      roles: ['Admin', 'Sales man'],
       items: [
         {
           title: "Offer List",
@@ -145,12 +157,33 @@ const data = {
           title: "Cheque Clearing",
           url: "/clearing-cheque",
         },
+        {
+          title: "Journal Voucher",
+          url: "/journal-vouchers",
+        },
+      ],
+    },
+    {
+      title: "Investor Management",
+      url: "#",
+      icon: BookKey,
+      roles: ['Admin'],
+      items: [
+        {
+          title: "Investors",
+          url: "/admin/investors",
+        },
+        {
+          title: "Profit Distribution",
+          url: "/admin/profit/distribute",
+        },
       ],
     },
     {
       title: "Reports",
       url: "#",
       icon: BookOpen,
+      roles: ['Admin'],
       items: [
         {
           title: "Accounts Report",
@@ -186,7 +219,7 @@ const data = {
         },
         {
           title: "Stock Reports",
-          url: "/reports/stock/status",
+          url: "/reports/stock",
         },
       ],
     },
@@ -194,6 +227,7 @@ const data = {
       title: "Orders",
       url: "#",
       icon: Settings2,
+      roles: ['Admin'],
       items: [
         {
           title: "Company Waise Order",
@@ -214,6 +248,7 @@ const data = {
       title: "Setting",
       url: "#",
       icon: Settings2,
+      roles: ['Admin'],
       items: [
         {
           title: "Country",
@@ -227,6 +262,14 @@ const data = {
           title: "Cites",
           url: "/cities",
         },
+        {
+          title: "Email Configuration",
+          url: "/admin/settings/email",
+        },
+        {
+          title: "Email Templates",
+          url: "/admin/settings/templates",
+        },
 
       ],
     },
@@ -234,7 +277,7 @@ const data = {
       title: "Administration",
       url: "#",
       icon: Users,
-      roles: ['admin'],
+      roles: ['Admin'],
       items: [
         {
           title: "Staff",
@@ -247,69 +290,32 @@ const data = {
       ],
     },
     {
-      title: "Investor Panel",
-      url: "#",
-      icon: PieChart,
+      title: "Profit History",
+      url: "/investor/profit/history",
+      icon: History,
       roles: ['investor'],
-      items: [
-        {
-          title: "Dashboard",
-          url: "/investor/dashboard",
-        },
-        {
-          title: "Profit History",
-          url: "/investor/profit/history",
-        },
-        {
-          title: "Transactions",
-          url: "/investor/transactions",
-        },
-        {
-          title: "Requests",
-          url: "/investor/requests",
-        },
-      ],
     },
     {
-      title: "Investor Management",
-      url: "#",
-      icon: BookKey,
-      roles: ['admin'],
-      items: [
-        {
-          title: "Investors",
-          url: "/admin/investors",
-        },
-        {
-          title: "Profit Distribution",
-          url: "/admin/profit/distribute",
-        },
-      ],
+      title: "Transactions",
+      url: "/investor/transactions",
+      icon: ArrowRightLeft,
+      roles: ['investor'],
     },
-  ],
+    {
+      title: "Requests",
+      url: "/investor/requests",
+      icon: MessageSquare,
+      roles: ['investor'],
+    },
+  ];
 
-}
-
-import { usePage } from "@inertiajs/react"
-import { User } from "@/types"
-
-interface PageProps {
-  auth: {
-    user: User;
-  };
-  [key: string]: unknown;
-}
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { auth } = usePage<PageProps>().props;
-  const user = auth.user;
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent className="custom-scrollbar">
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

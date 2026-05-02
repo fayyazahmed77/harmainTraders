@@ -17,10 +17,11 @@ import { motion } from 'framer-motion';
 import { route } from 'ziggy-js';
 
 interface Props {
-    data: any; // Paginated data
+    requests: any; // Paginated data
+    investor: any;
 }
 
-export default function RequestHistory({ data }: Props) {
+export default function RequestHistory({ requests, investor }: Props) {
     const breadcrumbs = [
         { title: 'Investor Panel', href: '/investor/dashboard' },
         { title: 'Requests', href: '/investor/requests' },
@@ -66,7 +67,7 @@ export default function RequestHistory({ data }: Props) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {data.data.map((req: any) => (
+                            {requests.data.map((req: any) => (
                                 <TableRow key={req.id} className="border-white/5 hover:bg-white/[0.02]">
                                     <TableCell className="text-[#F1F1F1] font-medium">
                                         {new Date(req.requested_at).toLocaleDateString()}
@@ -75,7 +76,7 @@ export default function RequestHistory({ data }: Props) {
                                         {req.request_type.replace('_', ' ')}
                                     </TableCell>
                                     <TableCell className="text-[#F1F1F1] font-mono">
-                                        PKR {req.amount.toLocaleString()}
+                                        PKR {Number(req.amount).toLocaleString()}
                                     </TableCell>
                                     <TableCell>{getStatusBadge(req.status)}</TableCell>
                                     <TableCell className="text-[#6B7280] text-xs max-w-[200px] truncate">
@@ -95,7 +96,7 @@ export default function RequestHistory({ data }: Props) {
                                     </TableCell>
                                 </TableRow>
                             ))}
-                            {data.data.length === 0 && (
+                            {requests.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center text-[#374151]">
                                         No request history found.
@@ -108,7 +109,7 @@ export default function RequestHistory({ data }: Props) {
 
                 {/* Simple Pagination Placeholder */}
                 <div className="mt-4 flex justify-end gap-2">
-                    {data.links.map((link: any, i: number) => (
+                    {requests.links.map((link: any, i: number) => (
                         <Button
                             key={i}
                             variant="outline"

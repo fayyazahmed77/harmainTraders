@@ -38,6 +38,8 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\AccountCategoryController;
 use App\Http\Controllers\GuestController;
 use App\Http\Controllers\ProfitReportsController;
+use App\Http\Controllers\Admin\EmailSettingsController;
+use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Investor\DashboardController as InvestorDashboardController;
 use App\Http\Controllers\Investor\RequestController as InvestorRequestController;
 use App\Http\Controllers\Investor\ForecastController as InvestorForecastController;
@@ -46,6 +48,8 @@ use App\Http\Controllers\Admin\ProfitDistributionController;
 use App\Http\Controllers\PurchaseReturnReportsController;
 use App\Http\Controllers\SalesReportsController;   
 use App\Http\Controllers\StockReportsController;
+use App\Http\Controllers\JournalVoucherController;
+
 
 // API Routes
 Route::post('/api/check-email', [AuthController::class, 'checkEmail']);
@@ -353,6 +357,15 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{id}/cancel', [ClearingChequeController::class, 'cancel'])->name('clearing_cheque.cancel');
     });
 
+    //--------------------------------------------Journal Vouchers------------------------------------------------
+    Route::prefix('/journal-vouchers')->group(function () {
+        Route::get('/', [JournalVoucherController::class, 'index'])->name('journal-vouchers.index');
+        Route::get('/create', [JournalVoucherController::class, 'create'])->name('journal-vouchers.create');
+        Route::post('/', [JournalVoucherController::class, 'store'])->name('journal-vouchers.store');
+        Route::delete('/{id}', [JournalVoucherController::class, 'destroy'])->name('journal-vouchers.destroy');
+    });
+
+
     //--------------------------------------------Reports------------------------------------------------
     Route::prefix('/reports')->group(function () {
         Route::get('/', [ReportsController::class, 'index'])->name('reports.index');
@@ -475,8 +488,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/transactions/export-pdf', [InvestorDashboardController::class, 'exportPdf'])->name('investor.transactions.export-pdf');
     });
 
-    Route::middleware(['role:admin'])->prefix('admin')->group(function () {
+    Route::middleware(['role:Admin'])->prefix('admin')->group(function () {
         Route::get('/investors', [InvestorManagementController::class, 'index'])->name('admin.investors.index');
+        Route::post('/investors', [InvestorManagementController::class, 'store'])->name('admin.investors.store');
         Route::get('/investors/export-excel', [InvestorManagementController::class, 'exportExcel'])->name('admin.investors.export-excel');
         Route::get('/investors/{id}', [InvestorManagementController::class, 'show'])->name('admin.investors.show');
         Route::get('/investors/{id}/export-pdf', [InvestorManagementController::class, 'exportPdf'])->name('admin.investors.export-pdf');
@@ -489,6 +503,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/profit/distribute', [ProfitDistributionController::class, 'index'])->name('admin.profit.distribute.index');
         Route::post('/profit/distribute/preview', [ProfitDistributionController::class, 'preview'])->name('admin.profit.distribute.preview');
         Route::post('/profit/distribute', [ProfitDistributionController::class, 'distribute'])->name('admin.profit.distribute.store');
+
+        // Email Settings & Templates
+        Route::prefix('settings')->group(function () {
+            Route::get('/email', [EmailSettingsController::class, 'index'])->name('admin.settings.email');
+            Route::post('/email', [EmailSettingsController::class, 'update'])->name('admin.settings.email.update');
+
+            Route::get('/templates', [EmailTemplateController::class, 'index'])->name('admin.settings.templates.index');
+            Route::get('/templates/{template}/edit', [EmailTemplateController::class, 'edit'])->name('admin.settings.templates.edit');
+            Route::put('/templates/{template}', [EmailTemplateController::class, 'update'])->name('admin.settings.templates.update');
+            Route::get('/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('admin.settings.templates.preview');
+        });
     });
 });
 

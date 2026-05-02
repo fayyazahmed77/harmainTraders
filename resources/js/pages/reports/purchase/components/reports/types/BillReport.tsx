@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format } from 'date-fns';
+import { formatSafeDate } from '@/lib/utils';
 
 const BillReport = ({ data, formatCurrency }: any) => {
     const totals = data.reduce((acc: any, row: any) => ({
@@ -30,7 +30,7 @@ const BillReport = ({ data, formatCurrency }: any) => {
                         <TableCell className="py-2 text-[10px] font-bold text-text-muted">{index + 1}</TableCell>
                         <TableCell className="py-2 text-[10px] font-black text-emerald-500 uppercase">{row.invoice}</TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-text-muted whitespace-nowrap">
-                            {format(new Date(row.date), 'dd-MMM-yy HH:mm:ss')}
+                            {formatSafeDate(row.date, 'dd-MMM-yy HH:mm:ss')}
                         </TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-text-primary uppercase">{row.account_name}</TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-right tabular-nums text-text-secondary">{row.gross > 0 ? formatCurrency(row.gross) : ''}</TableCell>

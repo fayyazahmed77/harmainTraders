@@ -18,35 +18,32 @@ const KpiCard = ({ title, value, subtitle, icon: Icon, delta, delay = 0 }: KpiCa
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay }}
+            className="h-full"
         >
-            <Card className="relative overflow-hidden border-white/5 bg-[#111318] p-5 transition-all hover:bg-[#181C23]">
+            <Card className="flex flex-col h-full min-h-[140px] relative overflow-hidden border-white/5 bg-[#111318] p-5 transition-all hover:bg-[#181C23]">
                 <div className="absolute top-0 left-0 h-1 w-full bg-[#C9A84C]/20" />
-                <div className="flex items-start justify-between">
-                    <div>
-                        <p className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">{title}</p>
-                        <h3 className="mt-2 text-2xl font-bold text-[#F1F1F1]">{value}</h3>
-                        <p className="mt-1 text-xs text-[#374151]">{subtitle}</p>
+                <div className="flex flex-1 flex-col justify-between">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#6B7280]">{title}</p>
+                            <h3 className="mt-2 text-2xl font-bold text-[#F1F1F1]">{value}</h3>
+                            <p className="mt-1 text-xs text-[#374151] truncate">{subtitle}</p>
+                        </div>
+                        <div className="rounded-lg bg-[#C9A84C]/10 p-2 text-[#C9A84C] shrink-0 ml-2">
+                            <Icon size={18} />
+                        </div>
                     </div>
-                    <div className="rounded-lg bg-[#C9A84C]/10 p-2 text-[#C9A84C]">
-                        <Icon size={20} />
-                    </div>
-                </div>
-                {delta !== undefined && (
-                    <div className="mt-4 flex items-center gap-1">
-                        {delta >= 0 ? (
-                            <span className="flex items-center gap-0.5 text-xs font-medium text-[#22C55E]">
-                                <TrendingUp size={12} />
-                                {delta}%
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-0.5 text-xs font-medium text-[#EF4444]">
-                                <TrendingDown size={12} />
+                    
+                    {delta !== undefined && (
+                        <div className="mt-4 flex items-center gap-2">
+                            <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${delta >= 0 ? 'bg-green-500/10 text-[#22C55E]' : 'bg-red-500/10 text-[#EF4444]'}`}>
+                                {delta >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                                 {Math.abs(delta)}%
-                            </span>
-                        )}
-                        <span className="text-[10px] text-[#374151]">vs last month</span>
-                    </div>
-                )}
+                            </div>
+                            <span className="text-[10px] font-medium text-[#374151]">vs last month</span>
+                        </div>
+                    )}
+                </div>
             </Card>
         </motion.div>
     );

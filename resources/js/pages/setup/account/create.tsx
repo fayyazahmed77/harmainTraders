@@ -17,6 +17,7 @@ import { useForm, router } from "@inertiajs/react";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { DirtyStateDialog } from "@/components/dirty-state-dialog";
 import { CalendarIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -440,6 +441,8 @@ export default function Create({
     ats_type: "",
     cnic: "",
     status: true,
+    email: "",
+    password: "",
   });
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
@@ -720,6 +723,39 @@ export default function Create({
                         )}
                       />
                     </TechLabel>
+
+                    {accountType?.value === 9 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        className="grid grid-cols-2 gap-4 pt-2"
+                      >
+                        <TechLabel label="Login Email" icon={Globe} error={errors.email}>
+                          <Input
+                            type="email"
+                            value={data.email}
+                            onChange={(e) => onInputChange("email", e.target.value)}
+                            placeholder="investor@example.com"
+                            className={cn(
+                              `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
+                              errors.email && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                            )}
+                          />
+                        </TechLabel>
+                        <TechLabel label="Login Password" icon={ShieldCheck} error={errors.password}>
+                          <Input
+                            type="password"
+                            value={data.password}
+                            onChange={(e) => onInputChange("password", e.target.value)}
+                            placeholder="Minimum 8 characters"
+                            className={cn(
+                              `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
+                              errors.password && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                            )}
+                          />
+                        </TechLabel>
+                      </motion.div>
+                    )}
 
                     {/* Permissions / Options */}
                     <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4">

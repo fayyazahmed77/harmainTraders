@@ -4,7 +4,6 @@ import {
     TableCell, 
     TableRow 
 } from '@/components/ui/table';
-import { format } from 'date-fns';
 import { 
     Banknote,
     FileText,
@@ -12,7 +11,7 @@ import {
     Scale,
     Layers
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatSafeDate } from '@/lib/utils';
 
 interface ReceivingDetail {
     id: number;
@@ -75,7 +74,7 @@ export function ReceivingDetailReportView({ data }: ReceivingDetailReportViewPro
                                     </TableCell>
                                     <TableCell className="py-1.5 px-2">
                                         <span className="text-[10px] font-bold text-text-muted tracking-tight">
-                                            {format(new Date(item.date), 'dd MMM yy')}
+                                            {formatSafeDate(item.date, 'dd MMM yy')}
                                         </span>
                                     </TableCell>
                                     <TableCell className="py-1.5 px-2">

@@ -436,7 +436,7 @@ export default function Edit({
     clearErrors();
 
     // Client-side validation
-    let validationErrors: any = {};
+    const validationErrors: any = {};
     if (!data.code) validationErrors.code = "Code is required";
     if (!data.title) validationErrors.title = "Account Title is required";
     if (!data.type) validationErrors.type = "Account Type is required";

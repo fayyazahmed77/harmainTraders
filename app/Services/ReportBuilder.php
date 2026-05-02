@@ -48,11 +48,11 @@ class ReportBuilder
         // 2. Fetch Transactions within range
         $sales = Sales::where('customer_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchases = Purchase::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Purchase' as type, id, date, CONCAT('Purchase #', id) as description, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->selectRaw("'Purchase' as type, id, date, CONCAT('Purchase #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         // Determine which column to query in payments table
         $isAsset = in_array($account->type, [1, 2, 14]);
@@ -70,22 +70,22 @@ class ReportBuilder
                   ->orWhere('cheque_status', '')
                   ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
             });
-            $payments->selectRaw("'Payment' as type, id, date, remarks as description, 
+            $payments->selectRaw("'Payment' as type, id, date, remarks as description, payment_method,
                 CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END as debit,
                 CASE WHEN type = 'RECEIPT' THEN 0 ELSE amount END as credit, created_at, cheque_no, cheque_date");
         } else {
-            $payments->selectRaw("'Payment' as type, id, date, remarks as description, 
+            $payments->selectRaw("'Payment' as type, id, date, remarks as description, payment_method,
                 CASE WHEN type = 'RECEIPT' THEN 0 ELSE (amount + discount) END as debit,
                 CASE WHEN type = 'RECEIPT' THEN (amount + discount) ELSE 0 END as credit, created_at, cheque_no, cheque_date");
         }
 
         $salesReturns = SalesReturn::where('customer_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchaseReturns = PurchaseReturn::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $query = $sales->unionAll($purchases)
             ->unionAll($payments)

@@ -23,7 +23,7 @@ export function StockReportSectionDialog({
     onSelect, 
     currentReportId 
 }: StockReportSectionDialogProps) {
-    console.log('Stock Reports available:', stockReports);
+    
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl bg-surface-1/95 backdrop-blur-xl border-border/40 p-0 overflow-hidden rounded-sm">

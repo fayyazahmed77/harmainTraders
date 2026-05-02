@@ -26,6 +26,10 @@ class DashboardController extends Controller
 
     public function index()
     {
+        if (auth()->user()->hasRole('investor')) {
+            return redirect()->route('investor.dashboard');
+        }
+
         $now = Carbon::now();
         $thisMonth = $now->month;
         $thisYear = $now->year;

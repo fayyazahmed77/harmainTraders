@@ -6,10 +6,20 @@
 @endphp
 
 @foreach($groupedData as $type => $items)
-    <div style="background-color: #f0fdf4; padding: 5px; border-left: 4px solid #059669; margin-top: 15px; margin-bottom: 5px;">
-        <span style="font-weight: bold; font-size: 11px; color: #059669; text-transform: uppercase;">{{ $type ?: 'GENERAL' }}</span>
-        <span style="font-size: 9px; color: #666; margin-left: 10px;">({{ count($items) }} Items)</span>
-    </div>
+    @if(isset($is_excel) && $is_excel)
+        <table>
+            <tr>
+                <td colspan="7" style="background-color: #f0fdf4; font-weight: bold; font-size: 11px; color: #059669;">
+                    {{ strtoupper($type ?: 'GENERAL') }} ({{ count($items) }} Items)
+                </td>
+            </tr>
+        </table>
+    @else
+        <div style="background-color: #f0fdf4; padding: 5px; border-left: 4px solid #059669; margin-top: 15px; margin-bottom: 5px;">
+            <span style="font-weight: bold; font-size: 11px; color: #059669; text-transform: uppercase;">{{ $type ?: 'GENERAL' }}</span>
+            <span style="font-size: 9px; color: #666; margin-left: 10px;">({{ count($items) }} Items)</span>
+        </div>
+    @endif
     
     <table>
         <thead>
@@ -38,8 +48,12 @@
                 <tr>
                     <td class="text-center">{{ $idx + 1 }}</td>
                     <td>
-                        <div class="bold uppercase">{{ $row['item_name'] }}</div>
-                        <div style="font-size: 7px; color: #666;">{{ $row['company_name'] }}</div>
+                        @if(isset($is_excel) && $is_excel)
+                            {{ $row['item_name'] }} - {{ $row['company_name'] }}
+                        @else
+                            <div class="bold uppercase">{{ $row['item_name'] }}</div>
+                            <div style="font-size: 7px; color: #666;">{{ $row['company_name'] }}</div>
+                        @endif
                     </td>
                     <td class="text-right">{{ number_format($row['rate'], 2) }}</td>
                     <td class="text-center">{{ $row['packing_qty'] }}</td>
@@ -68,14 +82,25 @@
     $totalBalance = collect($data)->sum('balance_qty');
 @endphp
 
-<div style="margin-top: 20px; border-top: 2px solid #000; padding-top: 10px;">
-    <table style="border: none;">
+@if(isset($is_excel) && $is_excel)
+    <table>
         <tr style="font-weight: bold; font-size: 11px;">
-            <td style="text-align: right; border: none;">GRAND TOTAL ALL TYPES:</td>
-            <td style="width: 80px; text-align: right; border: none; color: #2563eb;">IN: {{ number_format($totalIn, 0) }}</td>
-            <td style="width: 80px; text-align: right; border: none; color: #d97706;">OUT: {{ number_format($totalOut, 0) }}</td>
-            <td style="width: 100px; text-align: right; border: none; color: #059669;">BALANCE: {{ number_format($totalBalance, 0) }}</td>
+            <td colspan="4" style="text-align: right;">GRAND TOTAL ALL TYPES:</td>
+            <td style="text-align: right; color: #2563eb;">IN: {{ number_format($totalIn, 0) }}</td>
+            <td style="text-align: right; color: #d97706;">OUT: {{ number_format($totalOut, 0) }}</td>
+            <td style="text-align: right; color: #059669;">BALANCE: {{ number_format($totalBalance, 0) }}</td>
         </tr>
     </table>
-</div>
+@else
+    <div style="margin-top: 20px; border-top: 2px solid #000; padding-top: 10px;">
+        <table style="border: none;">
+            <tr style="font-weight: bold; font-size: 11px;">
+                <td style="text-align: right; border: none;">GRAND TOTAL ALL TYPES:</td>
+                <td style="width: 80px; text-align: right; border: none; color: #2563eb;">IN: {{ number_format($totalIn, 0) }}</td>
+                <td style="width: 80px; text-align: right; border: none; color: #d97706;">OUT: {{ number_format($totalOut, 0) }}</td>
+                <td style="width: 100px; text-align: right; border: none; color: #059669;">BALANCE: {{ number_format($totalBalance, 0) }}</td>
+            </tr>
+        </table>
+    </div>
+@endif
 @endsection

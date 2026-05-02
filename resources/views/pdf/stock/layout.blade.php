@@ -1,19 +1,37 @@
 @if(isset($is_excel) && $is_excel)
+    <!DOCTYPE html>
+    <html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .bold { font-weight: bold; }
+            .uppercase { text-transform: uppercase; }
+            .text-success { color: #059669; }
+            .text-danger { color: #e11d48; }
+            .price-col { width: 50px; }
+            .qty-col { width: 40px; }
+        </style>
+    </head>
+    <body>
     <table>
         <tr>
-            <td colspan="10" style="font-size: 18pt; font-weight: bold; color: #059669;">Harmain Traders</td>
+            <td colspan="{{ $colspan ?? 10 }}" style="font-size: 18pt; font-weight: bold; color: #059669;">Harmain Traders</td>
         </tr>
         <tr>
-            <td colspan="10" style="font-size: 14pt; font-weight: bold;">{{ $title }}</td>
+            <td colspan="{{ $colspan ?? 10 }}" style="font-size: 14pt; font-weight: bold;">{{ $title }}</td>
         </tr>
         <tr>
-            <td colspan="10" style="font-size: 10pt; color: #666;">
+            <td colspan="{{ $colspan ?? 10 }}" style="font-size: 10pt; color: #666;">
                 VALUATION: {{ strtoupper(str_replace('_', ' ', $valuation)) }} | 
                 PERIOD: {{ $fromDate }} TO {{ $toDate }}
             </td>
         </tr>
     </table>
     @yield('content')
+    </body>
+    </html>
 @else
 <!DOCTYPE html>
 <html>
@@ -34,6 +52,8 @@
         .bold { font-weight: bold; }
         .text-success { color: #059669; }
         .text-danger { color: #e11d48; }
+        .price-col { width: 50px; }
+        .qty-col { width: 40px; }
         .footer { position: fixed; bottom: 0; width: 100%; font-size: 8px; color: #999; text-align: center; padding-top: 10px; border-top: 1px solid #eee; }
     </style>
 </head>

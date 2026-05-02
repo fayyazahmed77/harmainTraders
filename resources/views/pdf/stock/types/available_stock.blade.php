@@ -1,21 +1,11 @@
 @extends('pdf.stock.layout')
 
 @section('content')
-@if(!isset($is_excel) || !$is_excel)
-<style>
-    th { font-size: 7px; padding: 4px; }
-    td { font-size: 8px; padding: 4px; }
-    .item-row { border-bottom: 1px solid #eee; }
-    .price-col { width: 50px; }
-    .qty-col { width: 40px; }
-</style>
-@endif
-
 <table>
     <thead>
         <tr>
             <th style="width: 25px;">S.#</th>
-            <th>Item & Company</th>
+            <th>Item &amp; Company</th>
             <th style="width: 50px;">Profile</th>
             <th class="price-col">T.P</th>
             <th class="price-col">Retail</th>

@@ -44,7 +44,7 @@ const AnalyticsDialog = ({ isOpen, onClose, reportType, data }: AnalyticsDialogP
         let total = 0;
         let avg = 0;
         let max = 0;
-        let count = data.length;
+        const count = data.length;
 
         if (reportType === 'bill') {
             total = data.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);

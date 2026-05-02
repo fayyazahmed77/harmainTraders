@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format } from 'date-fns';
+import { formatSafeDate } from '@/lib/utils';
 
 const DateReport = ({ data, formatCurrency }: any) => {
     const total = data.reduce((acc: number, row: any) => acc + (Number(row.total_amount) || 0), 0);
@@ -19,7 +19,7 @@ const DateReport = ({ data, formatCurrency }: any) => {
                     <TableRow key={index} className="border-b border-border/10 hover:bg-emerald-500/5 transition-colors group">
                         <TableCell className="py-2.5 text-[10px] font-bold text-text-muted">{index + 1}</TableCell>
                         <TableCell className="py-2.5 text-[11px] font-black text-text-primary uppercase tracking-tight">
-                            {format(new Date(row.date), 'dd-MMM-yy')}
+                            {formatSafeDate(row.date)}
                         </TableCell>
                         <TableCell className="py-2.5 text-[11px] font-black text-right tabular-nums text-emerald-500">
                             {formatCurrency(row.total_amount)}

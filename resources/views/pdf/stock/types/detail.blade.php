@@ -26,8 +26,12 @@
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ \Carbon\Carbon::parse($row['date'])->format('d-M-y') }}</td>
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ $row['voucher_no'] }}</td>
                 <td style="padding: 5px; border: 1px solid #ddd;">
-                    <div style="font-weight: bold;">{{ $row['account_name'] }}</div>
-                    <div style="font-size: 7px; color: #666;">{{ strtoupper($row['type']) }}</div>
+                    @if(isset($is_excel) && $is_excel)
+                        {{ $row['account_name'] }} ({{ strtoupper($row['type']) }})
+                    @else
+                        <div style="font-weight: bold;">{{ $row['account_name'] }}</div>
+                        <div style="font-size: 7px; color: #666;">{{ strtoupper($row['type']) }}</div>
+                    @endif
                 </td>
                 <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ number_format($row['rate'], 2) }}</td>
                 <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ $row['in_qty'] > 0 ? number_format($row['in_qty'], 0) : '-' }}</td>

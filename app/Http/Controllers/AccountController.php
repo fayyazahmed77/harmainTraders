@@ -15,6 +15,13 @@ use App\Models\AccountCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
+use App\Models\Investor;
+use App\Models\InvestorCapitalAccount;
+use App\Services\InvestorCapitalService;
+use App\Mail\InvestorWelcomeMail;
+use Illuminate\Support\Facades\Mail;
 
 class AccountController extends Controller
 {
@@ -167,6 +174,8 @@ class AccountController extends Controller
             'ats_type' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
             'status' => 'boolean',
+            'email' => 'nullable|email|unique:users,email',
+            'password' => 'nullable|string|min:8',
         ];
 
         // ✅ Apply conditional rules
@@ -193,10 +202,55 @@ class AccountController extends Controller
         $validated['sale'] = $request->boolean('sale');
         $validated['status'] = $request->boolean('status');
 
-        // ✅ Save to DB
-        $account = Account::create($validated);
+        // ✅ Save to DB (Integrated with Investor creation)
+        return DB::transaction(function() use ($validated, $request) {
+            $account = Account::create($validated);
 
-        // ✅ Redirect back with success message
+            if ($request->type == 9 && $request->email && $request->password) {
+                $user = User::create([
+                    'name' => $request->title,
+                    'email' => $request->email,
+                    'password' => Hash::make($request->password),
+                    'status' => 'active',
+                ]);
+
+                $user->assignRole('investor');
+
+                $investor = Investor::create([
+                    'user_id' => $user->id,
+                    'full_name' => $request->title,
+                    'status' => 'active',
+                    'joining_date' => now(),
+                    'phone' => $request->mobile,
+                    'cnic' => $request->cnic,
+                    'address' => $request->address1,
+                ]);
+
+                InvestorCapitalAccount::create([
+                    'investor_id' => $investor->id,
+                    'current_capital' => (float)($request->opening_balance ?? 0),
+                    'ownership_percentage' => 0,
+                ]);
+
+                if ($request->opening_balance > 0) {
+                    app(InvestorCapitalService::class)->recalculateAllOwnerships();
+                }
+            }
+
+            return redirect()->route('account.index')
+                ->with('success', 'Account created successfully!');
+        });
+
+        // Send Welcome Email if investor was created
+        if ($request->type == 9 && $request->email && $request->password) {
+            try {
+                $user = User::where('email', $request->email)->first();
+                Mail::to($request->email)->send(new InvestorWelcomeMail($user, $request->password));
+            } catch (\Exception $e) {
+                \Log::error("Failed to send welcome email: " . $e->getMessage());
+            }
+        }
+
         return redirect()->route('account.index')
             ->with('success', 'Account created successfully!');
     }

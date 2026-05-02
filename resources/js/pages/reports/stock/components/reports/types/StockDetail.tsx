@@ -7,8 +7,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { cn, formatSafeDate } from '@/lib/utils';
 
 interface Props {
     data: any[];
@@ -40,7 +39,7 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                     {data.map((row, idx) => (
                         <TableRow key={idx} className="border-b border-border/10 hover:bg-surface-1/30 transition-all duration-200 group">
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase tabular-nums">
-                                {format(new Date(row.date), 'dd-MMM-yy')}
+                                {formatSafeDate(row.date)}
                             </TableCell>
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase italic tabular-nums">
                                 {row.voucher_no}

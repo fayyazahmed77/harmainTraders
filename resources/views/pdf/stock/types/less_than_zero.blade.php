@@ -1,10 +1,20 @@
 @extends('pdf.stock.layout')
 
 @section('content')
-<div style="background-color: #fff1f2; color: #e11d48; padding: 10px; border: 1px solid #fda4af; margin-bottom: 20px; text-align: center;">
-    <h2 style="margin: 0; font-size: 14px; text-transform: uppercase; font-weight: 900;">Negative Inventory Audit Report</h2>
-    <p style="margin: 5px 0 0; font-size: 9px; font-weight: bold;">CRITICAL: The following items have stock levels below zero and require immediate reconciliation.</p>
-</div>
+@if(isset($is_excel) && $is_excel)
+    <table>
+        <tr>
+            <td colspan="6" style="background-color: #fff1f2; color: #e11d48; text-align: center; font-weight: bold;">
+                NEGATIVE INVENTORY AUDIT REPORT - CRITICAL: REQUIRED RECONCILIATION
+            </td>
+        </tr>
+    </table>
+@else
+    <div style="background-color: #fff1f2; color: #e11d48; padding: 10px; border: 1px solid #fda4af; margin-bottom: 20px; text-align: center;">
+        <h2 style="margin: 0; font-size: 14px; text-transform: uppercase; font-weight: 900;">Negative Inventory Audit Report</h2>
+        <p style="margin: 5px 0 0; font-size: 9px; font-weight: bold;">CRITICAL: The following items have stock levels below zero and require immediate reconciliation.</p>
+    </div>
+@endif
 
 <table>
     <thead>
@@ -29,8 +39,12 @@
             <tr>
                 <td class="text-center">{{ $idx + 1 }}</td>
                 <td>
-                    <div class="bold uppercase">{{ $row['item_name'] }}</div>
-                    <div style="font-size: 7px; color: #666;">{{ $row['company_name'] }}</div>
+                    @if(isset($is_excel) && $is_excel)
+                        {{ $row['item_name'] }} - {{ $row['company_name'] }}
+                    @else
+                        <div class="bold uppercase">{{ $row['item_name'] }}</div>
+                        <div style="font-size: 7px; color: #666;">{{ $row['company_name'] }}</div>
+                    @endif
                 </td>
                 <td class="text-right">{{ number_format($row['rate'], 2) }}</td>
                 <td class="text-center">{{ $row['packing_qty'] }}</td>

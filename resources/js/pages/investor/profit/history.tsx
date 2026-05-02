@@ -60,7 +60,7 @@ export default function ProfitHistory({ shares }: Props) {
                             <span>Total Profit Earned</span>
                         </div>
                         <h2 className="mt-2 text-xl font-bold text-[#F1F1F1]">
-                            PKR {shares.data.reduce((sum, s) => sum + s.profit_amount, 0).toLocaleString()}
+                            PKR {shares.data.reduce((sum, s) => sum + Number(s.profit_amount), 0).toLocaleString()}
                         </h2>
                     </div>
                 </div>
@@ -87,13 +87,13 @@ export default function ProfitHistory({ shares }: Props) {
                                         {share.distribution.distribution_period}
                                     </TableCell>
                                     <TableCell className="text-[#6B7280]">
-                                        {share.capital_snapshot.toLocaleString()}
+                                        {Number(share.capital_snapshot).toLocaleString()}
                                     </TableCell>
                                     <TableCell className="text-[#6B7280]">
-                                        {share.ownership_snapshot.toFixed(2)}%
+                                        {Number(share.ownership_snapshot).toFixed(2)}%
                                     </TableCell>
                                     <TableCell className="text-right font-bold text-[#C9A84C]">
-                                        {share.profit_amount.toLocaleString()}
+                                        {Number(share.profit_amount).toLocaleString()}
                                     </TableCell>
                                     <TableCell className="text-right text-xs text-[#374151]">
                                         {new Date(share.credited_at).toLocaleDateString('en-GB')}
