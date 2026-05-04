@@ -14,8 +14,11 @@ import {
     History as HistoryIcon,
     Users,
     Percent,
-    ArrowDownRight
+    ArrowDownRight,
+    Lock,
+    Unlock
 } from 'lucide-react';
+import { router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { 
@@ -38,6 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { cn } from '@/lib/utils';
 
 interface Props {
     distributions: any[];
@@ -112,6 +116,18 @@ export default function Distribute({ distributions }: Props) {
         });
     };
 
+    const handleLock = (id: number) => {
+        router.post(`/admin/profit/distribute/${id}/lock`, {}, {
+            onSuccess: () => toast.success('Period locked successfully'),
+        });
+    };
+
+    const handleUnlock = (id: number) => {
+        router.post(`/admin/profit/distribute/${id}/unlock`, {}, {
+            onSuccess: () => toast.success('Period unlocked for edits'),
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Profit Distribution | Admin" />
@@ -177,18 +193,46 @@ export default function Distribute({ distributions }: Props) {
                             <div className="space-y-4">
                                 {Array.isArray(distributions) && distributions.length > 0 ? (
                                     distributions.slice(0, 5).map((dist) => (
-                                        <div key={dist.id} className="group p-3 rounded-xl bg-background/30 border border-border/30 hover:border-primary/30 transition-all">
+                                        <div key={dist.id} className={cn(
+                                            "group p-3 rounded-xl bg-background/30 border border-border/30 hover:border-primary/30 transition-all",
+                                            dist.is_locked && "border-primary/50 bg-primary/5 shadow-inner"
+                                        )}>
                                             <div className="flex justify-between items-center">
                                                 <div>
-                                                    <p className="text-[10px] font-black text-foreground uppercase tracking-tight">{dist.distribution_period}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-[10px] font-black text-foreground uppercase tracking-tight">{dist.distribution_period}</p>
+                                                        {dist.is_locked && <Lock size={10} className="text-primary" />}
+                                                    </div>
                                                     <p className="text-[9px] font-bold text-muted-foreground mt-0.5 uppercase">{new Date(dist.created_at).toLocaleDateString()}</p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className={`text-[10px] font-black tabular-nums ${dist.total_business_profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                        {dist.total_business_profit >= 0 ? '+' : ''}
-                                                        {Number(dist.total_business_profit).toLocaleString()}
-                                                    </p>
-                                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">Settled</p>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-right">
+                                                        <p className={`text-[10px] font-black tabular-nums ${dist.total_business_profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {dist.total_business_profit >= 0 ? '+' : ''}
+                                                            {Number(dist.total_business_profit).toLocaleString()}
+                                                        </p>
+                                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">Settled</p>
+                                                    </div>
+                                                    
+                                                    {dist.is_locked ? (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleUnlock(dist.id)}
+                                                            className="h-7 w-7 p-0 rounded-lg hover:bg-rose-500/10 hover:text-rose-500"
+                                                        >
+                                                            <Unlock size={12} />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            onClick={() => handleLock(dist.id)}
+                                                            className="h-7 w-7 p-0 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <Lock size={12} />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

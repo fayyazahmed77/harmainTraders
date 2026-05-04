@@ -4,6 +4,7 @@ import { Head, Link } from '@inertiajs/react';
 import { KpiCardRow } from './components/KpiCardRow';
 import { ProfitChart } from './components/ProfitChart';
 import { RequestModals } from './components/RequestModals';
+import { ForecastCalculator } from './components/ForecastCalculator';
 import { Button } from '@/components/ui/button';
 import { 
     History, 
@@ -36,12 +37,17 @@ interface Props {
     charts: {
         profit_history: any[];
     };
+    business_stats: {
+        avg_monthly_profit: number;
+        total_business_capital: number;
+        avg_roi_percent: number;
+    };
     requests: {
         pending: any[];
     };
 }
 
-export default function Dashboard({ investor, stats, charts, requests }: Props) {
+export default function Dashboard({ investor, stats, charts, requests, business_stats }: Props) {
     const [modalType, setModalType] = useState<'reinvest' | 'withdraw_profit' | 'withdraw_capital' | null>(null);
 
     const breadcrumbs = [
@@ -146,6 +152,18 @@ export default function Dashboard({ investor, stats, charts, requests }: Props) 
                                     )}
                                 </div>
                             </div>
+                        </motion.div>
+
+                        {/* Forecast Calculator */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.85 }}
+                        >
+                            <ForecastCalculator 
+                                currentCapital={stats.current_capital} 
+                                businessStats={business_stats} 
+                            />
                         </motion.div>
 
                         {/* Navigation Cards */}

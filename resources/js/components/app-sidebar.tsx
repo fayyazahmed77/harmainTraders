@@ -286,6 +286,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {
           title: "Roles & Permission",
           url: "/roles/permissions",
+        },
+        {
+          title: "Activity Logs",
+          url: "/admin/activity-logs",
         }
       ],
     },

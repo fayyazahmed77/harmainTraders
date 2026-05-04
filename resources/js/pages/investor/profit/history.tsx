@@ -6,7 +6,8 @@ import {
     TrendingUp, 
     Calendar,
     Wallet,
-    Percent
+    Percent,
+    FileText
 } from 'lucide-react';
 import { 
     Table, 
@@ -78,6 +79,7 @@ export default function ProfitHistory({ shares }: Props) {
                                 <TableHead className="text-[#6B7280]">Ownership %</TableHead>
                                 <TableHead className="text-right text-[#6B7280]">Profit Credited (PKR)</TableHead>
                                 <TableHead className="text-right text-[#6B7280]">Date</TableHead>
+                                <TableHead className="text-right text-[#6B7280]">Report</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -97,6 +99,16 @@ export default function ProfitHistory({ shares }: Props) {
                                     </TableCell>
                                     <TableCell className="text-right text-xs text-[#374151]">
                                         {new Date(share.credited_at).toLocaleDateString('en-GB')}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <a 
+                                            href={`/investor/reports/monthly/${share.distribution.distribution_period}`} 
+                                            target="_blank"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#181C23] border border-white/5 text-[10px] font-black uppercase tracking-widest text-[#6B7280] hover:text-[#C9A84C] hover:border-[#C9A84C]/20 transition-all"
+                                        >
+                                            <FileText size={12} />
+                                            <span>PDF</span>
+                                        </a>
                                     </TableCell>
                                 </TableRow>
                             ))}

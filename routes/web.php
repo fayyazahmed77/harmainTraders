@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Investor\RequestController as InvestorRequestController
 use App\Http\Controllers\Investor\ForecastController as InvestorForecastController;
 use App\Http\Controllers\Admin\InvestorManagementController;
 use App\Http\Controllers\Admin\ProfitDistributionController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\PurchaseReturnReportsController;
 use App\Http\Controllers\SalesReportsController;   
 use App\Http\Controllers\StockReportsController;
@@ -474,21 +476,28 @@ Route::middleware(['auth'])->group(function () {
     // ============================================================================
     // INVESTOR PANEL ROUTES
     // ============================================================================
-    Route::middleware(['role:investor'])->prefix('investor')->group(function () {
+    Route::middleware(['role:investor', 'two_factor'])->prefix('investor')->group(function () {
         Route::get('/dashboard', [InvestorDashboardController::class, 'index'])->name('investor.dashboard');
         Route::get('/profit/history', [InvestorDashboardController::class, 'profitHistory'])->name('investor.profit.history');
         Route::get('/transactions', [InvestorDashboardController::class, 'transactions'])->name('investor.transactions');
         Route::get('/requests', [InvestorRequestController::class, 'index'])->name('investor.requests');
         Route::get('/forecast', [InvestorForecastController::class, 'data'])->name('investor.forecast');
-        
         Route::post('/requests/reinvest', [InvestorRequestController::class, 'reinvest'])->name('investor.requests.reinvest');
         Route::post('/requests/withdraw-profit', [InvestorRequestController::class, 'withdrawProfit'])->name('investor.requests.withdraw-profit');
         Route::post('/requests/withdraw-capital', [InvestorRequestController::class, 'withdrawCapital'])->name('investor.requests.withdraw-capital');
         Route::delete('/requests/{id}', [InvestorRequestController::class, 'cancel'])->name('investor.requests.cancel');
         Route::get('/transactions/export-pdf', [InvestorDashboardController::class, 'exportPdf'])->name('investor.transactions.export-pdf');
+        Route::get('/reports/monthly/{period}', [InvestorDashboardController::class, 'downloadMonthlyReport'])->name('investor.reports.monthly');
     });
 
-    Route::middleware(['role:Admin'])->prefix('admin')->group(function () {
+    // 2FA Routes
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/verify-2fa', [TwoFactorController::class, 'index'])->name('2fa.index');
+        Route::post('/verify-2fa', [TwoFactorController::class, 'store'])->name('2fa.store');
+        Route::post('/verify-2fa/resend', [TwoFactorController::class, 'resend'])->name('2fa.resend');
+    });
+
+    Route::middleware(['role:Admin', 'two_factor'])->prefix('admin')->group(function () {
         Route::get('/investors', [InvestorManagementController::class, 'index'])->name('admin.investors.index');
         Route::post('/investors', [InvestorManagementController::class, 'store'])->name('admin.investors.store');
         Route::get('/investors/export-excel', [InvestorManagementController::class, 'exportExcel'])->name('admin.investors.export-excel');
@@ -503,6 +512,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/profit/distribute', [ProfitDistributionController::class, 'index'])->name('admin.profit.distribute.index');
         Route::post('/profit/distribute/preview', [ProfitDistributionController::class, 'preview'])->name('admin.profit.distribute.preview');
         Route::post('/profit/distribute', [ProfitDistributionController::class, 'distribute'])->name('admin.profit.distribute.store');
+        Route::post('/profit/distribute/{distribution}/lock', [ProfitDistributionController::class, 'lock'])->name('admin.profit.distribute.lock');
+        Route::post('/profit/distribute/{distribution}/unlock', [ProfitDistributionController::class, 'unlock'])->name('admin.profit.distribute.unlock');
 
         // Email Settings & Templates
         Route::prefix('settings')->group(function () {
@@ -514,6 +525,8 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/templates/{template}', [EmailTemplateController::class, 'update'])->name('admin.settings.templates.update');
             Route::get('/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('admin.settings.templates.preview');
         });
+
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('admin.activity-logs.index');
     });
 });
 

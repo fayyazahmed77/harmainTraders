@@ -6,15 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Services\ProfitDistributionService;
 use App\Services\ProfitReportBuilder;
 use App\Models\ProfitDistribution;
+use App\Services\ActivityLogger;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ProfitDistributionController extends Controller
 {
     public function index()
     {
         return Inertia::render('admin/profit/distribute', [
-            'distributions' => ProfitDistribution::with('distributedBy')->orderBy('id', 'desc')->get(),
+            'distributions' => ProfitDistribution::with('distributedBy', 'lockedBy')->orderBy('id', 'desc')->get(),
         ]);
     }
 
@@ -76,7 +78,35 @@ class ProfitDistributionController extends Controller
 
         app(ProfitDistributionService::class)->distributeProfit($period, $totalProfit);
 
+        ActivityLogger::log('created', 'Profit Distribution', "Distributed profit for period {$period}");
+
         $type = $totalProfit >= 0 ? 'Profit' : 'Loss';
         return back()->with('success', "Business $type of PKR " . number_format(abs($totalProfit)) . " distributed successfully for " . $period);
+    }
+
+    public function lock(ProfitDistribution $distribution)
+    {
+        $distribution->update([
+            'is_locked' => true,
+            'locked_at' => now(),
+            'locked_by' => Auth::id(),
+        ]);
+
+        ActivityLogger::log('updated', 'Financial Period', "Locked financial period: {$distribution->distribution_period}");
+
+        return back()->with('success', "Financial period {$distribution->distribution_period} has been locked.");
+    }
+
+    public function unlock(ProfitDistribution $distribution)
+    {
+        $distribution->update([
+            'is_locked' => false,
+            'locked_at' => null,
+            'locked_by' => null,
+        ]);
+
+        ActivityLogger::log('updated', 'Financial Period', "Unlocked financial period: {$distribution->distribution_period}");
+
+        return back()->with('warning', "Financial period {$distribution->distribution_period} has been unlocked for modifications.");
     }
 }

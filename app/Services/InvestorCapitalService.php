@@ -9,6 +9,7 @@ use App\Models\InvestorTransaction;
 use App\Models\FinancialRequest;
 use App\Models\Payment;
 use App\Models\Account;
+use App\Services\FinancialGovernanceService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -54,6 +55,10 @@ class InvestorCapitalService
     {
         DB::transaction(function () use ($requestId) {
             $request = FinancialRequest::findOrFail($requestId);
+            
+            // Governance Check
+            app(FinancialGovernanceService::class)->validateDateNotLocked($request->effective_date ?? now());
+
             $investor = $request->investor;
             $capitalAccount = $investor->capitalAccount;
 
@@ -127,6 +132,9 @@ class InvestorCapitalService
 
     private function handleProfitWithdrawal(FinancialRequest $request, int $paymentAccountId = null): void
     {
+        // Governance Check
+        app(FinancialGovernanceService::class)->validateDateNotLocked($request->paid_at ?? now());
+
         $investor = $request->investor;
         $balanceBefore = $this->getAvailableBalance($investor->id);
 
@@ -154,8 +162,10 @@ class InvestorCapitalService
 
     private function handleCapitalWithdrawal(FinancialRequest $request, int $paymentAccountId = null): void
     {
+        // Governance Check
+        app(FinancialGovernanceService::class)->validateDateNotLocked($request->effective_date ?? now());
+
         $investor = $request->investor;
-        $capitalAccount = $investor->capitalAccount;
 
         $capitalBefore = $capitalAccount->current_capital;
         $ownershipBefore = $capitalAccount->ownership_percentage;
@@ -227,7 +237,10 @@ class InvestorCapitalService
     public function adjustCapital(int $investorId, float $amount, string $type, int $adminId, string $notes = ''): void
     {
         DB::transaction(function () use ($investorId, $amount, $type, $adminId, $notes) {
-            $investor = Investor::findOrFail($investorId);
+            // Governance Check
+            app(FinancialGovernanceService::class)->validateDateNotLocked(now());
+
+            $investor = $investorId instanceof Investor ? $investorId : Investor::findOrFail($investorId);
             $capitalAccount = $investor->capitalAccount;
 
             $capitalBefore = $capitalAccount->current_capital;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteSetting;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Artisan;
@@ -44,10 +45,17 @@ class EmailSettingsController extends Controller
             $validated['logo_path'] = 'storage/' . $path;
         }
 
+        $oldValues = $settings->getRawOriginal();
         $settings->update($validated);
+        $newValues = $settings->fresh()->toArray();
 
-        // Optional: Clear config cache if using dynamic settings in bootstrap
-        // Artisan::call('config:clear');
+        ActivityLogger::log(
+            'updated', 
+            'Email Settings', 
+            "Updated system email and branding configuration",
+            $oldValues,
+            $newValues
+        );
 
         return back()->with('success', 'Email settings updated successfully.');
     }

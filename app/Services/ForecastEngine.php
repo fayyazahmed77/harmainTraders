@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Models\Investor;
 use App\Models\InvestorProfitShare;
+use App\Models\InvestorCapitalAccount;
+use App\Models\ProfitDistribution;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ForecastEngine
 {
@@ -119,5 +122,29 @@ class ForecastEngine
         }
 
         return $history->concat($projections)->toArray();
+    }
+
+    public function getBusinessROIStats(): array
+    {
+        $distributions = ProfitDistribution::orderBy('id', 'desc')->take(6)->get();
+        
+        if ($distributions->isEmpty()) {
+            return [
+                'avg_monthly_profit' => 0,
+                'total_business_capital' => InvestorCapitalAccount::sum('current_capital'),
+                'avg_roi_percent' => 0
+            ];
+        }
+
+        $avgProfit = $distributions->avg('total_business_profit');
+        $currentCapital = InvestorCapitalAccount::sum('current_capital');
+        
+        $roiPercent = $currentCapital > 0 ? ($avgProfit / $currentCapital) * 100 : 0;
+
+        return [
+            'avg_monthly_profit' => (float)$avgProfit,
+            'total_business_capital' => (float)$currentCapital,
+            'avg_roi_percent' => round($roiPercent, 2)
+        ];
     }
 }

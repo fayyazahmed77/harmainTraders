@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\EmailTemplate;
 use App\Services\EmailTemplateService;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -31,7 +32,17 @@ class EmailTemplateController extends Controller
             'content' => 'required|string',
         ]);
 
+        $oldValues = $template->getRawOriginal();
         $template->update($validated);
+        $newValues = $template->fresh()->toArray();
+
+        ActivityLogger::log(
+            'updated', 
+            'Email Template', 
+            "Updated template: {$template->name}",
+            $oldValues,
+            $newValues
+        );
 
         return redirect()->route('admin.settings.templates.index')
             ->with('success', 'Email template updated successfully.');
