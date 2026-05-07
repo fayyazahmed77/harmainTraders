@@ -83,7 +83,7 @@ class ItemCategoryController extends Controller
         $userId = Auth::user()->id;
         $data = [
             'name' => $request->name,
-            'code' => strtoupper($request->code ?? ''),
+            'code' => $request->code ? strtoupper($request->code) : null,
             'description' => $request->description ?? '',
             'status' => $request->status ?? 'active',
             'updated_by' => $userId,

@@ -34,6 +34,15 @@ class PurchaseReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
         if (!empty($filters['firm_id'])) $query->where('purchases.firm_id', $filters['firm_id']);
+        if (!empty($filters['company_id'])) {
+            $query->whereExists(function ($q) use ($filters) {
+                $q->select(DB::raw(1))
+                    ->from('purchase_items')
+                    ->join('items', 'purchase_items.item_id', '=', 'items.id')
+                    ->whereRaw('purchase_items.purchase_id = purchases.id')
+                    ->where('items.company', $filters['company_id']);
+            });
+        }
 
         $results = $query->select(
             'purchases.invoice',
@@ -80,6 +89,7 @@ class PurchaseReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
         if (!empty($filters['item_id'])) $query->where('purchase_items.item_id', $filters['item_id']);
+        if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
             'purchases.invoice',
@@ -111,6 +121,7 @@ class PurchaseReportBuilder
             ->join('accounts', 'purchases.supplier_id', '=', 'accounts.id');
 
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
+        if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
             'purchases.invoice',
@@ -142,6 +153,7 @@ class PurchaseReportBuilder
             ->join('items', 'purchase_items.item_id', '=', 'items.id');
 
         if (!empty($filters['item_id'])) $query->where('purchase_items.item_id', $filters['item_id']);
+        if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
             'items.id',
@@ -251,8 +263,9 @@ class PurchaseReportBuilder
         
         $filters = [
             'account_id' => ($params['accountId'] ?? 'ALL') === 'ALL' ? null : $params['accountId'],
-            'item_id' => ($params['itemId'] ?? 'ALL') === 'ALL' ? null : $params['item_id'],
+            'item_id' => ($params['itemId'] ?? 'ALL') === 'ALL' ? null : $params['itemId'],
             'firm_id' => ($params['firmId'] ?? 'ALL') === 'ALL' ? null : $params['firmId'],
+            'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
         ];
 
         switch ($reportId) {

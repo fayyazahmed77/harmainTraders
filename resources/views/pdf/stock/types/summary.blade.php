@@ -11,6 +11,9 @@
             <th style="width: 60px;">In</th>
             <th style="width: 60px;">Out</th>
             <th style="width: 60px;">Balance</th>
+            @if(isset($params['withAmount']) && $params['withAmount'])
+                <th style="width: 80px;">Amount</th>
+            @endif
         </tr>
     </thead>
     <tbody>
@@ -18,12 +21,14 @@
             $totalIn = 0;
             $totalOut = 0;
             $totalBalance = 0;
+            $totalAmount = 0;
         @endphp
         @foreach($data as $idx => $row)
             @php
                 $totalIn += $row['in_qty'];
                 $totalOut += $row['out_qty'];
                 $totalBalance += $row['balance_qty'];
+                $totalAmount += $row['amount'] ?? 0;
             @endphp
             <tr>
                 <td class="text-center">{{ $idx + 1 }}</td>
@@ -42,6 +47,9 @@
                 <td class="text-right bold {{ $row['balance_qty'] < 0 ? 'text-danger' : '' }}">
                     {{ number_format($row['balance_qty'], 0) }}
                 </td>
+                @if(isset($params['withAmount']) && $params['withAmount'])
+                    <td class="text-right bold">{{ number_format($row['amount'] ?? 0, 2) }}</td>
+                @endif
             </tr>
         @endforeach
     </tbody>
@@ -51,6 +59,9 @@
             <td class="text-right">{{ number_format($totalIn, 0) }}</td>
             <td class="text-right">{{ number_format($totalOut, 0) }}</td>
             <td class="text-right" style="color: #059669;">{{ number_format($totalBalance, 0) }}</td>
+            @if(isset($params['withAmount']) && $params['withAmount'])
+                <td class="text-right" style="color: #059669;">{{ number_format($totalAmount, 2) }}</td>
+            @endif
         </tr>
     </tfoot>
 </table>

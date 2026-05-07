@@ -68,6 +68,7 @@ class Items extends Model
         'price_per_pcs',
         'total_stock_pcs',
         'stock_breakdown',
+        'primary_image_url',
     ];
 
     /**
@@ -136,5 +137,16 @@ class Items extends Model
     public function lastPurchaseItem()
     {
         return $this->hasOne(PurchaseItem::class, 'item_id')->latestOfMany();
+    }
+
+    public function images()
+    {
+        return $this->hasMany(ItemImage::class, 'item_id')->orderBy('sort_order');
+    }
+
+    public function getPrimaryImageUrlAttribute()
+    {
+        $primary = $this->images()->where('is_primary', true)->first() ?? $this->images()->first();
+        return $primary ? asset($primary->image_path) : null;
     }
 }

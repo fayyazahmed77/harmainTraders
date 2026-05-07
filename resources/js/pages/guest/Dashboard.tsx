@@ -19,6 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { CatalogHeader } from "./components/CatalogHeader";
+import { CatalogFooter } from "./components/CatalogFooter";
+import { Cart } from "./components/types";
+
 interface Bill {
     id: number;
     invoice: string;
@@ -55,34 +59,41 @@ interface GuestDashboardProps {
 }
 
 export default function GuestDashboard({ account, summary, unpaidBills, paidBills, recentPayments, token }: GuestDashboardProps) {
+    const [cart, setCart] = React.useState<Cart>(() => {
+        const saved = localStorage.getItem(`cart_${token}`);
+        return saved ? JSON.parse(saved) : {};
+    });
+
+    const cartCount = Object.keys(cart).length;
+    const cartTotal = Object.values(cart).reduce((acc, item) => {
+        return acc + (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0));
+    }, 0);
+
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(amount);
+        return new Intl.NumberFormat('en-PK', {
+            style: 'currency',
+            currency: 'PKR',
+            minimumFractionDigits: 0,
+        }).format(amount).replace('PKR', 'Rs');
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 font-sans text-slate-900 dark:text-zinc-100 pb-20">
+        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 font-sans text-slate-900 dark:text-zinc-100">
             <Head title="Customer Dashboard" />
 
-            {/* Header */}
-            <header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 text-xl font-bold">
-                            HT
-                        </div>
-                        <div>
-                            <h1 className="text-sm font-bold truncate max-w-[180px]">{account.title}</h1>
-                            <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono">{account.code}</p>
-                        </div>
-                    </div>
-                    <Link href={`/g/${token}/catalog`}>
-                        <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-4 h-9 shadow-lg shadow-orange-500/20 gap-2">
-                            <ShoppingBag size={16} />
-                            <span className="hidden sm:inline">Order Now</span>
-                        </Button>
-                    </Link>
-                </div>
-            </header>
+            <CatalogHeader 
+                search=""
+                setSearch={() => {}}
+                cartCount={cartCount}
+                cartTotal={cartTotal}
+                formatCurrency={formatCurrency}
+                setCheckoutOpen={() => {
+                    // Redirect to catalog if they want to checkout or see cart details
+                    window.location.href = `/g/${token}/catalog`;
+                }}
+                account={account}
+                token={token}
+            />
 
             <main className="max-w-4xl mx-auto px-4 pt-6 space-y-6">
                 {/* Summary Cards */}
@@ -263,16 +274,7 @@ export default function GuestDashboard({ account, summary, unpaidBills, paidBill
                 </motion.div>
             </main>
 
-            {/* Bottom Refresh Action */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 pointer-events-none flex justify-center">
-                <Button 
-                    className="pointer-events-auto bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 rounded-full shadow-2xl border border-slate-200 dark:border-zinc-700 font-bold text-xs h-10 px-6 gap-2"
-                    onClick={() => window.location.reload()}
-                >
-                    <RefreshCw size={14} className="text-orange-500" />
-                    Refresh Status
-                </Button>
-            </div>
+            <CatalogFooter token={token} />
         </div>
     );
 }

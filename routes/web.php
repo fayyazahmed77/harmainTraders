@@ -48,7 +48,8 @@ use App\Http\Controllers\Admin\InvestorManagementController;
 use App\Http\Controllers\Admin\ProfitDistributionController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\PurchaseReturnReportsController;
-use App\Http\Controllers\SalesReportsController;   
+use App\Http\Controllers\SalesReportsController;
+use App\Http\Controllers\SalesReturnReportsController;
 use App\Http\Controllers\StockReportsController;
 use App\Http\Controllers\JournalVoucherController;
 
@@ -430,9 +431,14 @@ Route::middleware(['auth'])->group(function () {
         });
 
         // Old sales routes removed
-        Route::get('/sales-return', [ReportsController::class, 'salesReturn'])->name('reports.sales-return');
-        Route::get('/sales-return/export/pdf', [ReportsController::class, 'salesReturnExportPdf'])->name('reports.sales-return.export.pdf');
-        Route::get('/sales-return/export/excel', [ReportsController::class, 'salesReturnExportExcel'])->name('reports.sales-return.export.excel');
+        // Sales Return Reports (Modularized)
+        Route::prefix('/sales-return')->group(function () {
+            Route::get('/', [SalesReturnReportsController::class, 'index'])->name('reports.sales-return.index');
+            Route::get('/data', [SalesReturnReportsController::class, 'getData'])->name('reports.sales-return.data');
+            Route::get('/export', [SalesReturnReportsController::class, 'exportPdf'])->name('reports.sales-return.export');
+            Route::get('/excel', [SalesReturnReportsController::class, 'exportExcel'])->name('reports.sales-return.excel');
+            Route::get('/print', [SalesReturnReportsController::class, 'exportPdf'])->name('reports.sales-return.print');
+        });
         Route::get('/sales-map', [SalesMapReportController::class, 'index'])->name('reports.sales-map');
         Route::get('/sales-map/data', [SalesMapReportController::class, 'getData'])->name('reports.sales-map.data');
          // Purchase Reports (Modularized Playground)

@@ -46,7 +46,10 @@ interface ParameterFormProps {
     firms: any[];
     salesmen: any[];
     areas: any[];
+    sub_areas: any[];
     categories: any[];
+    users: any[];
+    companies: any[];
 }
 
 const SearchableSelect = ({ value, onValueChange, options, placeholder, emptyMessage }: any) => {
@@ -121,7 +124,10 @@ export function ParameterForm({
     firms,
     salesmen,
     areas,
-    categories
+    sub_areas,
+    categories,
+    users,
+    companies
 }: ParameterFormProps) {
     const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
     const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
@@ -143,7 +149,7 @@ export function ParameterForm({
     return (
         <div className="space-y-4">
             {/* Header Command Bar */}
-            <Card className="p-2 bg-card/40 backdrop-blur-3xl border-border/50 shadow-xl rounded-sm overflow-visible ring-1 ring-border/5">
+            <Card className="p-2 bg-card/40 backdrop-blur-3xl border-border/50 shadow-sm rounded-sm overflow-visible ring-1 ring-border/5">
                 <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
                     
                     {/* Compact Inline Date Range */}
@@ -259,7 +265,7 @@ export function ParameterForm({
                         initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.2 }}
                     >
-                        <Card className="p-8 bg-surface-1/60 border-border/40 shadow-2xl mt-4 rounded-sm backdrop-blur-3xl ring-1 ring-white/5 relative overflow-hidden">
+                        <Card className="p-8 bg-surface-1/60 border-border/40 shadow-sm mt-4 rounded-sm backdrop-blur-3xl ring-1 ring-white/5 relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600/40" />
                             
                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
@@ -284,6 +290,20 @@ export function ParameterForm({
                                                 ]}
                                                 placeholder="Select Area"
                                                 emptyMessage="No areas found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-600/60 uppercase tracking-widest ml-1">Sub Area</Label>
+                                            <SearchableSelect 
+                                                value={params.subAreaId} 
+                                                onValueChange={(v: string) => updateParam('subAreaId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL SUB AREAS' },
+                                                    ...(sub_areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                ]}
+                                                placeholder="Select Sub Area"
+                                                emptyMessage="No sub areas found"
                                             />
                                         </div>
 
@@ -337,6 +357,34 @@ export function ParameterForm({
                                                 ]}
                                                 placeholder="Select Category"
                                                 emptyMessage="No categories found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest ml-1">Input By (User)</Label>
+                                            <SearchableSelect 
+                                                value={params.userId} 
+                                                onValueChange={(v: string) => updateParam('userId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL USERS' },
+                                                    ...(users || []).map(u => ({ value: u.id.toString(), label: u.name }))
+                                                ]}
+                                                placeholder="Select User"
+                                                emptyMessage="No users found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest ml-1">Company</Label>
+                                            <SearchableSelect 
+                                                value={params.companyId} 
+                                                onValueChange={(v: string) => updateParam('companyId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL Company' },
+                                                    ...(companies || []).map(c => ({ value: c.id.toString(), label: c.title }))
+                                                ]}
+                                                placeholder="Select Company"
+                                                emptyMessage="No company found"
                                             />
                                         </div>
                                     </div>

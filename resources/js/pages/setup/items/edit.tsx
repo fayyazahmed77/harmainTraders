@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Hash, Type, User as UserIcon, CalendarDays, Package, MapPin, Tag, Tags, Component, DollarSign, Percent, FileText, CheckCircle2, Box, Layers, Building2, Beaker, Briefcase, Ruler, BadgePercent, ChevronLeft, ChevronRight } from "lucide-react"
+import { CalendarIcon, Hash, Type, User as UserIcon, CalendarDays, Package, MapPin, Tag, Tags, Component, DollarSign, Percent, FileText, CheckCircle2, Box, Layers, Building2, Beaker, Briefcase, Ruler, BadgePercent, ChevronLeft, ChevronRight, Upload, Image as ImageIcon, X, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { BreadcrumbItem } from "@/types"
@@ -81,6 +81,10 @@ interface ItemForm {
   pt7: string | number;
   scheme: string;
   scheme2: string;
+  images: File[];
+  deleted_images: number[];
+  primary_image_id: number | null;
+  primary_new_index: number | null;
   [key: string]: any;
 }
 
@@ -257,13 +261,30 @@ export default function Page({ item, categories, companies, pagination }: Props)
     pt7: item.pt7 ?? "",
     scheme: item.scheme ?? "",
     scheme2: item.scheme2 ?? "",
+    images: [],
+    deleted_images: [],
+    primary_image_id: item.images?.find((img: any) => img.is_primary)?.id || null,
+    primary_new_index: null,
   })
+
+  const [existingImages, setExistingImages] = useState(item.images || []);
+  const [previews, setPreviews] = useState<string[]>([]);
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // small helper typed setter - using type bypass to resolve deep recursion in large forms
   const onInputChange = (key: keyof ItemForm, value: any) =>
     (setData as any)(key, value)
+
+  const setPrimaryExisting = (id: number) => {
+    (setData as any)("primary_image_id", id);
+    (setData as any)("primary_new_index", null);
+  };
+
+  const setPrimaryNew = (idx: number) => {
+    (setData as any)("primary_image_id", null);
+    (setData as any)("primary_new_index", idx);
+  };
 
   // UseEffect to calculating Retail and Trade Price difference
   useEffect(() => {
@@ -288,17 +309,31 @@ export default function Page({ item, categories, companies, pagination }: Props)
   }, [data.trade_price, data.retail]);
 
 
-  // submit handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    const payload = {
-      ...data,
-      date: openingDate ? openingDate.toISOString().split("T")[0] : data.date,
+    const payload: any = { ...data };
+    
+    // Rigorous filtering to ensure only actual File objects are sent
+    if (payload.images && Array.isArray(payload.images)) {
+      payload.images = payload.images.filter((img: any) => img instanceof File);
+      if (payload.images.length === 0) {
+        delete payload.images;
+      }
+    } else {
+      delete payload.images;
     }
 
-    put(`/items/${item.id}`, {
-      onSuccess: () => toast.success("Item updated successfully"),
+    router.post(`/items/${item.id}`, {
+      ...payload,
+      _method: 'PUT',
+      date: openingDate ? openingDate.toISOString().split("T")[0] : data.date,
+    }, {
+      forceFormData: true,
+      onSuccess: () => {
+        toast.success("Item updated successfully");
+        setPreviews([]);
+      },
       onError: (errs) => {
         console.error("Validation Errors:", errs)
         const errorMessages = Object.values(errs)
@@ -310,6 +345,34 @@ export default function Page({ item, categories, companies, pagination }: Props)
       },
     })
   }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      (setData as any)("images", [...(data.images || []), ...files]);
+
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeExistingImage = (id: number, idx: number) => {
+    (setData as any)("deleted_images", [...data.deleted_images, id]);
+    const newExisting = [...existingImages];
+    newExisting.splice(idx, 1);
+    setExistingImages(newExisting);
+  };
+
+  const removeNewImage = (index: number) => {
+    const newImages = [...data.images];
+    newImages.splice(index, 1);
+    (setData as any)("images", newImages);
+
+    const newPreviews = [...previews];
+    URL.revokeObjectURL(newPreviews[index]);
+    newPreviews.splice(index, 1);
+    setPreviews(newPreviews);
+  };
 
   return (
     <SidebarProvider
@@ -776,6 +839,97 @@ export default function Page({ item, categories, companies, pagination }: Props)
                     </div>
                   </TechLabel>
                 </div>
+              </Card>
+
+              {/* MEDIA GALLERY */}
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
+                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={16} className="text-orange-500" />
+                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Media Gallery</h3>
+                  </div>
+                  <SignalBadge text={`${existingImages.length + previews.length} Images`} type="orange" />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                  <label className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-orange-500/5 transition-all group">
+                    <input type="file" multiple onChange={handleImageChange} className="hidden" accept="image/*" />
+                    <Upload size={24} className="text-zinc-400 group-hover:text-orange-500 mb-2" />
+                    <span className="text-[10px] font-black uppercase tracking-tighter text-zinc-500 group-hover:text-orange-600">Add Images</span>
+                  </label>
+
+                  {/* Existing Images */}
+                  {existingImages.map((img: any, idx: number) => (
+                    <div key={`existing-${img.id}`} className={`relative aspect-square rounded-xl overflow-hidden border group shadow-sm transition-all ${data.primary_image_id === img.id ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-zinc-100 dark:border-zinc-800'}`}>
+                      <img src={`/${img.image_path}`} alt="Product" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      <div className="absolute top-2 right-2 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-200">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button 
+                                type="button" 
+                                onClick={() => setPrimaryExisting(img.id)}
+                                className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-xl backdrop-blur-md transition-all ${data.primary_image_id === img.id ? 'bg-orange-500 text-white' : 'bg-white/90 text-zinc-500 hover:text-orange-500'}`}
+                              >
+                                <Star size={14} fill={data.primary_image_id === img.id ? "currentColor" : "none"} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-[10px] font-bold">Set as Primary</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <button 
+                          type="button" 
+                          onClick={() => removeExistingImage(img.id, idx)}
+                          className="h-7 w-7 flex items-center justify-center bg-white/90 text-rose-500 rounded-lg shadow-xl backdrop-blur-md hover:bg-rose-500 hover:text-white transition-all"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {data.primary_image_id === img.id && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-orange-500 text-white text-[8px] font-black uppercase text-center py-1 tracking-[0.2em] shadow-lg">Primary</div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* New Previews */}
+                  {previews.map((preview, idx) => (
+                    <div key={`new-${idx}`} className={`relative aspect-square rounded-xl overflow-hidden border group shadow-sm transition-all ${data.primary_new_index === idx ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-zinc-100 dark:border-zinc-800'}`}>
+                      <img src={preview} alt="New Upload" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      <div className="absolute top-2 right-2 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-200">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button 
+                                type="button" 
+                                onClick={() => setPrimaryNew(idx)}
+                                className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-xl backdrop-blur-md transition-all ${data.primary_new_index === idx ? 'bg-orange-500 text-white' : 'bg-white/90 text-zinc-500 hover:text-orange-500'}`}
+                              >
+                                <Star size={14} fill={data.primary_new_index === idx ? "currentColor" : "none"} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-[10px] font-bold">Set as Primary</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <button 
+                          type="button" 
+                          onClick={() => removeNewImage(idx)}
+                          className="h-7 w-7 flex items-center justify-center bg-white/90 text-rose-500 rounded-lg shadow-xl backdrop-blur-md hover:bg-rose-500 hover:text-white transition-all"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 flex flex-col">
+                        <div className="bg-emerald-600 text-white text-[8px] font-black uppercase text-center py-0.5 tracking-[0.1em]">New</div>
+                        {data.primary_new_index === idx && (
+                          <div className="bg-orange-500 text-white text-[8px] font-black uppercase text-center py-1 tracking-[0.2em] shadow-lg">Primary</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {errors.images && <p className="text-[10px] text-rose-500 mt-2 font-bold">{errors.images}</p>}
               </Card>
 
               {/* ACTION FOOTER */}

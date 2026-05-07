@@ -33,7 +33,10 @@ class SalesReportsController extends Controller
             'firms' => Firm::select('id', 'name')->get(),
             'salesmen' => Saleman::select('id', 'name')->get(),
             'areas' => Areas::select('id', 'name')->get(),
+            'sub_areas' => \App\Models\Subarea::select('id', 'name')->get(),
             'categories' => ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
+            'users' => \App\Models\User::select('id', 'name')->get(),
+            'companies' => Account::where('type', 5)->select('id', 'title')->orderBy('title')->get(),
         ]);
     }
 

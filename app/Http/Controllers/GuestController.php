@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Items;
+use App\Models\ItemCategory;
 use App\Models\Sales;
 use App\Models\SalesItem;
 use App\Models\Payment;
@@ -60,7 +61,8 @@ class GuestController extends Controller
     public function catalog($token)
     {
         $account = Account::where('guest_token', $token)->firstOrFail();
-        $items = Items::where('is_active', true)->get();
+        $categories = ItemCategory::where('status', 'active')->orderBy('name')->get();
+        $items = Items::where('is_active', true)->with(['images', 'companyAccount'])->get();
         
         $customerCategory = (string) $account->item_category;
         
@@ -94,12 +96,19 @@ class GuestController extends Controller
                 'price' => $guestPrice,
                 'company' => $item->companyAccount->title ?? '',
                 'stock' => $item->total_stock_pcs,
+                'category_id' => $item->category,
+                'image' => $item->primary_image_url,
+                'images' => $item->images->map(fn($img) => asset($img->image_path)),
+                'price_carton' => $guestPrice,
+                'price_loose_carton' => round($guestPrice * 1.03),
+                'price_piece' => ceil(($guestPrice * 1.03) / ($item->packing_qty ?: 1)),
             ];
         });
 
         return Inertia::render('guest/Catalog', [
             'account' => $account,
             'items' => $itemsWithPrice,
+            'categories' => $categories,
             'token' => $token,
         ]);
     }
@@ -153,7 +162,7 @@ class GuestController extends Controller
                 
                 if ($totalPcs <= 0) continue;
                 
-                $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * ($price / $packing));
+                $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * (round($price * 1.03) / $packing));
                 $grossTotal += $subtotal;
                 
                 $orderItems[] = [

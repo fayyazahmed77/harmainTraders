@@ -1,100 +1,100 @@
-import React, { useState, useMemo } from "react";
-import { Head, Link } from "@inertiajs/react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useMemo } from 'react';
+import { Head } from '@inertiajs/react';
 import { 
-    Search, 
-    ShoppingBag, 
-    Plus, 
-    Minus, 
-    ChevronLeft, 
-    CheckCircle2, 
-    Package, 
-    Info,
-    ArrowRight,
-    Loader2,
-    X
+    LayoutGrid, 
+    List as ListIcon, 
+    Box
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogFooter,
-    DialogDescription
-} from "@/components/ui/dialog";
 import axios from "axios";
 
-interface Item {
-    id: number;
-    title: string;
-    short_name: string;
-    code: string;
-    packing_qty: number;
-    price: number;
-    company: string;
-    stock: number;
-}
+// UI Components
+import { Badge } from '@/components/ui/badge';
 
-interface CartItem extends Item {
-    qty_carton: number;
-    qty_pcs: number;
-}
+// Domain Components
+import { CatalogHeader } from './components/CatalogHeader';
+import { CategoryCarousel, CategorySkeleton } from './components/CategoryCarousel';
+import { ProductCard, ProductCardSkeleton } from './components/ProductCard';
+import { ProductListItem } from './components/ProductListItem';
+import { CartDrawer } from './components/CartDrawer';
+import { BuyNowDialog } from './components/BuyNowDialog';
+import { SuccessDialog } from './components/SuccessDialog';
+import { CatalogFooter } from './components/CatalogFooter';
+import { Item, Cart, Category } from './components/types';
 
-interface GuestCatalogProps {
-    account: {
-        id: number;
-        title: string;
-    };
+interface CatalogProps {
     items: Item[];
+    categories: Category[];
+    account: { title: string };
     token: string;
 }
 
-export default function GuestCatalog({ account, items, token }: GuestCatalogProps) {
-    const [search, setSearch] = useState("");
-    const [cart, setCart] = useState<Record<number, CartItem>>({});
+const DEFAULT_IMAGE = "https://placehold.co/400x400/f8fafc/cbd5e1?text=No+Image";
+
+export default function Catalog({ items, categories, account, token }: CatalogProps) {
+    const [search, setSearch] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string | number>('all');
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [cart, setCart] = useState<Cart>(() => {
+        const saved = localStorage.getItem(`cart_${token}`);
+        return saved ? JSON.parse(saved) : {};
+    });
+    
+    const [buyItem, setBuyItem] = useState<Item | null>(null);
+    const [buyOpen, setBuyOpen] = useState(false);
     const [checkoutOpen, setCheckoutOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [successInvoice, setSuccessInvoice] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(amount);
-    };
+    useEffect(() => {
+        const timer = setTimeout(() => setLoading(false), 1000);
+        return () => clearTimeout(timer);
+    }, [selectedCategory]);
+
+    useEffect(() => {
+        localStorage.setItem(`cart_${token}`, JSON.stringify(cart));
+    }, [cart, token]);
 
     const filteredItems = useMemo(() => {
-        const q = search.toLowerCase();
-        return items.filter(item => 
-            item.title.toLowerCase().includes(q) || 
-            item.code.toLowerCase().includes(q) ||
-            item.company.toLowerCase().includes(q)
-        );
-    }, [items, search]);
-
-    const cartTotal = useMemo(() => {
-        return Object.values(cart).reduce((total, item) => {
-            const packing = item.packing_qty || 1;
-            const itemTotal = (item.qty_carton * item.price) + (item.qty_pcs * (item.price / packing));
-            return total + itemTotal;
-        }, 0);
-    }, [cart]);
+        const query = search.toLowerCase();
+        return items.filter(item => {
+            const matchesSearch = (item.title?.toLowerCase() ?? '').includes(query) || 
+                                (item.code?.toLowerCase() ?? '').includes(query) ||
+                                (item.company?.toLowerCase() ?? '').includes(query);
+            const matchesCategory = selectedCategory === 'all' || String(item.category_id) === String(selectedCategory);
+            return matchesSearch && matchesCategory;
+        });
+    }, [items, search, selectedCategory]);
 
     const cartCount = Object.keys(cart).length;
+    const cartTotal = Object.values(cart).reduce((acc, item) => {
+        return acc + (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0));
+    }, 0);
 
-    const updateCart = (item: Item, field: 'qty_carton' | 'qty_pcs', val: number) => {
+    const updateCart = (item: Item, field: 'qty_carton' | 'qty_pcs', value: number) => {
         setCart(prev => {
-            const current = prev[item.id] || { ...item, qty_carton: 0, qty_pcs: 0 };
-            const next = { ...current, [field]: Math.max(0, val) };
+            const currentItem = prev[item.id] || { ...item, qty_carton: 0, qty_pcs: 0 };
+            const newQty = Math.max(0, value);
             
-            if (next.qty_carton === 0 && next.qty_pcs === 0) {
-                const { [item.id]: removed, ...rest } = prev;
-                return rest;
+            const newCart = { ...prev };
+            const updatedItem = { ...currentItem, [field]: newQty };
+
+            if (updatedItem.qty_carton === 0 && updatedItem.qty_pcs === 0) {
+                delete newCart[item.id];
+            } else {
+                newCart[item.id] = updatedItem;
             }
             
-            return { ...prev, [item.id]: next };
+            return newCart;
         });
+    };
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('en-PK', {
+            style: 'currency',
+            currency: 'PKR',
+            minimumFractionDigits: 0,
+        }).format(value).replace('PKR', 'Rs');
     };
 
     const handleCheckout = async () => {
@@ -121,227 +121,140 @@ export default function GuestCatalog({ account, items, token }: GuestCatalogProp
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 pb-32">
+        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100">
             <Head title="Product Catalog" />
 
-            {/* Header */}
-            <header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 sticky top-0 z-20">
-                <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-                    <Link href={`/g/${token}`} className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-wider">
-                        <ChevronLeft size={16} /> Dashboard
-                    </Link>
-                    <div className="flex-1 max-w-sm relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input 
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Find products..." 
-                            className="pl-9 h-9 rounded-full bg-slate-100 dark:bg-zinc-800 border-none text-xs focus-visible:ring-orange-500"
-                        />
+            <CatalogHeader 
+                search={search}
+                setSearch={setSearch}
+                cartCount={cartCount}
+                cartTotal={cartTotal}
+                formatCurrency={formatCurrency}
+                setCheckoutOpen={setCheckoutOpen}
+                account={account}
+                token={token}
+            />
+
+            {loading ? (
+                <div className="bg-white dark:bg-zinc-900 shadow-sm relative overflow-hidden group">
+                    <div className="max-w-[1800px] mx-auto relative px-12 py-10">
+                        <div className="flex gap-8 overflow-x-hidden px-2">
+                            {[...Array(12)].map((_, i) => (
+                                <CategorySkeleton key={i} />
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </header>
+            ) : (
+                <CategoryCarousel 
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    DEFAULT_IMAGE={DEFAULT_IMAGE}
+                />
+            )}
 
-            <main className="max-w-4xl mx-auto px-4 pt-4 space-y-4">
-                <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-black">All Items</h2>
-                    <SignalBadge text={`${filteredItems.length} Products`} type="blue" />
+            <main className="max-w-[1800px] mx-auto px-4 py-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-3xl font-black italic uppercase text-slate-900 dark:text-zinc-100 tracking-tighter">
+                            {selectedCategory === 'all' ? 'All Items' : categories.find(c => c.id === selectedCategory)?.name}
+                        </h2>
+                        <Badge className="bg-orange-600 text-white border-none font-black px-2 py-0.5 text-[10px]">
+                            {filteredItems.length} ITEMS
+                        </Badge>
+                    </div>
+
+                    <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-zinc-800">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <ListIcon size={18} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <LayoutGrid size={18} />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3">
-                    {filteredItems.map((item) => (
-                        <Card key={item.id} className="p-4 bg-white dark:bg-zinc-900 border-none shadow-md relative overflow-hidden group">
-                            <div className="flex justify-between items-start gap-4">
-                                <div className="space-y-1 flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Badge variant="outline" className="text-[8px] h-4 font-mono uppercase bg-slate-50 dark:bg-zinc-800 border-none">
-                                            {item.code}
-                                        </Badge>
-                                        <span className="text-[10px] text-orange-500 font-bold uppercase tracking-tighter truncate max-w-[120px]">
-                                            {item.company}
-                                        </span>
-                                    </div>
-                                    <h3 className="font-bold text-sm leading-tight group-hover:text-orange-600 transition-colors uppercase italic">{item.title}</h3>
-                                    <div className="flex items-center gap-4 pt-1">
-                                        <div>
-                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Rate</p>
-                                            <p className="font-black text-lg text-slate-900 dark:text-zinc-100">{formatCurrency(item.price)}</p>
-                                        </div>
-                                        <div className="h-8 w-[1px] bg-slate-100 dark:bg-zinc-800" />
-                                        <div>
-                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Packing</p>
-                                            <p className="font-bold text-xs">{item.packing_qty} Pcs</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 min-w-[120px]">
-                                    {/* Carton Qty */}
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-slate-500 font-bold text-center">Full CTN</span>
-                                        <div className="flex items-center justify-between bg-slate-100 dark:bg-zinc-800 rounded-lg p-1">
-                                            <button 
-                                                onClick={() => updateCart(item, 'qty_carton', (cart[item.id]?.qty_carton || 0) - 1)}
-                                                className="p-1 hover:text-orange-500"
-                                            >
-                                                <Minus size={14} />
-                                            </button>
-                                            <input 
-                                                type="number"
-                                                value={cart[item.id]?.qty_carton || 0}
-                                                onChange={(e) => updateCart(item, 'qty_carton', parseInt(e.target.value) || 0)}
-                                                className="w-8 bg-transparent text-center text-xs font-bold border-none focus:ring-0 p-0"
-                                            />
-                                            <button 
-                                                onClick={() => updateCart(item, 'qty_carton', (cart[item.id]?.qty_carton || 0) + 1)}
-                                                className="p-1 hover:text-orange-500"
-                                            >
-                                                <Plus size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Pcs Qty */}
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-slate-500 font-bold text-center">Loose PCS</span>
-                                        <div className="flex items-center justify-between bg-slate-100 dark:bg-zinc-800 rounded-lg p-1">
-                                            <button 
-                                                onClick={() => updateCart(item, 'qty_pcs', (cart[item.id]?.qty_pcs || 0) - 1)}
-                                                className="p-1 hover:text-orange-500"
-                                            >
-                                                <Minus size={14} />
-                                            </button>
-                                            <input 
-                                                type="number"
-                                                value={cart[item.id]?.qty_pcs || 0}
-                                                onChange={(e) => updateCart(item, 'qty_pcs', parseInt(e.target.value) || 0)}
-                                                className="w-8 bg-transparent text-center text-xs font-bold border-none focus:ring-0 p-0"
-                                            />
-                                            <button 
-                                                onClick={() => updateCart(item, 'qty_pcs', (cart[item.id]?.qty_pcs || 0) + 1)}
-                                                className="p-1 hover:text-orange-500"
-                                            >
-                                                <Plus size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
-                </div>
-            </main>
-
-            {/* Cart Sticky Footer */}
-            <AnimatePresence>
-                {cartCount > 0 && (
-                    <motion.div 
-                        initial={{ y: 100 }}
-                        animate={{ y: 0 }}
-                        exit={{ y: 100 }}
-                        className="fixed bottom-0 left-0 right-0 p-4 z-30"
-                    >
-                        <Card className="max-w-4xl mx-auto p-4 bg-orange-600 dark:bg-orange-600 text-white border-none shadow-2xl rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center relative">
-                                    <ShoppingBag size={24} />
-                                    <span className="absolute -top-2 -right-2 bg-white text-orange-600 text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
-                                        {cartCount}
-                                    </span>
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-[10px] opacity-80 font-bold uppercase tracking-widest">Total Amount</p>
-                                    <h4 className="text-xl font-black">{formatCurrency(cartTotal)}</h4>
-                                </div>
-                            </div>
-                            <Button 
-                                onClick={() => setCheckoutOpen(true)}
-                                className="bg-white text-orange-600 hover:bg-slate-50 font-black rounded-xl h-12 px-6 shadow-xl gap-2"
-                            >
-                                Checkout <ArrowRight size={18} />
-                            </Button>
-                        </Card>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Checkout Dialog */}
-            <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-                <DialogContent className="max-w-md w-[95%] rounded-2xl p-0 overflow-hidden border-none">
-                    <DialogHeader className="p-6 pb-0">
-                        <DialogTitle className="text-2xl font-black text-slate-900">Review Order</DialogTitle>
-                        <DialogDescription className="text-xs text-slate-500 italic">Please review your items before submitting.</DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="p-6 pt-4 max-h-[60vh] overflow-y-auto space-y-3">
-                        {Object.values(cart).map(item => (
-                            <div key={item.id} className="flex justify-between items-center bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-slate-100 dark:border-zinc-800">
-                                <div>
-                                    <h5 className="text-[11px] font-bold truncate max-w-[180px] uppercase italic">{item.title}</h5>
-                                    <p className="text-[10px] text-slate-500">
-                                        {item.qty_carton} CTN + {item.qty_pcs} PCS
-                                    </p>
-                                </div>
-                                <p className="font-bold text-xs">
-                                    {formatCurrency((item.qty_carton * item.price) + (item.qty_pcs * (item.price / (item.packing_qty || 1))))}
-                                </p>
-                            </div>
+                {loading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
+                        {[...Array(12)].map((_, i) => (
+                            <ProductCardSkeleton key={i} />
                         ))}
                     </div>
-
-                    <div className="p-6 pt-0 space-y-4">
-                        <div className="py-4 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center">
-                            <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Total Payable</span>
-                            <span className="text-2xl font-black text-orange-600">{formatCurrency(cartTotal)}</span>
-                        </div>
-                        <Button 
-                            className="w-full h-14 bg-orange-500 hover:bg-orange-600 font-black text-lg rounded-xl shadow-xl shadow-orange-500/20 gap-3"
-                            disabled={processing}
-                            onClick={handleCheckout}
-                        >
-                            {processing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                            {processing ? "Processing..." : "Place My Order"}
-                        </Button>
+                ) : filteredItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 opacity-30">
+                        <Box size={48} className="mb-4 text-slate-400" />
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 text-center">
+                            No products found <br />
+                            <span className="text-[9px] font-bold opacity-60 tracking-normal">Try adjusting your filters or search</span>
+                        </p>
                     </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Success Dialog */}
-            <Dialog open={!!successInvoice} onOpenChange={() => setSuccessInvoice(null)}>
-                <DialogContent className="max-w-sm w-[90%] rounded-3xl p-8 text-center border-none flex flex-col items-center">
-                    <motion.div 
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-6 shadow-2xl shadow-emerald-500/30"
-                    >
-                        <CheckCircle2 size={48} />
-                    </motion.div>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2 italic uppercase">Order Placed!</h2>
-                    <p className="text-sm text-slate-500 mb-6">
-                        Your order <span className="font-bold text-slate-900">#{successInvoice}</span> has been received and is pending confirmation.
-                    </p>
-                    <div className="flex flex-col w-full gap-3">
-                        <Link href={`/g/${token}`} className="w-full">
-                            <Button className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold h-11">Back to Dashboard</Button>
-                        </Link>
-                        <Button variant="outline" onClick={() => setSuccessInvoice(null)} className="h-12 rounded-xl border-slate-200 font-bold h-11">Close</Button>
+                ) : viewMode === 'list' ? (
+                    <div className="grid grid-cols-1 gap-3">
+                        {filteredItems.map((item) => (
+                            <ProductListItem 
+                                key={item.id}
+                                item={item}
+                                formatCurrency={formatCurrency}
+                                setBuyItem={setBuyItem}
+                                setBuyOpen={setBuyOpen}
+                                DEFAULT_IMAGE={DEFAULT_IMAGE}
+                            />
+                        ))}
                     </div>
-                </DialogContent>
-            </Dialog>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
+                        {filteredItems.map((item) => (
+                            <ProductCard 
+                                key={item.id}
+                                item={item}
+                                formatCurrency={formatCurrency}
+                                setBuyItem={setBuyItem}
+                                setBuyOpen={setBuyOpen}
+                                DEFAULT_IMAGE={DEFAULT_IMAGE}
+                            />
+                        ))}
+                    </div>
+                )}
+            </main>
+
+            <CartDrawer 
+                checkoutOpen={checkoutOpen}
+                setCheckoutOpen={setCheckoutOpen}
+                cartCount={cartCount}
+                cart={cart}
+                setCart={setCart}
+                updateCart={updateCart}
+                cartTotal={cartTotal}
+                formatCurrency={formatCurrency}
+                processing={processing}
+                handleCheckout={handleCheckout}
+                DEFAULT_IMAGE={DEFAULT_IMAGE}
+            />
+
+            <BuyNowDialog 
+                buyOpen={buyOpen}
+                setBuyOpen={setBuyOpen}
+                buyItem={buyItem}
+                cart={cart}
+                updateCart={updateCart}
+                formatCurrency={formatCurrency}
+                DEFAULT_IMAGE={DEFAULT_IMAGE}
+            />
+
+            <SuccessDialog 
+                successInvoice={successInvoice}
+                setSuccessInvoice={setSuccessInvoice}
+                token={token}
+            />
+
+            <CatalogFooter token={token} />
         </div>
     );
 }
-
-const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
-    const colors = {
-        green: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-        red: "bg-rose-500/10 text-rose-600 border-rose-500/20",
-        orange: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-        blue: "bg-blue-500/10 text-blue-600 border-blue-500/20"
-    };
-    return (
-        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${colors[type]}`}>
-            {text}
-        </span>
-    );
-};

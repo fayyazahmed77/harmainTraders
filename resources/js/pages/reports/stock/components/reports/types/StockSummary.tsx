@@ -29,6 +29,9 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">In</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Out</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Balance</TableHead>
+                    {params.withAmount && (
+                        <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Amount</TableHead>
+                    )}
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -63,6 +66,11 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                         )}>
                             {Number(row.balance_qty).toLocaleString()}
                         </TableCell>
+                        {params.withAmount && (
+                            <TableCell className="py-4 px-4 text-right font-black text-[12px] text-emerald-600 tabular-nums">
+                                {formatCurrency(Number(row.amount || 0))}
+                            </TableCell>
+                        )}
                     </TableRow>
                 ))}
             </TableBody>
@@ -80,6 +88,11 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                     <TableCell className="py-4 px-4 text-right text-[12px] text-emerald-600 tabular-nums">
                         {totals.balance.toLocaleString()}
                     </TableCell>
+                    {params.withAmount && (
+                        <TableCell className="py-4 px-4 text-right text-[13px] text-emerald-600 tabular-nums underline decoration-double decoration-emerald-600/30">
+                            {formatCurrency(totals.amount)}
+                        </TableCell>
+                    )}
                 </TableRow>
             </tfoot>
         </>

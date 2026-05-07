@@ -59,6 +59,7 @@ interface Item {
     reorder_level: string;
     packing_qty: string;
     is_active: boolean;
+    primary_image_url?: string;
     created_at: string;
 }
 
@@ -97,7 +98,27 @@ export function DataTable({ data }: DataTableProps) {
                 </div>
             ),
         },
-        { accessorKey: "title", header: "Title" },
+        { 
+            accessorKey: "title", 
+            header: "Title",
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3 min-w-[200px]">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shrink-0 shadow-sm">
+                        <img 
+                            src={row.original.primary_image_url || "https://placehold.co/40x40/f8fafc/cbd5e1?text=?"} 
+                            alt={row.original.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://placehold.co/40x40/f8fafc/cbd5e1?text=?";
+                            }}
+                        />
+                    </div>
+                    <span className="font-medium text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-tight">
+                        {row.original.title}
+                    </span>
+                </div>
+            )
+        },
         { accessorKey: "category.name", header: "Category" },
         {
             accessorKey: "trade_price",

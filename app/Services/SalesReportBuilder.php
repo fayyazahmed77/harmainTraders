@@ -39,6 +39,8 @@ class SalesReportBuilder
             'area_id' => ($params['areaId'] ?? 'ALL') === 'ALL' ? null : $params['areaId'],
             'firm_id' => ($params['firmId'] ?? 'ALL') === 'ALL' ? null : $params['firmId'],
             'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
+            'sub_area_id' => ($params['subAreaId'] ?? 'ALL') === 'ALL' ? null : $params['subAreaId'],
+            'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
         ];
 
         // Routing to specific methods (Placeholder implementations for now)
@@ -70,6 +72,19 @@ class SalesReportBuilder
 
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['salesman_id']) $query->where('sales.salesman_id', $filters['salesman_id']);
+        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        
+        if ($filters['company_id'] || $filters['category_id']) {
+            $query->whereExists(function ($q) use ($filters) {
+                $q->select(DB::raw(1))
+                    ->from('sales_items')
+                    ->join('items', 'sales_items.item_id', '=', 'items.id')
+                    ->whereRaw('sales_items.sale_id = sales.id');
+                if ($filters['company_id']) $q->where('items.company', $filters['company_id']);
+                if ($filters['category_id']) $q->where('items.category', $filters['category_id']);
+            });
+        }
 
         $results = $query->select(
             'sales.invoice',
@@ -97,6 +112,9 @@ class SalesReportBuilder
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['item_id']) $query->where('sales_items.item_id', $filters['item_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
+        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        if ($filters['company_id']) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
             'sales.invoice',
@@ -323,6 +341,11 @@ class SalesReportBuilder
         ->groupBy('items.id', 'items.title', 'items.packing_qty')
         ->orderBy('items.title')
         ->get();
+
+        if ($filters['item_id'] && $results->count() > 0) {
+            $history = $this->details($fromDate, $toDate, $filters);
+            $results[0]->history = $history;
+        }
 
         return $this->transformToArray($results);
     }

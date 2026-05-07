@@ -21,6 +21,7 @@ import StockDetail from './types/StockDetail';
 import StockTypeWise from './types/StockTypeWise';
 import StockNegativeAudit from './types/StockNegativeAudit';
 import StockAvailable from './types/StockAvailable';
+import StockReOrderLevel from './types/StockReOrderLevel';
 
 interface ReportViewProps {
     reportId: string;
@@ -126,6 +127,7 @@ export function ReportView({
                                         'type_wise': StockTypeWise,
                                         'less_than_zero': StockNegativeAudit,
                                         'available_stock': StockAvailable,
+                                        're_order_level': StockReOrderLevel,
                                     };
 
                                     const ActiveComponent = components[reportId] || StockSummary;

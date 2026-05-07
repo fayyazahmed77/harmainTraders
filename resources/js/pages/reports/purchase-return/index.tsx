@@ -18,6 +18,12 @@ interface PageProps {
     accounts: any[];
     items: any[];
     firms: any[];
+    areas: any[];
+    sub_areas: any[];
+    categories: any[];
+    salesmen: any[];
+    users: any[];
+    companies: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -26,7 +32,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Purchase Return Analysis", href: "/reports/purchase-return" },
 ];
 
-export default function PurchaseReturnReports({ accounts, items, firms }: PageProps) {
+export default function PurchaseReturnReports({ accounts, items, firms, areas, sub_areas, categories, salesmen, users, companies }: PageProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === 'dark';
 
@@ -37,6 +43,12 @@ export default function PurchaseReturnReports({ accounts, items, firms }: PagePr
         itemId: 'ALL',
         reportId: 'bill',
         firmId: 'ALL',
+        areaId: 'ALL',
+        subAreaId: 'ALL',
+        categoryId: 'ALL',
+        salesmanId: 'ALL',
+        userId: 'ALL',
+        companyId: 'ALL',
         printOn: 'screen',
     });
 
@@ -149,7 +161,7 @@ export default function PurchaseReturnReports({ accounts, items, firms }: PagePr
                                     data={params} 
                                     setData={setParams} 
                                     onExecute={fetchData}
-                                    bootstrap={{ accounts, items, firms }} 
+                                    bootstrap={{ accounts, items, firms, areas, sub_areas, categories, salesmen, users, companies }} 
                                 />
                             </motion.div>
 

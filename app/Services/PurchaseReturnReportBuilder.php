@@ -33,6 +33,20 @@ class PurchaseReturnReportBuilder
             ->join('accounts', 'purchase_returns.supplier_id', '=', 'accounts.id');
 
         if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
+        if (!empty($filters['salesman_id'])) $query->where('purchase_returns.salesman_id', $filters['salesman_id']);
+        if (!empty($filters['area_id'])) $query->where('accounts.area_id', $filters['area_id']);
+        if (!empty($filters['sub_area_id'])) $query->where('accounts.sub_area_id', $filters['sub_area_id']);
+        
+        if (!empty($filters['company_id']) || !empty($filters['category_id'])) {
+            $query->whereExists(function ($q) use ($filters) {
+                $q->select(DB::raw(1))
+                    ->from('purchase_return_items')
+                    ->join('items', 'purchase_return_items.item_id', '=', 'items.id')
+                    ->whereRaw('purchase_return_items.purchase_return_id = purchase_returns.id');
+                if (!empty($filters['company_id'])) $q->where('items.company', $filters['company_id']);
+                if (!empty($filters['category_id'])) $q->where('items.category_id', $filters['category_id']);
+            });
+        }
 
         $results = $query->select(
             'purchase_returns.invoice',
@@ -76,6 +90,11 @@ class PurchaseReturnReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
         if (!empty($filters['item_id'])) $query->where('purchase_return_items.item_id', $filters['item_id']);
+        if (!empty($filters['salesman_id'])) $query->where('purchase_returns.salesman_id', $filters['salesman_id']);
+        if (!empty($filters['area_id'])) $query->where('accounts.area_id', $filters['area_id']);
+        if (!empty($filters['sub_area_id'])) $query->where('accounts.sub_area_id', $filters['sub_area_id']);
+        if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
+        if (!empty($filters['category_id'])) $query->where('items.category_id', $filters['category_id']);
 
         $results = $query->select(
             'purchase_returns.invoice',
@@ -101,6 +120,8 @@ class PurchaseReturnReportBuilder
             ->join('items', 'purchase_return_items.item_id', '=', 'items.id');
 
         if (!empty($filters['item_id'])) $query->where('purchase_return_items.item_id', $filters['item_id']);
+        if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
+        if (!empty($filters['category_id'])) $query->where('items.category_id', $filters['category_id']);
 
         $results = $query->select(
             'items.id',
@@ -128,6 +149,11 @@ class PurchaseReturnReportBuilder
             'account_id' => ($params['accountId'] ?? 'ALL') === 'ALL' ? null : $params['accountId'],
             'item_id' => ($params['itemId'] ?? 'ALL') === 'ALL' ? null : $params['itemId'],
             'firm_id' => ($params['firmId'] ?? 'ALL') === 'ALL' ? null : $params['firmId'],
+            'area_id' => ($params['areaId'] ?? 'ALL') === 'ALL' ? null : $params['areaId'],
+            'sub_area_id' => ($params['subAreaId'] ?? 'ALL') === 'ALL' ? null : $params['subAreaId'],
+            'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
+            'salesman_id' => ($params['salesmanId'] ?? 'ALL') === 'ALL' ? null : $params['salesmanId'],
+            'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
         ];
 
         switch ($reportId) {

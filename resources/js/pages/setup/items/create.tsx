@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Hash, Type, User as UserIcon, CalendarDays, Package, MapPin, Tag, Tags, Component, DollarSign, Percent, FileText, CheckCircle2, Box, Layers, Building2, Beaker, Briefcase, Ruler, BadgePercent } from "lucide-react"
+import { CalendarIcon, Hash, Type, User as UserIcon, CalendarDays, Package, MapPin, Tag, Tags, Component, DollarSign, Percent, FileText, CheckCircle2, Box, Layers, Building2, Beaker, Briefcase, Ruler, BadgePercent, ChevronLeft, ChevronRight, Upload, Image as ImageIcon, X, Star
+ } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 import { BreadcrumbItem } from "@/types"
@@ -81,6 +82,8 @@ interface ItemForm {
   pt7: string | number;
   scheme: string;
   scheme2: string;
+  images: File[];
+  primary_new_index: number | null;
   [key: string]: any;
 }
 
@@ -244,7 +247,11 @@ export default function Page({ categories, companies }: { categories: any, compa
     pt7: 0,
     scheme: "",
     scheme2: "",
+    images: [],
+    primary_new_index: null,
   })
+
+  const [previews, setPreviews] = useState<string[]>([]);
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
@@ -291,11 +298,28 @@ export default function Page({ categories, companies }: { categories: any, compa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    post("/items", {
+    const payload: any = { ...data };
+
+    // Rigorous filtering to ensure only actual File objects are sent
+    if (payload.images && Array.isArray(payload.images)) {
+      payload.images = payload.images.filter((img: any) => img instanceof File);
+      if (payload.images.length === 0) {
+        delete payload.images;
+      }
+    } else {
+      delete payload.images;
+    }
+
+    router.post("/items", {
+      ...payload,
+      date: openingDate ? openingDate.toISOString().split("T")[0] : data.date,
+    }, {
+      forceFormData: true,
       onSuccess: () => {
         toast.success("Item created successfully")
         reset()
         setOpeningDate(undefined)
+        setPreviews([])
       },
       onError: (errs) => {
         console.error("Validation Errors:", errs)
@@ -308,6 +332,35 @@ export default function Page({ categories, companies }: { categories: any, compa
       },
     })
   }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      (setData as any)("images", [...(data.images || []), ...files]);
+
+      if (data.primary_new_index === null && files.length > 0) {
+        (setData as any)("primary_new_index", 0);
+      }
+
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const setPrimaryNew = (idx: number) => {
+    (setData as any)("primary_new_index", idx);
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = [...data.images];
+    newImages.splice(index, 1);
+    (setData as any)("images", newImages);
+
+    const newPreviews = [...previews];
+    URL.revokeObjectURL(newPreviews[index]);
+    newPreviews.splice(index, 1);
+    setPreviews(newPreviews);
+  };
 
   return (
     <SidebarProvider
@@ -738,6 +791,59 @@ export default function Page({ categories, companies }: { categories: any, compa
                     </div>
                   </TechLabel>
                 </div>
+              </Card>
+
+              {/* MEDIA GALLERY */}
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
+                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={16} className="text-orange-500" />
+                    <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Media Gallery</h3>
+                  </div>
+                  <SignalBadge text={`${data.images.length} Selected`} type={data.images.length > 0 ? 'orange' : 'blue'} />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                  <label className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-orange-500/5 transition-all group">
+                    <input type="file" multiple onChange={handleImageChange} className="hidden" accept="image/*" />
+                    <Upload size={24} className="text-zinc-400 group-hover:text-orange-500 mb-2" />
+                    <span className="text-[10px] font-black uppercase tracking-tighter text-zinc-500 group-hover:text-orange-600">Upload Images</span>
+                  </label>
+
+                  {previews.map((preview, idx) => (
+                    <div key={idx} className={`relative aspect-square rounded-xl overflow-hidden border group shadow-sm transition-all ${data.primary_new_index === idx ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-zinc-100 dark:border-zinc-800'}`}>
+                      <img src={preview} alt="New Upload" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      <div className="absolute top-2 right-2 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-200">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button 
+                                type="button" 
+                                onClick={() => setPrimaryNew(idx)}
+                                className={`h-7 w-7 flex items-center justify-center rounded-lg shadow-xl backdrop-blur-md transition-all ${data.primary_new_index === idx ? 'bg-orange-500 text-white' : 'bg-white/90 text-zinc-500 hover:text-orange-500'}`}
+                              >
+                                <Star size={14} fill={data.primary_new_index === idx ? "currentColor" : "none"} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent><p className="text-[10px] font-bold">Set as Primary</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <button 
+                          type="button" 
+                          onClick={() => removeImage(idx)}
+                          className="h-7 w-7 flex items-center justify-center bg-white/90 text-rose-500 rounded-lg shadow-xl backdrop-blur-md hover:bg-rose-500 hover:text-white transition-all"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {data.primary_new_index === idx && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-orange-500 text-white text-[8px] font-black uppercase text-center py-1 tracking-[0.2em] shadow-lg">Primary</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {errors.images && <p className="text-[10px] text-rose-500 mt-2 font-bold">{errors.images}</p>}
               </Card>
 
               {/* ACTION FOOTER */}

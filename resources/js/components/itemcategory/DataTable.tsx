@@ -127,6 +127,18 @@ export function DataTable({ data }: DataTableProps) {
     setImagePreview(cat.image ? `/images/${cat.image}` : null);
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files ? e.target.files[0] : null;
+    setForm("image", file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview(null);
+    }
+  };
+
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editCategory) return;
@@ -136,6 +148,7 @@ export function DataTable({ data }: DataTableProps) {
       onSuccess: () => {
         toast.success("Category updated successfully");
         setEditCategory(null);
+        setImagePreview(null);
         resetForm();
       },
     });
@@ -444,6 +457,29 @@ export function DataTable({ data }: DataTableProps) {
                   />
                 </div>
                 {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.name}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Category Image</Label>
+                <div className="flex items-center gap-4 p-4 border border-zinc-100 dark:border-zinc-800 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/50 group hover:border-orange-500/50 transition-all">
+                  <div className="relative h-20 w-20 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-2 border-dashed border-zinc-200 dark:border-zinc-700 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-orange-500/50 transition-all">
+                    {imagePreview ? (
+                      <img src={imagePreview} className="h-full w-full object-cover" />
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-zinc-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest leading-none">Update icon or representative photo</p>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="h-9 text-[10px] border-zinc-200 dark:border-zinc-800 rounded-lg cursor-pointer file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-orange-500 file:text-white hover:file:bg-orange-600"
+                    />
+                  </div>
+                </div>
+                {errors.image && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.image}</p>}
               </div>
             </div>
 

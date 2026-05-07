@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Items;
 use App\Models\ItemCategory;
 use App\Models\Account;
+use App\Models\ItemImage;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,7 +13,7 @@ class ItemsController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Items::with(['category', 'companyAccount']);
+        $query = Items::with(['category', 'companyAccount', 'images']);
 
         // Filter by Category
         if ($request->has('category_id') && $request->category_id && $request->category_id !== 'all') {
@@ -182,10 +183,43 @@ class ItemsController extends Controller
             'pt7' => 'nullable|numeric',
             'scheme' => 'nullable|string|max:255',
             'scheme2' => 'nullable|string|max:255',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'primary_new_index' => 'nullable|numeric',
         ]);
 
         // ✅ Create item
         $item = Items::create($validated);
+
+        if ($request->hasFile('images')) {
+            $uploadedFiles = $request->file('images');
+            if (!is_array($uploadedFiles)) $uploadedFiles = [$uploadedFiles];
+
+            foreach ($uploadedFiles as $index => $image) {
+                if ($image && $image->isValid()) {
+                    // Manual validation check for security
+                    $ext = strtolower($image->getClientOriginalExtension());
+                    if (in_array($ext, ['jpeg', 'png', 'jpg', 'gif', 'webp']) && $image->getSize() <= 5242880) {
+                        $image_name = time() . '_' . $index . '.' . $ext;
+                        $image->move(public_path('images/items'), $image_name);
+                        
+                        $isPrimary = false;
+                        if ($request->filled('primary_new_index') && (int)$request->primary_new_index === $index) {
+                            $isPrimary = true;
+                        } elseif (!$request->filled('primary_new_index') && $index === 0) {
+                            $isPrimary = true;
+                        }
+
+                        ItemImage::create([
+                            'item_id' => $item->id,
+                            'image_path' => 'images/items/' . $image_name,
+                            'is_primary' => $isPrimary,
+                            'sort_order' => $index,
+                        ]);
+                    }
+                }
+            }
+        }
 
         return redirect()->route('items.index')->with('success', 'Item created successfully');
     }
@@ -207,7 +241,7 @@ class ItemsController extends Controller
         $currentIndex = Items::where('id', '>', $id)->count() + 1;
 
         return Inertia::render("setup/items/edit", [
-            'item' => $item,
+            'item' => $item->load('images'),
             'categories' => $categories,
             'companies' => $companies,
             'pagination' => [
@@ -282,8 +316,72 @@ class ItemsController extends Controller
             'pt7' => 'nullable|numeric',
             'scheme' => 'nullable|string|max:255',
             'scheme2' => 'nullable|string|max:255',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'deleted_images' => 'nullable|array',
+            'deleted_images.*' => 'numeric',
+            'primary_image_id' => 'nullable|numeric',
+            'primary_new_index' => 'nullable|numeric',
         ]);
         $item->update($validated);
+
+        // Handle deletions
+        if ($request->has('deleted_images')) {
+            $imagesToDelete = ItemImage::whereIn('id', $request->deleted_images)->where('item_id', $item->id)->get();
+            foreach ($imagesToDelete as $img) {
+                if (file_exists(public_path($img->image_path))) {
+                    unlink(public_path($img->image_path));
+                }
+                $img->delete();
+            }
+        }
+
+        // Handle Primary Image Designation
+        if ($request->filled('primary_image_id') || $request->filled('primary_new_index')) {
+            ItemImage::where('item_id', $item->id)->update(['is_primary' => false]);
+            
+            if ($request->filled('primary_image_id')) {
+                ItemImage::where('id', $request->primary_image_id)
+                         ->where('item_id', $item->id)
+                         ->update(['is_primary' => true]);
+            }
+        }
+
+        // Handle new uploads
+        if ($request->hasFile('images')) {
+            $currentCount = $item->images()->count();
+            $uploadedFiles = $request->file('images');
+            
+            // Ensure we are iterating over an array
+            if (!is_array($uploadedFiles)) {
+                $uploadedFiles = [$uploadedFiles];
+            }
+
+            foreach ($uploadedFiles as $index => $image) {
+                if ($image && $image->isValid()) {
+                    // Manual validation check for security
+                    $ext = strtolower($image->getClientOriginalExtension());
+                    if (in_array($ext, ['jpeg', 'png', 'jpg', 'gif', 'webp']) && $image->getSize() <= 5242880) {
+                        $image_name = time() . '_' . $index . '.' . $ext;
+                        $image->move(public_path('images/items'), $image_name);
+                        
+                        $isPrimary = false;
+                        if ($request->filled('primary_new_index') && (int)$request->primary_new_index === $index) {
+                            $isPrimary = true;
+                        } elseif (!$request->filled('primary_image_id') && !$request->filled('primary_new_index') && $currentCount === 0 && $index === 0) {
+                            $isPrimary = true;
+                        }
+
+                        ItemImage::create([
+                            'item_id' => $item->id,
+                            'image_path' => 'images/items/' . $image_name,
+                            'is_primary' => $isPrimary,
+                            'sort_order' => $currentCount + $index,
+                        ]);
+                    }
+                }
+            }
+        }
 
         return redirect()->route('items.index')->with('success', 'Item updated successfully');
     }

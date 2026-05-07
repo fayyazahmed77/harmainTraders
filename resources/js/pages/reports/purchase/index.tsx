@@ -23,6 +23,7 @@ interface PageProps {
     categories: any[];
     salesmen: any[];
     users: any[];
+    companies: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -31,7 +32,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Purchase Playground", href: "/reports/purchase" },
 ];
 
-export default function PurchaseReports({ accounts, items, firms, areas, sub_areas, categories, salesmen, users }: PageProps) {
+export default function PurchaseReports({ accounts, items, firms, areas, sub_areas, categories, salesmen, users, companies }: PageProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === 'dark';
 
@@ -47,6 +48,7 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
         categoryId: 'ALL',
         salesmanId: 'ALL',
         userId: 'ALL',
+        companyId: 'ALL',
         printOn: 'screen',
     });
 
@@ -154,7 +156,7 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
                                     data={params} 
                                     setData={setParams} 
                                     onExecute={fetchData}
-                                    bootstrap={{ accounts, items, firms, areas, sub_areas, categories, salesmen, users }} 
+                                    bootstrap={{ accounts, items, firms, areas, sub_areas, categories, salesmen, users, companies }} 
                                 />
                             </motion.div>
 

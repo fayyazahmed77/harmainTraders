@@ -51,6 +51,7 @@ interface PurchaseParameterFormProps {
         categories: any[];
         salesmen: any[];
         users: any[];
+        companies: any[];
     };
     onExecute: () => void;
 }
@@ -266,7 +267,7 @@ export function PurchaseParameterForm({ data, setData, bootstrap, onExecute }: P
                                         </div>
                                         <h4 className="text-[11px] font-black text-text-primary uppercase tracking-[0.2em] italic">Entity & Region</h4>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest ml-1">Business Firm</Label>
                                             <SearchableSelect 
@@ -319,7 +320,7 @@ export function PurchaseParameterForm({ data, setData, bootstrap, onExecute }: P
                                         </div>
                                         <h4 className="text-[11px] font-black text-text-primary uppercase tracking-[0.2em] italic">Product & Personnel</h4>
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Item Category</Label>
                                             <SearchableSelect 
@@ -359,6 +360,19 @@ export function PurchaseParameterForm({ data, setData, bootstrap, onExecute }: P
                                                 ]}
                                                 placeholder="Select User"
                                                 emptyMessage="No users found"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Company</Label>
+                                            <SearchableSelect 
+                                                value={data.companyId} 
+                                                onValueChange={(v: string) => handleChange('companyId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL Company' },
+                                                    ...(bootstrap.companies || []).map(c => ({ value: c.id.toString(), label: c.title }))
+                                                ]}
+                                                placeholder="Select Company"
+                                                emptyMessage="No company found"
                                             />
                                         </div>
                                     </div>

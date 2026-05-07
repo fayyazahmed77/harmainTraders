@@ -37,6 +37,7 @@ class PurchaseReportsController extends Controller
             'categories' => ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
             'salesmen' => Saleman::select('id', 'name')->get(),
             'users' => User::select('id', 'name')->get(),
+            'companies' => Account::where('type', 5)->select('id', 'title')->orderBy('title')->get(),
         ]);
     }
 

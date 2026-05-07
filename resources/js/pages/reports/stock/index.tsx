@@ -53,6 +53,11 @@ export default function StockReportsIndex({ items, companies, categories, firms 
         showPT6: false,
         showPT7: false,
         showRetail: true,
+        all: true,
+        remove_zero: false,
+        show_zero: false,
+        reorder_level: false,
+        remove_negative: false,
         sortBy: 'ITEM_DESC',
         printOn: 'screen'
     });

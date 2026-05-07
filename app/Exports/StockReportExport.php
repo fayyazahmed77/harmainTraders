@@ -40,7 +40,10 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
         }
 
         $colspan = 7;
-        if (in_array($this->type, ['available_stock', 'detail', 'price_list'])) {
+        if (isset($this->params['withAmount']) && $this->params['withAmount']) {
+            $colspan = 8;
+        }
+        if (in_array($this->type, ['available_stock', 'detail', 'price_list', 're_order_level'])) {
             $colspan = 10;
         }
 
@@ -72,14 +75,29 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
                     'I' => 15, // Amount
                     'J' => 15, // Profit/Loss
                 ];
+            case 're_order_level':
+                return [
+                    'A' => 8,  // S.#
+                    'B' => 40, // Item
+                    'C' => 12, // Rate
+                    'D' => 10, // Packing
+                    'E' => 12, // Re-Order
+                    'F' => 12, // Balance
+                    'G' => 12, // Shortfall
+                    'H' => 15, // Amount
+                ];
             case 'price_list':
                 return [
                     'A' => 8, 'B' => 50, 'C' => 30, 'D' => 10, 'E' => 15, 'F' => 15, 'G' => 15,
                 ];
             default:
-                return [
-                    'A' => 8, 'B' => 50, 'C' => 30, 'D' => 10, 'E' => 15, 'F' => 15, 'G' => 20,
+                $widths = [
+                    'A' => 8, 'B' => 50, 'C' => 15, 'D' => 10, 'E' => 12, 'F' => 12, 'G' => 15,
                 ];
+                if (isset($this->params['withAmount']) && $this->params['withAmount']) {
+                    $widths['H'] = 18;
+                }
+                return $widths;
         }
     }
 
@@ -96,11 +114,16 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
                 'J' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             ];
         }
-        return [
+        $formats = [
+            'C' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             'E' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
         ];
+        if (isset($this->params['withAmount']) && $this->params['withAmount']) {
+            $formats['H'] = NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1;
+        }
+        return $formats;
     }
 
     public function styles(Worksheet $sheet)

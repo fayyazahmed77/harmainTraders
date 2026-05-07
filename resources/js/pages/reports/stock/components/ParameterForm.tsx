@@ -383,8 +383,7 @@ export function ParameterForm({
                                         {[
                                             { id: 'last_purchase', label: 'Last Purchase' },
                                             { id: 'average', label: 'Average Rate' },
-                                            { id: 'trade_price', label: 'Trade Price' },
-                                            { id: 'retail', label: 'Retail Price' }
+                                            
                                         ].map(opt => (
                                             <div key={opt.id} className="flex items-center space-x-3 group cursor-pointer">
                                                 <RadioGroupItem value={opt.id} id={opt.id} className="border-blue-600/40 text-blue-600 h-4 w-4" />
@@ -404,10 +403,12 @@ export function ParameterForm({
                                     </div>
                                     <div className="space-y-4">
                                         {[
+                                            { id: 'all', label: 'All Stock' },
                                             { id: 'remove_zero', label: 'Remove Zero Stock' },
-                                            { id: 'show_minus', label: 'Show Negative Stock' },
+                                            { id: 'show_zero', label: 'Show Zero Stock' },
                                             { id: 'reorder_level', label: 'Below Re-Order Level' },
-                                            { id: 'dead_stock', label: 'Include Dead Items' }
+                                            { id: 'remove_negative', label: 'Remove Negative Stock' },
+                                           
                                         ].map(opt => (
                                             <div key={opt.id} className="flex items-center space-x-4 group">
                                                 <Checkbox 
@@ -472,15 +473,18 @@ export function ParameterForm({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest ml-1">Dead Stock Ref.</Label>
+                                            <Label className="text-[9px] font-black text-emerald-600/60 uppercase tracking-widest ml-1">Company.</Label>
                                             <div className="relative">
-                                                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted/40" />
-                                                <Input 
-                                                    type="date" 
-                                                    value={params.deadStockDate} 
-                                                    onChange={(e) => updateParam('deadStockDate', e.target.value)}
-                                                    className="h-10 pl-10 text-[11px] font-bold uppercase bg-surface-0/60 border-border/20 rounded-sm focus-visible:ring-emerald-600/20"
-                                                />
+                                                <SearchableSelect 
+                                                value={params.companyId} 
+                                                onValueChange={(v: string) => updateParam('companyId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL Company' },
+                                                    ...(companies || []).map(c => ({ value: c.id.toString(), label: c.title }))
+                                                ]}
+                                                placeholder="Select Company"
+                                                emptyMessage="No company found"
+                                            />
                                             </div>
                                         </div>
                                     </div>

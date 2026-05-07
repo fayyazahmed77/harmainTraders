@@ -19,6 +19,11 @@ class StockReportBuilder
             'godown_id' => ($params['godownId'] ?? 'ALL') === 'ALL' ? null : $params['godownId'],
             'firm_id' => ($params['firmId'] ?? 'ALL') === 'ALL' ? null : $params['firmId'],
             'valuation' => $params['valuation'] ?? 'last_purchase',
+            'remove_zero' => filter_var($params['remove_zero'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'show_zero' => filter_var($params['show_zero'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'reorder_level' => filter_var($params['reorder_level'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'remove_negative' => filter_var($params['remove_negative'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'all' => filter_var($params['all'] ?? true, FILTER_VALIDATE_BOOLEAN),
         ];
 
         switch ($reportId) {
@@ -28,6 +33,7 @@ class StockReportBuilder
             case 'type_wise': return $this->typeWiseSummary($toDate, $filters);
             case 'less_than_zero': return $this->lessThanZero($toDate, $filters);
             case 'available_stock': return $this->availableStock($toDate, $filters);
+            case 're_order_level': return $this->reOrderLevel($toDate, $filters);
             default: return [];
         }
     }
@@ -53,7 +59,12 @@ class StockReportBuilder
         // Subqueries for In/Out calculation with date filter
         $purchaseQty = DB::table('purchase_items')
             ->join('purchases', 'purchase_items.purchase_id', '=', 'purchases.id')
-            ->select('item_id', DB::raw('SUM(total_pcs) as total'))
+            ->select(
+                'item_id', 
+                DB::raw('SUM(total_pcs) as total'),
+                DB::raw('SUM(subtotal) / SUM(total_pcs) as avg_rate'),
+                DB::raw('(SELECT trade_price FROM purchase_items pi2 WHERE pi2.item_id = purchase_items.item_id ORDER BY id DESC LIMIT 1) as last_rate')
+            )
             ->whereDate('purchases.date', '<=', $toDate)
             ->groupBy('item_id');
 
@@ -79,14 +90,17 @@ class StockReportBuilder
             'items.id',
             'items.title as item_name',
             'items.type as item_type',
+            'items.reorder_level',
             'companies.title as company_name',
             'item_categories.name as category_name',
             'items.packing_qty',
             'items.retail',
+            'items.trade_price as base_tp',
             DB::raw('COALESCE(p.total, 0) + COALESCE(sr.total, 0) as in_qty'),
             DB::raw('COALESCE(s.total, 0) + COALESCE(pr.total, 0) as out_qty'),
-            DB::raw('items.trade_price as rate'),
-            DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty')
+            DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
+            DB::raw('COALESCE(p.avg_rate, items.trade_price) as avg_rate'),
+            DB::raw('COALESCE(p.last_rate, items.trade_price) as last_rate')
         )
         ->leftJoinSub($purchaseQty, 'p', 'items.id', '=', 'p.item_id')
         ->leftJoinSub($saleReturnQty, 'sr', 'items.id', '=', 'sr.item_id')
@@ -94,11 +108,35 @@ class StockReportBuilder
         ->leftJoinSub($purchaseReturnQty, 'pr', 'items.id', '=', 'pr.item_id')
         ->get();
 
-        return $results->map(function($row) {
+        $data = $results->map(function($row) use ($filters) {
             $row = (array)$row;
+            
+            // Apply Valuation Logic
+            $row['rate'] = ($filters['valuation'] === 'average') ? $row['avg_rate'] : $row['last_rate'];
+            if (!$row['rate'] || $row['rate'] == 0) $row['rate'] = $row['base_tp'];
+
             $row['amount'] = $row['balance_qty'] * $row['rate'];
+            
             return $row;
-        })->toArray();
+        });
+
+        // Apply Calculation Filters
+        if (!$filters['all']) {
+            if ($filters['remove_zero']) {
+                $data = $data->filter(fn($r) => floatval($r['balance_qty']) != 0);
+            }
+            if ($filters['show_zero']) {
+                $data = $data->filter(fn($r) => floatval($r['balance_qty']) == 0);
+            }
+            if ($filters['reorder_level']) {
+                $data = $data->filter(fn($r) => floatval($r['balance_qty']) < (floatval($r['reorder_level'] ?? 0)));
+            }
+            if ($filters['remove_negative']) {
+                $data = $data->filter(fn($r) => floatval($r['balance_qty']) >= 0);
+            }
+        }
+
+        return $data->values()->toArray();
     }
 
     public function detail($toDate, $filters)
@@ -277,5 +315,19 @@ class StockReportBuilder
             
             return $row;
         }, $available));
+    }
+
+    public function reOrderLevel($toDate, $filters)
+    {
+        // Force reorder_level filter to true for this specific report
+        $filters['reorder_level'] = true;
+        $filters['all'] = false; // Ensure filter is applied
+
+        $data = $this->summary($toDate, $filters);
+
+        return array_values(array_map(function($row) {
+            $row['shortfall'] = max(0, floatval($row['reorder_level'] ?? 0) - floatval($row['balance_qty']));
+            return $row;
+        }, $data));
     }
 }

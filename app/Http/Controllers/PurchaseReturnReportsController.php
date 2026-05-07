@@ -27,6 +27,12 @@ class PurchaseReturnReportsController extends Controller
             'accounts' => Account::where('purchase', 1)->select('id', 'title', 'code')->get(),
             'items' => Items::select('id', 'title', 'code')->get(),
             'firms' => Firm::select('id', 'name')->get(),
+            'areas' => \App\Models\Areas::select('id', 'name')->get(),
+            'sub_areas' => \App\Models\Subarea::select('id', 'name')->get(),
+            'categories' => \App\Models\ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
+            'salesmen' => \App\Models\Saleman::select('id', 'name')->get(),
+            'users' => \App\Models\User::select('id', 'name')->get(),
+            'companies' => Account::where('type', 5)->select('id', 'title')->orderBy('title')->get(),
         ]);
     }
 

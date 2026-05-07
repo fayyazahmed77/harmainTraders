@@ -16,13 +16,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { 
     CalendarIcon, 
     Search, 
-    Undo2, 
+    Printer, 
     Wallet, 
     LayoutDashboard, 
     ChevronRight, 
     Filter, 
     Package,
-    Building2
+    Building2,
+    Check,
+    ChevronDown,
+    MapPin,
+    Map,
+    UserCheck,
+    User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -40,9 +46,77 @@ interface ReturnParameterFormProps {
         accounts: any[];
         items: any[];
         firms: any[];
+        areas: any[];
+        sub_areas: any[];
+        categories: any[];
+        salesmen: any[];
+        users: any[];
+        companies: any[];
     };
     onExecute: () => void;
 }
+
+const SearchableSelect = ({ value, onValueChange, options, placeholder, emptyMessage }: any) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    
+    const filteredOptions = options.filter((opt: any) => 
+        opt.label.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const selectedOption = options.find((opt: any) => opt.value === value);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button 
+                    variant="outline" 
+                    role="combobox" 
+                    aria-expanded={open}
+                    className="h-10 w-full bg-surface-0/60 border-border/20 rounded-sm text-[11px] font-bold uppercase tracking-tight justify-between hover:bg-surface-0/80 transition-all group"
+                >
+                    <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+                    <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 opacity-50 transition-transform duration-200", open && "rotate-180")} />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-0 bg-surface-1 border-border/40 shadow-2xl z-[100]" align="start">
+                <div className="flex flex-col">
+                    <div className="p-2 border-b border-border/10 flex items-center gap-2 bg-surface-0/40">
+                        <Search className="h-3.5 w-3.5 text-rose-500/50" />
+                        <Input 
+                            placeholder="Filter..." 
+                            className="h-7 border-none bg-transparent text-[10px] uppercase font-black focus-visible:ring-0 p-0" 
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="max-h-[240px] overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-rose-500/20">
+                        {filteredOptions.length === 0 && (
+                            <div className="p-4 text-[9px] font-black text-text-muted text-center uppercase tracking-widest opacity-40">No results found</div>
+                        )}
+                        {filteredOptions.map((opt: any) => (
+                            <button
+                                key={opt.value}
+                                className={cn(
+                                    "w-full text-left px-3 py-2 text-[10px] font-bold uppercase rounded-sm flex items-center justify-between hover:bg-rose-500/10 hover:text-rose-500 transition-all group/item",
+                                    value === opt.value ? "bg-rose-500/10 text-rose-500" : "text-text-muted"
+                                )}
+                                onClick={() => {
+                                    onValueChange(opt.value);
+                                    setOpen(false);
+                                    setSearch('');
+                                }}
+                            >
+                                <span className="truncate pr-4">{opt.label}</span>
+                                {value === opt.value && <Check className="h-3 w-3 shrink-0" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: ReturnParameterFormProps) {
     const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
@@ -155,7 +229,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                         className="h-14 px-8 bg-rose-600 hover:bg-rose-500 text-white rounded-sm flex items-center gap-3 group transition-all duration-300 shadow-lg shadow-rose-500/20 active:scale-[0.98] border border-white/10 relative overflow-hidden shrink-0"
                     >
                         <Search className="h-4 w-4 relative z-10 group-hover:scale-110 transition-transform" />
-                        <span className="font-black uppercase tracking-widest relative z-10 text-xs">Analyze</span>
+                        <span className="font-black uppercase tracking-widest relative z-10 text-xs">Execute</span>
                     </Button>
                 </div>
             </Card>
@@ -180,57 +254,129 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                         initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.2 }}
                     >
-                        <Card className="p-6 bg-surface-1/20 backdrop-blur-md border-border/50 shadow-inner rounded-sm">
-                             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                        <Card className="p-8 bg-surface-1/60 border-border/40 shadow-2xl mt-4 rounded-sm backdrop-blur-3xl ring-1 ring-white/5 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-rose-500/40" />
+                            
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-10">
                                 
-                                <div className="xl:col-span-10 space-y-6">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <div className="space-y-1.5 group">
-                                            <div className="flex items-center gap-2 ml-1">
-                                                <Building2 className="h-2.5 w-2.5 text-text-muted/40 group-hover:text-rose-500 transition-colors" />
-                                                <Label className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Firm</Label>
-                                            </div>
-                                            <Select value={data.firmId} onValueChange={(v) => handleChange('firmId', v)}>
-                                                <SelectTrigger className="h-8 w-full bg-surface-0 border-border/50 text-[10px] font-bold text-text-primary shadow-none hover:border-rose-400 transition-all rounded-sm">
-                                                    <SelectValue placeholder="ALL" />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-sm">
-                                                    <SelectItem value="ALL">ALL</SelectItem>
-                                                    {bootstrap.firms?.map((opt: any) => (
-                                                        <SelectItem key={opt.id} value={opt.id.toString()}>{opt.name || opt.title}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                {/* Entity & Region */}
+                                <div className="space-y-6 lg:col-span-3">
+                                    <div className="flex items-center gap-3 border-b border-border/10 pb-3">
+                                        <div className="h-8 w-8 rounded-sm bg-rose-500/10 flex items-center justify-center">
+                                            <Building2 className="h-4 w-4 text-rose-500" />
+                                        </div>
+                                        <h4 className="text-[11px] font-black text-text-primary uppercase tracking-[0.2em] italic">Entity & Region</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Business Firm</Label>
+                                            <SearchableSelect 
+                                                value={data.firmId} 
+                                                onValueChange={(v: string) => handleChange('firmId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL FIRMS' },
+                                                    ...(bootstrap.firms || []).map(f => ({ value: f.id.toString(), label: f.name || f.title }))
+                                                ]}
+                                                placeholder="Select Firm"
+                                                emptyMessage="No firms found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Region / Area</Label>
+                                            <SearchableSelect 
+                                                value={data.areaId} 
+                                                onValueChange={(v: string) => handleChange('areaId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL AREAS' },
+                                                    ...(bootstrap.areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                ]}
+                                                placeholder="Select Area"
+                                                emptyMessage="No areas found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Sub Area</Label>
+                                            <SearchableSelect 
+                                                value={data.subAreaId} 
+                                                onValueChange={(v: string) => handleChange('subAreaId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL SUB AREAS' },
+                                                    ...(bootstrap.sub_areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                ]}
+                                                placeholder="Select Sub Area"
+                                                emptyMessage="No sub areas found"
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Sidebar Control Group */}
-                                <div className="xl:col-span-2 space-y-5 bg-surface-1/30 p-5 rounded-sm border border-border/50 shadow-sm">
-                                    <div className="space-y-3">
-                                        <h4 className="text-[9px] font-black text-text-muted uppercase tracking-widest border-b border-border/20 pb-1">Output Mode</h4>
-                                        <RadioGroup value={data.printOn} onValueChange={(v: any) => handleChange('printOn', v)} className="flex flex-col gap-2">
-                                            {[
-                                                { id: 'screen', label: 'Screen' },
-                                                { id: 'pdf', label: 'PDF Report' },
-                                                { id: 'printer', label: 'Direct Print' },
-                                            ].map(opt => (
-                                                <div key={opt.id} className="flex items-center gap-2.5 group/radio cursor-pointer">
-                                                    <RadioGroupItem value={opt.id} id={`print-${opt.id}`} className="h-3.5 w-3.5 border-border" />
-                                                    <label htmlFor={`print-${opt.id}`} className="text-[10px] font-bold text-text-secondary group-hover/radio:text-text-primary uppercase cursor-pointer">{opt.label}</label>
-                                                </div>
-                                            ))}
-                                        </RadioGroup>
+                                {/* Personnel & Product */}
+                                <div className="space-y-6 lg:col-span-3">
+                                    <div className="flex items-center gap-3 border-b border-border/10 pb-3">
+                                        <div className="h-8 w-8 rounded-sm bg-indigo-500/10 flex items-center justify-center">
+                                            <Package className="h-4 w-4 text-indigo-500" />
+                                        </div>
+                                        <h4 className="text-[11px] font-black text-text-primary uppercase tracking-[0.2em] italic">Product & Personnel</h4>
                                     </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Item Category</Label>
+                                            <SearchableSelect 
+                                                value={data.categoryId} 
+                                                onValueChange={(v: string) => handleChange('categoryId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL CATEGORIES' },
+                                                    ...(bootstrap.categories || []).map(c => ({ value: c.id.toString(), label: c.title || c.name }))
+                                                ]}
+                                                placeholder="Select Category"
+                                                emptyMessage="No categories found"
+                                            />
+                                        </div>
 
-                                    <div className="pt-2">
-                                        <div className="flex items-center justify-between px-2 py-1.5 bg-rose-500/10 rounded-sm border border-rose-500/20">
-                                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">Engine v1.0</span>
-                                            <Badge variant="outline" className="h-3.5 text-[8px] border-rose-500/30 text-rose-500 font-bold px-1 rounded-none">STABLE</Badge>
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Purchasing Agent</Label>
+                                            <SearchableSelect 
+                                                value={data.salesmanId} 
+                                                onValueChange={(v: string) => handleChange('salesmanId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL AGENTS' },
+                                                    ...(bootstrap.salesmen || []).map(s => ({ value: s.id.toString(), label: s.name }))
+                                                ]}
+                                                placeholder="Select Agent"
+                                                emptyMessage="No agents found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Input By (User)</Label>
+                                            <SearchableSelect 
+                                                value={data.userId} 
+                                                onValueChange={(v: string) => handleChange('userId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL USERS' },
+                                                    ...(bootstrap.users || []).map(u => ({ value: u.id.toString(), label: u.name }))
+                                                ]}
+                                                placeholder="Select User"
+                                                emptyMessage="No users found"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-indigo-500/60 uppercase tracking-widest ml-1">Company</Label>
+                                            <SearchableSelect 
+                                                value={data.companyId} 
+                                                onValueChange={(v: string) => handleChange('companyId', v)}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL Company' },
+                                                    ...(bootstrap.companies || []).map(c => ({ value: c.id.toString(), label: c.title }))
+                                                ]}
+                                                placeholder="Select Company"
+                                                emptyMessage="No company found"
+                                            />
                                         </div>
                                     </div>
                                 </div>
-
                              </div>
                         </Card>
                     </motion.div>

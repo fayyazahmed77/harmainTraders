@@ -39,6 +39,12 @@ export const stockReports = [
         icon: 'Layers'
     },
     {
+        id: 're_order_level',
+        title: 'Re Order Level',
+        description: 'Inventory re order level',
+        icon: 'Layers'
+    },
+    {
         id: 'less_than_zero',
         title: 'Stock Summary Less Than Zero',
         description: 'Critical check for negative inventory levels',

@@ -39,4 +39,56 @@
         </tr>
     </tfoot>
 </table>
+
+@php
+    $historyRow = collect($data)->first(function($row) {
+        return isset($row['history']) && count($row['history']) > 0;
+    });
+    $historyData = $historyRow ? $historyRow['history'] : null;
+@endphp
+
+@if($historyData)
+    <div style="margin-top: 30px; page-break-before: auto;">
+        <div style="border-left: 3px solid #4f46e5; padding-left: 10px; margin-bottom: 10px;">
+            <h3 style="margin: 0; text-transform: uppercase; font-style: italic; font-size: 11px;">Sales <span style="color: #4f46e5;">History</span></h3>
+            <p style="margin: 0; font-size: 7px; color: #666; text-transform: uppercase; letter-spacing: 1px;">Detailed transaction log for selected item</p>
+        </div>
+
+        <table style="border: 1px solid #000; width: 100%;">
+            <thead>
+                <tr style="background-color: #f3f4f6;">
+                    <th style="width: 60px; border: 1px solid #000; font-size: 8px;">Inv.#</th>
+                    <th style="width: 60px; border: 1px solid #000; font-size: 8px;">Date</th>
+                    <th style="border: 1px solid #000; font-size: 8px;">Customer Name</th>
+                    <th style="width: 40px; border: 1px solid #000; font-size: 8px;" class="text-center">Full</th>
+                    <th style="width: 40px; border: 1px solid #000; font-size: 8px;" class="text-center">Pcs</th>
+                    <th style="width: 60px; border: 1px solid #000; font-size: 8px;" class="text-right">Rate</th>
+                    <th style="width: 80px; border: 1px solid #000; font-size: 8px;" class="text-right">Net Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($historyData as $h)
+                    <tr>
+                        <td style="font-size: 8px; font-weight: bold; color: #4f46e5; border: 0.5px solid #eee; padding: 4px;">{{ $h['invoice'] }}</td>
+                        <td style="font-size: 8px; border: 0.5px solid #eee; padding: 4px;">{{ $h['date'] }}</td>
+                        <td style="font-size: 8px; text-transform: uppercase; border: 0.5px solid #eee; padding: 4px;">{{ $h['customer_name'] }}</td>
+                        <td style="font-size: 8px; text-align: center; border: 0.5px solid #eee; padding: 4px;">{{ (int)$h['qty_full'] }}</td>
+                        <td style="font-size: 8px; text-align: center; border: 0.5px solid #eee; padding: 4px;">{{ (int)$h['qty_pcs'] }}</td>
+                        <td style="font-size: 8px; text-align: right; border: 0.5px solid #eee; padding: 4px;">{{ number_format($h['tp'], 1) }}</td>
+                        <td style="font-size: 8px; font-weight: bold; text-align: right; border: 0.5px solid #eee; padding: 4px;">{{ number_format($h['amount'], 2) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr style="background-color: #f9fafb; font-weight: bold;">
+                    <td colspan="3" style="font-size: 8px; text-align: right; padding: 6px;">Sub-Total Transactions</td>
+                    <td style="font-size: 8px; text-align: center; border: 0.5px solid #eee;">{{ (int)collect($historyData)->sum('qty_full') }}</td>
+                    <td style="font-size: 8px; text-align: center; border: 0.5px solid #eee;">{{ (int)collect($historyData)->sum('qty_pcs') }}</td>
+                    <td style="border: 0.5px solid #eee;"></td>
+                    <td style="font-size: 9px; text-align: right; border: 0.5px solid #eee; color: #4f46e5;">{{ number_format(collect($historyData)->sum('amount'), 2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+@endif
 @endsection

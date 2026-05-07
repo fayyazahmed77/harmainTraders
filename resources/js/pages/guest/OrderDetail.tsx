@@ -19,6 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 
+import { CatalogHeader } from "./components/CatalogHeader";
+import { CatalogFooter } from "./components/CatalogFooter";
+import { Cart } from "./components/types";
+
 interface Props {
     account: any;
     sale: any;
@@ -26,12 +30,22 @@ interface Props {
 }
 
 export default function OrderDetail({ account, sale, token }: Props) {
+    const [cart, setCart] = React.useState<Cart>(() => {
+        const saved = localStorage.getItem(`cart_${token}`);
+        return saved ? JSON.parse(saved) : {};
+    });
+
+    const cartCount = Object.keys(cart).length;
+    const cartTotal = Object.values(cart).reduce((acc, item) => {
+        return acc + (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0));
+    }, 0);
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
             style: "currency",
             currency: "PKR",
             minimumFractionDigits: 0,
-        }).format(amount);
+        }).format(amount).replace('PKR', 'Rs');
     };
 
     const formatDate = (dateString: string) => {
@@ -45,25 +59,23 @@ export default function OrderDetail({ account, sale, token }: Props) {
     const isPending = sale.status === 'Pending Order';
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col items-center">
+        <div className="min-h-screen bg-slate-50 dark:bg-zinc-950">
             <Head title={`Invoice ${sale.invoice}`} />
 
-            {/* Header */}
-            <header className="w-full max-w-4xl px-4 py-6 flex items-center justify-between sticky top-0 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-md z-10">
-                <Link href={`/g/${token}`} className="flex items-center gap-2 text-slate-600 dark:text-zinc-400 hover:text-orange-600 transition-colors">
-                    <ArrowLeft className="h-4 w-4" />
-                    <span className="font-medium text-sm">Dashboard</span>
-                </Link>
-                
-                <div className="text-center">
-                    <div className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">{account.title}</div>
-                    <div className="text-sm font-bold text-slate-900 dark:text-zinc-100">{sale.invoice}</div>
-                </div>
+            <CatalogHeader 
+                search=""
+                setSearch={() => {}}
+                cartCount={cartCount}
+                cartTotal={cartTotal}
+                formatCurrency={formatCurrency}
+                setCheckoutOpen={() => {
+                    window.location.href = `/g/${token}/catalog`;
+                }}
+                account={account}
+                token={token}
+            />
 
-                <div className="w-10" aria-hidden="true" /> {/* Spacer */}
-            </header>
-
-            <main className="w-full max-w-4xl px-4 py-4 space-y-6 flex-1">
+            <main className="w-full max-w-4xl mx-auto px-4 py-4 space-y-6 min-h-[60vh]">
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -221,13 +233,7 @@ export default function OrderDetail({ account, sale, token }: Props) {
                 )}
             </main>
 
-            <footer className="w-full max-w-4xl px-4 py-8 text-center space-y-4">
-                <Separator />
-                <div className="flex flex-col items-center gap-1">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Harnain Traders</div>
-                    <div className="text-xs text-muted-foreground italic">Thank you for choosing us!</div>
-                </div>
-            </footer>
+            <CatalogFooter token={token} />
         </div>
     );
 }
