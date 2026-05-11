@@ -20,6 +20,7 @@ export default function InvoiceDetailsReport({ data, formatCurrency }: Props) {
                 invNo: row.inv_no,
                 invDate: row.inv_date,
                 account: row.account_title,
+                salesman: row.salesman_name,
                 totalAmount: row.inv_amount,
                 items: []
             };
@@ -57,6 +58,10 @@ export default function InvoiceDetailsReport({ data, formatCurrency }: Props) {
                             <div className="flex flex-col border-l border-border/50 pl-8">
                                 <span className="text-[9px] font-black text-text-muted/60 uppercase tracking-widest">Account Title</span>
                                 <span className="text-[13px] font-black uppercase text-text-primary tracking-tight">{inv.account}</span>
+                            </div>
+                            <div className="flex flex-col border-l border-border/50 pl-8">
+                                <span className="text-[9px] font-black text-text-muted/60 uppercase tracking-widest">Salesman</span>
+                                <span className="text-[13px] font-black uppercase text-text-primary tracking-tight">{inv.salesman || 'N/A'}</span>
                             </div>
                         </div>
                         <div className=" px-6 py-2 rounded-sm">

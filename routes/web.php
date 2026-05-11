@@ -47,6 +47,8 @@ use App\Http\Controllers\Investor\ForecastController as InvestorForecastControll
 use App\Http\Controllers\Admin\InvestorManagementController;
 use App\Http\Controllers\Admin\ProfitDistributionController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\SupplierCompanyController;
+use App\Http\Controllers\Admin\SupplierOrderController;
 use App\Http\Controllers\PurchaseReturnReportsController;
 use App\Http\Controllers\SalesReportsController;
 use App\Http\Controllers\SalesReturnReportsController;
@@ -533,6 +535,19 @@ Route::middleware(['auth'])->group(function () {
         });
 
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('admin.activity-logs.index');
+
+        // Supplier Companies
+        Route::get('/supplier-companies', [SupplierCompanyController::class, 'index'])->name('admin.supplier-companies.index');
+        Route::post('/supplier-companies', [SupplierCompanyController::class, 'store'])->name('admin.supplier-companies.store');
+        Route::delete('/supplier-companies/{supplierId}/{companyId}', [SupplierCompanyController::class, 'destroy'])->name('admin.supplier-companies.destroy');
+
+        // Supplier Orders
+        Route::get('/supplier-order', [SupplierOrderController::class, 'index'])->name('admin.supplier-order.index');
+        Route::post('/api/supplier-order/items', [SupplierOrderController::class, 'getItems']);
+        Route::post('/api/supplier-order/store', [SupplierOrderController::class, 'store']);
+        Route::get('/supplier-order/list', [SupplierOrderController::class, 'list'])->name('admin.supplier-order.list');
+        Route::get('/supplier-order/{id}/show', [SupplierOrderController::class, 'show'])->name('admin.supplier-order.show');
+        Route::get('/supplier-order/{id}/print', [SupplierOrderController::class, 'print'])->name('admin.supplier-order.print');
     });
 });
 

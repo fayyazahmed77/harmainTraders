@@ -589,6 +589,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
       invoice: invoiceNo,
       code: code,
+      type: cashCredit,
       customer_id: accountType?.value,
       salesman_id: salesman,
       firm_id: selectedFirmId && selectedFirmId !== "0" ? Number(selectedFirmId) : null,

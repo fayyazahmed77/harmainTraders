@@ -380,6 +380,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       date: date?.toISOString().split('T')[0],
       invoice: invoiceNo,
       code,
+      type: cashCredit,
       customer_id: accountType?.value,
       salesman_id: salesman,
       firm_id: selectedFirmId !== "0" ? Number(selectedFirmId) : null,

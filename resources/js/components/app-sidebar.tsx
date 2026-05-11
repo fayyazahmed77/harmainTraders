@@ -230,18 +230,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       roles: ['Admin'],
       items: [
         {
-          title: "Company Waise Order",
-          url: "#",
+          title: "Supplier Orders List",
+          url: "/admin/supplier-order/list",
         },
         {
-          title: "Supplier Waise Order",
-          url: "#",
+          title: "Create Supplier Order",
+          url: "/admin/supplier-order",
         },
         {
-          title: "Supplier Waise Company",
-          url: "#",
+          title: "Supplier Companies",
+          url: "/admin/supplier-companies",
         },
-
       ],
     },
     {

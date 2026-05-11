@@ -1006,6 +1006,7 @@ class ReportBuilder
                 'date' => $sale->date,
                 'voucher_no' => str_pad($sale->invoice ?? $sale->id, 6, "0", STR_PAD_LEFT),
                 'party_name' => $sale->customer->title ?? 'Unknown',
+                'type' => $sale->type ?? 'CREDIT',
                 'customer_id' => $sale->customer_id,
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,

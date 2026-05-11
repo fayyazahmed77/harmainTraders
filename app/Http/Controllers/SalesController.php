@@ -149,6 +149,8 @@ class SalesController extends Controller
         $request->validate([
             'date'            => 'required|date',
             'invoice'         => 'required|string', // Assuming auto-generated or passed
+            'code'            => 'nullable|string',
+            'type'            => 'nullable|string',
             'customer_id'     => 'required|integer', // Assuming passed
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
@@ -230,6 +232,7 @@ class SalesController extends Controller
                 'date'            => $request->date,
                 'invoice'         => $request->invoice ?? 'INV-' . time(),
                 'code'            => $request->code,
+                'type'            => $request->type ?? 'CREDIT',
                 'customer_id'     => $request->customer_id ?? 0,
                 'salesman_id'     => $request->salesman_id ?? 0,
                 'firm_id'         => $request->firm_id ?? null,
@@ -578,6 +581,7 @@ class SalesController extends Controller
                 'date'            => $request->date,
                 'invoice'         => $request->invoice,
                 'code'            => $request->code,
+                'type'            => $request->type ?? $sale->type,
                 'customer_id'     => $request->customer_id ?? $sale->customer_id,
                 'salesman_id'     => $request->salesman_id ?? $sale->salesman_id,
                 'firm_id'         => $request->firm_id ?? $sale->firm_id,

@@ -17,6 +17,7 @@ class Sales extends Model
         'date',
         'invoice',
         'code',
+        'type',
         'customer_id', // Assuming customer_id instead of supplier_id
         'salesman_id',
         'firm_id',

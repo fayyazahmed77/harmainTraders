@@ -44,6 +44,7 @@ interface ActivityLog {
   new_values: any;
   ip_address: string;
   user_agent: string;
+  location: string | null;
   created_at: string;
 }
 
@@ -102,6 +103,7 @@ export default function ActivityLogIndex({ logs, modules, actions }: Props) {
                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Action</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Module</TableHead>
                   <TableHead className="text-[10px] font-black uppercase tracking-widest">Description</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest">IP & Location</TableHead>
                   <TableHead className="text-right text-[10px] font-black uppercase tracking-widest px-6">Details</TableHead>
                 </TableRow>
               </TableHeader>
@@ -140,6 +142,12 @@ export default function ActivityLogIndex({ logs, modules, actions }: Props) {
                     <TableCell className="max-w-xs truncate">
                       <span className="text-xs text-zinc-600 dark:text-zinc-400">{log.description}</span>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-bold text-zinc-700 dark:text-zinc-300">{log.ip_address}</span>
+                        <span className="text-[10px] text-zinc-400 font-medium">{log.location || 'N/A'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right px-6">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -172,8 +180,9 @@ export default function ActivityLogIndex({ logs, modules, actions }: Props) {
                                   <p className="text-sm font-bold">{new Date(selectedLog.created_at).toLocaleString()}</p>
                                 </div>
                                 <div className="space-y-1">
-                                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">IP Address</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">IP & Location</p>
                                   <p className="text-xs font-mono">{selectedLog.ip_address}</p>
+                                  <p className="text-[10px] text-zinc-500 font-bold">{selectedLog.location || 'Unknown'}</p>
                                 </div>
                                 <div className="space-y-1 text-right">
                                   <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Action</p>

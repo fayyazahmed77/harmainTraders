@@ -182,8 +182,9 @@ if (file_exists($logo_path)) {
                 <thead>
                     <tr>
                         <th width="10%">Date</th>
-                        <th width="10%">Voucher #</th>
-                        <th width="35%">Party Name</th>
+                        <th width="8%">Voucher #</th>
+                        <th width="30%">Party Name</th>
+                        <th width="8%">Status</th>
                         <th width="10%">Due Date</th>
                         <th width="5%">Days</th>
                         <th width="10%">Bill Amt</th>
@@ -194,10 +195,20 @@ if (file_exists($logo_path)) {
                 </thead>
                 <tbody>
                     @foreach($bills as $bill)
+                    @php
+                        $statusType = $bill['type'] ?? 'CREDIT';
+                        $statusColor = $statusType === 'CASH' ? '#059669' : '#2563eb';
+                        $statusStyle = "font-weight: bold; color: {$statusColor};";
+                    @endphp
                     <tr>
                         <td class="text-center">{{ strtoupper(date('d-M-y', strtotime($bill['date']))) }}</td>
                         <td class="text-center">{{ $bill['voucher_no'] }}</td>
                         <td>{{ $bill['party_name'] }}</td>
+                        @if($statusType === 'CASH')
+                            <td class="text-center" style="font-weight: bold; color: #059669;">CASH</td>
+                        @else
+                            <td class="text-center" style="font-weight: bold; color: #2563eb;">CREDIT</td>
+                        @endif
                         <td class="text-center">{{ strtoupper(date('d-M-y', strtotime($bill['due_date']))) }}</td>
                         <td class="text-center">{{ $bill['days'] }}</td>
                         <td class="text-right">{{ formatNum($bill['bill_amt']) }}</td>

@@ -83,6 +83,7 @@ export function DueBillsReportView({
                                                 <th className="px-4 py-2 border-r border-border w-[100px]">Date</th>
                                                 <th className="px-4 py-2 border-r border-border w-[100px]">Voucher #</th>
                                                 <th className="px-4 py-2 border-r border-border">Party Name</th>
+                                                <th className="px-3 py-2 border-r border-border w-[80px] text-center">Status</th>
                                                 <th className="px-4 py-2 border-r border-border w-[100px] text-center">Due Date</th>
                                                 <th className="px-3 py-2 border-r border-border w-[60px] text-center">Days</th>
                                                 <th className="px-4 py-2 border-r border-border text-right w-[100px]">Bill Amt</th>
@@ -97,6 +98,14 @@ export function DueBillsReportView({
                                                     <td className="px-4 py-2 font-black text-text-secondary tabular-nums border-r border-border/10">{format(new Date(row.date), 'dd-MMM-yy').toUpperCase()}</td>
                                                     <td className="px-4 py-2 font-bold text-text-muted border-r border-border/10">{row.voucher_no}</td>
                                                     <td className="px-4 py-2 font-medium text-text-secondary border-r border-border/10">{row.party_name}</td>
+                                                    <td className="px-3 py-2 text-center border-r border-border/10">
+                                                        <span className={cn(
+                                                            "px-1.5 py-0.5 rounded-[4px] text-[9px] font-black tracking-tighter uppercase",
+                                                            row.type === 'CASH' ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                                                        )}>
+                                                            {row.type || 'CREDIT'}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-4 py-2 text-center tabular-nums text-text-muted border-r border-border/10">{format(new Date(row.due_date), 'dd-MMM-yy').toUpperCase()}</td>
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>

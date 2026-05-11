@@ -83,4 +83,9 @@ class User extends Authenticatable
         $this->two_factor_expires_at = null;
         $this->save();
     }
+
+    public function verifiedDevices()
+    {
+        return $this->hasMany(UserVerifiedDevice::class);
+    }
 }

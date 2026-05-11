@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useForm } from "@inertiajs/react";
 import { toast } from "sonner";
+import { route } from 'ziggy-js';
 import { 
   Mail, 
   Settings, 
@@ -24,7 +25,9 @@ import {
   ShieldCheck,
   Server,
   Lock,
-  Save
+  Save,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +85,7 @@ export default function EmailSettings({ settings }: Props) {
     mail_from_name: settings.mail_from_name || "",
     logo: null as File | null,
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,12 +156,18 @@ export default function EmailSettings({ settings }: Props) {
                       <Label className="text-xs font-bold uppercase text-zinc-500">Password</Label>
                       <div className="relative">
                         <Input 
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           value={data.mail_password} 
                           onChange={e => setData('mail_password', e.target.value)} 
                           className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 pr-10"
                         />
-                        <Lock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
                       </div>
                     </div>
                     <div className="space-y-2">

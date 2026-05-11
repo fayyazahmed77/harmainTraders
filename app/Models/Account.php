@@ -178,6 +178,22 @@ class Account extends Model
         
         return (float)$this->opening_balance;
     }
+
+    public function assignedCompanies()
+    {
+        return $this->belongsToMany(Account::class, 'supplier_companies', 'supplier_id', 'company_id')->withTimestamps();
+    }
+
+    public function assignedSuppliers()
+    {
+        return $this->belongsToMany(Account::class, 'supplier_companies', 'company_id', 'supplier_id')->withTimestamps();
+    }
+
+    public function items()
+    {
+        return $this->hasMany(Items::class, 'company');
+    }
+
     public function getGuestLinkAttribute()
     {
         if (!$this->guest_token) {

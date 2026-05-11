@@ -136,7 +136,8 @@ class SalesReportBuilder
     {
         $query = $this->getSalesItemsQuery($fromDate, $toDate)
             ->join('items', 'sales_items.item_id', '=', 'items.id')
-            ->join('accounts', 'sales.customer_id', '=', 'accounts.id');
+            ->join('accounts', 'sales.customer_id', '=', 'accounts.id')
+            ->leftJoin('salemen', 'sales.salesman_id', '=', 'salemen.id');
 
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
@@ -146,6 +147,7 @@ class SalesReportBuilder
             'sales.invoice as inv_no',
             'sales.date as inv_date',
             'accounts.title as account_title',
+            'salemen.name as salesman_name',
             'sales.net_total as inv_amount',
             'items.title as item_name',
             'sales_items.trade_price',
