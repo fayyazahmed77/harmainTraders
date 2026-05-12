@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useForm, router } from "@inertiajs/react";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { DirtyStateDialog } from "@/components/dirty-state-dialog";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Plus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -42,6 +42,7 @@ import {
   Save,
   RotateCcw
 } from "lucide-react";
+import { useAppearance } from "@/hooks/use-appearance";
 
 const PREMIUM_ROUNDING_MD = "rounded-xl";
 const SIGNAL_ORANGE = "rgb(249, 115, 22)";
@@ -127,6 +128,7 @@ interface AccountForm {
   ats_type: string;
   cnic: string;
   status: boolean;
+  image?: File | null;
 }
 
 interface EditProps {
@@ -214,39 +216,44 @@ export default function Edit({
   const [booker, setBooker] = useState<Option | null>(getMappedOption(account.booker_id, bookers));
   const [accountType, setAccountType] = useState<Option | null>(getMappedOption(account.type, accountTypes));
   const [selectedCategory, setSelectedCategory] = useState<Option | null>(getMappedOption(account.category, accountCategories));
+  const [imagePreview, setImagePreview] = useState<string | null>(account.image_url || null);
 
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
   const isCompany = accountType?.label === "Company";
 
-  const isDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const { appearance } = useAppearance();
+  const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const selectBg = isDark ? '#0a0a0a' : '#ffffff';
   const selectBorder = isDark ? '#262626' : '#e5e7eb';
+
+  const SIGNAL_ORANGE = '#f97316';
 
   // Define custom styles for react-select to match Items form
   const getSelectStyles = (hasError: boolean) => ({
     control: (base: any, state: any) => ({
       ...base,
-      backgroundColor: selectBg,
-      border: `1px solid ${hasError ? '#f43f5e' : (state.isFocused ? SIGNAL_ORANGE : selectBorder)}`,
-      borderRadius: 'var(--radius)',
-      boxShadow: state.isFocused ? `0 0 0 1px ${SIGNAL_ORANGE}` : 'none',
+      backgroundColor: 'transparent',
+      borderColor: hasError ? 'rgb(244 63 94)' : state.isFocused ? SIGNAL_ORANGE : 'var(--border)',
+      color: 'inherit',
+      minHeight: '2.5rem',
+      height: '2.5rem',
+      borderRadius: 'calc(var(--radius) - 2px)',
+      boxShadow: state.isFocused ? (hasError ? '0 0 0 1px rgb(244 63 94)' : `0 0 0 1px ${SIGNAL_ORANGE}`) : 'none',
       '&:hover': {
-        borderColor: hasError ? '#f43f5e' : (state.isFocused ? SIGNAL_ORANGE : selectBorder),
+        borderColor: hasError ? 'rgb(225 29 72)' : state.isFocused ? SIGNAL_ORANGE : 'var(--border)',
       },
-      minHeight: '40px',
+      opacity: state.isDisabled ? 0.5 : 1,
       fontSize: '0.875rem',
-      cursor: 'pointer',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'all 0.2s ease',
     }),
     singleValue: (base: any) => ({
       ...base,
-      color: isDark ? '#f4f4f5' : '#18181b',
-      fontWeight: '600',
+      color: 'inherit',
     }),
     placeholder: (base: any) => ({
       ...base,
-      color: isDark ? '#71717a' : '#a1a1aa',
+      color: 'var(--muted-foreground)',
       fontSize: '0.875rem',
     }),
     menu: (base: any) => ({
@@ -264,30 +271,37 @@ export default function Edit({
       borderRadius: 'calc(var(--radius) - 2px)',
       backgroundColor: state.isSelected
         ? SIGNAL_ORANGE
-        : (state.isFocused ? (isDark ? '#27272a' : '#f4f4f5') : 'transparent'),
+        : state.isFocused
+          ? 'var(--accent)'
+          : 'transparent',
       color: state.isSelected
         ? '#ffffff'
-        : (isDark ? '#f4f4f5' : '#18181b'),
+        : state.isFocused
+          ? 'var(--accent-foreground)'
+          : 'inherit',
       cursor: 'pointer',
-      fontWeight: state.isSelected ? '700' : '500',
       fontSize: '0.875rem',
       padding: '8px 12px',
-      '&:active': {
-        backgroundColor: SIGNAL_ORANGE,
-        color: '#ffffff',
-      },
     }),
-    input: (base: any) => ({ ...base, color: isDark ? '#f4f4f5' : '#18181b' }),
+    input: (base: any) => ({
+      ...base,
+      color: 'inherit',
+    }),
     dropdownIndicator: (base: any) => ({
       ...base,
-      color: isDark ? '#52525b' : '#a1a1aa',
-      '&:hover': { color: SIGNAL_ORANGE }
+      color: 'var(--muted-foreground)',
+      padding: '4px',
+      '&:hover': {
+        color: SIGNAL_ORANGE,
+      },
     }),
-    indicatorSeparator: () => ({ display: 'none' }),
+    indicatorSeparator: () => ({
+      display: 'none',
+    }),
   });
 
   // ---------- Inertia Form (Moved Up) ----------
-  const { data, setData, put, processing, errors, transform, reset, clearErrors, setError, isDirty } = useForm<AccountForm>({
+  const { data, setData, post, processing, errors, transform, reset, clearErrors, setError, isDirty } = useForm<AccountForm>({
     ...account,
     // ensure boolean types
     purchase: Number(account.purchase) === 1,
@@ -319,6 +333,7 @@ export default function Edit({
     item_category: account.item_category ? String(account.item_category) : "",
     ats_percentage: account.ats_percentage ?? "",
     ats_type: account.ats_type ?? "",
+    image: null,
   } as AccountForm);
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
@@ -491,9 +506,10 @@ export default function Edit({
       type: accountType?.value ? String(accountType.value) : "",
       booker_id: booker?.value ? String(booker.value) : "",
       category: selectedCategory?.value ? String(selectedCategory.value) : "",
+      _method: 'PUT',
     }));
 
-    put(`/account/${account.id}`, {
+    post(`/account/${account.id}`, {
       onSuccess: () => {
         toast.success("Account updated successfully!");
       },
@@ -522,7 +538,7 @@ export default function Edit({
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="flex flex-1 flex-col overflow-hidden bg-[#f0f2f5]/50 dark:bg-zinc-950/50">
           <div className="flex-1 overflow-y-auto custom-scrollbar pt-8 pb-32">
-            <div className="max-w-7xl mx-auto px-6">
+            <div className=" mx-auto px-6">
               <div className="mb-8">
                 <h1 className={`text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'} mb-2`}>
                   EDIT <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">ACCOUNT</span>
@@ -735,6 +751,64 @@ export default function Edit({
                           className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 uppercase"
                         />
                       </TechLabel>
+                    </Card>
+
+                    {/* PROFILE IMAGE */}
+                    <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                      <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                        <UserIcon size={16} className="text-orange-500" />
+                        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Profile Image</h3>
+                      </div>
+
+                      <div className="flex flex-col items-center gap-4">
+                        {imagePreview ? (
+                          <div className="relative group">
+                            <img
+                              src={imagePreview}
+                              alt="Preview"
+                              className="w-32 h-32 rounded-xl object-cover border-4 border-white dark:border-zinc-800 shadow-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImagePreview(null);
+                                setData("image", null);
+                              }}
+                              className="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Plus className="rotate-45 h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
+                            onClick={() => document.getElementById('image-upload')?.click()}
+                          >
+                            <Plus className="h-8 w-8" />
+                            <span className="text-[10px] font-black uppercase tracking-tighter">Upload Photo</span>
+                          </div>
+                        )}
+
+                        <Input
+                          id="image-upload"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setData("image", file);
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setImagePreview(reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                        <p className="text-[10px] text-zinc-400 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
+                        {errors.image && <p className="text-[10px] text-rose-500 font-bold uppercase">{errors.image}</p>}
+                      </div>
                     </Card>
                   </div>
 

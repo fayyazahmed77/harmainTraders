@@ -71,6 +71,7 @@ interface Account {
     status?: boolean;
     guest_token?: string;
     guest_link?: string;
+    image_url?: string;
 }
 
 interface DataTableProps {
@@ -112,9 +113,13 @@ export function DataTable({ data }: DataTableProps) {
                     <div className="flex items-center gap-3 group py-1">
                         <Link
                             href={`/account/${row.original.id}/show`}
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold text-sm shadow-md group-hover:scale-105 transition-all duration-300"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold text-sm shadow-md group-hover:scale-105 transition-all duration-300 overflow-hidden"
                         >
-                            {firstLetter}
+                            {row.original.image_url ? (
+                                <img src={row.original.image_url} alt={title} className="h-full w-full object-cover" />
+                            ) : (
+                                firstLetter
+                            )}
                         </Link>
                         <div className="flex flex-col">
                             <Link

@@ -17,6 +17,7 @@ import {
 import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, RotateCcw } from "lucide-react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
+import { useAppearance } from "@/hooks/use-appearance";
 
 interface Company {
   id: number;
@@ -62,6 +63,8 @@ interface Props {
 }
 
 export default function SupplierOrder({ suppliers }: Props) {
+  const { appearance } = useAppearance();
+  const isDark = appearance === 'dark';
   const [currentDate, setCurrentDate] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -204,21 +207,21 @@ export default function SupplierOrder({ suppliers }: Props) {
   return (
     <SidebarProvider>
       <AppSidebar variant="inset" />
-      <SidebarInset>
+      <SidebarInset className="h-screen overflow-hidden flex flex-col">
         <SiteHeader breadcrumbs={breadcrumbs} />
-        <div className="flex flex-col flex-1 bg-[#111111] min-h-[calc(100vh-80px)] text-zinc-300 font-sans p-4">
+        <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 font-sans p-4 overflow-hidden">
           
           {/* Topbar */}
           <div className="flex flex-wrap items-end gap-4 mb-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">Purchase Date</label>
               <div className="flex gap-2">
-                <div className="flex items-center gap-3 bg-[#1A1A1A] border border-zinc-800 rounded-lg h-10 px-4 text-xs font-mono w-32 shadow-inner">
-                  <span className="text-zinc-100">{currentDate}</span>
+                <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-mono w-32 shadow-sm">
+                  <span className="text-zinc-900 dark:text-zinc-100">{currentDate}</span>
                   <Calendar size={14} className="text-blue-500/70 ml-auto" />
                 </div>
-                <div className="flex items-center gap-3 bg-[#1A1A1A] border border-zinc-800 rounded-lg h-10 px-4 text-xs font-mono w-36 shadow-inner">
-                  <span className="text-zinc-100">{currentTime}</span>
+                <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-mono w-36 shadow-sm">
+                  <span className="text-zinc-900 dark:text-zinc-100">{currentTime}</span>
                   <Clock size={14} className="text-orange-500/70 ml-auto" />
                 </div>
               </div>
@@ -228,14 +231,14 @@ export default function SupplierOrder({ suppliers }: Props) {
               <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">Select Supplier</label>
               <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
                 <DialogTrigger asChild>
-                  <button className="flex items-center justify-between bg-[#1A1A1A] hover:bg-[#222] border border-zinc-800 rounded-lg h-10 px-4 text-xs font-bold transition-colors w-full text-left">
-                    <span className={selectedSupplier ? "text-zinc-100" : "text-zinc-500"}>
+                  <button className="flex items-center justify-between bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-bold transition-colors w-full text-left shadow-sm">
+                    <span className={selectedSupplier ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
                       {selectedSupplier ? selectedSupplier.title : "Select Supplier..."}
                     </span>
-                    <ChevronDown size={14} className="text-zinc-600" />
+                    <ChevronDown size={14} className="text-zinc-400 dark:text-zinc-600" />
                   </button>
                 </DialogTrigger>
-                <DialogContent className="bg-[#1A1A1A] border-zinc-800 text-zinc-100">
+                <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
                   <DialogHeader>
                     <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-300">Select Supplier</DialogTitle>
                   </DialogHeader>
@@ -244,7 +247,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                       placeholder="Search..." 
                       value={supplierSearch}
                       onChange={e => setSupplierSearch(e.target.value)}
-                      className="bg-[#111] border-zinc-800 text-sm h-10 mb-4 focus-visible:ring-orange-500/50"
+                      className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-sm h-10 mb-4 focus-visible:ring-orange-500/50"
                     />
                     <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-1">
                       {filteredSuppliers.map(sup => {
@@ -257,9 +260,9 @@ export default function SupplierOrder({ suppliers }: Props) {
                               setIsSupplierDialogOpen(false);
                               loadSupplierItems(sup);
                             }}
-                            className="text-left px-3 py-2.5 rounded-md hover:bg-[#222] transition-colors border border-transparent hover:border-zinc-800 flex flex-col gap-1"
+                            className="text-left px-3 py-2.5 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 flex flex-col gap-1"
                           >
-                            <span className="text-sm font-bold text-zinc-200">{sup.title}</span>
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-200">{sup.title}</span>
                             {sup.assigned_companies && sup.assigned_companies.length > 0 && (
                               <span className="text-[10px] text-zinc-500 font-mono">
                                 {sup.assigned_companies.map(c => c.title).join(', ')} <span className="text-orange-500 font-bold ml-1">({totalItems} items)</span>
@@ -276,24 +279,24 @@ export default function SupplierOrder({ suppliers }: Props) {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold text-center">Items</label>
-              <div className="flex items-center justify-center bg-[#1A1A1A] border border-zinc-800 rounded-lg h-10 px-6 text-sm font-black text-white min-w-[80px]">
+              <div className="flex items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-6 text-sm font-black text-zinc-900 dark:text-white min-w-[80px] shadow-sm">
                 {orderItems.length}
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5 ml-auto">
               <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">Filter Mode</label>
-              <div className="flex items-center bg-[#1A1A1A] border border-zinc-800 rounded-lg p-1 shadow-inner h-10">
+              <div className="flex items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-1 shadow-sm h-10">
                 <button 
                   onClick={() => setFilterMode('reorder')}
-                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 ${filterMode === 'reorder' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 ${filterMode === 'reorder' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
                 >
                   <RotateCcw size={12} className={filterMode === 'reorder' ? 'animate-spin-slow' : ''} />
                   Re-Order Wise
                 </button>
                 <button 
                   onClick={() => setFilterMode('sales')}
-                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 ${filterMode === 'sales' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 ${filterMode === 'sales' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
                 >
                   <Search size={12} />
                   Sales Wise
@@ -303,24 +306,24 @@ export default function SupplierOrder({ suppliers }: Props) {
           </div>
 
           {/* Items Table Panel */}
-          <div className="flex-1 bg-[#1A1A1A] border border-zinc-800 rounded-xl overflow-hidden flex flex-col shadow-2xl relative">
+          <div className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col shadow-xl relative min-h-0">
             <div className="overflow-auto flex-1 custom-scrollbar">
               <table className="w-full text-left border-collapse min-w-[1000px]">
-                <thead className="sticky top-0 bg-[#1A1A1A] z-10 shadow-sm border-b border-zinc-800">
+                <thead className="sticky top-0 bg-white dark:bg-zinc-900 z-10 shadow-sm border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-orange-500 w-[25%]">Product Title</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[8%]">Full</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[8%]">Pcs</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[8%]">B.Full</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[8%]">B.Pcs</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[10%]">Rate</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[8%]">Disc %</th>
-                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 w-[10%]">Net Rate</th>
-                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-right text-zinc-100 w-[10%]">Subtotal</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[8%]">Full</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[8%]">Pcs</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[8%]">B.Full</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[8%]">B.Pcs</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[10%]">Rate</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[8%]">Disc %</th>
+                    <th className="px-2 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[10%]">Net Rate</th>
+                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-right text-zinc-900 dark:text-zinc-100 w-[10%]">Subtotal</th>
                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-500 w-[5%]">Act</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50">
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                   {orderItems.map((item) => {
                     const parsedLastPurchaseRate = Number(item.last_purchase_rate) || 0;
                     const parsedDiscPercent = Number(item.disc_percent) || 0;
@@ -334,12 +337,12 @@ export default function SupplierOrder({ suppliers }: Props) {
                       <tr 
                         key={item.id} 
                         onClick={() => setSelectedRowId(item.id)}
-                        className={`group transition-colors cursor-pointer ${selectedRowId === item.id ? 'bg-[#222] ring-1 ring-inset ring-orange-500/20' : 'hover:bg-[#222]/50'}`}
+                        className={`group transition-colors cursor-pointer ${selectedRowId === item.id ? 'bg-zinc-50 dark:bg-zinc-800 ring-1 ring-inset ring-orange-500/20' : 'hover:bg-zinc-50/50 dark:hover:bg-[#222]/50'}`}
                       >
                         <td className="px-4 py-2">
                           <div className="flex flex-col">
-                            <span className={`text-xs font-bold truncate max-w-[250px] ${selectedRowId === item.id ? 'text-orange-400' : 'text-zinc-300'}`}>{item.title}</span>
-                            <span className="text-[9px] text-zinc-600 font-mono mt-0.5">{item.code} • Pk: {item.packing_qty}</span>
+                            <span className={`text-xs font-bold truncate max-w-[250px] ${selectedRowId === item.id ? 'text-orange-500' : 'text-zinc-900 dark:text-zinc-300'}`}>{item.title}</span>
+                            <span className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">{item.code} • Pk: {item.packing_qty}</span>
                           </div>
                         </td>
                         <td className="px-2 py-2">
@@ -348,7 +351,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                             min="0"
                             value={item.input_full || ''} 
                             onChange={e => handleItemChange(item.id, 'input_full', e.target.value)}
-                            className="h-8 bg-[#111] border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono"
+                            className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -357,7 +360,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                             min="0"
                             value={item.input_pcs || ''} 
                             onChange={e => handleItemChange(item.id, 'input_pcs', e.target.value)}
-                            className="h-8 bg-[#111] border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono"
+                            className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -366,7 +369,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                             min="0"
                             value={item.input_b_full || ''} 
                             onChange={e => handleItemChange(item.id, 'input_b_full', e.target.value)}
-                            className="h-8 bg-[#111] border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-600 font-mono text-zinc-500"
+                            className="h-8 bg-white dark:bg-zinc-950 border-zinc-200/50 dark:border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 font-mono text-zinc-400 dark:text-zinc-500"
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -375,10 +378,10 @@ export default function SupplierOrder({ suppliers }: Props) {
                             min="0"
                             value={item.input_b_pcs || ''} 
                             onChange={e => handleItemChange(item.id, 'input_b_pcs', e.target.value)}
-                            className="h-8 bg-[#111] border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-600 font-mono text-zinc-500"
+                            className="h-8 bg-white dark:bg-zinc-950 border-zinc-200/50 dark:border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 font-mono text-zinc-400 dark:text-zinc-500"
                           />
                         </td>
-                        <td className="px-2 py-2 text-center text-xs font-mono text-zinc-400">
+                        <td className="px-2 py-2 text-center text-xs font-mono text-zinc-500 dark:text-zinc-400">
                           {Number(item.last_purchase_rate || 0).toFixed(2)}
                         </td>
                         <td className="px-2 py-2">
@@ -388,10 +391,10 @@ export default function SupplierOrder({ suppliers }: Props) {
                             max="100"
                             value={item.disc_percent || ''} 
                             onChange={e => handleItemChange(item.id, 'disc_percent', e.target.value)}
-                            className="h-8 bg-[#111] border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono"
+                            className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />
                         </td>
-                        <td className="px-2 py-2 text-center text-xs font-mono font-bold text-zinc-300">
+                        <td className="px-2 py-2 text-center text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300">
                           {Number(netRate || 0).toFixed(2)}
                         </td>
                         <td className="px-4 py-2 text-right text-xs font-mono font-black text-orange-500">
@@ -410,7 +413,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                   })}
                   {orderItems.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-zinc-600 text-xs font-bold uppercase tracking-widest">
+                      <td colSpan={10} className="px-4 py-12 text-center text-zinc-400 dark:text-zinc-600 text-xs font-bold uppercase tracking-widest">
                         {isLoadingItems ? 'Loading items...' : 'Select a supplier and load items to begin'}
                       </td>
                     </tr>
@@ -420,7 +423,7 @@ export default function SupplierOrder({ suppliers }: Props) {
             </div>
 
             {/* Sub-Bottom Actions within Table Panel */}
-            <div className="bg-[#151515] border-t border-zinc-800 p-3 flex items-center justify-between">
+            <div className="bg-zinc-50 dark:bg-[#151515] border-t border-zinc-200 dark:border-zinc-800 p-3 flex items-center justify-between">
               <div className="flex gap-2">
                 <Button 
                   onClick={resetAll}
@@ -443,17 +446,17 @@ export default function SupplierOrder({ suppliers }: Props) {
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">Rows</span>
-                  <span className="bg-zinc-800 px-2 py-0.5 rounded text-xs font-mono font-bold">{orderItems.length}</span>
+                  <span className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">{orderItems.length}</span>
                 </div>
-                <div className="flex flex-col items-end border-l border-zinc-800 pl-6">
+                <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-6">
                   <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest leading-none">Total Discount</span>
-                  <span className="text-sm font-mono font-black text-rose-500 leading-none mt-1">
+                  <span className="text-sm font-mono font-black text-rose-600 dark:text-rose-500 leading-none mt-1">
                     -Rs {totalDiscount.toFixed(2)}
                   </span>
                 </div>
-                <div className="flex flex-col items-end border-l border-zinc-800 pl-6">
+                <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-6">
                   <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest leading-none">Total Amount</span>
-                  <span className="text-sm font-mono font-black text-emerald-400 leading-none mt-1">
+                  <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400 leading-none mt-1">
                     Rs {totalAmount.toFixed(2)}
                   </span>
                 </div>
@@ -462,8 +465,8 @@ export default function SupplierOrder({ suppliers }: Props) {
           </div>
 
           {/* Bottom Panel: Item Intelligence */}
-          <div className="mt-4 bg-[#1A1A1A] border border-zinc-800 rounded-xl p-4 shadow-xl min-h-[120px] flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+          <div className="mt-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-lg min-h-[120px] flex flex-col justify-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-zinc-400 dark:text-zinc-600">
               <Database size={120} />
             </div>
             
@@ -473,8 +476,8 @@ export default function SupplierOrder({ suppliers }: Props) {
                   <div className="bg-orange-500/10 p-2 rounded-lg text-orange-500">
                     <Database size={16} />
                   </div>
-                  <h3 className="text-xs font-black uppercase tracking-widest text-orange-400">
-                    {selectedItem.title} <span className="text-zinc-600 mx-2">•</span> Intelligence Panel
+                  <h3 className="text-xs font-black uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                    {selectedItem.title} <span className="text-zinc-300 dark:text-zinc-600 mx-2">•</span> Intelligence Panel
                   </h3>
                 </div>
                 
@@ -491,11 +494,11 @@ export default function SupplierOrder({ suppliers }: Props) {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Avg Pur. Rate</span>
-                    <span className="text-xs font-mono text-blue-400 font-bold">Rs {Number(selectedItem.av_purchase_rate || 0).toFixed(2)}</span>
+                    <span className="text-xs font-mono text-blue-600 dark:text-blue-400 font-bold">Rs {Number(selectedItem.av_purchase_rate || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Pur. Rate</span>
-                    <span className="text-xs font-mono text-orange-400 font-bold">Rs {Number(selectedItem.last_purchase_rate || 0).toFixed(2)}</span>
+                    <span className="text-xs font-mono text-orange-600 dark:text-orange-400 font-bold">Rs {Number(selectedItem.last_purchase_rate || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Available Qty</span>
@@ -512,13 +515,13 @@ export default function SupplierOrder({ suppliers }: Props) {
                       )}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l border-zinc-800 pl-4">
+                  <div className="flex flex-col gap-1 border-l border-zinc-100 dark:border-zinc-800 pl-4">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Supplier</span>
-                    <span className="text-xs text-zinc-300 font-bold truncate max-w-[120px]">{selectedItem.last_supplier || 'N/A'}</span>
+                    <span className="text-xs text-zinc-900 dark:text-zinc-300 font-bold truncate max-w-[120px]">{selectedItem.last_supplier || 'N/A'}</span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l border-zinc-800 pl-4">
+                  <div className="flex flex-col gap-1 border-l border-zinc-100 dark:border-zinc-800 pl-4">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Sales (15 Days)</span>
-                    <span className={`text-xs font-mono font-black ${Number(selectedItem.sales_15_days) > 0 ? 'text-blue-400' : 'text-zinc-600'}`}>
+                    <span className={`text-xs font-mono font-black ${Number(selectedItem.sales_15_days) > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-300 dark:text-zinc-600'}`}>
                       {selectedItem.sales_15_full} <span className="text-[9px] font-sans font-bold">Full</span>, {selectedItem.sales_15_pcs} <span className="text-[9px] font-sans font-bold">PCS</span>
                     </span>
                   </div>
@@ -535,9 +538,9 @@ export default function SupplierOrder({ suppliers }: Props) {
 
           {/* Success Dialog */}
           <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-            <DialogContent className="bg-[#1A1A1A] border-zinc-800 text-zinc-100 sm:max-w-md">
+            <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 sm:max-w-md">
               <DialogHeader>
-                <DialogTitle className="text-emerald-500 font-black uppercase tracking-widest text-center text-lg">
+                <DialogTitle className="text-emerald-600 dark:text-emerald-500 font-black uppercase tracking-widest text-center text-lg">
                   Order Saved Successfully!
                 </DialogTitle>
               </DialogHeader>
@@ -554,7 +557,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                       resetAll();
                       setShowSuccessDialog(false);
                     }}
-                    className="flex-1 bg-[#222] hover:bg-[#333] border border-zinc-700 text-zinc-300 uppercase font-black text-[10px] tracking-widest h-10"
+                    className="flex-1 bg-zinc-100 dark:bg-[#222] hover:bg-zinc-200 dark:hover:bg-[#333] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 uppercase font-black text-[10px] tracking-widest h-10"
                   >
                     Create New
                   </Button>

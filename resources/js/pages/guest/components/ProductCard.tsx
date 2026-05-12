@@ -76,7 +76,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                         <span className="text-[9px] px-1.5 py-0.5 bg-orange-50 dark:bg-orange-500/10 text-orange-600 rounded-md font-bold uppercase tracking-widest">
                             {item.packing_qty} Pcs
                         </span>
-                        <span className="text-[8px] font-bold text-emerald-500 uppercase">Free Shipping</span>
+                        {/* <span className="text-[8px] font-bold text-emerald-500 uppercase">Free Shipping</span> */}
                     </div>
                 </div>
             </div>

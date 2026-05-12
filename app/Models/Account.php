@@ -12,6 +12,7 @@ class Account extends Model
     protected $fillable = [
         'code',
         'title',
+        'image',
         'type',
         'purchase',
         'cashbank',
@@ -49,7 +50,7 @@ class Account extends Model
         'guest_token',
     ];
 
-    protected $appends = ['current_balance', 'guest_link'];
+    protected $appends = ['current_balance', 'guest_link', 'image_url'];
 
     protected $casts = [
         'purchase' => 'boolean',
@@ -200,5 +201,9 @@ class Account extends Model
             return null;
         }
         return url("/g/{$this->guest_token}");
+    }
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
     }
 }

@@ -50,24 +50,24 @@ export default function SupplierOrderShow({ order }: ShowProps) {
     <SidebarProvider>
       <Head title={`Order #ORD-${String(order.id).padStart(4, '0')}`} />
       <AppSidebar />
-      <SidebarInset className="bg-[#0f0f0f] text-zinc-100 flex flex-col h-screen overflow-hidden">
+      <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col h-screen overflow-hidden">
         
         {/* Header */}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-zinc-800 bg-[#151515] px-4">
-          <SidebarTrigger className="-ml-1 text-zinc-400 hover:text-zinc-100" />
-          <Separator orientation="vertical" className="mr-2 h-4 bg-zinc-800" />
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4">
+          <SidebarTrigger className="-ml-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100" />
+          <Separator orientation="vertical" className="mr-2 h-4 bg-zinc-200 dark:bg-zinc-800" />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#" className="text-zinc-500 hover:text-zinc-300">Orders</BreadcrumbLink>
+                <BreadcrumbLink href="#" className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300">Orders</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/admin/supplier-order/list" className="text-zinc-500 hover:text-zinc-300">Supplier Orders</BreadcrumbLink>
+                <BreadcrumbLink href="/admin/supplier-order/list" className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300">Supplier Orders</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage className="text-zinc-200 font-semibold tracking-wide">ORD-{String(order.id).padStart(4, '0')}</BreadcrumbPage>
+                <BreadcrumbPage className="text-zinc-900 dark:text-zinc-200 font-semibold tracking-wide">ORD-{String(order.id).padStart(4, '0')}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -78,16 +78,16 @@ export default function SupplierOrderShow({ order }: ShowProps) {
           <div className="max-w-5xl mx-auto space-y-6">
             
             {/* Action Bar */}
-            <div className="flex justify-between items-center bg-[#151515] border border-zinc-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg shadow-sm">
               <div className="flex items-center gap-4">
                 <Link href="/admin/supplier-order/list">
-                  <Button variant="outline" size="sm" className="h-8 border-zinc-700 hover:bg-zinc-800 text-zinc-400 gap-2">
+                  <Button variant="outline" size="sm" className="h-8 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 gap-2">
                     <ArrowLeft size={14} /> Back to List
                   </Button>
                 </Link>
                 <div>
-                  <h1 className="text-xl font-black tracking-widest text-white uppercase">Order #ORD-{String(order.id).padStart(4, '0')}</h1>
-                  <p className="text-zinc-500 text-xs mt-0.5">Created on {order.order_date}</p>
+                  <h1 className="text-xl font-black tracking-widest text-zinc-900 dark:text-white uppercase">Order #ORD-{String(order.id).padStart(4, '0')}</h1>
+                  <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-0.5">Created on {order.order_date}</p>
                 </div>
               </div>
               <Button 
@@ -100,34 +100,34 @@ export default function SupplierOrderShow({ order }: ShowProps) {
 
             {/* Meta Info */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-[#151515] border border-zinc-800 p-4 rounded-lg">
-                <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-1">Supplier</p>
-                <p className="text-lg font-bold text-zinc-200">{order.supplier?.title || 'Unknown Supplier'}</p>
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold mb-1">Supplier</p>
+                <p className="text-lg font-bold text-zinc-900 dark:text-zinc-200">{order.supplier?.title || 'Unknown Supplier'}</p>
               </div>
-              <div className="bg-[#151515] border border-zinc-800 p-4 rounded-lg">
-                <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold mb-1">Status</p>
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold mb-1">Status</p>
                 <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-widest inline-block mt-1 ${
-                  order.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' :
-                  order.status === 'Cancelled' ? 'bg-red-500/10 text-red-500' :
-                  'bg-orange-500/10 text-orange-500'
+                  order.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' :
+                  order.status === 'Cancelled' ? 'bg-red-500/10 text-red-600 dark:text-red-500' :
+                  'bg-orange-500/10 text-orange-600 dark:text-orange-500'
                 }`}>
                   {order.status}
                 </span>
               </div>
-              <div className="bg-[#151515] border border-emerald-900/50 p-4 rounded-lg">
-                <p className="text-xs text-emerald-500/70 uppercase tracking-widest font-bold mb-1">Total Amount</p>
-                <p className="text-2xl font-black text-emerald-500">Rs {Number(order.total_amount).toFixed(2)}</p>
+              <div className="bg-emerald-50/50 dark:bg-[#151515] border border-emerald-100 dark:border-emerald-900/50 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-emerald-600 dark:text-emerald-500/70 uppercase tracking-widest font-bold mb-1">Total Amount</p>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-500">Rs {Number(order.total_amount).toFixed(2)}</p>
               </div>
             </div>
 
             {/* Items Table */}
-            <div className="bg-[#151515] border border-zinc-800 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800 bg-[#1a1a1a]">
-                <h2 className="text-sm font-bold tracking-widest text-zinc-300 uppercase">Order Items</h2>
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#1a1a1a]">
+                <h2 className="text-sm font-bold tracking-widest text-zinc-700 dark:text-zinc-300 uppercase">Order Items</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] uppercase bg-[#111] text-zinc-500 font-black tracking-widest">
+                  <thead className="text-[10px] uppercase bg-zinc-50 dark:bg-zinc-950 text-zinc-400 dark:text-zinc-500 font-black tracking-widest">
                     <tr>
                       <th className="px-4 py-3">Product Title</th>
                       <th className="px-4 py-3 text-center">Full</th>
@@ -140,38 +140,38 @@ export default function SupplierOrderShow({ order }: ShowProps) {
                   </thead>
                   <tbody>
                     {order.items.map((item, index) => (
-                      <tr key={item.id} className={`border-b border-zinc-800/50 hover:bg-[#1a1a1a] ${index % 2 === 0 ? 'bg-[#151515]' : 'bg-[#131313]'}`}>
-                        <td className="px-4 py-3 font-bold text-zinc-200">{item.item?.title || 'Unknown Item'}</td>
-                        <td className="px-4 py-3 text-center text-zinc-400 font-mono">{item.qty_full}</td>
-                        <td className="px-4 py-3 text-center text-zinc-400 font-mono">{item.qty_pcs}</td>
-                        <td className="px-4 py-3 text-right text-zinc-400 font-mono">{Number(item.rate).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-zinc-400 font-mono">{Number(item.discount_percent).toFixed(2)}%</td>
-                        <td className="px-4 py-3 text-right text-zinc-300 font-mono font-bold">{Number(item.net_rate).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right text-emerald-500 font-mono font-bold">{Number(item.subtotal).toFixed(2)}</td>
+                      <tr key={item.id} className={`border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50/50 dark:hover:bg-[#1a1a1a] ${index % 2 === 0 ? 'bg-white dark:bg-[#151515]' : 'bg-zinc-50/30 dark:bg-[#131313]'}`}>
+                        <td className="px-4 py-3 font-bold text-zinc-900 dark:text-zinc-200">{item.item?.title || 'Unknown Item'}</td>
+                        <td className="px-4 py-3 text-center text-zinc-600 dark:text-zinc-400 font-mono">{item.qty_full}</td>
+                        <td className="px-4 py-3 text-center text-zinc-600 dark:text-zinc-400 font-mono">{item.qty_pcs}</td>
+                        <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400 font-mono">{Number(item.rate).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400 font-mono">{Number(item.discount_percent).toFixed(2)}%</td>
+                        <td className="px-4 py-3 text-right text-zinc-900 dark:text-zinc-300 font-mono font-bold">{Number(item.net_rate).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-500 font-mono font-bold">{Number(item.subtotal).toFixed(2)}</td>
                       </tr>
                     ))}
                     {order.items.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                        <td colSpan={7} className="px-4 py-8 text-center text-zinc-400 dark:text-zinc-500">
                           No items found in this order.
                         </td>
                       </tr>
                     )}
                   </tbody>
-                  <tfoot className="bg-[#111] border-t border-zinc-800 font-bold">
+                  <tfoot className="bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 font-bold">
                     <tr>
-                      <td colSpan={6} className="px-4 py-3 text-right text-zinc-500 uppercase tracking-widest text-[10px]">
+                      <td colSpan={6} className="px-4 py-3 text-right text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-[10px]">
                         Total Discount
                       </td>
-                      <td className="px-4 py-3 text-right text-red-500 font-mono">
+                      <td className="px-4 py-3 text-right text-rose-600 dark:text-red-500 font-mono">
                         -Rs {Number(order.total_discount).toFixed(2)}
                       </td>
                     </tr>
                     <tr>
-                      <td colSpan={6} className="px-4 py-3 text-right text-zinc-300 uppercase tracking-widest text-[10px]">
+                      <td colSpan={6} className="px-4 py-3 text-right text-zinc-700 dark:text-zinc-300 uppercase tracking-widest text-[10px]">
                         Grand Total
                       </td>
-                      <td className="px-4 py-3 text-right text-emerald-500 font-mono text-lg">
+                      <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-500 font-mono text-lg">
                         Rs {Number(order.total_amount).toFixed(2)}
                       </td>
                     </tr>

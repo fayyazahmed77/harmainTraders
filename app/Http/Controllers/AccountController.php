@@ -22,6 +22,7 @@ use App\Models\InvestorCapitalAccount;
 use App\Services\InvestorCapitalService;
 use App\Mail\InvestorWelcomeMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 
 class AccountController extends Controller
 {
@@ -176,6 +177,7 @@ class AccountController extends Controller
             'status' => 'boolean',
             'email' => 'nullable|email|unique:users,email',
             'password' => 'nullable|string|min:8',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
 
         // ✅ Apply conditional rules
@@ -204,6 +206,9 @@ class AccountController extends Controller
 
         // ✅ Save to DB (Integrated with Investor creation)
         return DB::transaction(function() use ($validated, $request) {
+            if ($request->hasFile('image')) {
+                $validated['image'] = $request->file('image')->store('accounts', 'public');
+            }
             $account = Account::create($validated);
 
             if ($request->type == 9 && $request->email && $request->password) {
@@ -317,6 +322,7 @@ class AccountController extends Controller
             'ats_type' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
             'status' => 'boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
         // ✅ Convert checkbox booleans
@@ -324,6 +330,15 @@ class AccountController extends Controller
         $validated['cashbank'] = $request->boolean('cashbank');
         $validated['sale'] = $request->boolean('sale');
         $validated['status'] = $request->boolean('status');
+        // ✅ Handle Image Upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($account->image && Storage::disk('public')->exists($account->image)) {
+                Storage::disk('public')->delete($account->image);
+            }
+            $validated['image'] = $request->file('image')->store('accounts', 'public');
+        }
+
         // ✅ Update DB
         $account->update($validated);
         // ✅ Redirect back with success message

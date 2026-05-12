@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useForm, router } from "@inertiajs/react";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { DirtyStateDialog } from "@/components/dirty-state-dialog";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -190,6 +190,7 @@ export default function Create({
   const [booker, setBooker] = useState<Option | null>(null);
   const [accountType, setAccountType] = useState<Option | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Option | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // ---------- convenience option lists ----------
   const salemanOptions: Option[] = salemans.map((s) => ({
@@ -443,6 +444,7 @@ export default function Create({
     status: true,
     email: "",
     password: "",
+    image: null as File | null,
   });
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
@@ -725,9 +727,9 @@ export default function Create({
                     </TechLabel>
 
                     {accountType?.value === 9 && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }} 
-                        animate={{ opacity: 1, y: 0 }} 
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         className="grid grid-cols-2 gap-4 pt-2"
                       >
                         <TechLabel label="Login Email" icon={Globe} error={errors.email}>
@@ -890,6 +892,64 @@ export default function Create({
                         className="h-10 text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 uppercase"
                       />
                     </TechLabel>
+                  </Card>
+
+                  {/* PROFILE IMAGE */}
+                  <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} space-y-4`}>
+                    <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
+                      <UserIcon size={16} className="text-orange-500" />
+                      <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Profile Image</h3>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-4">
+                      {imagePreview ? (
+                        <div className="relative group">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-32 h-32 rounded-xl object-cover border-4 border-white dark:border-zinc-800 shadow-xl"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImagePreview(null);
+                              setData("image", null);
+                            }}
+                            className="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Plus className="rotate-45 h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
+                          onClick={() => document.getElementById('image-upload')?.click()}
+                        >
+                          <Plus className="h-8 w-8" />
+                          <span className="text-[10px] font-black uppercase tracking-tighter">Upload Photo</span>
+                        </div>
+                      )}
+
+                      <Input
+                        id="image-upload"
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setData("image", file);
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setImagePreview(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <p className="text-[10px] text-zinc-400 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
+                      {errors.image && <p className="text-[10px] text-rose-500 font-bold uppercase">{errors.image}</p>}
+                    </div>
                   </Card>
                 </div>
 

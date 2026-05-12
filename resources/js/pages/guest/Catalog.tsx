@@ -33,6 +33,7 @@ const DEFAULT_IMAGE = "https://placehold.co/400x400/f8fafc/cbd5e1?text=No+Image"
 export default function Catalog({ items, categories, account, token }: CatalogProps) {
     const [search, setSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | number>('all');
+    const [selectedCompany, setSelectedCompany] = useState<string>('all');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [cart, setCart] = useState<Cart>(() => {
         const saved = localStorage.getItem(`cart_${token}`);
@@ -62,9 +63,27 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
                                 (item.code?.toLowerCase() ?? '').includes(query) ||
                                 (item.company?.toLowerCase() ?? '').includes(query);
             const matchesCategory = selectedCategory === 'all' || String(item.category_id) === String(selectedCategory);
-            return matchesSearch && matchesCategory;
+            const matchesCompany = selectedCompany === 'all' || item.company === selectedCompany;
+            return matchesSearch && matchesCategory && matchesCompany;
         });
-    }, [items, search, selectedCategory]);
+    }, [items, search, selectedCategory, selectedCompany]);
+
+    const companies = useMemo(() => {
+        const counts: { [key: string]: { count: number, image: string | null } } = {};
+        items.forEach(item => {
+            if (!item.company) return;
+            if (!counts[item.company]) {
+                counts[item.company] = { count: 0, image: item.image };
+            }
+            counts[item.company].count++;
+        });
+        
+        return Object.entries(counts).map(([name, data]) => ({
+            name,
+            count: data.count,
+            image: data.image
+        })).sort((a, b) => b.count - a.count);
+    }, [items]);
 
     const cartCount = Object.keys(cart).length;
     const cartTotal = Object.values(cart).reduce((acc, item) => {
@@ -155,73 +174,127 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
             )}
 
             <main className="max-w-[1800px] mx-auto px-4 py-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-3xl font-black italic uppercase text-slate-900 dark:text-zinc-100 tracking-tighter">
-                            {selectedCategory === 'all' ? 'All Items' : categories.find(c => c.id === selectedCategory)?.name}
-                        </h2>
-                        <Badge className="bg-orange-600 text-white border-none font-black px-2 py-0.5 text-[10px]">
-                            {filteredItems.length} ITEMS
-                        </Badge>
-                    </div>
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Sidebar: Companies */}
+                    <aside className="w-full lg:w-72 shrink-0">
+                        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden sticky top-24">
+                            <div className="p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/50">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Shop by Brand</h3>
+                                <Badge className="bg-orange-500/10 text-orange-600 border-none text-[9px] font-black">{companies.length}</Badge>
+                            </div>
+                            
+                            <div className="p-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                <button
+                                    onClick={() => setSelectedCompany('all')}
+                                    className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${selectedCompany === 'all' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedCompany === 'all' ? 'bg-white/20' : 'bg-slate-100 dark:bg-zinc-800'}`}>
+                                            <Box size={14} />
+                                        </div>
+                                        <span className="text-xs font-bold">All Brands</span>
+                                    </div>
+                                    <span className={`text-[10px] font-black ${selectedCompany === 'all' ? 'text-white/60' : 'text-slate-400'}`}>
+                                        {items.length}
+                                    </span>
+                                </button>
 
-                    <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-zinc-800">
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            <ListIcon size={18} />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            <LayoutGrid size={18} />
-                        </button>
+                                {companies.map((company) => (
+                                    <button
+                                        key={company.name}
+                                        onClick={() => setSelectedCompany(company.name)}
+                                        className={`w-full flex items-center justify-between p-3 rounded-xl transition-all mt-1 ${selectedCompany === company.name ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400'}`}
+                                    >
+                                        <div className="flex items-center gap-3 text-left">
+                                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-white border border-slate-100 dark:border-zinc-700 flex items-center justify-center shrink-0">
+                                                {company.image ? (
+                                                    <img src={company.image} alt={company.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-slate-300">{company.name.charAt(0)}</span>
+                                                )}
+                                            </div>
+                                            <span className="text-xs font-bold line-clamp-1">{company.name}</span>
+                                        </div>
+                                        <span className={`text-[10px] font-black ${selectedCompany === company.name ? 'text-white/60' : 'text-slate-400'}`}>
+                                            {company.count}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Content: Items Grid */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-3xl font-black italic uppercase text-slate-900 dark:text-zinc-100 tracking-tighter">
+                                    {selectedCompany !== 'all' ? selectedCompany : (selectedCategory === 'all' ? 'All Items' : categories.find(c => c.id === selectedCategory)?.name)}
+                                </h2>
+                                <Badge className="bg-orange-600 text-white border-none font-black px-2 py-0.5 text-[10px]">
+                                    {filteredItems.length} ITEMS
+                                </Badge>
+                            </div>
+
+                            <div className="flex bg-white dark:bg-zinc-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-zinc-800">
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    <ListIcon size={18} />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    <LayoutGrid size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {loading ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                                {[...Array(12)].map((_, i) => (
+                                    <ProductCardSkeleton key={i} />
+                                ))}
+                            </div>
+                        ) : filteredItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 opacity-30">
+                                <Box size={48} className="mb-4 text-slate-400" />
+                                <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 text-center">
+                                    No products found <br />
+                                    <span className="text-[9px] font-bold opacity-60 tracking-normal">Try adjusting your filters or search</span>
+                                </p>
+                            </div>
+                        ) : viewMode === 'list' ? (
+                            <div className="grid grid-cols-1 gap-3">
+                                {filteredItems.map((item) => (
+                                    <ProductListItem 
+                                        key={item.id}
+                                        item={item}
+                                        formatCurrency={formatCurrency}
+                                        setBuyItem={setBuyItem}
+                                        setBuyOpen={setBuyOpen}
+                                        DEFAULT_IMAGE={DEFAULT_IMAGE}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                                {filteredItems.map((item) => (
+                                    <ProductCard 
+                                        key={item.id}
+                                        item={item}
+                                        formatCurrency={formatCurrency}
+                                        setBuyItem={setBuyItem}
+                                        setBuyOpen={setBuyOpen}
+                                        DEFAULT_IMAGE={DEFAULT_IMAGE}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
-
-                {loading ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
-                        {[...Array(12)].map((_, i) => (
-                            <ProductCardSkeleton key={i} />
-                        ))}
-                    </div>
-                ) : filteredItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 opacity-30">
-                        <Box size={48} className="mb-4 text-slate-400" />
-                        <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 text-center">
-                            No products found <br />
-                            <span className="text-[9px] font-bold opacity-60 tracking-normal">Try adjusting your filters or search</span>
-                        </p>
-                    </div>
-                ) : viewMode === 'list' ? (
-                    <div className="grid grid-cols-1 gap-3">
-                        {filteredItems.map((item) => (
-                            <ProductListItem 
-                                key={item.id}
-                                item={item}
-                                formatCurrency={formatCurrency}
-                                setBuyItem={setBuyItem}
-                                setBuyOpen={setBuyOpen}
-                                DEFAULT_IMAGE={DEFAULT_IMAGE}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
-                        {filteredItems.map((item) => (
-                            <ProductCard 
-                                key={item.id}
-                                item={item}
-                                formatCurrency={formatCurrency}
-                                setBuyItem={setBuyItem}
-                                setBuyOpen={setBuyOpen}
-                                DEFAULT_IMAGE={DEFAULT_IMAGE}
-                            />
-                        ))}
-                    </div>
-                )}
             </main>
 
             <CartDrawer 

@@ -40,6 +40,7 @@ interface Company {
   id: number;
   title: string;
   items_count: number;
+  image_url: string | null;
 }
 
 interface Supplier {
@@ -228,7 +229,16 @@ export default function SupplierCompanies({ suppliers, allCompanies }: Props) {
                                 className="border-zinc-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                               />
                               <label htmlFor={`co-${company.id}`} className="flex-1 flex justify-between items-center cursor-pointer">
-                                <span className="text-xs font-bold uppercase text-zinc-800 dark:text-zinc-200">{company.title}</span>
+                                <div className="flex items-center gap-3">
+                                  <div className="h-6 w-6 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                                    {company.image_url ? (
+                                      <img src={company.image_url} alt={company.title} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <Building2 size={12} className="text-zinc-500" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-bold uppercase text-zinc-800 dark:text-zinc-200">{company.title}</span>
+                                </div>
                                 <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-1">
                                   <Package size={10} />
                                   {company.items_count} Items
@@ -281,8 +291,12 @@ export default function SupplierCompanies({ suppliers, allCompanies }: Props) {
                           <TableRow key={company.id} className="group transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
                             <TableCell className="py-4 pl-6">
                               <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                                  <Building2 size={14} className="text-zinc-500" />
+                                <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                                  {company.image_url ? (
+                                    <img src={company.image_url} alt={company.title} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <Building2 size={14} className="text-zinc-500" />
+                                  )}
                                 </div>
                                 <span className="text-xs font-bold uppercase text-zinc-900 dark:text-zinc-100">{company.title}</span>
                               </div>
