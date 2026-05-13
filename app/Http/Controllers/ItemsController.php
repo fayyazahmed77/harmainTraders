@@ -200,8 +200,7 @@ class ItemsController extends Controller
                     // Manual validation check for security
                     $ext = strtolower($image->getClientOriginalExtension());
                     if (in_array($ext, ['jpeg', 'png', 'jpg', 'gif', 'webp']) && $image->getSize() <= 5242880) {
-                        $image_name = time() . '_' . $index . '.' . $ext;
-                        $image->move(public_path('images/items'), $image_name);
+                        $path = $image->store('items', 'public');
                         
                         $isPrimary = false;
                         if ($request->filled('primary_new_index') && (int)$request->primary_new_index === $index) {
@@ -212,7 +211,7 @@ class ItemsController extends Controller
 
                         ItemImage::create([
                             'item_id' => $item->id,
-                            'image_path' => 'images/items/' . $image_name,
+                            'image_path' => 'storage/' . $path,
                             'is_primary' => $isPrimary,
                             'sort_order' => $index,
                         ]);
@@ -329,8 +328,10 @@ class ItemsController extends Controller
         if ($request->has('deleted_images')) {
             $imagesToDelete = ItemImage::whereIn('id', $request->deleted_images)->where('item_id', $item->id)->get();
             foreach ($imagesToDelete as $img) {
-                if (file_exists(public_path($img->image_path))) {
-                    unlink(public_path($img->image_path));
+                // Delete using storage facade
+                $diskPath = str_replace('storage/', '', $img->image_path);
+                if (\Illuminate\Support\Facades\Storage::disk('public')->exists($diskPath)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($diskPath);
                 }
                 $img->delete();
             }
@@ -362,8 +363,7 @@ class ItemsController extends Controller
                     // Manual validation check for security
                     $ext = strtolower($image->getClientOriginalExtension());
                     if (in_array($ext, ['jpeg', 'png', 'jpg', 'gif', 'webp']) && $image->getSize() <= 5242880) {
-                        $image_name = time() . '_' . $index . '.' . $ext;
-                        $image->move(public_path('images/items'), $image_name);
+                        $path = $image->store('items', 'public');
                         
                         $isPrimary = false;
                         if ($request->filled('primary_new_index') && (int)$request->primary_new_index === $index) {
@@ -374,7 +374,7 @@ class ItemsController extends Controller
 
                         ItemImage::create([
                             'item_id' => $item->id,
-                            'image_path' => 'images/items/' . $image_name,
+                            'image_path' => 'storage/' . $path,
                             'is_primary' => $isPrimary,
                             'sort_order' => $currentCount + $index,
                         ]);

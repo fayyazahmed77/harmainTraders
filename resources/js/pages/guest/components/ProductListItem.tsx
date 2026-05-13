@@ -26,9 +26,9 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
                 {/* Left: Large Image */}
                 <div className="w-full sm:w-[120px] h-[120px] bg-slate-50 dark:bg-zinc-800 flex-shrink-0 relative overflow-hidden">
                     <img
-                        src={item.image ? `/images/items/${item.image.split('/').pop()}` : DEFAULT_IMAGE}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        src={item.image || DEFAULT_IMAGE} 
+                        alt={item.title} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
                         onError={(e) => {
                             (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
                         }}

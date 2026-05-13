@@ -24,9 +24,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <Card className="bg-white dark:bg-zinc-900 py-0 border-none shadow-sm hover:shadow-md overflow-hidden flex flex-col group transition-all duration-200 cursor-pointer rounded-lg">
             <div className="aspect-square relative overflow-hidden bg-zinc-50 dark:bg-zinc-800">
                 <img
-                    src={item.image ? `/images/items/${item.image.split('/').pop()}` : DEFAULT_IMAGE}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    src={item.image || DEFAULT_IMAGE} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     onError={(e) => {
                         (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
                     }}

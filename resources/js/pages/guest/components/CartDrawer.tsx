@@ -69,9 +69,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                     {/* Image Section */}
                                     <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 dark:bg-zinc-800 border border-slate-100 dark:border-zinc-800 shrink-0 shadow-inner">
                                         <img
-                                            src={item.image ? `/images/items/${item.image.split('/').pop()}` : DEFAULT_IMAGE}
+                                            src={item.image || DEFAULT_IMAGE}
                                             alt={item.title}
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                                            }}
                                         />
                                     </div>
 

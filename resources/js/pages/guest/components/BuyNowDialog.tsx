@@ -74,9 +74,9 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                 </div>
                             ) : (
                                 <img
-                                    src={buyItem.image ? `/images/items/${buyItem.image.split('/').pop()}` : DEFAULT_IMAGE}
-                                    alt={buyItem.title}
-                                    className="w-full h-full object-cover"
+                                    src={buyItem.image || DEFAULT_IMAGE} 
+                                    alt={buyItem.title} 
+                                    className="w-full h-full object-cover" 
                                 />
                             )}
                             

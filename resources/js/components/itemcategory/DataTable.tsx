@@ -74,6 +74,7 @@ interface ItemCategory {
   name: string;
   code: string;
   image?: string | null;
+  image_url?: string | null;
   description?: string | null;
   status: "active" | "inactive";
   created_at: string;
@@ -124,7 +125,7 @@ export function DataTable({ data }: DataTableProps) {
       image: null,
       _method: "PUT",
     });
-    setImagePreview(cat.image ? `/images/${cat.image}` : null);
+    setImagePreview(cat.image_url || null);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,9 +177,9 @@ export function DataTable({ data }: DataTableProps) {
           <div className="flex items-center gap-4">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-tr from-orange-500/20 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur" />
-              {cat.image ? (
+              {cat.image_url ? (
                 <img
-                  src={`/images/${cat.image}`}
+                  src={cat.image_url}
                   alt={cat.name}
                   className="relative h-12 w-12 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800"
                 />

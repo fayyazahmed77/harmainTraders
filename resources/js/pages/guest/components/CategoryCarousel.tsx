@@ -67,9 +67,9 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
                         >
                             <div className={`w-20 h-20 rounded-full p-1 transition-all duration-500 border-2 ${selectedCategory === cat.id ? 'border-orange-500 scale-110 shadow-xl shadow-orange-500/20' : 'border-transparent group-hover/item:border-slate-300 dark:group-hover/item:border-zinc-600'}`}>
                                 <div className="w-full h-full rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
-                                    {cat.image ? (
+                                    {cat.image_url ? (
                                         <img 
-                                            src={`/images/${cat.image.split('/').pop()}`} 
+                                            src={cat.image_url} 
                                             alt={cat.name} 
                                             className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" 
                                             onError={(e) => {

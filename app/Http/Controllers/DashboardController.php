@@ -13,6 +13,7 @@ use App\Services\ReportBuilder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -26,14 +27,42 @@ class DashboardController extends Controller
 
     public function index()
     {
-        if (auth()->user()->hasRole('investor')) {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if ($user->hasRole('Investor')) {
             return redirect()->route('investor.dashboard');
         }
 
         $now = Carbon::now();
+        $today = Carbon::today();
         $thisMonth = $now->month;
         $thisYear = $now->year;
         $last7Days = $now->copy()->subDays(6);
+
+        // Daily Summary Stats
+        $dailySales      = Sales::whereDate('date', $today)->count();
+        $dailyPurchases  = Purchase::whereDate('date', $today)->count();
+        $dailyExpenses   = Payment::whereDate('date', $today)->whereHas('account', function($q) {
+            $q->where('type', 4); // Expense account type
+        })->where(function($q) {
+            $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+        })->sum('amount');
+        $dailyRecoveries = Payment::whereDate('date', $today)->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+            })->sum('amount');
+        
+        $dailySalesRevenue = (float)Sales::whereDate('date', $today)->sum('net_total');
+        $dailyPurchaseCost = (float)Purchase::whereDate('date', $today)->sum('net_total');
+        $dailyProfit = $dailySalesRevenue - $dailyPurchaseCost - (float)$dailyExpenses;
+
+        $dailySummary = [
+            'dailySales' => $dailySales,
+            'dailyPurchases' => $dailyPurchases,
+            'dailyExpenses' => (float)$dailyExpenses,
+            'dailyRecoveries' => (float)$dailyRecoveries,
+            'dailyProfit' => (float)$dailyProfit,
+        ];
 
         // 1. Stat Cards
         $totalSalesYear = (float)Sales::whereYear('date', $thisYear)->sum('net_total');
@@ -142,6 +171,94 @@ class DashboardController extends Controller
                 ];
             });
 
+        // Available Funds Distribution (Calculated dynamically)
+        $bankIds   = Account::where('type', 2)->pluck('id');
+        $cashIds   = Account::where('type', 1)->pluck('id');
+        $chequeIds = Account::where('type', 14)->pluck('id');
+
+        $getFunds = function($ids) {
+            if ($ids->isEmpty()) return 0;
+            
+            $opening = Account::whereIn('id', $ids)->sum('opening_balance');
+            
+            $totalIn = Payment::whereIn('payment_account_id', $ids)
+                ->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhere('cheque_status', '')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+                })->sum('amount');
+
+            $totalOut = Payment::whereIn('payment_account_id', $ids)
+                ->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhere('cheque_status', '')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+                })->sum('amount');
+
+            return (float)$opening + $totalIn - $totalOut;
+        };
+
+        $fundsData = [
+            ['name' => 'Bank',   'value' => $getFunds($bankIds),   'color' => '#4a9ede'],
+            ['name' => 'Cash',   'value' => $getFunds($cashIds),   'color' => '#4caf7a'],
+            ['name' => 'Cheque', 'value' => $getFunds($chequeIds), 'color' => '#e07b1a'],
+        ];
+
+        // FEATURE 3: Sales & Recoveries Datasets
+        $salesRecoveries = [];
+
+        // Daily (Last 7 Days)
+        $days = collect(range(6, 0))->map(fn($i) => Carbon::today()->subDays($i));
+        $salesRecoveries['daily'] = $days->map(fn($d) => [
+            'label' => $d->format('D'),
+            'sales' => (float)Sales::whereDate('date', $d)->sum('net_total'),
+            'recoveries' => (float)Payment::whereDate('date', $d)->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                })->sum('amount'),
+        ]);
+
+        // Weekly (Last 4 Weeks)
+        $weeks = collect(range(3, 0))->map(fn($i) => [
+            'start' => Carbon::now()->subWeeks($i)->startOfWeek(),
+            'end' => Carbon::now()->subWeeks($i)->endOfWeek(),
+            'label' => 'W' . (4 - $i)
+        ]);
+        $salesRecoveries['weekly'] = $weeks->map(fn($w) => [
+            'label' => $w['label'],
+            'sales' => (float)Sales::whereBetween('date', [$w['start'], $w['end']])->sum('net_total'),
+            'recoveries' => (float)Payment::whereBetween('date', [$w['start'], $w['end']])->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                })->sum('amount'),
+        ]);
+
+        // Monthly (12 Months of current year)
+        $months = collect(range(1, 12))->map(fn($m) => Carbon::create($thisYear, $m, 1));
+        $salesRecoveries['monthly'] = $months->map(fn($m) => [
+            'label' => $m->format('M'),
+            'sales' => (float)Sales::whereMonth('date', $m->month)->whereYear('date', $m->year)->sum('net_total'),
+            'recoveries' => (float)Payment::whereMonth('date', $m->month)->whereYear('date', $m->year)->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                })->sum('amount'),
+        ]);
+
+        // Yearly (Last 5 Years)
+        $years = collect(range(4, 0))->map(fn($i) => $thisYear - $i);
+        $salesRecoveries['yearly'] = $years->map(fn($y) => [
+            'label' => (string)$y,
+            'sales' => (float)Sales::whereYear('date', $y)->sum('net_total'),
+            'recoveries' => (float)Payment::whereYear('date', $y)->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                })->sum('amount'),
+        ]);
+
         return Inertia::render('Dashboard/Index', [
             'stats' => [
                 'totalSalesYear' => $totalSalesYear,
@@ -150,11 +267,51 @@ class DashboardController extends Controller
                 'totalCustomers' => $totalCustomers,
             ],
             'orderChartData' => $orderChart,
-            'heatmapData' => $heatmapData,
+            'fundsData' => $fundsData,
+            'salesRecoveries' => $salesRecoveries,
+            'postDateCheques' => Payment::with('account')
+                ->where('type', 'PAYMENT')
+                ->whereNotNull('cheque_no')
+                ->where('cheque_date', '>=', $today)
+                ->orderBy('cheque_date')
+                ->get()
+                ->map(function($p) use ($today) {
+                    $dueDate = Carbon::parse($p->cheque_date);
+                    return [
+                        'id' => $p->id,
+                        'customer_name' => $p->account?->title ?? 'N/A',
+                        'cheque_no' => $p->cheque_no,
+                        'due_date' => $dueDate->format('Y-m-d'),
+                        'amount' => (float)$p->amount,
+                        'status' => strtolower($p->cheque_status ?: 'pending'),
+                        'due_soon' => $dueDate->diffInDays($today) <= 7
+                    ];
+                }),
+            'stockItems' => Items::with('category')
+                ->select('*')
+                ->selectRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) as total_qty')
+                ->orderBy('total_qty', 'asc')
+                ->take(20)
+                ->get()
+                ->map(fn($p) => [
+                    'sku'       => $p->code,
+                    'name'      => $p->title,
+                    'category'  => $p->category?->name ?? 'Uncategorized',
+                    'unit'      => $p->packing_size ?: 'Pcs',
+                    'qty'       => (int)$p->total_qty,
+                    'min_level' => (int)$p->reorder_level,
+                    'status'    => $p->total_qty <= 0 ? 'out' : ($p->total_qty <= $p->reorder_level ? 'low' : 'ok'),
+                ]),
+            'stockSummary' => [
+                'total_skus'    => Items::count(),
+                'low_stock'     => Items::whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= reorder_level')->whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) > 0')->count(),
+                'out_of_stock'  => Items::whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= 0')->count(),
+            ],
             'recentCustomers' => $recentCustomers,
             'recentPurchases' => $recentPurchases,
             'recentTransactions' => $recentTransactions,
             // Keeping these for potential use or compatibility
+            'dailySummary' => $dailySummary,
             'roiTrendData' => [],
             'breakdownData' => [],
             'paymentsTrendData' => [],

@@ -42,11 +42,11 @@ class ItemCategoryController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $image_name = null;
+        $image_path = null;
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $image_name = time() . '.' . $image->getClientOriginalExtension();
-            $image->move(public_path('images'), $image_name);
+            $path = $image->store('categories', 'public');
+            $image_path = 'storage/' . $path;
         }
 
         $userId = Auth::user()->id;
@@ -65,7 +65,7 @@ class ItemCategoryController extends Controller
             'code' => strtoupper($code),
             'description' => $request->description ?? '',
             'status' => $request->status ?? 'active',
-            'image' => $image_name,
+            'image' => $image_path,
             'created_by' => $userId,
         ]);
         return redirect()->back()->with('success', 'Category created successfully');
@@ -91,9 +91,8 @@ class ItemCategoryController extends Controller
 
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $image_name = time() . '.' . $image->getClientOriginalExtension();
-            $image->move(public_path('images'), $image_name);
-            $data['image'] = $image_name;
+            $path = $image->store('categories', 'public');
+            $data['image'] = 'storage/' . $path;
         }
 
         ItemCategory::where('id', $id)->update($data);

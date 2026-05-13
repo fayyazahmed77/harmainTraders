@@ -26,4 +26,5 @@ export interface Category {
     id: number;
     name: string;
     image?: string;
+    image_url?: string;
 }

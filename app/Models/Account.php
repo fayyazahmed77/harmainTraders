@@ -147,34 +147,60 @@ class Account extends Model
         if ($type === 'customers') {
             $totalSales = $this->sales()->sum('net_total');
             $totalReturns = $this->salesReturns()->sum('net_total');
-            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
+            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
             
             return (float)$this->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
         } elseif ($type === 'supplier') {
             $totalPurchases = $this->purchases()->sum('net_total');
             $totalReturns = $this->purchaseReturns()->sum('net_total');
-            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
+            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
             
-            return (float)$this->opening_balance + $totalPurchases + $totalReceipts - $totalReturns - $totalPayments;
+            return (float)$this->opening_balance + $totalPurchases - $totalReceipts - $totalReturns - $totalPayments;
         } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
-            $totalIn = $this->financialPayments()->where('type', 'RECEIPT')
+            $baseQuery = $this->financialPayments()
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                });
+
+            $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('cheque_status')
-                      ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
                 })->sum('amount');
-            $totalOut = $this->financialPayments()->where('type', 'PAYMENT')
+
+            $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('cheque_status')
-                      ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
                 })->sum('amount');
             
             return (float)$this->opening_balance + $totalIn - $totalOut;
+        } elseif (in_array($type, ['expense', 'other'])) {
+            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+            
+            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+
+            return (float)$this->opening_balance + $totalPayments - $totalReceipts;
         }
         
         return (float)$this->opening_balance;

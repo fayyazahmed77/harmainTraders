@@ -28,6 +28,19 @@ class ItemImage extends Model
      */
     public function getUrlAttribute()
     {
-        return asset($this->image_path);
+        if (!$this->image_path) return null;
+
+        // If it's already an absolute URL, return it
+        if (filter_var($this->image_path, FILTER_VALIDATE_URL)) return $this->image_path;
+
+        // Fix: If it has redundant /images/ prefix from old data
+        $path = ltrim($this->image_path, '/');
+        if (str_starts_with($path, 'images/storage/')) {
+            $path = str_replace('images/storage/', 'storage/', $path);
+        } elseif (str_starts_with($path, 'images/')) {
+            $path = str_replace('images/', '', $path);
+        }
+
+        return asset($path);
     }
 }

@@ -1215,13 +1215,6 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <span className="text-zinc-500 font-bold text-[10px]">Unused Advance</span>
                       <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">Rs {toNum(advanceBalance).toLocaleString()}</span>
                     </div>
-
-                    <div className={`p-3 bg-zinc-50 dark:bg-zinc-900/50 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800`}>
-                      <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Contextual Analysis</div>
-                      <p className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
-                        "Liquidity event detected for account #{selectedAccountId}. Current coverage ratio is {(amount / Math.max(1, currentBalance)).toFixed(2)}x against net exposure."
-                      </p>
-                    </div>
                   </div>
                 </Card>
               </motion.div>

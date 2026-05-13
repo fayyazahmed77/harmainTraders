@@ -344,7 +344,7 @@ class PaymentController extends Controller
         $accounts = Account::with('accountType')
             ->select('id', 'title', 'type')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers', 'Supplier']);
+                $q->whereIn('name', ['Customers', 'Supplier', 'Expense', 'Other']);
             })
             ->get();
         $paymentAccounts = Account::with('accountType')
@@ -587,10 +587,22 @@ class PaymentController extends Controller
                 return back()->withErrors(['error' => 'Allocation total exceeds net payment.']);
             }
 
-            // Generate Base Voucher No
+            // Generate Base Voucher No - Robust logic
             $prefix = $request->type === 'RECEIPT' ? 'CRV-' : 'CPV-';
-            $count = Payment::where('type', $request->type)->count() + 1;
-            $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+            $lastVoucher = Payment::where('type', $request->type)
+                ->where('voucher_no', 'LIKE', $prefix . '%')
+                ->orderBy('id', 'desc')
+                ->first();
+            
+            $nextId = 1;
+            if ($lastVoucher) {
+                // Extract number from prefix-0001 or prefix-0001-A
+                $parts = explode('-', $lastVoucher->voucher_no);
+                if (isset($parts[1])) {
+                    $nextId = (int)$parts[1] + 1;
+                }
+            }
+            $baseVoucherNo = $prefix . str_pad($nextId, 4, '0', STR_PAD_LEFT);
 
             $groupId = null;
             $createdPayments = [];
@@ -640,6 +652,7 @@ class PaymentController extends Controller
                     'remarks' => !empty($request->remarks) ? $request->remarks : null,
                     'payment_method' => !empty($split['payment_method']) ? $split['payment_method'] : null,
                     'cheque_id' => $chequeId,
+                    'cheque_status' => ($split['payment_method'] ?? null) === 'Cheque' ? 'Pending' : 'Pending',
                     'message_line_id' => !empty($request->message_line_id) ? $request->message_line_id : null,
                 ]);
 
@@ -694,12 +707,13 @@ class PaymentController extends Controller
                             $bill->paid_amount      += $canAllocate;
                             $bill->remaining_amount -= $canAllocate;
 
+                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
                             if ($bill->remaining_amount <= 0) {
-                                $bill->status = 'Paid';
+                                $bill->status = $isSale ? 'Paid' : 'Completed';
                             } elseif ($bill->paid_amount > 0) {
-                                $bill->status = 'Partial';
+                                $bill->status = $isSale ? 'Partial' : 'Completed';
                             } else {
-                                $bill->status = 'Unpaid';
+                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
                             }
 
                             $bill->save();

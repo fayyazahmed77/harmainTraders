@@ -76,7 +76,7 @@ import {
 /* ------------------------------
    ✔️ Status Type (Fixes All TS Errors)
 --------------------------------- */
-export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled";
+export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled" | "Partial";
 
 /* ------------------------------
    ✔️ Main Interface
@@ -141,6 +141,10 @@ export default function DataTable({ data }: DataTableProps) {
         Canceled: {
             color: "bg-gray-100 text-gray-800",
             icon: <AlertCircle size={14} />,
+        },
+        Partial: {
+            color: "bg-indigo-100 text-indigo-800",
+            icon: <RefreshCcw size={14} />,
         },
     };
 
@@ -217,7 +221,12 @@ export default function DataTable({ data }: DataTableProps) {
             header: "Status",
             cell: ({ row }) => {
                 const status = row.original.status;
-                const { color, icon } = statusMap[status];
+                const config = statusMap[status] || {
+                    color: "bg-gray-100 text-gray-800",
+                    icon: <AlertCircle size={14} />,
+                };
+
+                const { color, icon } = config;
 
                 return (
                     <span

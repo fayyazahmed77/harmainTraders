@@ -1,5 +1,8 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
+import DailySummaryStrip from "@/components/Dashboard/DailySummaryStrip"
+import FundsPieChart from "@/components/Dashboard/FundsPieChart"
+import SalesRecoveriesChart from "@/components/Dashboard/SalesRecoveriesChart"
 import {
     SidebarInset,
     SidebarProvider,
@@ -39,6 +42,13 @@ import {
 } from "lucide-react";
 
 interface DashboardProps {
+    dailySummary: {
+        dailySales: number;
+        dailyPurchases: number;
+        dailyExpenses: number;
+        dailyRecoveries: number;
+        dailyProfit: number;
+    };
     stats: {
         totalSalesYear: number;
         totalOrdersYear: number;
@@ -46,13 +56,22 @@ interface DashboardProps {
         totalCustomers: number;
     };
     orderChartData: { day: string, orders: number }[];
-    heatmapData: { category: string, values: number[] }[];
+    fundsData: { name: string, value: number, color: string }[];
+    salesRecoveries: {
+        daily: { label: string, sales: number, recoveries: number }[];
+        weekly: { label: string, sales: number, recoveries: number }[];
+        monthly: { label: string, sales: number, recoveries: number }[];
+        yearly: { label: string, sales: number, recoveries: number }[];
+    };
+    postDateCheques: any[];
+    stockItems: any[];
+    stockSummary: any;
     recentCustomers: { id: number, name: string, location: string, rating: number, avatar: string }[];
     recentPurchases: { id: number, city: string, rating: number, address: string, phone: string, invoice: string, amount: number }[];
     recentTransactions: { date: string, paymentVia: string, status: "Success" | "Failed" | "Pending", amount: number, party: string }[];
 }
 
-export default function DashboardPage({ stats, orderChartData, heatmapData, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
+export default function DashboardPage({ dailySummary, stats, orderChartData, fundsData, salesRecoveries, postDateCheques, stockItems, stockSummary, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
@@ -101,9 +120,6 @@ export default function DashboardPage({ stats, orderChartData, heatmapData, rece
         },
     ];
 
-    // Days for heatmap
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
     const getStatusColor = (status: string) => {
         switch (status) {
             case "Success": return "bg-blue-100 text-blue-700 hover:bg-blue-100";
@@ -111,15 +127,6 @@ export default function DashboardPage({ stats, orderChartData, heatmapData, rece
             case "Failed": return "bg-red-100 text-red-700 hover:bg-red-100";
             default: return "bg-gray-100 text-gray-700";
         }
-    };
-
-    const getHeatmapColor = (value: number) => {
-        if (value === 0) return "#f8fafc"; // Slate-50 for zero
-        if (value < 0.2) return "#fff7ed";
-        if (value < 0.4) return "#ffedd5";
-        if (value < 0.6) return "#fed7aa";
-        if (value < 0.8) return "#fdba74";
-        return "#f97316";
     };
 
     return (
@@ -133,6 +140,9 @@ export default function DashboardPage({ stats, orderChartData, heatmapData, rece
             <SidebarInset>
                 <SiteHeader />
                 <div className="flex flex-1 flex-col p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-950">
+
+                    {/* Daily Summary Strip */}
+                    <DailySummaryStrip dailySummary={dailySummary} />
 
                     {/* Top Stat Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -195,44 +205,18 @@ export default function DashboardPage({ stats, orderChartData, heatmapData, rece
                             </CardContent>
                         </Card>
 
-                        {/* Shop by Category */}
-                        <Card className="border-gray-200 dark:border-gray-800">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base font-semibold">Sales by Category</CardTitle>
-                                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => router.get(route('item-categories.index'))}>
-                                        MONTHLY <ChevronDown className="w-3 h-3 ml-1" />
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-sidebar-primary mt-2">Distribution across top 5 categories</p>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {/* Days Header */}
-                                    <div className="grid grid-cols-8 gap-1 text-[10px] font-medium text-gray-500 mb-1 pl-16">
-                                        {days.map(day => (
-                                            <div key={day} className="text-center">{day}</div>
-                                        ))}
-                                    </div>
-                                    {/* Heatmap Rows */}
-                                    {heatmapData.length > 0 ? heatmapData.map((row, rowIndex) => (
-                                        <div key={rowIndex} className="grid grid-cols-8 gap-1 items-center">
-                                            <div className="col-span-1 text-[10px] font-semibold text-gray-700 pr-2 truncate text-right w-16" title={row.category}>{row.category}</div>
-                                            {row.values.map((value, colIndex) => (
-                                                <div
-                                                    key={colIndex}
-                                                    className="h-7 rounded-sm transition-colors duration-200 hover:ring-1 hover:ring-orange-300"
-                                                    style={{ backgroundColor: getHeatmapColor(value) }}
-                                                    title={`${Math.round(value * 100)}% volume`}
-                                                />
-                                            ))}
-                                        </div>
-                                    )) : (
-                                        <div className="h-48 flex items-center justify-center text-xs text-gray-400">No data available</div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {/* Available Funds */}
+                        <FundsPieChart fundsData={fundsData} />
+                    </div>
+                    
+                    {/* Full-width Tabbed Section */}
+                    <div className="grid grid-cols-1 gap-4">
+                        <SalesRecoveriesChart 
+                            salesRecoveries={salesRecoveries} 
+                            postDateCheques={postDateCheques}
+                            stockItems={stockItems}
+                            stockSummary={stockSummary}
+                        />
                     </div>
 
                     {/* Bottom Row - Data Tables */}
