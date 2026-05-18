@@ -277,19 +277,74 @@ class ProfitReportBuilder
 
         switch ($reportId) {
             case 'transaction':
-                return $this->transactionWiseProfit($fromDate, $toDate, $filters);
+                $data = $this->transactionWiseProfit($fromDate, $toDate, $filters);
+                break;
             case 'party':
-                return $this->partyWiseProfit($fromDate, $toDate, $filters);
+                $data = $this->partyWiseProfit($fromDate, $toDate, $filters);
+                break;
             case 'salesman':
-                return $this->salesmanWiseProfit($fromDate, $toDate, $filters);
+                $data = $this->salesmanWiseProfit($fromDate, $toDate, $filters);
+                break;
             case 'company':
-                return $this->companyWiseProfit($fromDate, $toDate, $filters);
+                $data = $this->companyWiseProfit($fromDate, $toDate, $filters);
+                break;
             case 'date':
-                return $this->dateWiseProfit($fromDate, $toDate);
+                $data = $this->dateWiseProfit($fromDate, $toDate);
+                break;
             case 'month':
-                return $this->monthWiseProfit($fromDate, $toDate);
+                $data = $this->monthWiseProfit($fromDate, $toDate);
+                break;
             default:
-                return $this->transactionWiseProfit($fromDate, $toDate, $filters);
+                $data = $this->transactionWiseProfit($fromDate, $toDate, $filters);
+                break;
+        }
+
+        // Apply sorting if a sortBy parameter is present
+        if (!empty($params['sortBy']) && $params['sortBy'] !== 'default') {
+            $data = $this->sortData($data, $params['sortBy']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Sort profit report data based on chosen filter.
+     */
+    private function sortData($data, $sortBy)
+    {
+        $collection = collect($data);
+
+        switch ($sortBy) {
+            case 'revenue_desc':
+                return $collection->sortByDesc('revenue')->values()->toArray();
+            case 'revenue_asc':
+                return $collection->sortBy('revenue')->values()->toArray();
+            case 'profit_desc':
+                return $collection->sortByDesc('profit')->values()->toArray();
+            case 'profit_asc':
+                return $collection->sortBy('profit')->values()->toArray();
+            case 'margin_desc':
+                return $collection->sortByDesc('margin')->values()->toArray();
+            case 'margin_asc':
+                return $collection->sortBy('margin')->values()->toArray();
+            case 'qty_desc':
+                return $collection->sortByDesc('qty')->values()->toArray();
+            case 'qty_asc':
+                return $collection->sortBy('qty')->values()->toArray();
+            case 'date_desc':
+                return $collection->sortByDesc('date')->values()->toArray();
+            case 'date_asc':
+                return $collection->sortBy('date')->values()->toArray();
+            case 'name_asc':
+                return $collection->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'name_desc':
+                return $collection->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'net_profit_desc':
+                return $collection->sortByDesc('net_profit')->values()->toArray();
+            case 'net_profit_asc':
+                return $collection->sortBy('net_profit')->values()->toArray();
+            default:
+                return $data;
         }
     }
 }

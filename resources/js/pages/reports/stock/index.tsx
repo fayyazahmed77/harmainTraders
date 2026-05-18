@@ -58,7 +58,7 @@ export default function StockReportsIndex({ items, companies, categories, firms 
         show_zero: false,
         reorder_level: false,
         remove_negative: false,
-        sortBy: 'ITEM_DESC',
+        sortBy: 'default',
         printOn: 'screen'
     });
 
@@ -91,10 +91,11 @@ export default function StockReportsIndex({ items, companies, categories, firms 
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel') => {
+    const handleExport = (type: 'pdf' | 'excel', currentSort?: string) => {
         const baseUrl = type === 'pdf' ? route('reports.stock.export') : route('reports.stock.excel');
         const queryParams = new URLSearchParams({
             ...params as any,
+            sortBy: currentSort || params.sortBy || 'default',
             fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
             toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
         });
@@ -174,8 +175,8 @@ export default function StockReportsIndex({ items, companies, categories, firms 
                                         reportId={params.reportId}
                                         data={reportData}
                                         loading={loading}
-                                        onExportPdf={() => handleExport('pdf')}
-                                        onExportExcel={() => handleExport('excel')}
+                                        onExportPdf={(sort) => handleExport('pdf', sort)}
+                                        onExportExcel={(sort) => handleExport('excel', sort)}
                                         params={params}
                                     />
                                 </motion.div>

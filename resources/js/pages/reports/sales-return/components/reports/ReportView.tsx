@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
     DollarSign, 
@@ -8,7 +8,8 @@ import {
     TrendingUp, 
     List, 
     BarChart3,
-    LayoutDashboard
+    LayoutDashboard,
+    ArrowUpDown
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,13 @@ import { salesReturnReports } from '../../constants/salesReturnReports';
 import AnalyticsButton from '@/components/Reports/AnalyticsButton';
 import AnalyticsDialog from '@/components/Reports/AnalyticsDialog';
 import * as Reports from './types';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
 
 // [ANIMATION] Custom Hook for Count-Up Animation
 function useCountUp(target: number, duration = 1200, delay = 0) {
@@ -48,10 +56,88 @@ interface ReportViewProps {
     reportId: string;
     data: any[];
     loading: boolean;
-    onExportPdf: () => void;
-    onExportExcel: () => void;
+    onExportPdf: (sortBy?: string) => void;
+    onExportExcel: (sortBy?: string) => void;
     params: any;
 }
+
+const getSortOptions = (reportId: string) => {
+    const baseOptions = [
+        { value: 'default', label: 'Default Order' },
+        { value: 'amount_desc', label: 'Refund: High to Low' },
+        { value: 'amount_asc', label: 'Refund: Low to High' },
+    ];
+
+    switch (reportId) {
+        case 'bill':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'date_desc', label: 'Date: Newest First' },
+                { value: 'date_asc', label: 'Date: Oldest First' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'gross_desc', label: 'Gross: High to Low' },
+                { value: 'gross_asc', label: 'Gross: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Refund Amount: High to Low' },
+                { value: 'amount_asc', label: 'Refund Amount: Low to High' },
+            ];
+        case 'detail':
+        case 'details_wise':
+            return [
+                { value: 'default', label: 'Default (Newest First)' },
+                { value: 'date_desc', label: 'Date: Newest First' },
+                { value: 'date_asc', label: 'Date: Oldest First' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'product_name_asc', label: 'Product: A to Z' },
+                { value: 'product_name_desc', label: 'Product: Z to A' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+                { value: 'amount_desc', label: 'Refund: High to Low' },
+                { value: 'amount_asc', label: 'Refund: Low to High' },
+            ];
+        case 'area_item_party':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'product_name_asc', label: 'Product: A to Z' },
+                { value: 'product_name_desc', label: 'Product: Z to A' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+                { value: 'amount_desc', label: 'Refund: High to Low' },
+                { value: 'amount_asc', label: 'Refund: Low to High' },
+            ];
+        case 'item_summary':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'product_name_asc', label: 'Product: A to Z' },
+                { value: 'product_name_desc', label: 'Product: Z to A' },
+                { value: 'gross_desc', label: 'Gross: High to Low' },
+                { value: 'gross_asc', label: 'Gross: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Refund Amount: High to Low' },
+                { value: 'amount_asc', label: 'Refund Amount: Low to High' },
+            ];
+        case 'month':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'product_name_asc', label: 'Product: A to Z' },
+                { value: 'product_name_desc', label: 'Product: Z to A' },
+                { value: 'qty_desc', label: 'Quantity: High to Low' },
+                { value: 'qty_asc', label: 'Quantity: Low to High' },
+                { value: 'amount_desc', label: 'Refund: High to Low' },
+                { value: 'amount_asc', label: 'Refund: Low to High' },
+            ];
+        default:
+            return baseOptions;
+    }
+};
 
 export function ReportView({ 
     reportId, 
@@ -61,10 +147,16 @@ export function ReportView({
     onExportExcel,
     params
 }: ReportViewProps) {
+    const [sortBy, setSortBy] = useState<string>('default');
     const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
     const [pdfFlash, setPdfFlash] = useState(false);
     const [excelFlash, setExcelFlash] = useState(false);
     
+    // Reset sort option when report ID changes
+    useEffect(() => {
+        setSortBy('default');
+    }, [reportId]);
+
     const activeReport = salesReturnReports.find(r => r.id === reportId) || salesReturnReports[0];
 
     const formatCurrency = (val: number) => {
@@ -78,6 +170,78 @@ export function ReportView({
         amount: acc.amount + (Number(row.amount) || Number(row.total_amount) || Number(row.net_total) || Number(row.net_amount) || 0),
         qty: acc.qty + (Number(row.qty) || Number(row.total_qty) || Number(row.qty_f) || Number(row.qty_full) || 0),
     }), { amount: 0, qty: 0 });
+
+    const sortedData = useMemo(() => {
+        if (sortBy === 'default') return data;
+
+        const dataCopy = [...data];
+
+        return dataCopy.sort((a, b) => {
+            let valA: any = 0;
+            let valB: any = 0;
+
+            switch (sortBy) {
+                case 'amount_desc':
+                    valA = Number(a.amount || a.net_amount || 0);
+                    valB = Number(b.amount || b.net_amount || 0);
+                    return valB - valA;
+                case 'amount_asc':
+                    valA = Number(a.amount || a.net_amount || 0);
+                    valB = Number(b.amount || b.net_amount || 0);
+                    return valA - valB;
+                case 'gross_desc':
+                    valA = Number(a.gross || a.gross_amount || 0);
+                    valB = Number(b.gross || b.gross_amount || 0);
+                    return valB - valA;
+                case 'gross_asc':
+                    valA = Number(a.gross || a.gross_amount || 0);
+                    valB = Number(b.gross || b.gross_amount || 0);
+                    return valA - valB;
+                case 'discount_desc':
+                    valA = Number(a.discount || a.disc_amt || 0);
+                    valB = Number(b.discount || b.disc_amt || 0);
+                    return valB - valA;
+                case 'discount_asc':
+                    valA = Number(a.discount || a.disc_amt || 0);
+                    valB = Number(b.discount || b.disc_amt || 0);
+                    return valA - valB;
+                case 'qty_desc':
+                    valA = Number(a.qty_full || a.qty_f || a.qty || 0);
+                    valB = Number(b.qty_full || b.qty_f || b.qty || 0);
+                    return valB - valA;
+                case 'qty_asc':
+                    valA = Number(a.qty_full || a.qty_f || a.qty || 0);
+                    valB = Number(b.qty_full || b.qty_f || b.qty || 0);
+                    return valA - valB;
+                case 'date_desc':
+                    valA = String(a.date || a.month_name || '0');
+                    valB = String(b.date || b.month_name || '0');
+                    return valB.localeCompare(valA);
+                case 'date_asc':
+                    valA = String(a.date || a.month_name || '0');
+                    valB = String(b.date || b.month_name || '0');
+                    return valA.localeCompare(valB);
+                case 'name_asc':
+                    valA = String(a.customer_name || a.account_name || a.account_title || '').toLowerCase();
+                    valB = String(b.customer_name || b.account_name || b.account_title || '').toLowerCase();
+                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                case 'name_desc':
+                    valA = String(a.customer_name || a.account_name || a.account_title || '').toLowerCase();
+                    valB = String(b.customer_name || b.account_name || b.account_title || '').toLowerCase();
+                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                case 'product_name_asc':
+                    valA = String(a.product_name || a.item_name || a.item_description || '').toLowerCase();
+                    valB = String(b.product_name || b.item_name || b.item_description || '').toLowerCase();
+                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                case 'product_name_desc':
+                    valA = String(a.product_name || a.item_name || a.item_description || '').toLowerCase();
+                    valB = String(b.product_name || b.item_name || b.item_description || '').toLowerCase();
+                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                default:
+                    return 0;
+            }
+        });
+    }, [data, sortBy]);
 
     // [ANIMATION] Count-up values
     const animatedTotalReturns = useCountUp(totals.amount, 1200, 300);
@@ -95,13 +259,13 @@ export function ReportView({
 
     const handlePdfClick = () => {
         setPdfFlash(true);
-        onExportPdf();
+        onExportPdf(sortBy);
         setTimeout(() => setPdfFlash(false), 600);
     };
 
     const handleExcelClick = () => {
         setExcelFlash(true);
-        onExportExcel();
+        onExportExcel(sortBy);
         setTimeout(() => setExcelFlash(false), 600);
     };
 
@@ -125,13 +289,13 @@ export function ReportView({
                 .animate-progress-bar {
                     animation: progressBar 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                 }
-
+ 
                 @keyframes breathe {
                     0%, 100% { opacity: 0.6; }
                     50%       { opacity: 1; }
                 }
                 .animate-breathe { animation: breathe 3s ease-in-out infinite; }
-
+ 
                 @keyframes scanLine {
                     0%   { top: 20%; opacity: 0; }
                     10%  { opacity: 1; }
@@ -141,7 +305,7 @@ export function ReportView({
                 .animate-scan-line {
                     animation: scanLine 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                 }
-
+ 
                 @media (prefers-reduced-motion: reduce) {
                     *, *::before, *::after { 
                         animation-duration: 0.01ms !important; 
@@ -209,7 +373,7 @@ export function ReportView({
                     </div>
                 </div>
 
-                <div className="p-5 border-b border-border/50 flex items-center justify-between bg-surface-1/30">
+                <div className="p-5 border-b border-border/50 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-surface-1/30">
                     <div>
                         <h3 className="text-md font-black text-text-primary uppercase tracking-tight flex items-center gap-2 italic">
                              Return Analysis <span className="text-orange-600">Engine</span>
@@ -219,7 +383,7 @@ export function ReportView({
                         </h3>
                         <p className="text-[9px] font-bold text-text-muted uppercase mt-1 tracking-widest opacity-60">{criteria}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                         {/* [ANIMATION] Analytics Button heartbeat */}
                         <div className="animate-breathe">
                             <AnalyticsButton 
@@ -234,7 +398,22 @@ export function ReportView({
                             />
                         </div>
                         
-                        <div className="h-4 w-[1px] bg-border mx-1" />
+                        <div className="h-4 w-[1px] bg-border mx-1 hidden lg:block" />
+
+                        {/* Premium Sorting Dropdown */}
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="h-9 w-[190px] rounded-none border-border/50 bg-surface-1 hover:bg-surface-2 text-[10px] font-black uppercase tracking-tight focus:ring-0 focus:ring-offset-0 flex items-center gap-2">
+                                <ArrowUpDown className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                                <SelectValue placeholder="SORT BY" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-none bg-surface-0 border-border/50 text-[10px] font-bold uppercase tracking-tight">
+                                {getSortOptions(reportId).map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value} className="text-[10px] font-bold uppercase tracking-tight cursor-pointer hover:bg-surface-1 rounded-none">
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         
                         <Button 
                             variant="outline" 
@@ -292,7 +471,7 @@ export function ReportView({
                                     };
 
                                     const ActiveComponent = components[reportId] || Reports.BillReport;
-                                    return <ActiveComponent data={data} formatCurrency={formatCurrency} />;
+                                    return <ActiveComponent data={sortedData} formatCurrency={formatCurrency} />;
                                 })()}
                             </Table>
                         </div>
@@ -304,7 +483,7 @@ export function ReportView({
                 isOpen={isAnalyticsOpen} 
                 onClose={() => setIsAnalyticsOpen(false)} 
                 reportType={reportId} 
-                data={data} 
+                data={sortedData} 
             />
         </div>
     );

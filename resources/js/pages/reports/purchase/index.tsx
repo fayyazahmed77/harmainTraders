@@ -50,6 +50,7 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
         userId: 'ALL',
         companyId: 'ALL',
         printOn: 'screen',
+        sortBy: 'default',
     });
 
     const [reportData, setReportData] = useState<any[]>([]);
@@ -89,7 +90,7 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel' | 'print') => {
+    const handleExport = (type: 'pdf' | 'excel' | 'print', currentSort?: string) => {
         let baseUrl = '';
         switch(type) {
             case 'pdf': baseUrl = route('reports.purchase.export'); break;
@@ -99,6 +100,7 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
 
         const queryParams = new URLSearchParams({
             ...params as any,
+            sortBy: currentSort || params.sortBy || 'default',
             fromDate: params.fromDate.toISOString(),
             toDate: params.toDate.toISOString(),
         });

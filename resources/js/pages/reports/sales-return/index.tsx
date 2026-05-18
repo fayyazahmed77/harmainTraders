@@ -54,7 +54,8 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
         subAreaId: 'ALL',
         userId: 'ALL',
         companyId: 'ALL',
-        printOn: 'screen'
+        printOn: 'screen',
+        sortBy: 'default'
     });
 
     const fetchReportData = async () => {
@@ -89,7 +90,7 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel') => {
+    const handleExport = (type: 'pdf' | 'excel', currentSort?: string) => {
         let baseUrl = '';
         switch(type) {
             case 'pdf': baseUrl = route('reports.sales-return.export'); break;
@@ -98,6 +99,7 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
 
         const queryParams = new URLSearchParams({
             ...params as any,
+            sortBy: currentSort || params.sortBy || 'default',
             fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
             toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
         });
@@ -203,8 +205,8 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
                                         reportId={params.reportId}
                                         data={reportData}
                                         loading={loading}
-                                        onExportPdf={() => handleExport('pdf')}
-                                        onExportExcel={() => handleExport('excel')}
+                                        onExportPdf={(sort) => handleExport('pdf', sort)}
+                                        onExportExcel={(sort) => handleExport('excel', sort)}
                                         params={params}
                                     />
                                 </motion.div>

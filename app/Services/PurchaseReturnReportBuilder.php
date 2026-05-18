@@ -157,14 +157,94 @@ class PurchaseReturnReportBuilder
         ];
 
         switch ($reportId) {
-            case 'bill': return $this->billWise($fromDate, $toDate, $filters);
-            case 'date': return $this->dateWise($fromDate, $toDate, $filters);
-            case 'details': return $this->details($fromDate, $toDate, $filters);
-            case 'invoice_details': return $this->details($fromDate, $toDate, $filters); // Returns usually simple, reuse details
-            case 'item': return $this->itemWise($fromDate, $toDate, $filters);
-            case 'month': return $this->monthWise($fromDate, $toDate, $filters);
-            case 'payment': return $this->paymentWise($fromDate, $toDate, $filters);
-            default: return $this->billWise($fromDate, $toDate, $filters);
+            case 'bill': $data = $this->billWise($fromDate, $toDate, $filters); break;
+            case 'date': $data = $this->dateWise($fromDate, $toDate, $filters); break;
+            case 'details': $data = $this->details($fromDate, $toDate, $filters); break;
+            case 'invoice_details': $data = $this->details($fromDate, $toDate, $filters); break; 
+            case 'item': $data = $this->itemWise($fromDate, $toDate, $filters); break;
+            case 'month': $data = $this->monthWise($fromDate, $toDate, $filters); break;
+            case 'payment': $data = $this->paymentWise($fromDate, $toDate, $filters); break;
+            default: $data = $this->billWise($fromDate, $toDate, $filters); break;
+        }
+
+        // Apply sorting if a sortBy parameter is present
+        if (!empty($params['sortBy']) && $params['sortBy'] !== 'default') {
+            $data = $this->sortData($data, $params['sortBy']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Sort purchase return report data based on chosen filter.
+     */
+    private function sortData($data, $sortBy)
+    {
+        $collection = collect($data);
+
+        switch ($sortBy) {
+            case 'amount_desc':
+                return $collection->sortByDesc(function ($item) {
+                    return $item['amount'] ?? $item['total_amount'] ?? $item['net_amount'] ?? 0;
+                })->values()->toArray();
+            case 'amount_asc':
+                return $collection->sortBy(function ($item) {
+                    return $item['amount'] ?? $item['total_amount'] ?? $item['net_amount'] ?? 0;
+                })->values()->toArray();
+            case 'gross_desc':
+                return $collection->sortByDesc(function ($item) {
+                    return $item['gross'] ?? $item['gross_amount'] ?? 0;
+                })->values()->toArray();
+            case 'gross_asc':
+                return $collection->sortBy(function ($item) {
+                    return $item['gross'] ?? $item['gross_amount'] ?? 0;
+                })->values()->toArray();
+            case 'discount_desc':
+                return $collection->sortByDesc(function ($item) {
+                    return $item['discount'] ?? $item['discount_amount'] ?? 0;
+                })->values()->toArray();
+            case 'discount_asc':
+                return $collection->sortBy(function ($item) {
+                    return $item['discount'] ?? $item['discount_amount'] ?? 0;
+                })->values()->toArray();
+            case 'paid_desc':
+                return $collection->sortByDesc('paid_amount')->values()->toArray();
+            case 'paid_asc':
+                return $collection->sortBy('paid_amount')->values()->toArray();
+            case 'qty_desc':
+                return $collection->sortByDesc('qty_full')->values()->toArray();
+            case 'qty_asc':
+                return $collection->sortBy('qty_full')->values()->toArray();
+            case 'bills_desc':
+                return $collection->sortByDesc('total_bills')->values()->toArray();
+            case 'bills_asc':
+                return $collection->sortBy('total_bills')->values()->toArray();
+            case 'date_desc':
+                return $collection->sortByDesc(function ($item) {
+                    return $item['date'] ?? $item['month'] ?? '';
+                })->values()->toArray();
+            case 'date_asc':
+                return $collection->sortBy(function ($item) {
+                    return $item['date'] ?? $item['month'] ?? '';
+                })->values()->toArray();
+            case 'name_asc':
+                return $collection->sortBy(function ($item) {
+                    return $item['account_name'] ?? $item['name'] ?? '';
+                }, SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'name_desc':
+                return $collection->sortByDesc(function ($item) {
+                    return $item['account_name'] ?? $item['name'] ?? '';
+                }, SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'product_name_asc':
+                return $collection->sortBy('product_name', SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'product_name_desc':
+                return $collection->sortByDesc('product_name', SORT_NATURAL | SORT_FLAG_CASE)->values()->toArray();
+            case 'balance_desc':
+                return $collection->sortByDesc('balance')->values()->toArray();
+            case 'balance_asc':
+                return $collection->sortBy('balance')->values()->toArray();
+            default:
+                return $data;
         }
     }
 

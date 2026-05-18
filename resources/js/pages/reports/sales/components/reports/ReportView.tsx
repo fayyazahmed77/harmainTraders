@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { 
     DollarSign, 
@@ -8,7 +8,8 @@ import {
     TrendingUp, 
     List, 
     BarChart3,
-    LayoutDashboard
+    LayoutDashboard,
+    ArrowUpDown
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,13 @@ import { salesReports } from '../../constants/salesReports';
 import AnalyticsButton from '@/components/Reports/AnalyticsButton';
 import AnalyticsDialog from '@/components/Reports/AnalyticsDialog';
 import * as Reports from './types';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
 
 // [ANIMATION] Custom Hook for Count-Up Animation
 function useCountUp(target: number, duration = 1200, delay = 0) {
@@ -48,10 +56,148 @@ interface ReportViewProps {
     reportId: string;
     data: any[];
     loading: boolean;
-    onExportPdf: () => void;
-    onExportExcel: () => void;
+    onExportPdf: (sortBy?: string) => void;
+    onExportExcel: (sortBy?: string) => void;
     params: any;
 }
+
+const getSortOptions = (reportId: string) => {
+    const baseOptions = [
+        { value: 'default', label: 'Default Order' },
+        { value: 'amount_desc', label: 'Amount: High to Low' },
+        { value: 'amount_asc', label: 'Amount: Low to High' },
+    ];
+
+    switch (reportId) {
+        case 'bill':
+            return [
+                { value: 'default', label: 'Default (Newest First)' },
+                { value: 'date_desc', label: 'Date: Newest First' },
+                { value: 'date_asc', label: 'Date: Oldest First' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'gross_desc', label: 'Gross: High to Low' },
+                { value: 'gross_asc', label: 'Gross: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+                { value: 'paid_desc', label: 'Recovery: High to Low' },
+                { value: 'paid_asc', label: 'Recovery: Low to High' },
+            ];
+        case 'detail':
+        case 'details_wise':
+        case 'invoice_details':
+            return [
+                { value: 'default', label: 'Default (Newest First)' },
+                { value: 'date_desc', label: 'Date: Newest First' },
+                { value: 'date_asc', label: 'Date: Oldest First' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'product_name_asc', label: 'Product Name: A to Z' },
+                { value: 'product_name_desc', label: 'Product Name: Z to A' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+                { value: 'amount_desc', label: 'Subtotal: High to Low' },
+                { value: 'amount_asc', label: 'Subtotal: Low to High' },
+            ];
+        case 'month':
+        case 'item_party':
+        case 'area_item_party':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'product_name_asc', label: 'Product Name: A to Z' },
+                { value: 'product_name_desc', label: 'Product Name: Z to A' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+            ];
+        case 'month_amount':
+        case 'area_party':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+            ];
+        case 'month_qty':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+            ];
+        case 'item_summary':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'product_name_asc', label: 'Product Name: A to Z' },
+                { value: 'product_name_desc', label: 'Product Name: Z to A' },
+                { value: 'gross_desc', label: 'Gross Amount: High to Low' },
+                { value: 'gross_asc', label: 'Gross Amount: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+            ];
+        case 'party_summary':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'gross_desc', label: 'Gross Amount: High to Low' },
+                { value: 'gross_asc', label: 'Gross Amount: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+            ];
+        case 'recovery':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Customer: A to Z' },
+                { value: 'name_desc', label: 'Customer: Z to A' },
+                { value: 'amount_desc', label: 'Total Sales: High to Low' },
+                { value: 'amount_asc', label: 'Total Sales: Low to High' },
+                { value: 'paid_desc', label: 'Recovered/Received: High to Low' },
+                { value: 'paid_asc', label: 'Recovered/Received: Low to High' },
+                { value: 'balance_desc', label: 'Outstanding Balance: High to Low' },
+                { value: 'balance_asc', label: 'Outstanding Balance: Low to High' },
+            ];
+        case 'company':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Company: A to Z' },
+                { value: 'name_desc', label: 'Company: Z to A' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+                { value: 'percentage_desc', label: 'Percentage: High to Low' },
+                { value: 'percentage_asc', label: 'Percentage: Low to High' },
+            ];
+        case 'salesman':
+            return [
+                { value: 'default', label: 'Default Order' },
+                { value: 'name_asc', label: 'Salesman: A to Z' },
+                { value: 'name_desc', label: 'Salesman: Z to A' },
+                { value: 'gross_desc', label: 'Gross Amount: High to Low' },
+                { value: 'gross_asc', label: 'Gross Amount: Low to High' },
+                { value: 'discount_desc', label: 'Discount: High to Low' },
+                { value: 'discount_asc', label: 'Discount: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
+                { value: 'paid_desc', label: 'Recovery: High to Low' },
+                { value: 'paid_asc', label: 'Recovery: Low to High' },
+                { value: 'percentage_desc', label: 'Percentage: High to Low' },
+                { value: 'percentage_asc', label: 'Percentage: Low to High' },
+            ];
+        default:
+            return baseOptions;
+    }
+};
 
 export function ReportView({ 
     reportId, 
@@ -61,10 +207,16 @@ export function ReportView({
     onExportExcel,
     params
 }: ReportViewProps) {
+    const [sortBy, setSortBy] = useState<string>('default');
     const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
     const [pdfFlash, setPdfFlash] = useState(false);
     const [excelFlash, setExcelFlash] = useState(false);
     
+    // Reset sort option when report ID changes
+    useEffect(() => {
+        setSortBy('default');
+    }, [reportId]);
+
     const activeReport = salesReports.find(r => r.id === reportId) || salesReports[0];
 
     const formatCurrency = (val: number) => {
@@ -78,6 +230,94 @@ export function ReportView({
         amount: acc.amount + (Number(row.amount) || Number(row.total_amount) || Number(row.net_total) || Number(row.total_sales) || Number(row.sales) || 0),
         qty: acc.qty + (Number(row.qty) || Number(row.total_qty) || Number(row.qty_full) || 0),
     }), { amount: 0, qty: 0 });
+
+    const sortedData = useMemo(() => {
+        if (sortBy === 'default') return data;
+
+        const dataCopy = [...data];
+
+        return dataCopy.sort((a, b) => {
+            let valA: any = 0;
+            let valB: any = 0;
+
+            switch (sortBy) {
+                case 'amount_desc':
+                    valA = Number(a.amount || a.net_amount || a.inv_amount || a.sales || 0);
+                    valB = Number(b.amount || b.net_amount || b.inv_amount || b.sales || 0);
+                    return valB - valA;
+                case 'amount_asc':
+                    valA = Number(a.amount || a.net_amount || a.inv_amount || a.sales || 0);
+                    valB = Number(b.amount || b.net_amount || b.inv_amount || b.sales || 0);
+                    return valA - valB;
+                case 'gross_desc':
+                    valA = Number(a.gross || a.gross_amount || 0);
+                    valB = Number(b.gross || b.gross_amount || 0);
+                    return valB - valA;
+                case 'gross_asc':
+                    valA = Number(a.gross || a.gross_amount || 0);
+                    valB = Number(b.gross || b.gross_amount || 0);
+                    return valA - valB;
+                case 'discount_desc':
+                    valA = Number(a.discount || a.discount_amount || a.disc_amt || a.disc_1 || 0);
+                    valB = Number(b.discount || b.discount_amount || b.disc_amt || b.disc_1 || 0);
+                    return valB - valA;
+                case 'discount_asc':
+                    valA = Number(a.discount || a.discount_amount || a.disc_amt || a.disc_1 || 0);
+                    valB = Number(b.discount || b.discount_amount || b.disc_amt || b.disc_1 || 0);
+                    return valA - valB;
+                case 'paid_desc':
+                    valA = Number(a.paid_amount || a.received || a.recovery || 0);
+                    valB = Number(b.paid_amount || b.received || b.recovery || 0);
+                    return valB - valA;
+                case 'paid_asc':
+                    valA = Number(a.paid_amount || a.received || a.recovery || 0);
+                    valB = Number(b.paid_amount || b.received || b.recovery || 0);
+                    return valA - valB;
+                case 'qty_desc':
+                    valA = Number(a.qty_full || a.qty_f || a.qty || 0);
+                    valB = Number(b.qty_full || b.qty_f || b.qty || 0);
+                    return valB - valA;
+                case 'qty_asc':
+                    valA = Number(a.qty_full || a.qty_f || a.qty || 0);
+                    valB = Number(b.qty_full || b.qty_f || b.qty || 0);
+                    return valA - valB;
+                case 'percentage_desc':
+                    return (Number(b.percentage) || 0) - (Number(a.percentage) || 0);
+                case 'percentage_asc':
+                    return (Number(a.percentage) || 0) - (Number(b.percentage) || 0);
+                case 'balance_desc':
+                    return (Number(b.balance) || 0) - (Number(a.balance) || 0);
+                case 'balance_asc':
+                    return (Number(a.balance) || 0) - (Number(b.balance) || 0);
+                case 'date_desc':
+                    valA = String(a.date || a.inv_date || a.month_name || '0');
+                    valB = String(b.date || b.inv_date || b.month_name || '0');
+                    return valB.localeCompare(valA);
+                case 'date_asc':
+                    valA = String(a.date || a.inv_date || a.month_name || '0');
+                    valB = String(b.date || b.inv_date || b.month_name || '0');
+                    return valA.localeCompare(valB);
+                case 'name_asc':
+                    valA = String(a.customer_name || a.account_name || a.party_name || a.salesman_name || a.company_name || a.account_title || '').toLowerCase();
+                    valB = String(b.customer_name || b.account_name || b.party_name || b.salesman_name || b.company_name || b.account_title || '').toLowerCase();
+                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                case 'name_desc':
+                    valA = String(a.customer_name || a.account_name || a.party_name || a.salesman_name || a.company_name || a.account_title || '').toLowerCase();
+                    valB = String(b.customer_name || b.account_name || b.party_name || b.salesman_name || b.company_name || b.account_title || '').toLowerCase();
+                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                case 'product_name_asc':
+                    valA = String(a.product_name || a.item_name || a.item_description || '').toLowerCase();
+                    valB = String(b.product_name || b.item_name || b.item_description || '').toLowerCase();
+                    return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                case 'product_name_desc':
+                    valA = String(a.product_name || a.item_name || a.item_description || '').toLowerCase();
+                    valB = String(b.product_name || b.item_name || b.item_description || '').toLowerCase();
+                    return valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
+                default:
+                    return 0;
+            }
+        });
+    }, [data, sortBy]);
 
     // [ANIMATION] Count-up values
     const animatedTotalSales = useCountUp(totals.amount, 1200, 300);
@@ -95,13 +335,13 @@ export function ReportView({
 
     const handlePdfClick = () => {
         setPdfFlash(true);
-        onExportPdf();
+        onExportPdf(sortBy);
         setTimeout(() => setPdfFlash(false), 600);
     };
 
     const handleExcelClick = () => {
         setExcelFlash(true);
-        onExportExcel();
+        onExportExcel(sortBy);
         setTimeout(() => setExcelFlash(false), 600);
     };
 
@@ -209,7 +449,7 @@ export function ReportView({
                     </div>
                 </div>
 
-                <div className="p-5 border-b border-border/50 flex items-center justify-between bg-surface-1/30">
+                <div className="p-5 border-b border-border/50 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-surface-1/30">
                     <div>
                         <h3 className="text-md font-black text-text-primary uppercase tracking-tight flex items-center gap-2 italic">
                              Sales Analysis <span className="text-indigo-600">Engine</span>
@@ -219,7 +459,7 @@ export function ReportView({
                         </h3>
                         <p className="text-[9px] font-bold text-text-muted uppercase mt-1 tracking-widest opacity-60">{criteria}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                         {/* [ANIMATION] Analytics Button heartbeat */}
                         <div className="animate-breathe">
                             <AnalyticsButton 
@@ -234,7 +474,22 @@ export function ReportView({
                             />
                         </div>
                         
-                        <div className="h-4 w-[1px] bg-border mx-1" />
+                        <div className="h-4 w-[1px] bg-border mx-1 hidden lg:block" />
+
+                        {/* Premium Sorting Dropdown */}
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="h-9 w-[190px] rounded-none border-border/50 bg-surface-1 hover:bg-surface-2 text-[10px] font-black uppercase tracking-tight focus:ring-0 focus:ring-offset-0 flex items-center gap-2">
+                                <ArrowUpDown className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                                <SelectValue placeholder="SORT BY" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-none bg-surface-0 border-border/50 text-[10px] font-bold uppercase tracking-tight">
+                                {getSortOptions(reportId).map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value} className="text-[10px] font-bold uppercase tracking-tight cursor-pointer hover:bg-surface-1 rounded-none">
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         
                         <Button 
                             variant="outline" 
@@ -301,7 +556,7 @@ export function ReportView({
                                     };
 
                                     const ActiveComponent = components[reportId] || Reports.BillReport;
-                                    return <ActiveComponent data={data} formatCurrency={formatCurrency} />;
+                                    return <ActiveComponent data={sortedData} formatCurrency={formatCurrency} />;
                                 })()}
                             </Table>
                         </div>
@@ -313,7 +568,7 @@ export function ReportView({
                 isOpen={isAnalyticsOpen} 
                 onClose={() => setIsAnalyticsOpen(false)} 
                 reportType={reportId} 
-                data={data} 
+                data={sortedData} 
             />
         </div>
     );

@@ -105,7 +105,7 @@ export default function ProfitReports({
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel' | 'print') => {
+    const handleExport = (type: 'pdf' | 'excel' | 'print', currentSort?: string) => {
         let baseUrl = '';
         switch(type) {
             case 'pdf': baseUrl = route('reports.profit.export'); break;
@@ -115,6 +115,7 @@ export default function ProfitReports({
 
         const queryParams = new URLSearchParams({
             ...params as any,
+            sortBy: currentSort || params.sortBy || 'default',
             fromDate: params.fromDate.toISOString(),
             toDate: params.toDate.toISOString(),
         });
