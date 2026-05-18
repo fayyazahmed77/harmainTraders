@@ -87,6 +87,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function AccountView({ account, financial_summary }: Props) {
+    const itemCategoryMap: Record<string, string> = {
+        "1": "1 (Trade Price)",
+        "2": "2 (T.P 1)",
+        "3": "3 (T.P 2)",
+        "4": "4 (T.P 3)",
+        "5": "5 (T.P 4)",
+        "6": "6 (T.P 5)",
+        "7": "7 (T.P 6)",
+    };
+
     const formatDate = (dateString: string | null) => {
         if (!dateString) return "N/A";
         const date = new Date(dateString);
@@ -521,7 +531,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                                 <InfoRow label="CNIC #" value={account.cnic} />
                                                 <InfoRow label="Note Head" value={account.note_head} />
                                                 <InfoRow label="Category" value={account.category} />
-                                                <InfoRow label="Item Category" value={account.item_category} />
+                                                <InfoRow label="Item Category" value={account.item_category ? (itemCategoryMap[String(account.item_category)] || account.item_category) : null} />
                                                 <div className="md:col-span-2">
                                                     <InfoRow label="A.T.S Info" value={account.ats_type ? `${account.ats_type} (${account.ats_percentage}%)` : null} />
                                                 </div>

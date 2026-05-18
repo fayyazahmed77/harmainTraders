@@ -56,11 +56,13 @@ class HandleInertiaRequests extends Middleware
 
             // ✅ Return plain values, not closures
             'flash' => [
-                'success' => $request->session()->get('success'),
-                'error'   => $request->session()->get('error'),
-                'warning' => $request->session()->get('warning'),
-                'pdf_url' => $request->session()->get('pdf_url'),
-                'id'      => $request->session()->get('id'),
+                'success'        => $request->session()->get('success'),
+                'error'          => $request->session()->get('error'),
+                'warning'        => $request->session()->get('warning'),
+                'pdf_url'        => $request->session()->get('pdf_url'),
+                'id'             => $request->session()->get('id'),
+                'print_id'       => $request->session()->get('print_id'),
+                'saved_payments' => $request->session()->get('saved_payments'),
             ],
         ];
     }

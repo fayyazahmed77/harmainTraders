@@ -218,6 +218,16 @@ export default function Create({
     percentage: cat.percentage,
   }));
 
+  const itemCategoryOptions = [
+    { value: "1", label: "1 (Trade Price)" },
+    { value: "2", label: "2 (T.P 1)" },
+    { value: "3", label: "3 (T.P 2)" },
+    { value: "4", label: "4 (T.P 3)" },
+    { value: "5", label: "5 (T.P 4)" },
+    { value: "6", label: "6 (T.P 5)" },
+    { value: "7", label: "7 (T.P 6)" },
+  ];
+
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
   const isCompany = accountType?.label === "Company";
@@ -1106,15 +1116,8 @@ export default function Create({
                       {isCustomer && (
                         <TechLabel label="Item Category" icon={Tags} required={isCustomer} error={errors.item_category}>
                           <Select
-                            options={[
-                              { value: "2", label: "1 (T.P 1)" },
-                              { value: "3", label: "2 (T.P 2)" },
-                              { value: "4", label: "3 (T.P 3)" },
-                              { value: "5", label: "4 (T.P 4)" },
-                              { value: "6", label: "5 (T.P 5)" },
-                              { value: "7", label: "6 (T.P 6)" },
-                            ]}
-                            value={data.item_category ? { value: data.item_category, label: data.item_category } : null}
+                            options={itemCategoryOptions}
+                            value={data.item_category ? (itemCategoryOptions.find(opt => opt.value === String(data.item_category)) || { value: data.item_category, label: data.item_category }) : null}
                             onChange={(opt: any) => onInputChange("item_category", opt ? String(opt.value) : "")}
                             placeholder="Select Category"
                             className="text-sm"

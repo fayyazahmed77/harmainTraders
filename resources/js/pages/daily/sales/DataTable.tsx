@@ -50,7 +50,8 @@ import {
     ChevronsLeft as IconChevronsLeft, 
     ChevronsRight as IconChevronsRight, 
     Clock, 
-    AlertCircle 
+    AlertCircle,
+    Printer
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -182,16 +183,28 @@ export default function DataTable({ data }: DataTableProps) {
             accessorKey: "invoice",
             header: "Invoice",
             cell: ({ row }) => (
-                <div className="flex flex-col">
+                <div 
+                    className="flex flex-col cursor-pointer group w-fit"
+                    onClick={() => router.visit(`/sales/${row.original.id}/view`)}
+                >
                     <div className="flex items-center gap-2">
-                        <span className="font-bold">{row.original.invoice}</span>
-                        {row.original.is_online && (
-                            <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-blue-200 bg-blue-50 text-blue-700 font-bold uppercase tracking-widest">
+                        <span className="font-bold group-hover:text-orange-600 transition-colors underline-offset-4 group-hover:underline">{row.original.invoice}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        Code: {row.original.code}
+                        {Number(row.original.is_online) === 1 && (
+                            <Badge 
+                                variant="outline" 
+                                className="text-[9px] h-3.5 px-1 border-green-200 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50 font-bold uppercase tracking-tighter flex items-center gap-1 animate-pulse"
+                            >
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                                </span>
                                 Online
                             </Badge>
                         )}
                     </div>
-                    <div className="text-xs text-muted-foreground">Code: {row.original.code}</div>
                 </div>
             )
         },
@@ -286,6 +299,20 @@ export default function DataTable({ data }: DataTableProps) {
                                 onClick={() => router.visit(`/sales/${sale.id}/view`)}
                             >
                                 <Eye size={14} className="mr-2 text-slate-500" /> View Invoice
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-blue-50 text-blue-600"
+                                onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, '_blank')}
+                            >
+                                <Printer size={14} className="mr-2" /> Print Thermal
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-blue-50 text-blue-600"
+                                onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, '_blank')}
+                            >
+                                <Printer size={14} className="mr-2" /> Print A4
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                                 className="font-medium focus:bg-slate-50"

@@ -66,7 +66,14 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger} from "@radix-ui/react-dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PREMIUM_ROUNDING = "rounded-2xl";
 
@@ -244,11 +251,12 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                   <MoreHorizontal className="h-4 w-4 text-zinc-400" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl p-2 shadow-2xl">
+              <DropdownMenuContent align="end" className="w-64 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl p-2 shadow-2xl flex flex-col gap-1">
                 <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 px-4 py-2">Firm Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800 mx-2" />
-                <Link href={`/firms/${firm.id}/show`} className="block w-full">
-                  <DropdownMenuItem className="flex items-center gap-3 rounded-lg focus:bg-zinc-100 dark:focus:bg-zinc-800 cursor-pointer py-3 px-4 group">
+                
+                <DropdownMenuItem asChild className="flex items-center gap-3 rounded-lg focus:bg-zinc-100 dark:focus:bg-zinc-800 cursor-pointer py-3 px-4 group outline-none">
+                  <Link href={`/firms/${firm.id}/show`}>
                     <div className="h-8 w-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <Eye className="h-4 w-4 text-zinc-500" />
                     </div>
@@ -256,11 +264,12 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                       <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">View Details</span>
                       <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">View company profile</span>
                     </div>
-                  </DropdownMenuItem>
-                </Link>
+                  </Link>
+                </DropdownMenuItem>
+
                 {canEdit && (
-                  <Link href={`/firms/${firm.id}/edit`} className="block w-full">
-                    <DropdownMenuItem className="flex items-center gap-3 rounded-lg focus:bg-orange-500/10 cursor-pointer py-3 px-4 group">
+                  <DropdownMenuItem asChild className="flex items-center gap-3 rounded-lg focus:bg-orange-500/10 cursor-pointer py-3 px-4 group outline-none">
+                    <Link href={`/firms/${firm.id}/edit`}>
                       <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform border border-orange-500/20">
                         <Pencil className="h-4 w-4 text-orange-500" />
                       </div>
@@ -268,9 +277,10 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                         <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 text-orange-600 dark:text-orange-400">Edit Firm</span>
                         <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter">Update details</span>
                       </div>
-                    </DropdownMenuItem>
-                  </Link>
+                    </Link>
+                  </DropdownMenuItem>
                 )}
+
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800 mx-2" />
@@ -279,7 +289,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                         setSelectedFirm(firm);
                         setOpenDeleteDialog(true);
                       }}
-                      className="flex items-center gap-3 rounded-lg focus:bg-rose-500/10 cursor-pointer py-3 px-4 group"
+                      className="flex items-center gap-3 rounded-lg focus:bg-rose-500/10 cursor-pointer py-3 px-4 group outline-none"
                     >
                       <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Trash2 className="h-4 w-4 text-rose-500" />

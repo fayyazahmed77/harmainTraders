@@ -1158,7 +1158,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                 )}
                               </TechLabel>
                               <TechLabel label="Chq Date">
-                                <Input value={chequeDate} onChange={e => setChequeDate(e.target.value)} type="date" disabled={paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand'} className={`h-9 text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
+                                <Input value={chequeDate} onChange={e => setChequeDate(e.target.value)} type="date" disabled={paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'CHEQUE IN HAND'} className={`h-9 text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
                               </TechLabel>
                             </div>
                           )}
@@ -1580,14 +1580,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   >
                     <CheckCircle2 size={32} className="text-white drop-shadow-md" />
                   </motion.div>
-                  <motion.div 
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.2 }}
-                    className="w-14 h-14 bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-xl"
-                  >
-                    <CheckCircle2 size={32} className="text-white" />
-                  </motion.div>
+                  
                 </div>
                 
                 <motion.h2 

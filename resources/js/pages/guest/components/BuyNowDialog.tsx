@@ -16,6 +16,7 @@ interface BuyNowDialogProps {
     updateCart: (item: Item, field: 'qty_carton' | 'qty_pcs', value: number) => void;
     formatCurrency: (val: number) => string;
     DEFAULT_IMAGE: string;
+    customerCategory?: string | number;
 }
 
 export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
@@ -25,7 +26,8 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
     cart,
     updateCart,
     formatCurrency,
-    DEFAULT_IMAGE
+    DEFAULT_IMAGE,
+    customerCategory
 }) => {
     const [currentImg, setCurrentImg] = useState(0);
     const images = buyItem?.images || [];
@@ -97,18 +99,29 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                         </div>
 
                         <div className="p-6 space-y-6 bg-white dark:bg-zinc-900">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
-                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Full Carton</span>
-                                    <span className="text-xl font-black text-orange-600">{formatCurrency(buyItem.price_carton)}</span>
-                                    <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per CTN</span>
+                            {/* Pricing Matrix */}
+                            {(customerCategory === 1 || customerCategory === '1') ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Pack Carton</span>
+                                        <span className="text-xl font-black text-orange-600">{formatCurrency(buyItem.price_carton)}</span>
+                                        <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per CTN</span>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Loose Carton</span>
+                                        <span className="text-xl font-black text-zinc-700 dark:text-zinc-200">{formatCurrency(buyItem.price_piece)}</span>
+                                        <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per PC</span>
+                                    </div>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
-                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Loose Carton</span>
-                                    <span className="text-xl font-black text-zinc-700 dark:text-zinc-200">{formatCurrency(buyItem.price_loose_carton)}</span>
-                                    <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per CTN</span>
+                            ) : (
+                                <div className="grid grid-cols-1">
+                                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center gap-1 text-center">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Full Carton</span>
+                                        <span className="text-2xl font-black text-orange-600">{formatCurrency(buyItem.price_carton)}</span>
+                                        <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per CTN</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -116,16 +129,25 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Add to Cart</span>
                                         <span className="text-[9px] font-bold text-orange-500 uppercase italic">Configure your quantity</span>
                                     </div>
-                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-500/10 rounded-full border border-orange-100 dark:border-orange-500/20">
-                                        <Package size={14} className="text-orange-500" />
-                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">{buyItem.packing_qty} Pcs / CTN</span>
+                                    <div className="flex items-center gap-2">
+                                        {(buyItem as any).retail && (buyItem as any).retail > 0 && (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 dark:bg-rose-500/10 rounded-full border border-rose-100 dark:border-rose-500/20 text-rose-600">
+                                                <span className="text-[10px] font-black uppercase tracking-tighter">Retail: {formatCurrency((buyItem as any).retail)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-500/10 rounded-full border border-orange-100 dark:border-orange-500/20">
+                                            <Package size={14} className="text-orange-500" />
+                                            <span className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">{buyItem.packing_qty} Pcs / CTN</span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-3">
                                     <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-zinc-100 dark:border-zinc-800 group hover:border-orange-500/50 transition-all">
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Full Cartons</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                                                {(customerCategory === 1 || customerCategory === '1') ? 'Pack Cartons' : 'Full Cartons'}
+                                            </span>
                                             <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">Ordering in Bulk</span>
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -142,7 +164,9 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
 
                                     <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-zinc-100 dark:border-zinc-800 group hover:border-orange-500/50 transition-all">
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Loose Pieces</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                                                {(customerCategory === 1 || customerCategory === '1') ? 'Loose Cartons' : 'Loose Pieces'}
+                                            </span>
                                             <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300">Smaller Quantity</span>
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -165,7 +189,11 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                             >
                                 Done {((cart[buyItem.id]?.qty_carton || 0) > 0 || (cart[buyItem.id]?.qty_pcs || 0) > 0) && (
                                     <span className="ml-2 opacity-80">
-                                        ({formatCurrency((cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + (cart[buyItem.id]?.qty_pcs || 0) * (buyItem.price_piece || 0))})
+                                        ({formatCurrency(
+                                            (customerCategory === 1 || customerCategory === '1')
+                                                ? (cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + (cart[buyItem.id]?.qty_pcs || 0) * (buyItem.price_piece || 0)
+                                                : Math.round((cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + (cart[buyItem.id]?.qty_pcs || 0) * (buyItem.price_carton / Math.max(1, buyItem.packing_qty || 1)))
+                                        )})
                                     </span>
                                 )}
                             </Button>

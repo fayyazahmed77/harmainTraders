@@ -814,14 +814,25 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Price Details: {selectedItem.title}</span>
                                     </div>
 
-                                    <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                                        {[2, 3, 4, 5, 6, 7].map((num) => {
-                                            const priceKey = `pt${num}` as keyof Item;
-                                            const percentage = Number(selectedItem[priceKey] ?? 0);
+                                    <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-7 gap-3">
+                                        {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                                            let percentage = 0;
+                                            let label = "";
+
+                                            if (num === 1) {
+                                                percentage = 0;
+                                                label = "Trade Price";
+                                            } else {
+                                                const priceKey = `pt${num}` as keyof Item;
+                                                percentage = Number(selectedItem[priceKey] ?? 0);
+                                                label = `Tier ${num}`;
+                                            }
 
                                             // Formula: Trade Price * (1 + Percentage / 100)
                                             const adjustedPrice = calculatePrice(selectedItem, num);
                                             const isActive = String(num) === String(customerCategory);
+
+                                            if (num !== 1 && percentage === 0 && !isActive) return null;
 
                                             return (
                                                 <div
@@ -837,7 +848,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                         "text-[9px] font-black uppercase tracking-wider mb-1",
                                                         isActive ? "text-orange-600 dark:text-orange-400" : "text-zinc-400"
                                                     )}>
-                                                        Price Type {num} <span className="opacity-60 lowercase font-bold">({percentage}%)</span>
+                                                        {label} <span className="opacity-60 lowercase font-bold">{num === 1 ? "(BASE)" : `(${percentage}%)`}</span>
                                                     </div>
                                                     <div className={cn(
                                                         "text-sm font-black tabular-nums",

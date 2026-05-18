@@ -11,6 +11,7 @@ export interface Item {
     image: string | null;
     images?: string[];
     category_id: number;
+    company_image?: string | null;
 }
 
 export interface CartItem extends Item {

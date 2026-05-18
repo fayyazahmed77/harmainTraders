@@ -23,6 +23,7 @@ interface CartDrawerProps {
     processing: boolean;
     handleCheckout: () => void;
     DEFAULT_IMAGE: string;
+    customerCategory?: string | number;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -36,7 +37,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     formatCurrency,
     processing,
     handleCheckout,
-    DEFAULT_IMAGE
+    DEFAULT_IMAGE,
+    customerCategory
 }) => {
     return (
         <Sheet open={checkoutOpen} onOpenChange={setCheckoutOpen}>
@@ -153,7 +155,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                         <div className="mt-4 pt-3 border-t border-dashed border-slate-200 dark:border-zinc-800 flex justify-between items-center">
                                             <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Subtotal</span>
                                             <span className="text-sm font-black text-slate-900 dark:text-zinc-100">
-                                                {formatCurrency((item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0)))}
+                                                {formatCurrency(
+                                                    (customerCategory === 1 || customerCategory === '1')
+                                                        ? (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0))
+                                                        : Math.round((item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_carton / Math.max(1, item.packing_qty || 1))))
+                                                )}
                                             </span>
                                         </div>
                                     </div>

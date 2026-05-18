@@ -886,7 +886,7 @@ class SalesController extends Controller
     /**
      * Confirm a pending guest order
      */
-    public function confirm($id)
+    public function confirm(Request $request, $id)
     {
         DB::beginTransaction();
         try {
@@ -895,6 +895,8 @@ class SalesController extends Controller
             if ($sale->status !== 'Pending Order') {
                 return redirect()->back()->with('error', 'Only pending orders can be confirmed.');
             }
+
+            $courierCharges = (float) $request->input('courier_charges', 0);
 
             // Deduct Stock
             foreach ($sale->items as $item) {
@@ -909,10 +911,13 @@ class SalesController extends Controller
             }
 
             $sale->status = 'Completed';
+            $sale->courier_charges = $courierCharges;
+            $sale->net_total += $courierCharges;
+            $sale->remaining_amount += $courierCharges;
             $sale->save();
 
             DB::commit();
-            return redirect()->back()->with('success', "Order #{$sale->invoice} confirmed successfully. Balance has been updated.");
+            return redirect()->back()->with('success', "Order #{$sale->invoice} confirmed successfully. Courier charges of {$courierCharges} added to bill.");
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error confirming order: ' . $e->getMessage());

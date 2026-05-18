@@ -10,7 +10,7 @@
         }
 
         @page {
-            margin: 2mm;
+            margin: 1mm;
         }
 
         body {
@@ -23,9 +23,10 @@
         }
 
         .receipt-wrapper {
-            width: 75mm;
-            /* Reduced width for safety on 80mm paper */
-            margin: 0;
+            width: 64mm;
+            /* Further reduced width for maximum safety on 80mm/58mm printers */
+            margin: 0 auto;
+            padding-right: 3mm; /* Safe margin for printer head to prevent cut-off */
         }
 
         .text-center {
@@ -105,11 +106,11 @@
         }
 
         .w-bonus {
-            width: 35%;
+            width: 34%;
         }
 
         .w-normal {
-            width: 45%;
+            width: 47%;
         }
 
         .items-table td {
@@ -141,15 +142,16 @@
 
         .total-label {
             float: left;
-            width: 70%;
+            width: 65%;
             text-align: right;
             padding-right: 5px;
         }
 
         .total-value {
             float: right;
-            width: 25%;
+            width: 33%;
             text-align: right;
+            padding-right: 2mm;
         }
 
         .footer-text {
@@ -205,15 +207,15 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center;">F</th>
-                    <th style="width: 8%; text-align: center; border-left: 1px solid #000;">P</th>
+                    <th style="width: 7%; text-align: center;">F</th>
+                    <th style="width: 7%; text-align: center; border-left: 1px solid #000;">P</th>
                     @if($hasBonus)
                     <th style="width: 10%; text-align: center;">Bns</th>
                     @endif
                     <th class="{{ $hasBonus ? 'w-bonus' : 'w-normal' }}">Item(s)</th>
-                    <th style="width: 15%; text-align: right;">Rate</th>
-                    <th style="width: 10%; text-align: right;">Disc</th>
-                    <th style="width: 15%; text-align: right;">Amount</th>
+                    <th style="width: 13%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Rate</th>
+                    <th style="width: 9%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Dis</th>
+                    <th style="width: 17%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -232,9 +234,9 @@
                     <td class="text-center">{{ $bonusText ?: '-' }}</td>
                     @endif
                     <td>{{ $item->item->title }}</td>
-                    <td class="text-right">{{ number_format($item->trade_price, 2) }}</td>
-                    <td class="text-right">{{ $item->discount > 0 ? number_format($item->discount, 0) : '.' }}</td>
-                    <td class="text-right">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->trade_price, 0) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->discount, 0) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->subtotal, 0) }}</td>
                 </tr>
                 @endforeach
             </tbody>

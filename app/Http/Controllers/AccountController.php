@@ -337,6 +337,8 @@ class AccountController extends Controller
                 Storage::disk('public')->delete($account->image);
             }
             $validated['image'] = $request->file('image')->store('accounts', 'public');
+        } else {
+            unset($validated['image']);
         }
 
         // ✅ Update DB

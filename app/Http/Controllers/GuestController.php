@@ -81,10 +81,19 @@ class GuestController extends Controller
             }
             
             $guestPrice = $tradePrice;
-            if ($percentage > 0) {
-                $guestPrice = round($tradePrice * (1 + $percentage / 100));
-            } elseif ($item->retail > 0) {
-                $guestPrice = (float) $item->retail;
+            if ($customerCategory === '1') {
+                $priceCarton = $tradePrice * ($item->packing_qty ?: 1);
+                $priceLooseCarton = $tradePrice;
+                $pricePiece = $tradePrice;
+            } else {
+                if ($percentage > 0) {
+                    $guestPrice = $percentage;
+                } elseif ($item->retail > 0) {
+                    $guestPrice = (float) $item->retail;
+                }
+                $priceCarton = $guestPrice;
+                $priceLooseCarton = $guestPrice;
+                $pricePiece = round($guestPrice / ($item->packing_qty ?: 1));
             }
 
             return [
@@ -93,15 +102,17 @@ class GuestController extends Controller
                 'short_name' => $item->short_name,
                 'code' => $item->code,
                 'packing_qty' => $item->packing_qty,
-                'price' => $guestPrice,
+                'price' => $customerCategory === '1' ? $tradePrice : $guestPrice,
                 'company' => $item->companyAccount->title ?? '',
+                'company_image' => $item->companyAccount->image_url ?? null,
                 'stock' => $item->total_stock_pcs,
                 'category_id' => $item->category,
                 'image' => $item->primary_image_url,
                 'images' => $item->images->map(fn($img) => asset($img->image_path)),
-                'price_carton' => $guestPrice,
-                'price_loose_carton' => round($guestPrice * 1.03),
-                'price_piece' => ceil(($guestPrice * 1.03) / ($item->packing_qty ?: 1)),
+                'price_carton' => $priceCarton,
+                'price_loose_carton' => $priceLooseCarton,
+                'price_piece' => $pricePiece,
+                'retail' => $item->retail,
             ];
         });
 
@@ -151,10 +162,14 @@ class GuestController extends Controller
                 }
                 
                 $price = $tradePrice;
-                if ($percentage > 0) {
-                    $price = round($tradePrice * (1 + $percentage / 100));
-                } elseif ($item->retail > 0) {
-                    $price = (float) $item->retail;
+                if ($customerCategory === '1') {
+                    $price = $tradePrice;
+                } else {
+                    if ($percentage > 0) {
+                        $price = $percentage;
+                    } elseif ($item->retail > 0) {
+                        $price = (float) $item->retail;
+                    }
                 }
 
                 $packing = $item->packing_qty ?: 1;
@@ -162,7 +177,11 @@ class GuestController extends Controller
                 
                 if ($totalPcs <= 0) continue;
                 
-                $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * (round($price * 1.03) / $packing));
+                if ($customerCategory === '1') {
+                    $subtotal = ($it['qty_carton'] * $price * $packing) + ($it['qty_pcs'] * $price);
+                } else {
+                    $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * ($price / $packing));
+                }
                 $grossTotal += $subtotal;
                 
                 $orderItems[] = [

@@ -42,6 +42,23 @@ class User extends Authenticatable
     ];
 
     /**
+     * The attributes that should be appended to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['avatar'];
+
+    /**
+     * Get the user's avatar URL.
+     *
+     * @return string|null
+     */
+    public function getAvatarAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
+    }
+
+    /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>

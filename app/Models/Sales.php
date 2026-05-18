@@ -12,6 +12,10 @@ use App\Traits\Auditable;
 class Sales extends Model
 {
     use HasFactory, Auditable;
+    
+    protected $casts = [
+        'is_online' => 'boolean',
+    ];
 
     protected $fillable = [
         'date',

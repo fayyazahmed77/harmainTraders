@@ -67,7 +67,7 @@ export const SuccessDialog: React.FC<SuccessDialogProps> = ({
           </div>
           
           <DialogTitle className="text-2xl font-black text-white m-0 leading-tight">
-             {type === 'edit' ? 'Purchase Updated Successfully!' : 'Purchase Created Successfully!'}
+             {type === 'edit' ? 'Sales Updated Successfully!' : 'Sales Created Successfully!'}
           </DialogTitle>
           <p className="text-white/80 text-[11px] font-bold mt-2 font-mono uppercase tracking-wider">
              Invoice record saved with ID: {invoiceNo}

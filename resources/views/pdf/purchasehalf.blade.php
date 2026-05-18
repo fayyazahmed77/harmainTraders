@@ -10,7 +10,7 @@
         }
 
         @page {
-            margin: 2mm;
+            margin: 1mm;
         }
 
         body {
@@ -23,9 +23,10 @@
         }
 
         .receipt-wrapper {
-            width: 75mm;
-            /* Reduced width for safety on 80mm paper */
-            margin: 0;
+            width: 64mm;
+            /* Further reduced width for maximum safety on 80mm/58mm printers */
+            margin: 0 auto;
+            padding-right: 3mm; /* Safe margin for printer head to prevent cut-off */
         }
 
         .text-center {
@@ -133,15 +134,16 @@
 
         .total-label {
             float: left;
-            width: 70%;
+            width: 68%;
             text-align: right;
             padding-right: 5px;
         }
 
         .total-value {
             float: right;
-            width: 25%;
+            width: 28%;
             text-align: right;
+            padding-right: 2mm;
         }
 
         .footer-text {
@@ -192,11 +194,11 @@
         <table class="items-table">
             <thead>
                 <tr>
-                    <th style="width: 10%; text-align: center;">F</th>
-                    <th style="width: 10%; text-align: center; border-left: 1px solid #000;">P</th>
-                    <th style="width: 40%">Item(s)</th>
+                    <th style="width: 8%; text-align: center;">F</th>
+                    <th style="width: 8%; text-align: center; border-left: 1px solid #000;">P</th>
+                    <th style="width: 45%">Item(s)</th>
                     <th style="width: 15%; text-align: right;">Rate</th>
-                    <th style="width: 25%; text-align: right;">Amount</th>
+                    <th style="width: 20%; text-align: right; padding-right: 1mm;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -206,7 +208,7 @@
                     <td class="text-center" style="border-left: 1px solid #000;">{{ (int)$item->qty_pcs }}</td>
                     <td>{{ $item->item->title }}</td>
                     <td class="text-right">{{ number_format($item->trade_price, 2) }}</td>
-                    <td class="text-right">{{ number_format($item->subtotal, 0) }}</td>
+                    <td class="text-right" style="padding-right: 1mm;">{{ number_format($item->subtotal, 0) }}</td>
                 </tr>
                 @endforeach
             </tbody>

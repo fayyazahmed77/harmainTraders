@@ -20,18 +20,32 @@ import {
     RefreshCcw,
     CheckCircle,
     RotateCw,
-    Info
+    Info,
+    Clock,
+    AlertCircle,
+    CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogDescription, 
+    DialogFooter, 
+    DialogHeader, 
+    DialogTitle 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { router } from "@inertiajs/react";
 
 // ───────────────────────────────────────────
 // Types
 // ───────────────────────────────────────────
-type SaleStatus = "Completed" | "Partial Return" | "Returned";
+type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled" | "Partial";
 
 interface SaleItem {
     id: number;
@@ -94,6 +108,7 @@ interface Sale {
     gross_total: number;
     discount_total: number;
     tax_total: number;
+    courier_charges: number;
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
@@ -120,6 +135,9 @@ export default function View({ sale }: Props) {
     const [selectedItemId, setSelectedItemId] = React.useState<number | null>(
         sale.items.length > 0 ? sale.items[0].item.id : null
     );
+    const [isVerifyDialogOpen, setIsVerifyDialogOpen] = React.useState(false);
+    const [courierCharges, setCourierCharges] = React.useState<number>(0);
+    const [isProcessing, setIsProcessing] = React.useState(false);
 
     const selectedItem = React.useMemo(() => {
         if (!selectedItemId) return null;
@@ -153,6 +171,21 @@ export default function View({ sale }: Props) {
             label: "FULL_RETURNED",
             color: "bg-rose-500/10 text-rose-500 border-rose-500/20",
             icon: <RefreshCcw className="h-2.5 w-2.5" />,
+        },
+        "Pending Order": {
+            label: "PENDING_ORDER",
+            color: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse",
+            icon: <Clock className="h-2.5 w-2.5" />,
+        },
+        Canceled: {
+            label: "ORDER_CANCELED",
+            color: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+            icon: <AlertCircle className="h-2.5 w-2.5" />,
+        },
+        Partial: {
+            label: "PARTIAL_SETTLED",
+            color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+            icon: <RotateCw className="h-2.5 w-2.5" />,
         },
     };
 
@@ -205,6 +238,29 @@ export default function View({ sale }: Props) {
                             animate={{ opacity: 1, scale: 1 }}
                             className="flex items-center flex-wrap gap-2"
                         >
+                            {sale.status === "Pending Order" && (
+                                <>
+                                    <Button
+                                        onClick={() => setIsVerifyDialogOpen(true)}
+                                        className="h-10 px-6 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/10 border-none transition-all group"
+                                    >
+                                        <CheckCircle2 className="h-3.5 w-3.5 mr-2 group-hover:scale-110 transition-transform" />
+                                        VERIFY & PROCESS
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (confirm("Are you sure you want to cancel this order?")) {
+                                                router.post(`/sales/${sale.id}/cancel`);
+                                            }
+                                        }}
+                                        className="h-10 px-4 text-xs font-bold rounded-xl border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 transition-all shadow-sm"
+                                    >
+                                        <AlertCircle className="h-3.5 w-3.5 mr-2" />
+                                        CANCEL ORDER
+                                    </Button>
+                                </>
+                            )}
                             <Button
                                 variant="outline"
                                 onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
@@ -456,15 +512,27 @@ export default function View({ sale }: Props) {
                                             <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Pricing Analysis: {selectedItem.title}</span>
                                         </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                                            {[2, 3, 4, 5, 6, 7].map((num) => {
-                                                const priceKey = `pt${num}` as keyof typeof selectedItem;
-                                                const percentage = Number(selectedItem[priceKey] || 0);
-                                                if (percentage === 0) return null;
-
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                                            {[1, 2, 3, 4, 5, 6, 7].map((num) => {
                                                 const tradePrice = Number(selectedItem.trade_price || 0);
-                                                const calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                                                let percentage = 0;
+                                                let calculatedPrice = tradePrice;
+                                                let label = "";
+
+                                                if (num === 1) {
+                                                    percentage = 0;
+                                                    calculatedPrice = tradePrice;
+                                                    label = "Trade Price";
+                                                } else {
+                                                    const priceKey = `pt${num}` as keyof typeof selectedItem;
+                                                    percentage = Number(selectedItem[priceKey] || 0);
+                                                    calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                                                    label = `Tier ${num}`;
+                                                }
+
                                                 const isActive = String(num) === customerCategory;
+
+                                                if (num !== 1 && percentage === 0 && !isActive) return null;
 
                                                 return (
                                                     <div
@@ -481,9 +549,11 @@ export default function View({ sale }: Props) {
                                                                 "text-[8px] font-black uppercase tracking-widest",
                                                                 isActive ? "text-orange-500" : "text-muted-foreground"
                                                             )}>
-                                                                Type {num}
+                                                                {label}
                                                             </span>
-                                                            <span className="text-[8px] font-bold opacity-40">({percentage}%)</span>
+                                                            <span className="text-[8px] font-bold opacity-40">
+                                                                {num === 1 ? "(BASE)" : `(${percentage}%)`}
+                                                            </span>
                                                         </div>
                                                         <p className={cn(
                                                             "text-sm font-black font-mono tracking-tighter",
@@ -514,13 +584,7 @@ export default function View({ sale }: Props) {
                                     </div>
                                 </Card>
 
-                                <Card className="p-5 bg-blue-500/[0.03] border-blue-500/10 flex flex-col justify-between group hover:bg-blue-500/[0.08] transition-all">
-                                    <p className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-3">Tax Component</p>
-                                    <div className="flex items-baseline gap-2 text-blue-600">
-                                        <span className="text-xl font-black tracking-tight font-mono">+{formatCurrency(sale.tax_total).replace('PKR', '').trim()}</span>
-                                        <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">GST</span>
-                                    </div>
-                                </Card>
+                              
 
                                 <Card className="p-5 bg-rose-500/[0.03] border-rose-500/10 flex flex-col justify-between group hover:bg-rose-500/[0.08] transition-all">
                                     <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-3">Loyalty Credits</p>
@@ -529,6 +593,16 @@ export default function View({ sale }: Props) {
                                         <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">DISC</span>
                                     </div>
                                 </Card>
+
+                                {sale.courier_charges > 0 && (
+                                    <Card className="p-5 bg-purple-500/[0.03] border-purple-500/10 flex flex-col justify-between group hover:bg-purple-500/[0.08] transition-all">
+                                        <p className="text-[8px] font-black text-purple-500 uppercase tracking-widest mb-3">Courier Charges</p>
+                                        <div className="flex items-baseline gap-2 text-purple-600">
+                                            <span className="text-xl font-black tracking-tight font-mono">+{formatCurrency(sale.courier_charges).replace('PKR', '').trim()}</span>
+                                            <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">LGC</span>
+                                        </div>
+                                    </Card>
+                                )}
 
                                 <Card className="p-5 bg-[#FF8904] text-white shadow-xl shadow-orange-500/10 flex flex-col justify-center relative overflow-hidden group border-none">
                                     <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-125 transition-transform duration-700">
@@ -644,6 +718,62 @@ export default function View({ sale }: Props) {
 
                 </div>
             </SidebarInset>
+
+            <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
+                <DialogContent className="sm:max-w-[425px] rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black tracking-tight">Verify & Process Sale</DialogTitle>
+                        <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                            Finalize shipment details for invoice {sale.invoice}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="courier_charges" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Courier / Logistics Charges (PKR)
+                            </Label>
+                            <Input
+                                id="courier_charges"
+                                type="number"
+                                value={courierCharges}
+                                onChange={(e) => setCourierCharges(Number(e.target.value))}
+                                className="h-12 rounded-xl font-black text-lg border-2 focus-visible:ring-emerald-500"
+                                autoFocus
+                            />
+                            <p className="text-[9px] font-bold text-muted-foreground italic">
+                                * This amount will be added to the final net total of the invoice.
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button 
+                            variant="ghost" 
+                            onClick={() => setIsVerifyDialogOpen(false)}
+                            className="h-12 rounded-xl font-bold text-xs uppercase tracking-widest"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={() => {
+                                setIsProcessing(true);
+                                router.post(`/sales/${sale.id}/confirm`, {
+                                    courier_charges: courierCharges
+                                }, {
+                                    onSuccess: () => {
+                                        setIsVerifyDialogOpen(false);
+                                        setIsProcessing(false);
+                                    },
+                                    onFinish: () => setIsProcessing(false)
+                                });
+                            }}
+                            disabled={isProcessing}
+                            className="h-12 px-8 rounded-xl font-black text-xs uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 border-none transition-all"
+                        >
+                            {isProcessing ? "PROCESSING..." : "CONFIRM & VERIFY"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </SidebarProvider>
     );
 }

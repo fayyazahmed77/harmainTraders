@@ -24,7 +24,7 @@ import { Item, Cart, Category } from './components/types';
 interface CatalogProps {
     items: Item[];
     categories: Category[];
-    account: { title: string };
+    account: any;
     token: string;
 }
 
@@ -73,7 +73,7 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
         items.forEach(item => {
             if (!item.company) return;
             if (!counts[item.company]) {
-                counts[item.company] = { count: 0, image: item.image };
+                counts[item.company] = { count: 0, image: item.company_image || null };
             }
             counts[item.company].count++;
         });
@@ -85,9 +85,26 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
         })).sort((a, b) => b.count - a.count);
     }, [items]);
 
+    const customerCategory = account?.item_category;
+    const isCat1 = customerCategory === 1 || customerCategory === '1';
+
+    const getItemSubtotal = (item: any) => {
+        const qtyCarton = item.qty_carton || 0;
+        const qtyPcs = item.qty_pcs || 0;
+        const priceCarton = item.price_carton;
+        const pricePiece = item.price_piece || 0;
+        const packing = Math.max(1, item.packing_qty || 1);
+
+        if (isCat1) {
+            return (qtyCarton * priceCarton) + (qtyPcs * pricePiece);
+        } else {
+            return Math.round((qtyCarton * priceCarton) + (qtyPcs * (priceCarton / packing)));
+        }
+    };
+
     const cartCount = Object.keys(cart).length;
     const cartTotal = Object.values(cart).reduce((acc, item) => {
-        return acc + (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0));
+        return acc + getItemSubtotal(item);
     }, 0);
 
     const updateCart = (item: Item, field: 'qty_carton' | 'qty_pcs', value: number) => {
@@ -309,6 +326,7 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
                 processing={processing}
                 handleCheckout={handleCheckout}
                 DEFAULT_IMAGE={DEFAULT_IMAGE}
+                customerCategory={account?.item_category}
             />
 
             <BuyNowDialog 
@@ -319,6 +337,7 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
                 updateCart={updateCart}
                 formatCurrency={formatCurrency}
                 DEFAULT_IMAGE={DEFAULT_IMAGE}
+                customerCategory={account?.item_category}
             />
 
             <SuccessDialog 

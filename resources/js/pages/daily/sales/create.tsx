@@ -176,7 +176,7 @@ const TechLabel = ({ children, icon: Icon, label, className = "space-y-1.5 flex-
   <div className={className}>
     <div className="flex items-center gap-2 px-1">
       {Icon && <Icon size={10} className="text-orange-500 shrink-0" />}
-      <span className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest truncate">{label}</span>
+      <span className="text-[10px] font-black uppercase text-zinc-700 dark:text-zinc-300 tracking-widest truncate">{label}</span>
     </div>
     {children}
   </div>
@@ -449,19 +449,22 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     // Only apply if we have a valid Trade Price to base it on.
     const actualTradePrice = toNumber(selected.trade_price ?? 0);
     if (customerCategory && actualTradePrice > 0) {
-      let percentage = 0;
-      switch (customerCategory) {
-        case "2": percentage = toNumber(selected.pt2); break;
-        case "3": percentage = toNumber(selected.pt3); break;
-        case "4": percentage = toNumber(selected.pt4); break;
-        case "5": percentage = toNumber(selected.pt5); break;
-        case "6": percentage = toNumber(selected.pt6); break;
-        case "7": percentage = toNumber(selected.pt7); break;
-      }
+      if (customerCategory === "1") {
+        baseRate = actualTradePrice;
+      } else {
+        let percentage = 0;
+        switch (customerCategory) {
+          case "2": percentage = toNumber(selected.pt2); break;
+          case "3": percentage = toNumber(selected.pt3); break;
+          case "4": percentage = toNumber(selected.pt4); break;
+          case "5": percentage = toNumber(selected.pt5); break;
+          case "6": percentage = toNumber(selected.pt6); break;
+          case "7": percentage = toNumber(selected.pt7); break;
+        }
 
-      if (percentage > 0) {
-        // Calculate rate: Trade Price + (Trade Price * Percentage / 100)
-        baseRate = Math.round(actualTradePrice * (1 + percentage / 100));
+        if (percentage > 0) {
+          baseRate = percentage;
+        }
       }
     }
 
@@ -983,15 +986,15 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   <div className="overflow-visible md:overflow-x-auto">
                     <div className="w-full md:min-w-[1200px]">
                       <div className="hidden md:grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-3 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20">
-                        <div className="col-span-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">Item Identification</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Full</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Pcs</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">B.Full</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">B.Pcs</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Rate</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Disc %</div>
-                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">After</div>
-                        <div className="col-span-1 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Subtotal</div>
+                        <div className="col-span-4 text-[10px] font-black uppercase tracking-widest ">Item Identification</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">Full</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest ">Pcs</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">B.Full</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">B.Pcs</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">Rate</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">Disc %</div>
+                        <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">After</div>
+                        <div className="col-span-1 text-right text-[10px] font-black uppercase tracking-widest">Subtotal</div>
                       </div>
 
                       {/* Rows (scrollable) */}
@@ -1303,15 +1306,30 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                             <div className="md:col-span-6 p-5 border-r border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/20 dark:bg-zinc-900/20 flex flex-col h-full">
                              
 
-                              <div className="grid grid-cols-3 gap-3 flex-1 min-h-0">
-                                {[2, 3, 4, 5, 6, 7].map((num) => {
-                                  const priceKey = `pt${num}` as keyof InventoryItem;
-                                  const percentage = toNumber(selectedItem[priceKey]);
+                              <div className="grid grid-cols-3 lg:grid-cols-4 gap-3 flex-1 min-h-0">
+                                {[1, 2, 3, 4, 5, 6, 7].map((num) => {
                                   const tradePrice = toNumber(selectedItem.trade_price);
-                                  const calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                                  let percentage = 0;
+                                  let calculatedPrice = tradePrice;
+                                  let label = "";
+                                  let tooltipText = "";
+
+                                  if (num === 1) {
+                                    percentage = 0;
+                                    calculatedPrice = tradePrice;
+                                    label = "Trade Price";
+                                    tooltipText = "Base Trade Price";
+                                  } else {
+                                    const priceKey = `pt${num}` as keyof InventoryItem;
+                                    percentage = toNumber(selectedItem[priceKey]);
+                                    calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
+                                    label = `Tier ${num}`;
+                                    tooltipText = `Trade + ${percentage}%`;
+                                  }
+
                                   const isActive = String(num) === customerCategory;
                                   
-                                  if (percentage === 0 && !isActive) return null;
+                                  if (num !== 1 && percentage === 0 && !isActive) return null;
 
                                   return (
                                     <Tooltip key={num}>
@@ -1323,8 +1341,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                             : "bg-white dark:bg-zinc-900/50 border-zinc-200/60 dark:border-zinc-800/60 hover:border-orange-200 dark:hover:border-orange-500/40 hover:shadow-lg"
                                         )}>
                                           <div className="flex items-center justify-between mb-1.5">
-                                            <span className={cn("text-[8px] font-black uppercase tracking-widest", isActive ? "text-orange-100" : "text-zinc-400")}>Tier {num}</span>
-                                            <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded-md", isActive ? "bg-white/20 text-white" : "text-orange-600 bg-orange-500/5")}>{percentage}%</span>
+                                            <span className={cn("text-[8px] font-black uppercase tracking-widest", isActive ? "text-orange-100" : "text-zinc-400")}>{label}</span>
+                                            <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded-md", isActive ? "bg-white/20 text-white" : "text-orange-600 bg-orange-500/5")}>
+                                              {num === 1 ? "BASE" : `${percentage}%`}
+                                            </span>
                                           </div>
                                           <div className={cn("text-xl font-black italic tracking-tighter", isActive ? "text-white" : "text-zinc-900 dark:text-zinc-100")}>
                                             <span className="text-[11px] opacity-60 mr-1 not-italic font-bold tracking-normal underline underline-offset-2">Rs</span>
@@ -1332,7 +1352,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                           </div>
                                         </div>
                                       </TooltipTrigger>
-                                      <TooltipContent side="top" className="bg-zinc-900 text-[9px] font-black uppercase tracking-widest px-3 py-1.5">Trade + {percentage}%</TooltipContent>
+                                      <TooltipContent side="top" className="bg-zinc-900 text-[9px] font-black uppercase tracking-widest px-3 py-1.5">{tooltipText}</TooltipContent>
                                     </Tooltip>
                                   );
                                 })}
