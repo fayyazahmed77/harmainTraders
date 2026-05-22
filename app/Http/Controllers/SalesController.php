@@ -17,8 +17,21 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 
-class SalesController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class SalesController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view sales', only: ['index', 'view', 'pdf', 'download']),
+            new Middleware('permission:create sales', only: ['create', 'store']),
+            new Middleware('permission:edit sales', only: ['edit', 'update', 'confirm', 'cancel']),
+            new Middleware('permission:delete sales', only: ['destroy']),
+        ];
+    }
+
     //index
     public function index(Request $request)
     {
@@ -345,7 +358,7 @@ class SalesController extends Controller
 
                 if ($remainingToAllocate > 0) {
                     // 1. Current Bill Allocation (Respecting existing advance allocations)
-                    $toThisBill = min($remainingToAllocate, $sale->remaining_amount);
+                    $toThisBill = min($remainingToAllocate, $sale->remaining_amount + $actualPaidOnThisBill);
                     if ($toThisBill > 0) {
                         $tempThis = $toThisBill;
                         foreach ($createdPayments as $p) {

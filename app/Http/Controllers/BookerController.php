@@ -6,8 +6,17 @@ use App\Models\Booker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class BookerController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class BookerController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:manage staff'),
+        ];
+    }
     public function index()
     {
         $bookers = Booker::with('creator')

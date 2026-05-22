@@ -19,7 +19,7 @@ beforeEach(function () {
     $this->supplier = Account::create([
         'code' => 'S001',
         'title' => 'Test Supplier',
-        'type' => 'Supplier',
+        'type' => $this->supplierType->id,
         'opening_balance' => 0,
     ]);
 

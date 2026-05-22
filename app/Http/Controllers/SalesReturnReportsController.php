@@ -16,8 +16,18 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\SalesReturnReportExport;
 
-class SalesReturnReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class SalesReturnReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view reports'),
+        ];
+    }
+
     protected $returnBuilder;
 
     public function __construct(SalesReturnReportBuilder $returnBuilder)

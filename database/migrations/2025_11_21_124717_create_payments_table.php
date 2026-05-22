@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('cheque_no')->nullable();
             $table->date('cheque_date')->nullable();
             $table->date('clear_date')->nullable();
+            $table->string('cheque_status')->default('Pending');
 
             $table->text('remarks')->nullable();
             $table->timestamps();

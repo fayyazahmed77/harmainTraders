@@ -33,6 +33,7 @@ use App\Http\Controllers\ClearingChequeController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\PurchaseReportsController;
 use App\Http\Controllers\SalesMapReportController;
 use App\Http\Controllers\WalletController;
@@ -73,34 +74,45 @@ use App\Http\Controllers\DashboardController;
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/sales', [DashboardController::class, 'salesOverview'])->name('dashboard.sales');
+    Route::get('salesman/dashboard', [DashboardController::class, 'counterDashboard'])->name('salesman.dashboard');
 });
 
 // ============================================================================
 // PROTECTED ROUTES - Require Authentication
 // ============================================================================
 Route::middleware(['auth'])->group(function () {
-    //------------------------Permission Crud --------------------------------------------------------
-    Route::prefix('permissions')->group(function () {
-        Route::get('/', [PermissionController::class, 'index'])->name('permissions.index');
-        Route::post('/', [PermissionController::class, 'store'])->name('permissions.store');
-        Route::put('/{id}', [PermissionController::class, 'update'])->name('permissions.update');
-        Route::delete('/{id}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
-    });
-    //------------------------Permission Category --------------------------------------------------------
-    Route::prefix('permissions/category')->group(function () {
-        Route::get('/', [PermissionCatController::class, 'index'])->name('category.index');
-        Route::post('/', [PermissionCatController::class, 'store'])->name('category.store');
-        Route::put('/{id}', [PermissionCatController::class, 'update'])->name('category.update');
-        Route::delete('/{id}', [PermissionCatController::class, 'destroy'])->name('category.destroy');
-    });
-    //---------------------Users Rols and Permission----------------------------------------------------
-    Route::prefix('/roles/permissions')->group(function () {
-        Route::get('/list', [RoleController::class, 'list'])->name('roles.list');
-        Route::get('/', [RoleController::class, 'index'])->name('roles.index');
-        Route::post('/', [RoleController::class, 'store'])->name('roles.store');
-        Route::get('/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
-        Route::put('/{id}', [RoleController::class, 'update'])->name('roles.update');
-        Route::delete('/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    Route::get('/api/server-time', \App\Http\Controllers\Api\ServerTimeController::class);
+
+    //------------------------Permission & Role Administration (Secured)------------------------------
+    Route::middleware(['role:Admin'])->group(function () {
+        Route::prefix('permissions')
+            ->middleware('permission:manage permissions')
+            ->group(function () {
+                Route::get('/', [PermissionController::class, 'index'])->name('permissions.index');
+                Route::post('/', [PermissionController::class, 'store'])->name('permissions.store');
+                Route::put('/{id}', [PermissionController::class, 'update'])->name('permissions.update');
+                Route::delete('/{id}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
+            });
+        //------------------------Permission Category --------------------------------------------------------
+        Route::prefix('permissions/category')
+            ->middleware('permission:manage permissions')
+            ->group(function () {
+                Route::get('/', [PermissionCatController::class, 'index'])->name('category.index');
+                Route::post('/', [PermissionCatController::class, 'store'])->name('category.store');
+                Route::put('/{id}', [PermissionCatController::class, 'update'])->name('category.update');
+                Route::delete('/{id}', [PermissionCatController::class, 'destroy'])->name('category.destroy');
+            });
+        //---------------------Users Rols and Permission----------------------------------------------------
+        Route::prefix('/roles/permissions')
+            ->middleware('permission:manage roles')
+            ->group(function () {
+                Route::get('/list', [RoleController::class, 'list'])->name('roles.list');
+                Route::get('/', [RoleController::class, 'index'])->name('roles.index');
+                Route::post('/', [RoleController::class, 'store'])->name('roles.store');
+                Route::get('/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+                Route::put('/{id}', [RoleController::class, 'update'])->name('roles.update');
+                Route::delete('/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
+            });
     });
     Route::prefix('/account')->group(function () {
         Route::get('/', [AccountController::class, 'index'])->name('account.index');
@@ -147,15 +159,19 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{accountCategory}', [AccountCategoryController::class, 'destroy'])->name('account-categories.destroy');
     });
 
-    //---------------------Staff Management--------------------------------------------------------------
-    Route::prefix('/staff')->group(function () {
-        Route::get('/', [StaffController::class, 'index'])->name('staff.index');
-        Route::get('/create', [StaffController::class, 'create'])->name('staff.create');
-        Route::post('/', [StaffController::class, 'store'])->name('staff.store');
-        Route::get('/{id}', [StaffController::class, 'show'])->name('staff.show');
-        Route::get('/{id}/edit', [StaffController::class, 'edit'])->name('staff.edit');
-        Route::put('/{id}', [StaffController::class, 'update'])->name('staff.update');
-        Route::delete('/{id}', [StaffController::class, 'destroy'])->name('staff.destroy');
+    //---------------------Staff Management (Secured)----------------------------------------------------
+    Route::middleware(['role:Admin'])->group(function () {
+        Route::prefix('/staff')
+            ->middleware('permission:manage staff')
+            ->group(function () {
+                Route::get('/', [StaffController::class, 'index'])->name('staff.index');
+                Route::get('/create', [StaffController::class, 'create'])->name('staff.create');
+                Route::post('/', [StaffController::class, 'store'])->name('staff.store');
+                Route::get('/{id}', [StaffController::class, 'show'])->name('staff.show');
+                Route::get('/{id}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+                Route::put('/{id}', [StaffController::class, 'update'])->name('staff.update');
+                Route::delete('/{id}', [StaffController::class, 'destroy'])->name('staff.destroy');
+            });
     });
     //---------------------salemen------------------------------------------------------------------
     Route::prefix('/salemen')->group(function () {
@@ -506,6 +522,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware(['role:Admin', 'two_factor'])->prefix('admin')->group(function () {
+        Route::resource('shifts', ShiftController::class);
         Route::get('/investors', [InvestorManagementController::class, 'index'])->name('admin.investors.index');
         Route::post('/investors', [InvestorManagementController::class, 'store'])->name('admin.investors.store');
         Route::get('/investors/export-excel', [InvestorManagementController::class, 'exportExcel'])->name('admin.investors.export-excel');
@@ -572,5 +589,9 @@ Route::prefix('g')->group(function () {
 // ============================================================================
 Route::get('/live-offers', [App\Http\Controllers\PublicOfferController::class, 'index'])->name('public.live-offers');
 Route::post('/api/access-my-offer', [App\Http\Controllers\PublicOfferController::class, 'accessMyOffer'])->name('public.access-my-offer');
+
+Route::get('/test-403', function () {
+    abort(403);
+});
 
 require __DIR__ . '/settings.php';

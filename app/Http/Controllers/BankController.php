@@ -8,8 +8,18 @@ use App\Models\Bank;
 
 use Illuminate\Http\Request;
 
-class BankController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class BankController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view banks', only: ['index', 'show']),
+            new Middleware('permission:manage banks', only: ['create', 'store', 'edit', 'update', 'destroy']),
+        ];
+    }
     //index
     public function index()
     {

@@ -17,8 +17,20 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\MessageLine;
 
-class SalesReturnController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class SalesReturnController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view returns', only: ['index', 'show']),
+            new Middleware('permission:create returns', only: ['create', 'store']),
+            new Middleware('permission:edit returns', only: ['edit', 'update']),
+            new Middleware('permission:delete returns', only: ['destroy']),
+        ];
+    }
     //index
     public function index()
     {

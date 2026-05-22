@@ -36,8 +36,18 @@ export default function OrderDetail({ account, sale, token }: Props) {
     });
 
     const cartCount = Object.keys(cart).length;
+    const customerCategory = account?.item_category;
+    const isCat1 = customerCategory === 1 || customerCategory === '1';
+
     const cartTotal = Object.values(cart).reduce((acc, item) => {
-        return acc + (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0));
+        if (isCat1) {
+            const packingSize = Math.max(1, item.packing_size || 1);
+            const fullCartonsFromPcs = Math.floor(item.qty_pcs / packingSize);
+            const remainingPcs = item.qty_pcs % packingSize;
+            return acc + (item.qty_carton * item.price_carton) + (fullCartonsFromPcs * item.price_carton) + (remainingPcs * (item.price_piece || 0));
+        } else {
+            return acc + Math.round((item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_carton / Math.max(1, item.packing_qty || 1))));
+        }
     }, 0);
 
     const formatCurrency = (amount: number) => {

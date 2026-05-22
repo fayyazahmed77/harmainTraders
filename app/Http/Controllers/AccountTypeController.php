@@ -7,8 +7,18 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 
-class AccountTypeController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class AccountTypeController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view accounts', only: ['index']),
+            new Middleware('permission:manage accounts', only: ['store', 'update', 'destroy']),
+        ];
+    }
     //index
     public function index(Request $request)
     {

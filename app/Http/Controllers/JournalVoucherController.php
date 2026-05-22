@@ -8,8 +8,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
-class JournalVoucherController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class JournalVoucherController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view jv', only: ['index']),
+            new Middleware('permission:create jv', only: ['create', 'store']),
+            new Middleware('permission:delete jv', only: ['destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         // Fetch all JVs, group by voucher_no. We can fetch where payment_method = 'Journal'

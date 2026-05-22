@@ -7,8 +7,18 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\ItemCategory;
 use Inertia\Inertia;
 
-class ItemCategoryController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ItemCategoryController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view stock', only: ['index']),
+            new Middleware('permission:manage stock', only: ['store', 'update', 'destroy']),
+        ];
+    }
     public function index(Request $request)
     {
         $query = ItemCategory::with('creator');

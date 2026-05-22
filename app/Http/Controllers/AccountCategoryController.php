@@ -6,8 +6,18 @@ use App\Models\AccountCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class AccountCategoryController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class AccountCategoryController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view accounts', only: ['index']),
+            new Middleware('permission:manage accounts', only: ['store', 'update', 'destroy']),
+        ];
+    }
     public function index(Request $request)
     {
         $search = $request->input('search');

@@ -82,9 +82,10 @@ class GuestController extends Controller
             
             $guestPrice = $tradePrice;
             if ($customerCategory === '1') {
-                $priceCarton = $tradePrice * ($item->packing_qty ?: 1);
-                $priceLooseCarton = $tradePrice;
-                $pricePiece = $tradePrice;
+                $packingSize = (float) $item->packing_size ?: 1;
+                $priceCarton = $tradePrice * $packingSize;
+                $priceLooseCarton = $tradePrice * (1 + ((float) $item->pt2 / 100));
+                $pricePiece = $priceLooseCarton;
             } else {
                 if ($percentage > 0) {
                     $guestPrice = $percentage;
@@ -102,6 +103,7 @@ class GuestController extends Controller
                 'short_name' => $item->short_name,
                 'code' => $item->code,
                 'packing_qty' => $item->packing_qty,
+                'packing_size' => (int) $item->packing_size,
                 'price' => $customerCategory === '1' ? $tradePrice : $guestPrice,
                 'company' => $item->companyAccount->title ?? '',
                 'company_image' => $item->companyAccount->image_url ?? null,
@@ -173,12 +175,23 @@ class GuestController extends Controller
                 }
 
                 $packing = $item->packing_qty ?: 1;
-                $totalPcs = ($it['qty_carton'] * $packing) + $it['qty_pcs'];
+                $packingSize = (float) $item->packing_size ?: 1;
+                
+                if ($customerCategory === '1') {
+                    $totalPcs = (($it['qty_carton'] * $packingSize) + $it['qty_pcs']) * $packing;
+                } else {
+                    $totalPcs = ($it['qty_carton'] * $packing) + $it['qty_pcs'];
+                }
                 
                 if ($totalPcs <= 0) continue;
                 
                 if ($customerCategory === '1') {
-                    $subtotal = ($it['qty_carton'] * $price * $packing) + ($it['qty_pcs'] * $price);
+                    $priceCarton = $tradePrice * $packingSize;
+                    $priceLooseCarton = $tradePrice * (1 + ((float) $item->pt2 / 100));
+                    $pricePiece = $priceLooseCarton;
+                    $fullCartonsFromPcs = floor($it['qty_pcs'] / $packingSize);
+                    $remainingPcs = $it['qty_pcs'] % $packingSize;
+                    $subtotal = ($it['qty_carton'] * $priceCarton) + ($fullCartonsFromPcs * $priceCarton) + ($remainingPcs * $pricePiece);
                 } else {
                     $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * ($price / $packing));
                 }

@@ -10,8 +10,18 @@ use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Storage;
 
-class FirmController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class FirmController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view firms', only: ['index', 'show']),
+            new Middleware('permission:manage firms', only: ['create', 'store', 'edit', 'update', 'destroy']),
+        ];
+    }
     // ✅ List all firms
     public function index()
     {

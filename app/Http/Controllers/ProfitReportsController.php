@@ -13,8 +13,18 @@ use Carbon\Carbon;
 use App\Exports\ProfitReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 
-class ProfitReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ProfitReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view profit reports'),
+        ];
+    }
+
     protected $profitBuilder;
 
     public function __construct(ProfitReportBuilder $profitBuilder)

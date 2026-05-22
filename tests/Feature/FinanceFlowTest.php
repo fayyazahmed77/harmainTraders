@@ -22,21 +22,21 @@ beforeEach(function () {
     $this->customer = Account::create([
         'code' => 'C001',
         'title' => 'Test Customer',
-        'type' => 'Customers',
+        'type' => $this->customerType->id,
         'opening_balance' => 0,
     ]);
 
     $this->supplier = Account::create([
         'code' => 'S001',
         'title' => 'Test Supplier',
-        'type' => 'Supplier',
+        'type' => $this->supplierType->id,
         'opening_balance' => 0,
     ]);
 
     $this->cashAccount = Account::create([
         'code' => 'CASH01',
         'title' => 'Main Cash',
-        'type' => 'Cash',
+        'type' => $this->cashType->id,
         'opening_balance' => 0,
     ]);
 });
@@ -74,6 +74,7 @@ it('verifies that manual payment reduces remaining balance of a sale via allocat
 
     $response = $this->post(route('payments.store'), $payload);
 
+    $response->assertSessionHasNoErrors();
     $response->assertRedirect();
 
     // Verify Payment and Allocation
@@ -120,6 +121,7 @@ it('verifies that manual payment reduces remaining balance of a purchase via all
 
     $response = $this->post(route('payments.store'), $payload);
 
+    $response->assertSessionHasNoErrors();
     $response->assertRedirect();
 
     // Verify Payment and Allocation

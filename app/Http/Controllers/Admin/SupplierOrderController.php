@@ -12,8 +12,18 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class SupplierOrderController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class SupplierOrderController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view purchases', only: ['index', 'getItems', 'list', 'show', 'print']),
+            new Middleware('permission:create purchases', only: ['store']),
+        ];
+    }
     public function index()
     {
         $suppliers = Account::where('type', 6) // Supplier

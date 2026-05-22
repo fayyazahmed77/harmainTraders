@@ -9,8 +9,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
-class CityController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class CityController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view cities', only: ['index', 'show']),
+            new Middleware('permission:edit cities', only: ['create', 'store', 'edit', 'update']),
+            new Middleware('permission:delete cities', only: ['destroy']),
+        ];
+    }
     public function index()
     {
         $countries = Country::all();

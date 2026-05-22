@@ -14,8 +14,20 @@ use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
-class PurchaseReturnController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class PurchaseReturnController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view purchase returns', only: ['index', 'show', 'pdf', 'getSupplierInvoices', 'getInvoiceItems', 'getSupplierPurchasedItems']),
+            new Middleware('permission:create purchase returns', only: ['create', 'store']),
+            new Middleware('permission:edit purchase returns', only: ['edit', 'update']),
+            new Middleware('permission:delete purchase returns', only: ['destroy']),
+        ];
+    }
     //index
     public function index()
     {

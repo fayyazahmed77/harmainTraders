@@ -283,6 +283,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: "/staff",
         },
         {
+          title: "Shifts",
+          url: "/admin/shifts",
+        },
+        {
           title: "Roles & Permission",
           url: "/roles/permissions",
         },

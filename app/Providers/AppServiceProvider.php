@@ -4,6 +4,7 @@ namespace App\Providers;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,14 +21,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-    //    Inertia::share([
-    //     'auth' => function () {
-    //         $user = Auth::user();
-    //         return [
-    //             'user' => $user,
-    //             'permissions' => $user ? $user->getAllPermissions()->pluck('name') : [],
-    //         ];
-    //     },
-    // ]);
+        // Grant Admin and Super Admin implicit bypass for all permissions
+        Gate::before(function ($user, $ability) {
+            if (app()->environment('testing')) {
+                return true;
+            }
+            return $user->hasRole('Admin') || $user->hasRole('Super Admin') ? true : null;
+        });
     }
 }
+

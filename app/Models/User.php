@@ -39,6 +39,7 @@ class User extends Authenticatable
         'portfolio_url',
         'two_factor_code',
         'two_factor_expires_at',
+        'shift_id',
     ];
 
     /**
@@ -104,5 +105,13 @@ class User extends Authenticatable
     public function verifiedDevices()
     {
         return $this->hasMany(UserVerifiedDevice::class);
+    }
+
+    /**
+     * Get the shift assigned to the user.
+     */
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
     }
 }

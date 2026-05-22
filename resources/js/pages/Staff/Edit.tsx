@@ -4,7 +4,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Card } from "@/components/ui/card";
 import { BreadcrumbItem } from "@/types";
-import { Camera, ChevronRight, Globe, Linkedin, Facebook, Instagram, Twitter, ExternalLink, Save, Plus, Eye, EyeOff, Shield, User as UserIcon, Briefcase, Mail, Phone, MapPin, Sparkles, Trash2, AlertCircle } from "lucide-react";
+import { Camera, ChevronRight, Globe, Linkedin, Facebook, Instagram, Twitter, ExternalLink, Save, Plus, Eye, EyeOff, Shield, User as UserIcon, Briefcase, Mail, Phone, MapPin, Sparkles, Trash2, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,11 +44,18 @@ interface User {
     portfolio_url: string;
     image: string;
     roles: Role[];
+    shift_id?: number | null;
+}
+
+interface Shift {
+    id: number;
+    name: string;
 }
 
 interface Props {
     staff: User;
     roles: Role[];
+    shifts: Shift[];
     [key: string]: unknown;
 }
 
@@ -69,7 +76,7 @@ const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode,
     </div>
 );
 
-export default function StaffEdit({ staff, roles }: Props) {
+export default function StaffEdit({ staff, roles, shifts }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         _method: "PUT",
         name: staff.name,
@@ -89,6 +96,7 @@ export default function StaffEdit({ staff, roles }: Props) {
         portfolio_url: staff.portfolio_url || "",
         roles: staff.roles.map(r => r.name),
         image: null as File | null,
+        shift_id: staff.shift_id || "",
     });
 
     const [showPassword, setShowPassword] = useState(false);
@@ -266,7 +274,7 @@ export default function StaffEdit({ staff, roles }: Props) {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <TechLabel label="Job Title" icon={Briefcase}>
                                                 <Input
                                                     placeholder="Role Title"
@@ -287,6 +295,25 @@ export default function StaffEdit({ staff, roles }: Props) {
                                                         <SelectItem value="Sales">Sales</SelectItem>
                                                         <SelectItem value="Human Resources">Human Resources</SelectItem>
                                                         <SelectItem value="Administration">Administration</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TechLabel>
+
+                                            <TechLabel label="Assigned Shift (Optional)" icon={Clock}>
+                                                <Select
+                                                    onValueChange={val => setData("shift_id", val === "none" ? "" : val)}
+                                                    value={data.shift_id ? data.shift_id.toString() : "none"}
+                                                >
+                                                    <SelectTrigger className="rounded-xl border-zinc-200 dark:border-zinc-800 w-full">
+                                                        <SelectValue placeholder="Select Shift" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="rounded-xl">
+                                                        <SelectItem value="none">No Shift</SelectItem>
+                                                        {shifts.map(shift => (
+                                                            <SelectItem key={shift.id} value={shift.id.toString()}>
+                                                                {shift.name}
+                                                            </SelectItem>
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
                                             </TechLabel>

@@ -24,8 +24,18 @@ use App\Mail\InvestorWelcomeMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
-class AccountController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class AccountController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode']),
+            new Middleware('permission:manage accounts', only: ['create', 'store', 'edit', 'update', 'destroy', 'toggleStatus', 'resetGuestToken']),
+        ];
+    }
     public function index(Request $request)
     {
         $query = Account::with(['accountType', 'city', 'area', 'saleman', 'creator']);

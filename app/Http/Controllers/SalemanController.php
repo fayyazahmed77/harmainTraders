@@ -6,8 +6,17 @@ use App\Models\Saleman;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class SalemanController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class SalemanController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:manage staff'),
+        ];
+    }
     /**
      * Display a listing of the resource.
      */

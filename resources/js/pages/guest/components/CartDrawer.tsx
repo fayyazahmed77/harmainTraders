@@ -108,7 +108,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                         <div className="grid grid-cols-2 gap-3">
                                             {/* Full CTN */}
                                             <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-100 dark:border-zinc-800/50">
-                                                <span className="text-[9px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Full CTN</span>
+                                                <span className="text-[9px] font-black uppercase text-slate-400 block mb-2 tracking-widest">
+                                                    {(customerCategory === 1 || customerCategory === '1') ? 'Pack CTN' : 'Full CTN'}
+                                                </span>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-xs font-black text-slate-900 dark:text-zinc-100">{item.qty_carton}</span>
                                                     <div className="flex gap-1.5">
@@ -130,7 +132,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
                                             {/* Loose PCS */}
                                             <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-100 dark:border-zinc-800/50">
-                                                <span className="text-[9px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Loose PCS</span>
+                                                <span className="text-[9px] font-black uppercase text-slate-400 block mb-2 tracking-widest">
+                                                    {(customerCategory === 1 || customerCategory === '1') ? 'Loose Packs' : 'Loose PCS'}
+                                                </span>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-xs font-black text-slate-900 dark:text-zinc-100">{item.qty_pcs}</span>
                                                     <div className="flex gap-1.5">
@@ -157,7 +161,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                             <span className="text-sm font-black text-slate-900 dark:text-zinc-100">
                                                 {formatCurrency(
                                                     (customerCategory === 1 || customerCategory === '1')
-                                                        ? (item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_piece || 0))
+                                                        ? (item.qty_carton * item.price_carton) + Math.floor(item.qty_pcs / Math.max(1, item.packing_size || 1)) * item.price_carton + ((item.qty_pcs % Math.max(1, item.packing_size || 1)) * (item.price_piece || 0))
                                                         : Math.round((item.qty_carton * item.price_carton) + (item.qty_pcs * (item.price_carton / Math.max(1, item.packing_qty || 1))))
                                                 )}
                                             </span>

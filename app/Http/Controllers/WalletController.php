@@ -8,8 +8,17 @@ use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
-class WalletController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class WalletController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:manage staff'),
+        ];
+    }
     // Index: Get Wallet History for a Salesman
     public function index($salesmanId)
     {

@@ -30,5 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $exception, \Illuminate\Http\Request $request) {
+            if ($response->getStatusCode() === 403) {
+                return \Inertia\Inertia::render('errors/403')
+                    ->toResponse($request)
+                    ->setStatusCode(403);
+            }
+            return $response;
+        });
     })->create();

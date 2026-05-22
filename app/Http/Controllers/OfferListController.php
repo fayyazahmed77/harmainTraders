@@ -14,8 +14,19 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
-class OfferListController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class OfferListController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view sales', only: ['index', 'view', 'pdf', 'download']),
+            new Middleware('permission:create sales', only: ['create', 'store', 'toggleLive']),
+            new Middleware('permission:delete sales', only: ['destroy']),
+        ];
+    }
     //index
     public function index()
     {

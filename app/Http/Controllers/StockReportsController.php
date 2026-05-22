@@ -12,8 +12,18 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
-class StockReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class StockReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view stock'),
+        ];
+    }
+
     protected $reportBuilder;
 
     public function __construct(StockReportBuilder $reportBuilder)

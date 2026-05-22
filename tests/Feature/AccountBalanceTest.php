@@ -20,7 +20,7 @@ beforeEach(function () {
     $this->customer = Account::create([
         'code' => 'C001',
         'title' => 'Ledger Customer',
-        'type' => 'Customers',
+        'type' => $this->customerType->id,
         'opening_balance' => 100, // Opening Dr
     ]);
 });

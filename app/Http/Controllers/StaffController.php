@@ -8,9 +8,17 @@ use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class StaffController extends Controller
+class StaffController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:manage staff'),
+        ];
+    }
     /**
      * Display a listing of the staff.
      */
@@ -29,8 +37,10 @@ class StaffController extends Controller
     public function create()
     {
         $roles = Role::all();
+        $shifts = \App\Models\Shift::where('is_active', true)->get(['id', 'name']);
         return Inertia::render('Staff/Create', [
             'roles' => $roles,
+            'shifts' => $shifts,
         ]);
     }
 
@@ -45,6 +55,7 @@ class StaffController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8|confirmed',
             'roles' => 'array',
+            'shift_id' => 'nullable|exists:shifts,id',
         ]);
 
         DB::beginTransaction();
@@ -64,6 +75,7 @@ class StaffController extends Controller
                 'instagram_url' => $request->instagram_url,
                 'twitter_url' => $request->twitter_url,
                 'portfolio_url' => $request->portfolio_url,
+                'shift_id' => $request->shift_id,
             ]);
 
             if ($request->has('roles')) {
@@ -103,11 +115,13 @@ class StaffController extends Controller
         $user = User::with('roles')->findOrFail($id);
         $roles = Role::all();
         $userRoles = $user->roles->pluck('name')->toArray();
+        $shifts = \App\Models\Shift::where('is_active', true)->get(['id', 'name']);
 
         return Inertia::render('Staff/Edit', [
             'staff' => $user,
             'roles' => $roles,
             'userRoles' => $userRoles,
+            'shifts' => $shifts,
         ]);
     }
 
@@ -116,6 +130,12 @@ class StaffController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // Prevent role escalation: only admins can change roles
+        // Gate::before already handles Admin bypass
+        if ($request->has('roles') && !auth()->user()->hasRole('Admin')) {
+            abort(403, 'You are not authorized to assign roles.');
+        }
+
         $user = User::findOrFail($id);
 
         $request->validate([
@@ -124,6 +144,7 @@ class StaffController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:8|confirmed',
             'roles' => 'array',
+            'shift_id' => 'nullable|exists:shifts,id',
         ]);
 
         DB::beginTransaction();
@@ -142,6 +163,7 @@ class StaffController extends Controller
                 'instagram_url' => $request->instagram_url,
                 'twitter_url' => $request->twitter_url,
                 'portfolio_url' => $request->portfolio_url,
+                'shift_id' => $request->shift_id,
             ];
 
             if ($request->filled('password')) {

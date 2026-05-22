@@ -53,8 +53,11 @@ class TwoFactorController extends Controller
 
             \App\Services\ActivityLogger::log('login', 'Auth', 'User logged in after 2FA verification');
 
-            if ($user->hasRole('investor')) {
+            if ($user->hasRole('investor') || $user->hasRole('Investor')) {
                 return redirect()->intended('/investor/dashboard');
+            }
+            if ($user->hasRole('Sales man') || $user->hasRole('salesman')) {
+                return redirect()->intended('/salesman/dashboard');
             }
             return redirect()->intended('/dashboard');
         }

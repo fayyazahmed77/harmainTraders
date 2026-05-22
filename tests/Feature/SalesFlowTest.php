@@ -21,14 +21,14 @@ beforeEach(function () {
     $this->customer = Account::create([
         'code' => 'C001',
         'title' => 'Test Customer',
-        'type' => 'Customers',
+        'type' => $this->customerType->id,
         'opening_balance' => 0,
     ]);
 
     $this->cashAccount = Account::create([
         'code' => 'CASH01',
         'title' => 'Main Cash',
-        'type' => 'Cash',
+        'type' => $this->cashType->id,
         'opening_balance' => 0,
     ]);
 

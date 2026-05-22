@@ -9,8 +9,17 @@ use App\Models\Payment;
 use App\Models\Chequebook;
 use Illuminate\Http\Request;
 
-class AccountHistoryController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class AccountHistoryController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view accounts'),
+        ];
+    }
     public function getSales(Request $request, Account $account)
     {
         $sales = Sales::where('customer_id', $account->id)

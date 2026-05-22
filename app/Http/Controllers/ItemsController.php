@@ -9,8 +9,18 @@ use App\Models\ItemImage;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class ItemsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ItemsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view stock', only: ['index', 'show', 'getNextCode']),
+            new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive']),
+        ];
+    }
     public function index(Request $request)
     {
         $query = Items::with(['category', 'companyAccount', 'images']);

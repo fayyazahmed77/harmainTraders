@@ -11,8 +11,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
-class AreasController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class AreasController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view areas', only: ['index', 'show', 'getByCity', 'getByArea']),
+            new Middleware('permission:edit areas', only: ['create', 'store', 'edit', 'update']),
+            new Middleware('permission:delete areas', only: ['destroy']),
+        ];
+    }
     //index
     public function index(Request $request)
     {

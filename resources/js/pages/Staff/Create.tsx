@@ -4,7 +4,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Card } from "@/components/ui/card";
 import { BreadcrumbItem } from "@/types";
-import { Camera, ChevronRight, Globe, Linkedin, Facebook, Instagram, Twitter, ExternalLink, Save, Plus, Eye, EyeOff, Shield, User as UserIcon, Briefcase, Mail, Phone, MapPin, Sparkles } from "lucide-react";
+import { Camera, ChevronRight, Globe, Linkedin, Facebook, Instagram, Twitter, ExternalLink, Save, Plus, Eye, EyeOff, Shield, User as UserIcon, Briefcase, Mail, Phone, MapPin, Sparkles, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +27,14 @@ interface Role {
     name: string;
 }
 
+interface Shift {
+    id: number;
+    name: string;
+}
+
 interface Props {
     roles: Role[];
+    shifts: Shift[];
     [key: string]: unknown;
 }
 
@@ -50,7 +56,7 @@ const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode,
     </div>
 );
 
-export default function StaffCreate({ roles }: Props) {
+export default function StaffCreate({ roles, shifts }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: "",
         email: "",
@@ -69,6 +75,7 @@ export default function StaffCreate({ roles }: Props) {
         portfolio_url: "",
         roles: [] as string[],
         image: null as File | null,
+        shift_id: "" as string | number,
     });
 
     const [showPassword, setShowPassword] = useState(false);
@@ -241,7 +248,7 @@ export default function StaffCreate({ roles }: Props) {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <TechLabel label="Job Title" icon={Briefcase}>
                                                 <Input
                                                     placeholder="Role Title"
@@ -262,6 +269,25 @@ export default function StaffCreate({ roles }: Props) {
                                                         <SelectItem value="Sales">Sales</SelectItem>
                                                         <SelectItem value="Human Resources">Human Resources</SelectItem>
                                                         <SelectItem value="Administration">Administration</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TechLabel>
+
+                                            <TechLabel label="Assigned Shift (Optional)" icon={Clock}>
+                                                <Select
+                                                    onValueChange={val => setData("shift_id", val === "none" ? "" : val)}
+                                                    value={data.shift_id ? data.shift_id.toString() : "none"}
+                                                >
+                                                    <SelectTrigger className="rounded-xl border-zinc-200 dark:border-zinc-800 w-full">
+                                                        <SelectValue placeholder="Select Shift" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="rounded-xl">
+                                                        <SelectItem value="none">No Shift</SelectItem>
+                                                        {shifts.map(shift => (
+                                                            <SelectItem key={shift.id} value={shift.id.toString()}>
+                                                                {shift.name}
+                                                            </SelectItem>
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
                                             </TechLabel>

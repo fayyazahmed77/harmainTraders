@@ -18,8 +18,18 @@ use App\Models\AccountType;
 use App\Models\AccountCategory;
 use App\Models\User;
 
-class ReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view reports'),
+        ];
+    }
+
     protected $reportBuilder;
 
     public function __construct(ReportBuilder $reportBuilder)
@@ -531,7 +541,7 @@ class ReportsController extends Controller
         $data = $this->reportBuilder->purchaseReport($request);
 
         return Excel::download(
-            new PurchaseReportExport($data),
+            new PurchaseReportExport($data['purchases'] ?? $data, $request->input('type', 'bill')),
             'purchase-report-' . date('Y-m-d') . '.xlsx'
         );
     }
@@ -562,7 +572,7 @@ class ReportsController extends Controller
         $data = $this->reportBuilder->purchaseReturnReport($request);
 
         return Excel::download(
-            new \App\Exports\PurchaseReturnReportExport($data),
+            new \App\Exports\PurchaseReturnReportExport($data['returns'] ?? $data, $request->input('type', 'bill')),
             'purchase-return-report-' . date('Y-m-d') . '.xlsx'
         );
     }
@@ -593,7 +603,7 @@ class ReportsController extends Controller
         $data = $this->reportBuilder->salesReport($request);
 
         return Excel::download(
-            new \App\Exports\SalesReportExport($data),
+            new \App\Exports\SalesReportExport($data['sales'] ?? $data, $request->input('type', 'bill')),
             'sales-report-' . date('Y-m-d') . '.xlsx'
         );
     }
@@ -624,7 +634,7 @@ class ReportsController extends Controller
         $data = $this->reportBuilder->salesReturnReport($request);
 
         return Excel::download(
-            new \App\Exports\SalesReturnReportExport($data),
+            new \App\Exports\SalesReturnReportExport($data['returns'] ?? $data, $request->input('type', 'bill')),
             'sales-return-report-' . date('Y-m-d') . '.xlsx'
         );
     }

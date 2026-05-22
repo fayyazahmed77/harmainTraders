@@ -12,8 +12,18 @@ use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 
-class PurchaseReturnReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class PurchaseReturnReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view reports'),
+        ];
+    }
+
     protected $returnBuilder;
 
     public function __construct(PurchaseReturnReportBuilder $returnBuilder)

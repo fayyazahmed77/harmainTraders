@@ -4,6 +4,7 @@ export interface Item {
     code: string;
     company: string;
     packing_qty: number;
+    packing_size: number;
     price: number;
     price_carton: number;
     price_piece: number;

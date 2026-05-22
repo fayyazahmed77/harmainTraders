@@ -17,8 +17,18 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\PurchaseReportExport;
 
-class PurchaseReportsController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class PurchaseReportsController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view reports'),
+        ];
+    }
+
     protected $purchaseBuilder;
 
     public function __construct(PurchaseReportBuilder $purchaseBuilder)

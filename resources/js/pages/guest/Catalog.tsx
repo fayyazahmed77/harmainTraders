@@ -94,9 +94,12 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
         const priceCarton = item.price_carton;
         const pricePiece = item.price_piece || 0;
         const packing = Math.max(1, item.packing_qty || 1);
+        const packingSize = Math.max(1, item.packing_size || 1);
 
         if (isCat1) {
-            return (qtyCarton * priceCarton) + (qtyPcs * pricePiece);
+            const fullCartonsFromPcs = Math.floor(qtyPcs / packingSize);
+            const remainingPcs = qtyPcs % packingSize;
+            return (qtyCarton * priceCarton) + (fullCartonsFromPcs * priceCarton) + (remainingPcs * pricePiece);
         } else {
             return Math.round((qtyCarton * priceCarton) + (qtyPcs * (priceCarton / packing)));
         }
@@ -114,6 +117,16 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
             
             const newCart = { ...prev };
             const updatedItem = { ...currentItem, [field]: newQty };
+
+            // Normalize loose quantities into full cartons for Category 1
+            if (isCat1) {
+                const packingSize = Math.max(1, item.packing_size || 1);
+                if (updatedItem.qty_pcs >= packingSize) {
+                    const extraCartons = Math.floor(updatedItem.qty_pcs / packingSize);
+                    updatedItem.qty_carton = (updatedItem.qty_carton || 0) + extraCartons;
+                    updatedItem.qty_pcs = updatedItem.qty_pcs % packingSize;
+                }
+            }
 
             if (updatedItem.qty_carton === 0 && updatedItem.qty_pcs === 0) {
                 delete newCart[item.id];

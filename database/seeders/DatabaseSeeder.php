@@ -15,6 +15,12 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        $this->call([
+            ShiftSeeder::class,
+            PermissionCategorySeeder::class,
+            PermissionSeeder::class,
+        ]);
+
         User::firstOrCreate(
             ['email' => 'test@example.com'],
             [

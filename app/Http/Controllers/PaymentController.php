@@ -13,8 +13,23 @@ use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 
-class PaymentController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class PaymentController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view payments', only: [
+                'index', 'show', 'pdf', 'getUnpaidBills', 'getNextCheque', 
+                'getAvailableCheques', 'getBillItems', 'getAvailableCustomerCheques'
+            ]),
+            new Middleware('permission:create payments', only: ['create', 'store']),
+            new Middleware('permission:edit payments', only: ['edit', 'update']),
+        ];
+    }
+
     // List payments and stats
     public function index(Request $request)
     {
@@ -657,7 +672,7 @@ class PaymentController extends Controller
                 ]);
 
                 // Handle "Cheque in hand" Logic
-                if ($payment->paymentAccount && $payment->paymentAccount->accountType->name === 'Cheque in hand') {
+                if ($payment->paymentAccount && $payment->paymentAccount->accountType?->name === 'Cheque in hand') {
                     if ($request->type === 'RECEIPT' && $payment->payment_method === 'Cheque') {
                         // Mark newly received cheque as In Hand
                         $payment->update(['cheque_status' => 'In Hand']);

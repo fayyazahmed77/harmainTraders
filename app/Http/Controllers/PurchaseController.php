@@ -17,8 +17,21 @@ use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 
-class PurchaseController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class PurchaseController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:view purchases', only: ['index', 'view', 'pdf', 'download', 'getLastPurchaseInfo']),
+            new Middleware('permission:create purchases', only: ['create', 'store']),
+            new Middleware('permission:edit purchases', only: ['edit', 'update']),
+            new Middleware('permission:delete purchases', only: ['destroy']),
+        ];
+    }
+
     public function index(Request $request)
     {
         $query = Purchase::with('supplier', 'salesman', 'messageLine');
@@ -311,7 +324,7 @@ class PurchaseController extends Controller
 
                 if ($remainingToAllocate > 0) {
                     // 1. Current Bill Allocation (Respecting existing advance allocations)
-                    $toThisBill = min($remainingToAllocate, $purchase->remaining_amount);
+                    $toThisBill = min($remainingToAllocate, $purchase->remaining_amount + $actualPaidOnThisBill);
                     if ($toThisBill > 0) {
                         $tempThis = $toThisBill;
                         foreach ($createdPayments as $p) {

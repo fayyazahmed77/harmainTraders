@@ -10,8 +10,17 @@ use App\Models\Bank;
 use App\Models\Account;
 use Carbon\Carbon;
 
-class ChequebookController extends Controller
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+
+class ChequebookController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:manage cheques'),
+        ];
+    }
     //index
     public function index()
     {
