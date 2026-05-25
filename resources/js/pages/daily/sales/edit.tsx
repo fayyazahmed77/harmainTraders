@@ -122,6 +122,26 @@ const toNumber = (v: any) => {
   return Number.isNaN(n) ? 0 : n;
 };
 
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(dateStr);
+};
+
+const formatLocalDate = (date: Date | undefined) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
@@ -219,7 +239,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 export default function SalesEditPage({ sale, items, accounts, salemans, paymentAccounts = [], firms = [], messageLines = [] }: { sale: Sale; items: InventoryItem[]; accounts: Account[]; salemans: Saleman[]; paymentAccounts: Account[]; firms: { id: number; name: string; defult: boolean }[]; messageLines: MessageLine[] }) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const [date, setDate] = useState<Date | undefined>(sale.date ? new Date(sale.date) : new Date());
+  const [date, setDate] = useState<Date | undefined>(sale.date ? parseLocalDate(sale.date) : new Date());
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString('en-GB', { hour12: false }));
   const [isTimeLive, setIsTimeLive] = useState(true);
   const [open, setOpen] = useState(false);
@@ -378,7 +398,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       const disc = toNumber(si.discount);
       return {
         id: si.id,
-        item_id: si.item_id,
+        item_id: si.item_id ? Number(si.item_id) : null,
         full: toNumber(si.qty_carton),
         pcs: toNumber(si.qty_pcs),
         bonus_full: toNumber(si.bonus_qty_carton),
@@ -395,14 +415,14 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   // Track the currently selected item for displaying info
   const [selectedItemId, setSelectedItemId] = useState<number | null>(() => {
     if (sale.items?.length && sale.items[0].item_id) {
-      return sale.items[0].item_id;
+      return Number(sale.items[0].item_id);
     }
     return null;
   });
 
   const selectedItem = useMemo<InventoryItem | null>(() => {
     if (!selectedItemId) return null;
-    return items.find((it) => it.id === selectedItemId) ?? null;
+    return items.find((it) => Number(it.id) === Number(selectedItemId)) ?? null;
   }, [selectedItemId, items]);
 
   const filteredItems = useMemo(() => {
@@ -442,7 +462,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   };
 
   const handleSelectItem = (rowId: number, itemId: number) => {
-    const selected = items.find((it) => it.id === itemId);
+    const selected = items.find((it) => Number(it.id) === Number(itemId));
     if (!selected) return;
 
     let baseRate = toNumber(selected.retail ?? selected.trade_price ?? 0);
@@ -486,7 +506,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     const itemUsage = new Map<number, number>();
     rows.forEach(r => {
       if (r.item_id) {
-        const item = items.find(it => it.id === r.item_id);
+        const item = items.find(it => Number(it.id) === Number(r.item_id));
         if (item) {
           const packing = toNumber(item.packing_qty ?? 1);
           const qty = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
@@ -497,7 +517,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     });
 
     return rows.map((r) => {
-      const item = items.find((it) => it.id === r.item_id) ?? undefined;
+      const item = items.find((it) => Number(it.id) === Number(r.item_id)) ?? undefined;
       const amount = recalcRowAmount(r, item);
 
       let stockExceeded = false;
@@ -571,7 +591,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     const newSplits = splits.filter(s => toNumber(s.amount) > 0);
 
     const payload = {
-      date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      date: date ? formatLocalDate(date) : formatLocalDate(new Date()),
       invoice: invoiceNo,
       code: code,
       type: cashCredit,
@@ -680,7 +700,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
                         setAccountType(selectedOption);
                         const id = selectedOption ? Number(selectedOption.value) : null;
-                        const selectedAccount = id ? accounts.find((a) => a.id === id) ?? null : null;
+                        const selectedAccount = id ? accounts.find((a) => Number(a.id) === Number(id)) ?? null : null;
 
                         if (selectedAccount) {
                           setCreditDays(selectedAccount.aging_days ?? 0);
@@ -826,7 +846,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
                         setAccountType(selectedOption);
                         const id = selectedOption ? Number(selectedOption.value) : null;
-                        const selectedAccount = id ? accounts.find((a) => a.id === id) ?? null : null;
+                        const selectedAccount = id ? accounts.find((a) => Number(a.id) === Number(id)) ?? null : null;
 
                         if (selectedAccount) {
                           setCreditDays(selectedAccount.aging_days ?? 0);
@@ -969,7 +989,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                     <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Item</div>
                                     {row.item_id ? (
                                       <div className="text-sm font-black text-zinc-900 dark:text-white uppercase italic flex items-center gap-1.5">
-                                        {items.find(it => it.id === row.item_id)?.title}
+                                        {items.find(it => Number(it.id) === Number(row.item_id))?.title}
                                         <ChevronDown size={14} className="text-zinc-400" />
                                       </div>
                                     ) : (
@@ -988,7 +1008,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                   <TechLabel label="Full Qty">
                                     <Input type="number" placeholder="FULL" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
                                   </TechLabel>
-                                  {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 && (
+                                  {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 && (
                                     <TechLabel label="Pieces" className="animate-in zoom-in-95 duration-200">
                                       <Input type="number" placeholder="PIECES" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
                                     </TechLabel>
@@ -1027,7 +1047,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                       className="flex flex-col text-left group/item"
                                     >
                                       <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
-                                        {items.find(it => it.id === row.item_id)?.title}
+                                        {items.find(it => Number(it.id) === Number(row.item_id))?.title}
                                       </span>
                                       <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest">ID: {row.item_id.toString().padStart(5, '0')}</span>
                                     </button>
@@ -1048,7 +1068,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                   <Input type="number" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
                                 </div>
                                 <div className="col-span-1">
-                                  {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 ? (
+                                  {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 ? (
                                     <Input type="number" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
                                   ) : (
                                     <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
@@ -1058,7 +1078,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                   <Input type="number" value={row.bonus_full || ""} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
                                 </div>
                                 <div className="col-span-1">
-                                  {toNumber(items.find(it => it.id === row.item_id)?.packing_qty) > 1 ? (
+                                  {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 ? (
                                     <Input type="number" value={row.bonus_pcs || ""} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
                                   ) : (
                                     <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
@@ -1213,7 +1233,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                   {(() => {
                                     const packing = toNumber(selectedItem.packing_qty) || 1;
                                     const currentTotalStock = toNumber(selectedItem.total_stock_pcs);
-                                    const activeRow = rows.find(r => r.item_id === selectedItem.id);
+                                    const activeRow = rows.find(r => Number(r.item_id) === Number(selectedItem.id));
                                     const enteredQty = activeRow ? (toNumber(activeRow.full) * packing) + toNumber(activeRow.pcs) + (toNumber(activeRow.bonus_full) * packing) + toNumber(activeRow.bonus_pcs) : 0;
                                     const remainingStock = currentTotalStock - enteredQty;
                                     const isNegative = remainingStock < 0;
@@ -1649,7 +1669,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               customerCategory={customerCategory}
               currentRows={rows}
               onAddUpdate={(item, data) => {
-                const existingRow = rows.find(r => r.item_id === item.id);
+                const existingRow = rows.find(r => Number(r.item_id) === Number(item.id));
                 if (existingRow) {
                   updateRow(existingRow.id, data);
                 } else {

@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('shift_id')
-                ->nullable()
-                ->after('id')
-                ->index()
-                ->constrained('shifts')
-                ->nullOnDelete();
-        });
+        if (!Schema::hasColumn('users', 'shift_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->foreignId('shift_id')
+                    ->nullable()
+                    ->after('id')
+                    ->index()
+                    ->constrained('shifts')
+                    ->nullOnDelete();
+            });
+        }
     }
 
     /**
@@ -26,9 +28,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['shift_id']);
-            $table->dropColumn('shift_id');
-        });
+        if (Schema::hasColumn('users', 'shift_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropForeign(['shift_id']);
+                $table->dropColumn('shift_id');
+            });
+        }
     }
 };

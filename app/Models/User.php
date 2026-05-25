@@ -114,4 +114,38 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Shift::class);
     }
+
+    /**
+     * Get the access requests submitted by the user.
+     */
+    public function accessRequests()
+    {
+        return $this->hasMany(AccessRequest::class);
+    }
+
+    /**
+     * Get the notification preferences configured by the user.
+     */
+    public function notificationPreferences()
+    {
+        return $this->hasMany(NotificationPreference::class);
+    }
+
+    /**
+     * Get the entity's notifications.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\MorphMany
+     */
+    public function notifications()
+    {
+        return $this->morphMany(Notification::class, 'notifiable')->latest();
+    }
+
+    /**
+     * Get the compliance audit ledger entries associated with this user.
+     */
+    public function auditLedgerEntries()
+    {
+        return $this->hasMany(AuditLedger::class);
+    }
 }

@@ -54,6 +54,10 @@ interface DashboardProps {
         totalOrdersYear: number;
         cancelledOrdersYear: number;
         totalCustomers: number;
+        totalSalesMonth: number;
+        totalOrdersMonth: number;
+        cancelledOrdersMonth: number;
+        currentMonthName: string;
     };
     orderChartData: { day: string, orders: number }[];
     fundsData: { name: string, value: number, color: string }[];
@@ -87,24 +91,24 @@ export default function DashboardPage({ dailySummary, stats, orderChartData, fun
 
     const statCards = [
         {
-            title: "Total Revenue (Year)",
-            value: formatCurrency(stats.totalSalesYear),
+            title: `Total Revenue (${stats.currentMonthName || "Month"})`,
+            value: formatCurrency(stats.totalSalesMonth),
             icon: DollarSign,
             color: "orange",
             chartData: Array.from({ length: 20 }, (_, i) => ({ value: Math.random() * 100 + 50 })),
             type: "area" as const
         },
         {
-            title: "Total Orders (Year)",
-            value: formatNumber(stats.totalOrdersYear),
+            title: `Total Orders (${stats.currentMonthName || "Month"})`,
+            value: formatNumber(stats.totalOrdersMonth),
             icon: ShoppingCart,
             color: "orange",
             chartData: Array.from({ length: 12 }, (_, i) => ({ value: Math.random() * 80 + 20 })),
             type: "bar" as const
         },
         {
-            title: "Total Returns (Year)",
-            value: formatNumber(stats.cancelledOrdersYear),
+            title: `Total Returns (${stats.currentMonthName || "Month"})`,
+            value: formatNumber(stats.cancelledOrdersMonth),
             icon: XCircle,
             color: "orange",
             chartData: Array.from({ length: 20 }, (_, i) => ({ value: Math.random() * 60 + 30 })),

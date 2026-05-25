@@ -1,10 +1,18 @@
 <?php
 
 namespace App\Providers;
+
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Event;
+use App\Events\AccessRequestCreated;
+use App\Events\AccessRequestStatusChanged;
+use App\Listeners\SendAdminApprovalEmail;
+use App\Listeners\StoreNotifications;
+use App\Listeners\WriteAuditLedger;
+use App\Listeners\SendAccessRequestStatusNotification;
 
 class AppServiceProvider extends ServiceProvider
 {

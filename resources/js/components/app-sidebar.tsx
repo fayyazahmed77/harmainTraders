@@ -266,6 +266,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: "/admin/settings/email",
         },
         {
+          title: "System Configuration",
+          url: "/admin/settings/configuration",
+        },
+        {
           title: "Email Templates",
           url: "/admin/settings/templates",
         },

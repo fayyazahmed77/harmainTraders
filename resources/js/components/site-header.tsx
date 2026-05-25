@@ -5,6 +5,7 @@ import { type BreadcrumbItem } from "@/types"
 import { Toaster } from "sonner";
 import { NavUser } from "@/components/nav-user"
 import FlashMessages from "@/components/FlashMessages";
+import { NotificationBell } from "@/components/notification/NotificationBell"
 type SiteHeaderProps = {
   breadcrumbs?: BreadcrumbItem[]
 }
@@ -44,7 +45,8 @@ export function SiteHeader({ breadcrumbs }: SiteHeaderProps) {
             ))}
           </nav>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
+          <NotificationBell />
           {/* user */}
           <NavUser user={user} />
         </div>

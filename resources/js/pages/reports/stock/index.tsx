@@ -32,9 +32,15 @@ export default function StockReportsIndex({ items, companies, categories, firms 
     const [reportData, setReportData] = useState<any[]>([]);
     const [params, setParams] = useState({
         reportId: 'summary',
-        fromDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // 01.01.2000 from image, but let's use current year start
-        toDate: new Date().toISOString().split('T')[0],
-        deadStockDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+        fromDate: `${new Date().getFullYear()}-01-01`,
+        toDate: (() => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        })(),
+        deadStockDate: `${new Date().getFullYear()}-01-01`,
         itemId: 'ALL',
         companyId: 'ALL',
         categoryId: 'ALL',
@@ -74,8 +80,8 @@ export default function StockReportsIndex({ items, companies, categories, firms 
             const response = await axios.get(endpoint, {
                 params: {
                     ...params,
-                    fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
-                    toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
+                    fromDate: params.fromDate,
+                    toDate: params.toDate,
                 }
             });
 
@@ -96,8 +102,8 @@ export default function StockReportsIndex({ items, companies, categories, firms 
         const queryParams = new URLSearchParams({
             ...params as any,
             sortBy: currentSort || params.sortBy || 'default',
-            fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
-            toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
+            fromDate: params.fromDate,
+            toDate: params.toDate,
         });
         window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
     };

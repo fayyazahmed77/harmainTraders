@@ -98,6 +98,26 @@ const SearchableSelect = ({ value, onValueChange, options, placeholder, emptyMes
     );
 };
 
+const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        return new Date(year, month, day);
+    }
+    return new Date(dateStr);
+};
+
+const formatLocalDate = (date: Date | undefined) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 interface ParameterFormProps {
     params: any;
     setParams: (params: any) => void;
@@ -161,22 +181,22 @@ export function ParameterForm({
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="ghost" className="h-9 px-3 text-[11px] font-bold text-text-primary hover:bg-surface-0 shadow-none rounded-sm">
-                                        {format(new Date(params.fromDate), "dd MMM yyyy")}
+                                        {format(parseLocalDate(params.fromDate), "dd MMM yyyy")}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 rounded-sm overflow-hidden" align="start">
-                                    <Calendar mode="single" selected={new Date(params.fromDate)} onSelect={(date) => updateParam('fromDate', date?.toISOString().split('T')[0])} initialFocus />
+                                    <Calendar mode="single" selected={parseLocalDate(params.fromDate)} onSelect={(date) => updateParam('fromDate', formatLocalDate(date))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                             <div className="h-px w-2 bg-border/40" />
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="ghost" className="h-9 px-3 text-[11px] font-bold text-text-primary hover:bg-surface-0 shadow-none rounded-sm">
-                                        {format(new Date(params.toDate), "dd MMM yyyy")}
+                                        {format(parseLocalDate(params.toDate), "dd MMM yyyy")}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 rounded-sm overflow-hidden" align="start">
-                                    <Calendar mode="single" selected={new Date(params.toDate)} onSelect={(date) => updateParam('toDate', date?.toISOString().split('T')[0])} initialFocus />
+                                    <Calendar mode="single" selected={parseLocalDate(params.toDate)} onSelect={(date) => updateParam('toDate', formatLocalDate(date))} initialFocus />
                                 </PopoverContent>
                             </Popover>
                         </div>

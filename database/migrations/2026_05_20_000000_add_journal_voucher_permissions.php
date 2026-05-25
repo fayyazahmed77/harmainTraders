@@ -12,41 +12,41 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Create permission category for Journal Vouchers
-        $categoryId = DB::table('permission_cats')->insertGetId([
-            'name' => 'Journal Voucher',
-            'icon' => 'Receipt',
-        ]);
+        // 1. Create or fetch permission category for Journal Vouchers
+        $category = DB::table('permission_cats')->where('name', 'Journal Voucher')->first();
+        if ($category) {
+            $categoryId = $category->id;
+        } else {
+            $categoryId = DB::table('permission_cats')->insertGetId([
+                'name' => 'Journal Voucher',
+                'icon' => 'Receipt',
+            ]);
+        }
 
-        // 2. Insert new permissions for Journal Vouchers
+        // 2. Insert new permissions for Journal Vouchers if not already present
         $permissions = [
-            [
-                'cat' => $categoryId,
-                'name' => 'view_journal_vouchers',
-                'guard_name' => 'web',
-                'created_by' => 1, // Default to admin or system ID
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'cat' => $categoryId,
-                'name' => 'create_journal_vouchers',
-                'guard_name' => 'web',
-                'created_by' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'cat' => $categoryId,
-                'name' => 'delete_journal_vouchers',
-                'guard_name' => 'web',
-                'created_by' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+            'view_journal_vouchers',
+            'create_journal_vouchers',
+            'delete_journal_vouchers'
         ];
 
-        DB::table('permissions')->insert($permissions);
+        foreach ($permissions as $permName) {
+            $exists = DB::table('permissions')
+                ->where('name', $permName)
+                ->where('guard_name', 'web')
+                ->exists();
+
+            if (!$exists) {
+                DB::table('permissions')->insert([
+                    'cat' => $categoryId,
+                    'name' => $permName,
+                    'guard_name' => 'web',
+                    'created_by' => 1, // Default to admin or system ID
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
     }
 
     /**

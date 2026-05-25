@@ -18,6 +18,13 @@ class EmailSettingsController extends Controller
         ]);
     }
 
+    public function configuration()
+    {
+        return Inertia::render('admin/settings/configuration', [
+            'settings' => SiteSetting::get(),
+        ]);
+    }
+
     public function update(Request $request)
     {
         $settings = SiteSetting::get();
@@ -38,6 +45,7 @@ class EmailSettingsController extends Controller
             'mail_encryption' => 'nullable|string',
             'mail_from_address' => 'nullable|email',
             'mail_from_name' => 'nullable|string',
+            'notification_settings' => 'nullable|array',
         ]);
 
         if ($request->hasFile('logo')) {

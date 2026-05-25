@@ -23,6 +23,11 @@ class SiteSetting extends Model
         'mail_encryption',
         'mail_from_address',
         'mail_from_name',
+        'notification_settings',
+    ];
+
+    protected $casts = [
+        'notification_settings' => 'array',
     ];
 
     public static function get()

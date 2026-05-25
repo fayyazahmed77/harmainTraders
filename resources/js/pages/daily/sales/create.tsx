@@ -128,6 +128,26 @@ const toNumber = (v: any) => {
   return Number.isNaN(n) ? 0 : n;
 };
 
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(dateStr);
+};
+
+const formatLocalDate = (date: Date | undefined) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // ───────────────────────────────────────────
 // Component
 // ───────────────────────────────────────────
@@ -589,7 +609,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
   const saveInvoice = (forceSave = false) => {
     const payload = {
-      date: date ? date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
+      date: date ? formatLocalDate(date) : formatLocalDate(new Date()), // Format as YYYY-MM-DD
       invoice: invoiceNo,
       code: code,
       type: cashCredit,

@@ -73,6 +73,11 @@ class DashboardController extends Controller
         $cancelledOrdersYear = SalesReturn::whereYear('date', $thisYear)->count();
         $totalCustomers = Account::where('sale', 1)->count();
 
+        $totalSalesMonth = (float)Sales::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->sum('net_total');
+        $totalOrdersMonth = Sales::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->count();
+        $cancelledOrdersMonth = SalesReturn::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->count();
+        $currentMonthName = $now->format('F');
+
         // Weekly Order Chart (Last 7 Days)
         $orderChart = DB::table('sales')
             ->where('date', '>=', $last7Days)
@@ -268,6 +273,10 @@ class DashboardController extends Controller
                 'totalOrdersYear' => $totalOrdersYear,
                 'cancelledOrdersYear' => $cancelledOrdersYear,
                 'totalCustomers' => $totalCustomers,
+                'totalSalesMonth' => $totalSalesMonth,
+                'totalOrdersMonth' => $totalOrdersMonth,
+                'cancelledOrdersMonth' => $cancelledOrdersMonth,
+                'currentMonthName' => $currentMonthName,
             ],
             'orderChartData' => $orderChart,
             'fundsData' => $fundsData,

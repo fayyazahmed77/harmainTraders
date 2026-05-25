@@ -43,8 +43,19 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
     const [reportData, setReportData] = useState<any[]>([]);
     const [params, setParams] = useState({
         reportId: 'bill',
-        fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        toDate: new Date().toISOString().split('T')[0],
+        fromDate: (() => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}-01`;
+        })(),
+        toDate: (() => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        })(),
         customerId: 'ALL',
         itemId: 'ALL',
         salesmanId: 'ALL',
@@ -71,8 +82,8 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
             const response = await axios.get(endpoint, {
                 params: {
                     ...params,
-                    fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
-                    toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
+                    fromDate: params.fromDate,
+                    toDate: params.toDate,
                 },
                 headers: { 'Accept': 'application/json' }
             });
@@ -100,8 +111,8 @@ export default function SalesReturnReportsIndex({ customers, items, firms, sales
         const queryParams = new URLSearchParams({
             ...params as any,
             sortBy: currentSort || params.sortBy || 'default',
-            fromDate: format(new Date(params.fromDate), 'yyyy-MM-dd'),
-            toDate: format(new Date(params.toDate), 'yyyy-MM-dd'),
+            fromDate: params.fromDate,
+            toDate: params.toDate,
         });
 
         window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');

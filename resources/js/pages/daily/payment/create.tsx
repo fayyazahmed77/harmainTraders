@@ -120,15 +120,35 @@ interface Props {
 
 const toNum = (v: any) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(dateStr);
+};
+
+const formatLocalDate = (date: Date | undefined) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const fmtDate = (d: string) => {
   if (!d) return "N/A";
-  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return parseLocalDate(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export default function PaymentVoucher({ accounts, paymentAccounts, messageLines }: Props) {
   const { flash, errors } = usePage().props as any;
   // State
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(formatLocalDate(new Date()));
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [accountSearch, setAccountSearch] = useState("");
   const [mobileAccOpen, setMobileAccOpen] = useState(false);
@@ -747,7 +767,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                        <Calendar mode="single" selected={new Date(date)} onSelect={(d) => { if (d) { setDate(d.toISOString().split('T')[0]); setCalOpen(false); } }} />
+                        <Calendar mode="single" selected={parseLocalDate(date)} onSelect={(d) => { if (d) { setDate(formatLocalDate(d)); setCalOpen(false); } }} />
                       </PopoverContent>
                     </Popover>
                   </TechLabel>

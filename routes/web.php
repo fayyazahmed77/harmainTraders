@@ -544,6 +544,7 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('settings')->group(function () {
             Route::get('/email', [EmailSettingsController::class, 'index'])->name('admin.settings.email');
             Route::post('/email', [EmailSettingsController::class, 'update'])->name('admin.settings.email.update');
+            Route::get('/configuration', [EmailSettingsController::class, 'configuration'])->name('admin.settings.configuration');
 
             Route::get('/templates', [EmailTemplateController::class, 'index'])->name('admin.settings.templates.index');
             Route::get('/templates/{template}/edit', [EmailTemplateController::class, 'edit'])->name('admin.settings.templates.edit');
@@ -565,8 +566,33 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/supplier-order/list', [SupplierOrderController::class, 'list'])->name('admin.supplier-order.list');
         Route::get('/supplier-order/{id}/show', [SupplierOrderController::class, 'show'])->name('admin.supplier-order.show');
         Route::get('/supplier-order/{id}/print', [SupplierOrderController::class, 'print'])->name('admin.supplier-order.print');
+
+        // Admin Access Requests Dashboard
+        Route::get('/access-requests', [\App\Http\Controllers\AccessRequestController::class, 'adminIndex'])->name('admin.access-requests.index');
     });
+
+    // Access Request API Routes
+    Route::post('/api/v1/access-requests', [\App\Http\Controllers\AccessRequestController::class, 'store'])->name('access-requests.store')->middleware('throttle:5,1');
+    Route::get('/api/v1/access-requests/pending', [\App\Http\Controllers\AccessRequestController::class, 'indexPending'])->name('access-requests.pending');
+    Route::post('/api/v1/access-requests/{id}/approve', [\App\Http\Controllers\AccessRequestController::class, 'approve'])->name('access-requests.approve');
+    Route::post('/api/v1/access-requests/{id}/reject', [\App\Http\Controllers\AccessRequestController::class, 'reject'])->name('access-requests.reject');
+    Route::post('/api/v1/access-requests/{id}/request-info', [\App\Http\Controllers\AccessRequestController::class, 'requestMoreInfo'])->name('access-requests.request-info');
+
+    // Notifications API Routes & Center
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'renderCenter'])->name('notifications.center');
+    Route::get('/api/v1/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::patch('/api/v1/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/api/v1/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::post('/api/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
 });
+
+// ============================================================================
+// SIGNED ACTIONS (No session authentication required, validated via URL signature)
+// ============================================================================
+Route::get('/api/v1/signed-action/approve/{id}', [\App\Http\Controllers\SignedApprovalController::class, 'approve'])->name('signed.approve')->middleware('signed');
+Route::get('/api/v1/signed-action/reject/{id}', [\App\Http\Controllers\SignedApprovalController::class, 'showRejectForm'])->name('signed.reject')->middleware('signed');
+Route::post('/api/v1/signed-action/reject/{id}', [\App\Http\Controllers\SignedApprovalController::class, 'reject'])->name('signed.reject.submit')->middleware('signed');
+
 
 
 // ============================================================================

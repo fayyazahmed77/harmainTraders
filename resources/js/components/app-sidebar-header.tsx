@@ -4,6 +4,7 @@ import { type BreadcrumbItem as BreadcrumbItemType, type User } from '@/types';
 import { NavUser } from '@/components/nav-user';
 import { usePage } from '@inertiajs/react';
 import { ShiftHeaderTimer } from '@/components/ShiftHeaderTimer';
+import { NotificationBell } from '@/components/notification/NotificationBell';
 
 interface PageProps {
     auth: {
@@ -27,7 +28,8 @@ export function AppSidebarHeader({
                     <SidebarTrigger className="-ml-1" />
                     <Breadcrumbs breadcrumbs={breadcrumbs} />
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <NotificationBell />
                     <NavUser user={user} />
                 </div>
             </div>
