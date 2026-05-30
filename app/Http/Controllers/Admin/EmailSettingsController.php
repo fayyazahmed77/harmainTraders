@@ -46,6 +46,11 @@ class EmailSettingsController extends Controller
             'mail_from_address' => 'nullable|email',
             'mail_from_name' => 'nullable|string',
             'notification_settings' => 'nullable|array',
+            'broadcast_driver' => 'nullable|string|in:reverb,pusher',
+            'pusher_app_id' => 'nullable|string',
+            'pusher_app_key' => 'nullable|string',
+            'pusher_app_secret' => 'nullable|string',
+            'pusher_app_cluster' => 'nullable|string',
         ]);
 
         if ($request->hasFile('logo')) {
@@ -57,14 +62,20 @@ class EmailSettingsController extends Controller
         $settings->update($validated);
         $newValues = $settings->fresh()->toArray();
 
+        try {
+            Artisan::call('config:clear');
+        } catch (\Exception $e) {
+            // Fail silently
+        }
+
         ActivityLogger::log(
             'updated', 
             'Email Settings', 
-            "Updated system email and branding configuration",
+            "Updated system configuration",
             $oldValues,
             $newValues
         );
 
-        return back()->with('success', 'Email settings updated successfully.');
+        return back()->with('success', 'Configuration updated successfully.');
     }
 }

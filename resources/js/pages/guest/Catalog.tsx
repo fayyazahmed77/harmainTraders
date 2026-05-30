@@ -146,10 +146,11 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
         }).format(value).replace('PKR', 'Rs');
     };
 
-    const handleCheckout = async () => {
+    const handleCheckout = async (email?: string) => {
         setProcessing(true);
         try {
             const response = await axios.post(`/g/${token}/order`, {
+                email,
                 items: Object.values(cart).map(it => ({
                     id: it.id,
                     qty_carton: it.qty_carton,

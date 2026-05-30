@@ -21,7 +21,7 @@ interface CartDrawerProps {
     cartTotal: number;
     formatCurrency: (val: number) => string;
     processing: boolean;
-    handleCheckout: () => void;
+    handleCheckout: (email?: string) => void;
     DEFAULT_IMAGE: string;
     customerCategory?: string | number;
 }
@@ -40,6 +40,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     DEFAULT_IMAGE,
     customerCategory
 }) => {
+    const [email, setEmail] = React.useState('');
     return (
         <Sheet open={checkoutOpen} onOpenChange={setCheckoutOpen}>
             <SheetContent className="w-full sm:max-w-md p-0 flex flex-col border-none shadow-2xl bg-white dark:bg-zinc-900">
@@ -181,10 +182,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                             <p className="text-3xl font-black text-orange-600 leading-none">{formatCurrency(cartTotal)}</p>
                         </div>
                     </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Email Address (to receive confirmation)</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="guest@example.com"
+                            className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        />
+                    </div>
+
                     <Button
                         className="w-full h-14 bg-orange-600 hover:bg-orange-700 font-black text-lg rounded-2xl shadow-xl shadow-orange-600/20 gap-3 group transition-all"
                         disabled={processing || cartCount === 0}
-                        onClick={handleCheckout}
+                        onClick={() => handleCheckout(email)}
                     >
                         {processing ? (
                             <Loader2 className="animate-spin" />

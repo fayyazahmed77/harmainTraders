@@ -24,7 +24,8 @@ import {
   Shield,
   Clock,
   Package,
-  Layers
+  Layers,
+  Radio
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,11 @@ interface SiteSetting {
   mail_from_address?: string;
   mail_from_name?: string;
   notification_settings?: Record<string, string[]>;
+  broadcast_driver?: 'reverb' | 'pusher';
+  pusher_app_id?: string;
+  pusher_app_key?: string;
+  pusher_app_secret?: string;
+  pusher_app_cluster?: string;
 }
 
 interface Props {
@@ -83,10 +89,15 @@ export default function SystemConfiguration({ settings }: Props) {
     mail_from_address: settings.mail_from_address || "",
     mail_from_name: settings.mail_from_name || "",
     notification_settings: initialNotificationSettings,
+    broadcast_driver: settings.broadcast_driver || "reverb",
+    pusher_app_id: settings.pusher_app_id || "",
+    pusher_app_key: settings.pusher_app_key || "",
+    pusher_app_secret: settings.pusher_app_secret || "",
+    pusher_app_cluster: settings.pusher_app_cluster || "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState<"email" | "notifications">("email");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "notifications">("broadcast");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,17 +162,17 @@ export default function SystemConfiguration({ settings }: Props) {
           {/* Premium Navigation Tabs */}
           <div className="flex border-b border-zinc-200 dark:border-zinc-800">
             <button
-              onClick={() => setActiveTab("email")}
+              onClick={() => setActiveTab("broadcast")}
               className={cn(
                 "px-5 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all duration-200 cursor-pointer",
-                activeTab === "email"
+                activeTab === "broadcast"
                   ? "border-orange-500 text-orange-500"
                   : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
               )}
             >
               <div className="flex items-center gap-2">
-                <Server size={14} />
-                Email / SMTP Setup
+                <Radio size={14} />
+                Broadcasting Setup
               </div>
             </button>
             <button
@@ -182,123 +193,135 @@ export default function SystemConfiguration({ settings }: Props) {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {activeTab === "email" && (
-              <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-950/20">
-                <CardHeader>
-                  <CardTitle className="text-md font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                    <Server size={16} className="text-orange-500" />
-                    SMTP Server Configuration Table
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto border-t border-zinc-200 dark:border-zinc-800">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-                          <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-500 w-1/4">Parameter</th>
-                          <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-500 w-1/3">Description</th>
-                          <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-500">Value Input</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">Mail Host</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">The IP address or domain hostname of your SMTP mail server.</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_host} 
-                              onChange={e => setData('mail_host', e.target.value)} 
-                              placeholder="smtp.mailtrap.io"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">Mail Port</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">The port number used to connect to your SMTP provider (e.g. 587, 465).</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_port} 
-                              onChange={e => setData('mail_port', e.target.value)} 
-                              placeholder="465"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">SMTP Username</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">Username credential needed to authenticate against the SMTP host.</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_username} 
-                              onChange={e => setData('mail_username', e.target.value)} 
-                              placeholder="user@provider.com"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">SMTP Password</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">Password credential corresponding to the authentication username.</td>
-                          <td className="px-6 py-4">
-                            <div className="relative max-w-lg">
-                              <Input 
-                                type={showPassword ? "text" : "password"}
-                                value={data.mail_password} 
-                                onChange={e => setData('mail_password', e.target.value)} 
-                                className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 pr-10"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
-                              >
-                                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">Mail Encryption</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">The encryption protocol protecting your SMTP transmission (e.g. tls, ssl).</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_encryption} 
-                              onChange={e => setData('mail_encryption', e.target.value)} 
-                              placeholder="ssl"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">Sender From Address</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">Global outbound email sender address (e.g. noreply@company.com).</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_from_address} 
-                              onChange={e => setData('mail_from_address', e.target.value)} 
-                              placeholder="noreply@harmaintraders.com"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 font-bold text-sm text-zinc-900 dark:text-zinc-200">Sender From Name</td>
-                          <td className="px-6 py-4 text-xs text-zinc-500">Friendly name displayed as the email sender in user clients.</td>
-                          <td className="px-6 py-4">
-                            <Input 
-                              value={data.mail_from_name} 
-                              onChange={e => setData('mail_from_name', e.target.value)} 
-                              placeholder="Harmain Traders"
-                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 max-w-lg"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+            {activeTab === "broadcast" && (
+              <div className="space-y-6">
+                {/* Premium Broadcaster Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div 
+                    onClick={() => setData('broadcast_driver', 'reverb')}
+                    className={cn(
+                      "p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-4 shadow-sm",
+                      data.broadcast_driver === 'reverb' 
+                        ? "border-orange-500 bg-orange-500/5 dark:bg-orange-500/10" 
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    )}
+                  >
+                    <div className={cn(
+                      "p-3 rounded-lg",
+                      data.broadcast_driver === 'reverb' ? "bg-orange-500 text-white" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-500"
+                    )}>
+                      <Server size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-zinc-900 dark:text-zinc-100">Laravel Reverb</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Local self-hosted WebSockets. High speed, no limits, requires running daemon.</p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div 
+                    onClick={() => setData('broadcast_driver', 'pusher')}
+                    className={cn(
+                      "p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-4 shadow-sm",
+                      data.broadcast_driver === 'pusher' 
+                        ? "border-orange-500 bg-orange-500/5 dark:bg-orange-500/10" 
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    )}
+                  >
+                    <div className={cn(
+                      "p-3 rounded-lg",
+                      data.broadcast_driver === 'pusher' ? "bg-orange-500 text-white" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-500"
+                    )}>
+                      <Radio size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-zinc-900 dark:text-zinc-100">Pusher</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Managed real-time cloud service. Stable, reliable, ideal for shared cPanel hosting.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {data.broadcast_driver === 'pusher' ? (
+                  <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-950/20">
+                    <CardHeader>
+                      <CardTitle className="text-md font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                        <Radio size={16} className="text-orange-500" />
+                        Pusher Credentials Configuration
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-zinc-500">Pusher App ID</Label>
+                          <Input 
+                            value={data.pusher_app_id} 
+                            onChange={e => setData('pusher_app_id', e.target.value)} 
+                            placeholder="e.g. 2161043"
+                            className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-zinc-500">Pusher Key</Label>
+                          <Input 
+                            value={data.pusher_app_key} 
+                            onChange={e => setData('pusher_app_key', e.target.value)} 
+                            placeholder="e.g. b6ceba21998c85c46523"
+                            className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-zinc-500">Pusher Secret</Label>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"}
+                              value={data.pusher_app_secret} 
+                              onChange={e => setData('pusher_app_secret', e.target.value)} 
+                              placeholder="e.g. c3c9271b1d091a3b614d"
+                              className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                            >
+                              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-zinc-500">Pusher Cluster</Label>
+                          <Input 
+                            value={data.pusher_app_cluster} 
+                            onChange={e => setData('pusher_app_cluster', e.target.value)} 
+                            placeholder="e.g. ap1"
+                            className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-950/20">
+                    <CardHeader>
+                      <CardTitle className="text-md font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                        <Server size={16} className="text-orange-500" />
+                        Laravel Reverb Server Configuration
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 text-sm text-zinc-500">
+                        <p className="font-bold text-zinc-900 dark:text-zinc-300 mb-2">Reverb Server is Active</p>
+                        <p className="text-xs">Laravel Reverb utilizes the settings configured in the system environment file (.env). To customize ports or hostnames, please configure them inside the environment parameters directly.</p>
+                        <div className="grid grid-cols-2 gap-4 mt-4 text-xs font-mono bg-zinc-100 dark:bg-zinc-950 p-3 rounded border border-zinc-200 dark:border-zinc-850">
+                          <div>Host: <span className="text-orange-500">localhost</span></div>
+                          <div>Port: <span className="text-orange-500">8080</span></div>
+                          <div>Scheme: <span className="text-orange-500">http</span></div>
+                          <div>Broadcaster: <span className="text-orange-500">reverb</span></div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             {activeTab === "notifications" && (

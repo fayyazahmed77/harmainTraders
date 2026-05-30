@@ -21,7 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (class_exists(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class)) {
+            $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
+        }
     }
 
     /**
@@ -36,6 +38,31 @@ class AppServiceProvider extends ServiceProvider
             }
             return $user->hasRole('Admin') || $user->hasRole('Super Admin') ? true : null;
         });
+
+        // Dynamically configure broadcasting settings from database
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+                $settings = \App\Models\SiteSetting::first();
+                if ($settings) {
+                    $driver = $settings->broadcast_driver ?? 'reverb';
+                    config([
+                        'broadcasting.default' => $driver,
+                    ]);
+
+                    if ($settings->pusher_app_id) {
+                        config([
+                            'broadcasting.connections.pusher.app_id' => $settings->pusher_app_id,
+                            'broadcasting.connections.pusher.key' => $settings->pusher_app_key,
+                            'broadcasting.connections.pusher.secret' => $settings->pusher_app_secret,
+                            'broadcasting.connections.pusher.options.cluster' => $settings->pusher_app_cluster ?? 'ap1',
+                            'broadcasting.connections.pusher.options.host' => 'api-' . ($settings->pusher_app_cluster ?? 'ap1') . '.pusher.com',
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Fail silently
+        }
     }
 }
 

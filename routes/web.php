@@ -39,6 +39,7 @@ use App\Http\Controllers\SalesMapReportController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\AccountCategoryController;
 use App\Http\Controllers\GuestController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfitReportsController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Admin\EmailTemplateController;
@@ -82,6 +83,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // ============================================================================
 Route::middleware(['auth'])->group(function () {
     Route::get('/api/server-time', \App\Http\Controllers\Api\ServerTimeController::class);
+
+    // Notification Center
+    Route::get('/notifications', [NotificationController::class, 'renderCenter'])->name('notifications.center');
+    Route::get('/api/v1/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::patch('/api/v1/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/api/v1/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
     //------------------------Permission & Role Administration (Secured)------------------------------
     Route::middleware(['role:Admin'])->group(function () {

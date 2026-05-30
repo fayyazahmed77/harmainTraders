@@ -160,3 +160,115 @@ test('access request status changed listener triggers notification delivery', fu
     // Also assert that the broadcast event was dispatched
     Event::assertDispatched(RealtimeNotificationEvent::class);
 });
+
+test('access request submitted dispatches created event and triggers notifications', function () {
+    Event::fake([\App\Events\AccessRequestCreated::class]);
+
+    $service = new AccessRequestService();
+    $service->createRequest([
+        'resource_type' => 'inventory',
+        'action_type' => 'approve',
+        'justification' => 'Test admin notification',
+    ], $this->user);
+
+    Event::assertDispatched(\App\Events\AccessRequestCreated::class);
+});
+
+test('guest order placed dispatches event and triggers notifications', function () {
+    Event::fake([\App\Events\GuestOrderPlaced::class]);
+
+    $customerType = \App\Models\AccountType::firstOrCreate(['name' => 'Customers']);
+    $account = \App\Models\Account::create([
+        'code' => 'G001',
+        'title' => 'Guest Customer',
+        'type' => $customerType->id,
+        'guest_token' => 'test-token-uuid-12345',
+        'email' => 'guest@example.com',
+    ]);
+    
+    $sale = \App\Models\Sales::create([
+        'date' => now(),
+        'invoice' => 'GST-TEST1234',
+        'customer_id' => $account->id,
+        'gross_total' => 1000,
+        'net_total' => 1000,
+        'paid_amount' => 0,
+        'remaining_amount' => 1000,
+        'status' => 'Pending Order',
+        'is_online' => true,
+        'courier_charges' => 0,
+        'discount_total' => 0,
+        'tax_total' => 0,
+        'no_of_items' => 0,
+    ]);
+
+    event(new \App\Events\GuestOrderPlaced($sale));
+
+    Event::assertDispatched(\App\Events\GuestOrderPlaced::class);
+});
+
+test('low stock alert dispatches event', function () {
+    Event::fake([\App\Events\LowStockAlert::class]);
+
+    $item = \App\Models\Items::create([
+        'code' => 'TESTITEM',
+        'title' => 'Test Item',
+        'reorder_level' => 10,
+        'packing_qty' => 1,
+        'stock_1' => 5,
+        'stock_2' => 0,
+    ]);
+
+    event(new \App\Events\LowStockAlert($item));
+
+    Event::assertDispatched(\App\Events\LowStockAlert::class);
+});
+
+test('payment confirmed dispatches event', function () {
+    Event::fake([\App\Events\PaymentConfirmed::class]);
+
+    $customerType = \App\Models\AccountType::firstOrCreate(['name' => 'Customers']);
+    $account = \App\Models\Account::create([
+        'code' => 'G002',
+        'title' => 'Guest Customer 2',
+        'type' => $customerType->id,
+    ]);
+    
+    $payment = \App\Models\Payment::create([
+        'date' => now(),
+        'voucher_no' => 'CRV-TEST',
+        'account_id' => $account->id,
+        'payment_account_id' => $account->id,
+        'amount' => 500,
+        'net_amount' => 500,
+        'type' => 'RECEIPT',
+    ]);
+
+    event(new \App\Events\PaymentConfirmed($payment));
+
+    Event::assertDispatched(\App\Events\PaymentConfirmed::class);
+});
+
+test('check sla breaches command identifies pending requests and marks them', function () {
+    Event::fake([\App\Events\RealtimeNotificationEvent::class]);
+
+    // Create a request that is overdue by 25 hours
+    $request = AccessRequest::create([
+        'user_id' => $this->user->id,
+        'resource_type' => 'finance',
+        'action_type' => 'view',
+        'justification' => 'Overdue request',
+        'status' => 'pending',
+        'current_step' => 1,
+        'sla_due_at' => now()->subHours(25),
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'PHPUnit',
+        'sla_breached' => false,
+    ]);
+
+    $this->artisan('app:check-sla-breaches')
+        ->assertExitCode(0);
+
+    $request->refresh();
+    expect($request->sla_breached)->toBeTrue();
+});

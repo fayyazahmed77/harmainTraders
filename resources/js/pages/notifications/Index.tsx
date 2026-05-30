@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Bell, Search, CheckCheck, ShieldAlert, FileText, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, Head, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { type SharedData } from '@/types';
 
 interface NotificationItem {
@@ -48,8 +49,8 @@ export default function NotificationCenter() {
         });
 
         try {
-            const res = await fetch(`/api/v1/notifications?${params}`);
-            const json = await res.json();
+            const res = await axios.get(`/api/v1/notifications?${params}`);
+            const json = res.data;
             if (json && json.data) {
                 if (isNewFilter) {
                     setNotifications(json.data);
@@ -118,7 +119,7 @@ export default function NotificationCenter() {
     const markAllRead = async () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         try {
-            await fetch('/api/v1/notifications/read-all', { method: 'POST' });
+            await axios.post('/api/v1/notifications/read-all');
         } catch (error) {
             console.error('Failed syncing read states', error);
         }
@@ -127,7 +128,7 @@ export default function NotificationCenter() {
     const handleMarkSingleRead = async (id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
         try {
-            await fetch(`/api/v1/notifications/${id}/read`, { method: 'PATCH' });
+            await axios.patch(`/api/v1/notifications/${id}/read`);
         } catch (error) {
             console.error('Failed marking notification read', error);
         }

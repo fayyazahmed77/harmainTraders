@@ -134,11 +134,17 @@ class GuestController extends Controller
         $account = Account::where('guest_token', $token)->firstOrFail();
         
         $request->validate([
+            'email' => 'nullable|email|max:255',
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|exists:items,id',
             'items.*.qty_carton' => 'required|numeric|min:0',
             'items.*.qty_pcs' => 'required|numeric|min:0',
         ]);
+
+        if ($request->filled('email')) {
+            $account->email = $request->email;
+            $account->save();
+        }
 
         DB::beginTransaction();
         try {
@@ -245,6 +251,9 @@ class GuestController extends Controller
             }
 
             DB::commit();
+
+            event(new \App\Events\GuestOrderPlaced($sale));
+
             return response()->json(['success' => true, 'invoice' => $invoiceNo]);
         } catch (\Exception $e) {
             DB::rollBack();

@@ -26,6 +26,7 @@ class AccessRequest extends Model
         'status',
         'current_step',
         'sla_due_at',
+        'sla_breached',
         'ip_address',
         'user_agent',
         'metadata',
@@ -40,6 +41,7 @@ class AccessRequest extends Model
         'metadata' => 'array',
         'sla_due_at' => 'datetime',
         'current_step' => 'integer',
+        'sla_breached' => 'boolean',
     ];
 
     /**

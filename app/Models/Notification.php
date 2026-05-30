@@ -23,6 +23,7 @@ class Notification extends LaravelDatabaseNotification
         'data' => 'array',
         'read_at' => 'datetime',
         'expires_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     /**

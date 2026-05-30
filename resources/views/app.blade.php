@@ -39,6 +39,39 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
 
+    {{-- Dynamic broadcast config --}}
+    @php
+        try {
+            $settings = \App\Models\SiteSetting::first();
+            $broadcastConfig = [
+                'driver' => $settings->broadcast_driver ?? 'reverb',
+                'pusher' => [
+                    'key' => $settings->pusher_app_key ?? env('PUSHER_APP_KEY'),
+                    'cluster' => $settings->pusher_app_cluster ?? env('PUSHER_APP_CLUSTER', 'mt1'),
+                ],
+                'reverb' => [
+                    'key' => env('REVERB_APP_KEY', 'local'),
+                    'host' => env('REVERB_HOST', '127.0.0.1'),
+                    'port' => env('REVERB_PORT', 8080),
+                    'scheme' => env('REVERB_SCHEME', 'http'),
+                ]
+            ];
+        } catch (\Exception $e) {
+            $broadcastConfig = [
+                'driver' => 'reverb',
+                'pusher' => [],
+                'reverb' => []
+            ];
+        }
+    @endphp
+    <meta id="broadcast-config" data-config="{{ json_encode($broadcastConfig) }}">
+    <script>
+        (function() {
+            var el = document.getElementById('broadcast-config');
+            window.broadcastConfig = el ? JSON.parse(el.getAttribute('data-config') || '{}') : {};
+        })();
+    </script>
+
     @routes
     @viteReactRefresh
     @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])

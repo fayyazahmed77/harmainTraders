@@ -24,6 +24,11 @@ class SiteSetting extends Model
         'mail_from_address',
         'mail_from_name',
         'notification_settings',
+        'broadcast_driver',
+        'pusher_app_id',
+        'pusher_app_key',
+        'pusher_app_secret',
+        'pusher_app_cluster',
     ];
 
     protected $casts = [

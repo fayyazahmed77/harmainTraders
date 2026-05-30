@@ -6,6 +6,7 @@ use App\Events\AccessRequestCreated;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Models\Role;
 
 class StoreNotifications implements ShouldQueue
 {
@@ -40,7 +41,7 @@ class StoreNotifications implements ShouldQueue
         ];
 
         // Fetch all administrator users safely by checking existing roles first
-        $existingRoles = \Spatie\Permission\Models\Role::pluck('name')->toArray();
+        $existingRoles = Role::pluck('name')->toArray();
         $adminRoles = array_intersect(['Admin', 'Super Admin'], $existingRoles);
         $admins = !empty($adminRoles) ? \App\Models\User::role($adminRoles)->get() : collect();
 

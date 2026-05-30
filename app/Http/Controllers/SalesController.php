@@ -14,7 +14,7 @@ use App\Models\MessageLine;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -351,6 +351,8 @@ class SalesController extends Controller implements HasMiddleware
                     if ($index === 0) $groupId = $payment->id;
                     $payment->update(['group_id' => $groupId]);
                     $createdPayments[] = $payment;
+
+                    event(new \App\Events\PaymentConfirmed($payment));
                 }
 
                 // Distribution Logic
@@ -450,6 +452,11 @@ class SalesController extends Controller implements HasMiddleware
                 \Illuminate\Support\Facades\Log::info("Deducting " . $totalToDeduct . " pcs from item " . $item->id . ". Current total_stock_pcs: " . $item->total_stock_pcs);
                 $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
                 \Illuminate\Support\Facades\Log::info("New stock for item " . $item->id . ": stock_1=" . $item->stock_1 . ", stock_2=" . $item->stock_2);
+
+                $item->refresh();
+                if ($item->total_stock_pcs < ($item->reorder_level ?? 0)) {
+                    event(new \App\Events\LowStockAlert($item));
+                }
             }
 
             DB::commit();
@@ -677,6 +684,8 @@ class SalesController extends Controller implements HasMiddleware
                     if ($index === 0) $groupId = $payment->id;
                     $payment->update(['group_id' => $groupId]);
                     $createdPayments[] = $payment;
+
+                    event(new \App\Events\PaymentConfirmed($payment));
                 }
 
                 // Distribute NEW payments (surplus allocation)
@@ -781,6 +790,11 @@ class SalesController extends Controller implements HasMiddleware
                     $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
                     $totalToDeduct = $it['total_pcs'] + $bonusUnits;
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
+
+                    $item->refresh();
+                    if ($item->total_stock_pcs < ($item->reorder_level ?? 0)) {
+                        event(new \App\Events\LowStockAlert($item));
+                    }
                 }
             }
 
@@ -920,6 +934,11 @@ class SalesController extends Controller implements HasMiddleware
                     $totalToDeduct = $item->total_pcs + $bonusUnits;
 
                     $product->updateStockFromPcs($product->total_stock_pcs - $totalToDeduct);
+
+                    $product->refresh();
+                    if ($product->total_stock_pcs < ($product->reorder_level ?? 0)) {
+                        event(new \App\Events\LowStockAlert($product));
+                    }
                 }
             }
 

@@ -40,4 +40,23 @@ class Saleman extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    /**
+     * Resolve the salesman's email address.
+     *
+     * @return string|null
+     */
+    public function getEmail()
+    {
+        $user = User::role(['Sales man', 'salesman'])->where('name', $this->name)->first();
+        if ($user) {
+            return $user->email;
+        }
+
+        if ($this->creator) {
+            return $this->creator->email;
+        }
+
+        return 'salesman@harmaintraders.com';
+    }
 }
