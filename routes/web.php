@@ -145,7 +145,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [FirmController::class, 'index'])->name('firms.index');
         Route::get('/create', [FirmController::class, 'create'])->name('firms.create');
         Route::post('/', [FirmController::class, 'store'])->name('firms.store');
-        Route::get('/{firm}', [FirmController::class, 'show'])->name('firms.show');
+        Route::get('/{firm}', [FirmController::class, 'show']);
         Route::get('/{firm}/edit', [FirmController::class, 'edit'])->name('firms.edit');
         Route::get('/{firm}/show', [FirmController::class, 'show'])->name('firms.show');
         Route::put('/{firm}', [FirmController::class, 'update'])->name('firms.update');
@@ -495,7 +495,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Payment Routes (Additional)
-    Route::get('/payment', [App\Http\Controllers\PaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payment', [App\Http\Controllers\PaymentController::class, 'index'])->name('payment.index');
     Route::get('/payment/create', [App\Http\Controllers\PaymentController::class, 'create'])->name('payment.create');
     Route::post('/payment/store', [App\Http\Controllers\PaymentController::class, 'store'])->name('payment.store');
     Route::get('/payment/unpaid-bills', [App\Http\Controllers\PaymentController::class, 'getUnpaidBills'])->name('payment.unpaid-bills');

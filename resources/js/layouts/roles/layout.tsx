@@ -1,11 +1,9 @@
 import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { type RoleItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { Users, FolderLock, BookKey, User, ChevronRight } from 'lucide-react';
+import { Users, FolderLock, BookKey, User } from 'lucide-react';
 import { motion } from "framer-motion";
 
 const sidebarNavItems: RoleItem[] = [
@@ -48,8 +46,8 @@ export default function RolesLayout({ children }: PropsWithChildren) {
                     className="flex flex-col md:flex-row md:items-end justify-between gap-4 flex-shrink-0"
                 >
                     <Heading
-                        title="Roles & Permissions"
-                        description="Configure system access controls and staff authorization layers"
+                        title="Roles & Permission"
+                        description="Manage your Staff Roles and Permissions"
                     />
                 </motion.div>
 
@@ -67,17 +65,16 @@ export default function RolesLayout({ children }: PropsWithChildren) {
                                         key={`${item.href}-${index}`}
                                         href={item.href}
                                         className={cn(
-                                            'group flex items-center justify-between px-3 py-2.5 text-sm font-bold uppercase tracking-tighter transition-all rounded-lg',
+                                            'group flex items-center justify-between px-3 py-2.5 text-sm font-semibold transition-all rounded-lg',
                                             isActive
-                                                ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-l-2 border-orange-500'
+                                                ? 'bg-primary/10 text-primary'
                                                 : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
                                         )}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-orange-500" : "text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200")} />
+                                            <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-primary" : "text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200")} />
                                             <span>{item.title}</span>
                                         </div>
-                                        {isActive && <ChevronRight className="w-4 h-4" />}
                                     </Link>
                                 );
                             })}
@@ -96,13 +93,6 @@ export default function RolesLayout({ children }: PropsWithChildren) {
                     </main>
                 </div>
             </div>
-
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #a5a5a5ff; border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
-            `}</style>
         </div>
     );
 }

@@ -14,7 +14,7 @@ use App\Models\MessageLine;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use Illuminate\Support\Facades\DB;
-use Inertia;
+use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
