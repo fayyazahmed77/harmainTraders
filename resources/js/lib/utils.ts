@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatSafeDate(date: any, formatStr: string = 'dd-MMM-yy', fallback: string = '---') {
+export function formatSafeDate(date: any, formatStr: string = 'dd MMM yy', fallback: string = '---') {
     if (!date) return fallback;
     const d = new Date(date);
     return isValid(d) ? format(d, formatStr) : fallback;

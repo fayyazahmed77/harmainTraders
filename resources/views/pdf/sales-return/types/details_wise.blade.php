@@ -19,7 +19,7 @@
         <tr>
             <td style="text-align: center; font-size: 7px; border: 0.5px solid #eee;">{{ $index + 1 }}</td>
             <td style="font-size: 8px; font-weight: bold; border: 0.5px solid #eee;">{{ $row['voucher_no'] }}</td>
-            <td style="font-size: 7px; border: 0.5px solid #eee;">{{ date('d-m-Y', strtotime($row['date'])) }}</td>
+            <td style="font-size: 7px; border: 0.5px solid #eee;">{{ strtoupper(date('d M y', strtotime($row['date']))) }}</td>
             <td style="border: 0.5px solid #eee; padding: 2px 4px;">
                 <div style="font-size: 8px; font-weight: bold; text-transform: uppercase;">{{ $row['customer_name'] }}</div>
                 <div style="font-size: 7px; color: #666; text-transform: uppercase;">{{ $row['product_name'] }}</div>

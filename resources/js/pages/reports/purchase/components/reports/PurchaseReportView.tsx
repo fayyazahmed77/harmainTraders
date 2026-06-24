@@ -297,8 +297,8 @@ export function PurchaseReportView({ data, type, criteria, onExport }: PurchaseR
                         <p className="text-[9px] font-bold text-text-muted uppercase mt-1 tracking-widest">{criteria}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                        <AnalyticsButton onClick={() => setIsAnalyticsOpen(true)} />
-                        <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" />
+                        {/* <AnalyticsButton onClick={() => setIsAnalyticsOpen(true)} />
+                        <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" /> */}
 
                         {/* Premium Sorting Dropdown */}
                         <Select value={sortBy} onValueChange={setSortBy}>

@@ -16,8 +16,11 @@ class TwoFactorMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-
-        if (auth()->check() && $user->two_factor_code) {
+        
+        $settings = \App\Models\SiteSetting::get();
+        $is2faEnabled = $settings ? ($settings->two_factor_enabled ?? true) : true;
+ 
+        if ($is2faEnabled && $user && $user->two_factor_code) {
             if (!$request->is('verify-2fa*') && !$request->is('logout')) {
                 return redirect()->route('2fa.index');
             }

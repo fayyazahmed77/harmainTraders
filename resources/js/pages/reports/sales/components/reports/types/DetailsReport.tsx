@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, formatSafeDate } from '@/lib/utils';
 
 interface Props {
     data: any[];
@@ -8,6 +8,10 @@ interface Props {
 }
 
 export default function DetailsReport({ data, formatCurrency }: Props) {
+    const totalQtyFull = data.reduce((sum, row) => sum + (Number(row.qty_full) || 0), 0);
+    const totalQtyPcs = data.reduce((sum, row) => sum + (Number(row.qty_pcs) || 0), 0);
+    const totalAmount = data.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+
     return (
         <>
             <TableHeader>
@@ -32,7 +36,7 @@ export default function DetailsReport({ data, formatCurrency }: Props) {
                                 {row.invoice}
                             </span>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{row.date}</TableCell>
+                        <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{formatSafeDate(row.date).toUpperCase()}</TableCell>
                         <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{row.customer_name}</TableCell>
                         <TableCell className="py-4 px-4 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase italic">{row.product_name}</TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{row.qty_full}</TableCell>
@@ -41,6 +45,15 @@ export default function DetailsReport({ data, formatCurrency }: Props) {
                         <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(row.amount)}</TableCell>
                     </TableRow>
                 ))}
+                {data.length > 0 && (
+                    <TableRow className="bg-surface-1/50 border-t-2 border-text-primary hover:bg-surface-1/50 font-black">
+                        <TableCell colSpan={5} className="py-4 px-6 text-[10px] font-black text-text-primary uppercase tracking-widest italic">Total</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{totalQtyFull}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{totalQtyPcs}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-text-muted text-[11px] tabular-nums"></TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(totalAmount)}</TableCell>
+                    </TableRow>
+                )}
             </TableBody>
         </>
     );

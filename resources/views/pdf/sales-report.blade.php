@@ -134,7 +134,7 @@
         <tbody>
             @foreach($purchases as $purchase)
             <tr>
-                <td>{{ date('d M Y', strtotime($purchase->date)) }}</td>
+                <td>{{ strtoupper(date('d M y', strtotime($purchase->date))) }}</td>
                 <td>{{ $purchase->invoice }}</td>
                 <td>{{ $purchase->supplier_name }}</td>
                 <td class="text-right">{{ $purchase->no_of_items }}</td>

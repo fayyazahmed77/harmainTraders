@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "@inertiajs/react";
 import { toast } from "sonner";
 import { route } from 'ziggy-js';
@@ -52,6 +53,7 @@ interface SiteSetting {
   pusher_app_key?: string;
   pusher_app_secret?: string;
   pusher_app_cluster?: string;
+  two_factor_enabled?: boolean;
 }
 
 interface Props {
@@ -94,10 +96,11 @@ export default function SystemConfiguration({ settings }: Props) {
     pusher_app_key: settings.pusher_app_key || "",
     pusher_app_secret: settings.pusher_app_secret || "",
     pusher_app_cluster: settings.pusher_app_cluster || "",
+    two_factor_enabled: settings.two_factor_enabled !== undefined ? settings.two_factor_enabled : true,
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState<"broadcast" | "notifications">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "notifications" | "security">("broadcast");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +190,20 @@ export default function SystemConfiguration({ settings }: Props) {
               <div className="flex items-center gap-2">
                 <Bell size={14} />
                 Notification Setup
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("security")}
+              className={cn(
+                "px-5 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all duration-200 cursor-pointer",
+                activeTab === "security"
+                  ? "border-orange-500 text-orange-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <Shield size={14} />
+                Security Setup
               </div>
             </button>
           </div>
@@ -384,6 +401,35 @@ export default function SystemConfiguration({ settings }: Props) {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeTab === "security" && (
+              <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-950/20">
+                <CardHeader>
+                  <CardTitle className="text-md font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                    <Shield size={16} className="text-orange-500" />
+                    Security Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-0">
+                  <div className="flex items-center justify-between p-5 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm transition-all duration-200 hover:border-zinc-300 dark:hover:border-zinc-700">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-bold text-zinc-900 dark:text-zinc-200">
+                        Two-Factor Authentication (2FA)
+                      </Label>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-lg leading-relaxed">
+                        Enforce a dynamic security verification check. When enabled, users will receive a secure authorization code via email upon login.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center p-2">
+                      <Switch
+                        checked={data.two_factor_enabled}
+                        onCheckedChange={(checked) => setData("two_factor_enabled", checked)}
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

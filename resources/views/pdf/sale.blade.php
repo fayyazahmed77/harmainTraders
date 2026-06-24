@@ -467,11 +467,11 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Invoice Date :</td>
-                        <td class="detail-value-cell">{{ \Carbon\Carbon::parse($sale->date)->format('d-M-y') }}</td>
+                        <td class="detail-value-cell">{{ strtoupper(\Carbon\Carbon::parse($sale->date)->format('d M y')) }}</td>
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Due Date :</td>
-                        <td class="detail-value-cell">{{ \Carbon\Carbon::parse($sale->date)->addDays((int)($sale->customer->aging_days ?? 0))->format('d-M-y') }}</td>
+                        <td class="detail-value-cell">{{ strtoupper(\Carbon\Carbon::parse($sale->date)->addDays((int)($sale->customer->aging_days ?? 0))->format('d M y')) }}</td>
                     </tr>
                 </table>
             </div>

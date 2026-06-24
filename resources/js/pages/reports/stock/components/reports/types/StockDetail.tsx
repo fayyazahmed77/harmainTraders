@@ -39,7 +39,7 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                     {data.map((row, idx) => (
                         <TableRow key={idx} className="border-b border-border/10 hover:bg-surface-1/30 transition-all duration-200 group">
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase tabular-nums">
-                                {formatSafeDate(row.date)}
+                                {formatSafeDate(row.date).toUpperCase()}
                             </TableCell>
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase italic tabular-nums">
                                 {row.voucher_no}

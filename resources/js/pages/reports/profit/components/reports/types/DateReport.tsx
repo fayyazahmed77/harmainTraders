@@ -30,7 +30,7 @@ const DateReport: React.FC<Props> = ({ data, formatCurrency }) => {
                 {data.map((row, idx) => (
                     <TableRow key={idx} className="border-border/30 hover:bg-surface-1 transition-colors group">
                         <TableCell className="text-[10px] font-bold text-text-primary tabular-nums">
-                            {row.date ? format(new Date(row.date), 'MMM dd, yyyy') : '---'}
+                            {row.date ? format(new Date(row.date), 'dd MMM yy').toUpperCase() : '---'}
                         </TableCell>
                         <TableCell className="text-[10px] font-bold text-text-primary/70 text-right tabular-nums">{formatCurrency(row.revenue)}</TableCell>
                         <TableCell className="text-[10px] font-bold text-text-primary/70 text-right tabular-nums">{formatCurrency(row.cogs)}</TableCell>

@@ -249,17 +249,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                                 {/* Sidebar Settings */}
                                 <div className="bg-surface-1/50 p-3 rounded-xl border border-border/40 space-y-4 shadow-sm flex flex-col justify-between">
                                      <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <h4 className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] border-b border-border/20 pb-1">Output Mode</h4>
-                                            <RadioGroup value={data.printOn} onValueChange={(v: any) => handleChange('printOn', v)} className="flex flex-col gap-1.5 pt-1">
-                                                {['pdf', 'screen', 'printer'].map(opt => (
-                                                    <div key={opt} className="flex items-center gap-2">
-                                                        <RadioGroupItem value={opt} id={`print-${opt}`} className="h-3 w-3 border-border" />
-                                                        <label htmlFor={`print-${opt}`} className="text-[10px] font-bold text-text-secondary uppercase cursor-pointer">{opt}</label>
-                                                    </div>
-                                                ))}
-                                            </RadioGroup>
-                                        </div>
+
 
                                         <div className="space-y-2">
                                             <h4 className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] border-b border-border/20 pb-1">Ledger Logic</h4>

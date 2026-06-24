@@ -74,7 +74,7 @@ export function ReceivingDetailReportView({ data }: ReceivingDetailReportViewPro
                                     </TableCell>
                                     <TableCell className="py-1.5 px-2">
                                         <span className="text-[10px] font-bold text-text-muted tracking-tight">
-                                            {formatSafeDate(item.date, 'dd MMM yy')}
+                                            {formatSafeDate(item.date, 'dd MMM yy').toUpperCase()}
                                         </span>
                                     </TableCell>
                                     <TableCell className="py-1.5 px-2">

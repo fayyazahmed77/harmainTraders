@@ -1,5 +1,6 @@
 import React from 'react';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
+import { formatSafeDate } from '@/lib/utils';
 
 export const DateReport = ({ data, formatCurrency }: { data: any[], formatCurrency: (v: number) => string }) => {
     const totals = data.reduce((acc, row) => ({
@@ -19,7 +20,7 @@ export const DateReport = ({ data, formatCurrency }: { data: any[], formatCurren
             <TableBody>
                 {data.map((row, i) => (
                     <TableRow key={i} className="border-border/40 group hover:bg-rose-500/5">
-                        <TableCell className="text-[10px] font-black text-text-primary uppercase tracking-wider">{row.date_display || row.date}</TableCell>
+                        <TableCell className="text-[10px] font-black text-text-primary uppercase tracking-wider">{formatSafeDate(row.date_display || row.date).toUpperCase()}</TableCell>
                         <TableCell className="text-[10px] font-bold text-right tabular-nums text-text-secondary">{row.total_bills}</TableCell>
                         <TableCell className="text-[11px] font-black text-right tabular-nums text-rose-600 dark:text-rose-400">{formatCurrency(row.total_amount)}</TableCell>
                     </TableRow>

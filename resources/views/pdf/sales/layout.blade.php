@@ -71,6 +71,14 @@
     <div class="footer">
         GENERATE AT: {{ date('d M Y H:i:s') }} | HARMAIN TRADERS PLATFORM
     </div>
+    
+    @if(isset($is_print_mode) && $is_print_mode)
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+    @endif
 </body>
 </html>
 @endif

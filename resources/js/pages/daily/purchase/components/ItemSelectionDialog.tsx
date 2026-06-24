@@ -83,6 +83,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
     const [dialogBonusFull, setDialogBonusFull] = useState<number>(0);
     const [dialogBonusPcs, setDialogBonusPcs] = useState<number>(0);
     const [dialogRate, setDialogRate] = useState<number>(0);
+    const [dialogDiscount, setDialogDiscount] = useState<number>(0);
 
     const handleItemClick = (item: Item) => {
         setSelectedItemForQty(item);
@@ -94,11 +95,13 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
             setDialogBonusFull(toNumber(existing.bonus_full));
             setDialogBonusPcs(toNumber(existing.bonus_pcs));
             setDialogRate(toNumber(existing.rate));
+            setDialogDiscount(toNumber(existing.discPercent));
         } else {
             setDialogFull(0);
             setDialogPcs(0);
             setDialogBonusFull(0);
             setDialogBonusPcs(0);
+            setDialogDiscount(toNumber(item.discount || 0));
             
             // Priority: item.last_purchase_rate > item.trade_price
             const defaultRate = toNumber(item.last_purchase_rate) > 0 
@@ -122,6 +125,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                 bonus_full: dialogBonusFull,
                 bonus_pcs: dialogBonusPcs,
                 rate: dialogRate,
+                discPercent: dialogDiscount,
                 amount: 0 // Will be recalculated by parent
             } : r));
         } else {
@@ -135,7 +139,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                     bonus_full: dialogBonusFull,
                     bonus_pcs: dialogBonusPcs,
                     rate: dialogRate,
-                    discPercent: toNumber(selectedItemForQty.discount),
+                    discPercent: dialogDiscount,
                     trade_price: toNumber(selectedItemForQty.trade_price),
                     amount: 0
                 } : r));
@@ -150,7 +154,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                         bonus_full: dialogBonusFull,
                         bonus_pcs: dialogBonusPcs,
                         rate: dialogRate,
-                        discPercent: toNumber(selectedItemForQty.discount),
+                        discPercent: dialogDiscount,
                         trade_price: toNumber(selectedItemForQty.trade_price),
                         amount: 0,
                         last_purchase_rate: 0
@@ -345,6 +349,16 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         value={dialogRate || ""}
                                         onChange={e => setDialogRate(toNumber(e.target.value))}
                                         className="w-28 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all shadow-inner"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1 items-center">
+                                    <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Discount (%)</span>
+                                    <Input
+                                        type="number"
+                                        value={dialogDiscount || ""}
+                                        onChange={e => setDialogDiscount(toNumber(e.target.value))}
+                                        className="w-24 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all shadow-inner"
                                     />
                                 </div>
 

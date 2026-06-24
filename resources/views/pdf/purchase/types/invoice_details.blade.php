@@ -16,7 +16,7 @@
         <tr class="total-row" style="background-color: #f8fafc;">
             <th colspan="10" style="text-align: left; padding: 6px 10px; font-size: 9px;">
                 INV #: <span class="font-black" style="color: #059669;">{{ $invoice }}</span> | 
-                DATE: <span class="font-bold">{{ \Carbon\Carbon::parse($firstItem['date'])->format('d-M-Y') }}</span> | 
+                DATE: <span class="font-bold">{{ strtoupper(\Carbon\Carbon::parse($firstItem['date'])->format('d M y')) }}</span> | 
                 PARTY: <span class="uppercase font-black">{{ $firstItem['account_name'] }}</span>
             </th>
             <th class="text-right" style="padding-right: 10px; font-size: 10px;">

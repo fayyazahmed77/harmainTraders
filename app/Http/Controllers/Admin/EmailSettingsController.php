@@ -51,6 +51,7 @@ class EmailSettingsController extends Controller
             'pusher_app_key' => 'nullable|string',
             'pusher_app_secret' => 'nullable|string',
             'pusher_app_cluster' => 'nullable|string',
+            'two_factor_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->hasFile('logo')) {

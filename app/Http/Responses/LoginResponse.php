@@ -56,9 +56,21 @@ class LoginResponse implements LoginResponseContract
             }
         }
 
-        // Check if 2FA is enabled or if we want it for everyone (let's do everyone for now as per "Elite" request)
-        // or just for Admins? Let's do it for all for maximum security.
-        
+        // Check if 2FA is enabled globally
+        $settings = \App\Models\SiteSetting::get();
+        if ($settings && isset($settings->two_factor_enabled) && !$settings->two_factor_enabled) {
+            $user->resetTwoFactorCode();
+            \App\Services\ActivityLogger::log('login', 'Auth', 'User logged in (2FA disabled dynamically)');
+            
+            if ($user->hasRole('investor') || $user->hasRole('Investor')) {
+                return redirect()->intended('/investor/dashboard');
+            }
+            if ($user->hasRole('Sales man') || $user->hasRole('salesman')) {
+                return redirect()->intended('/salesman/dashboard');
+            }
+            return redirect()->intended('/dashboard');
+        }
+
         $user->generateTwoFactorCode();
         
         try {

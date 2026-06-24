@@ -16,7 +16,7 @@ class ReportBuilder
     /**
      * Generate Account Ledger with running balance.
      */
-    public function accountLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50)
+    public function accountLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50, $params = [])
     {
         if ($accountId === 'ALL') {
              return [
@@ -43,16 +43,42 @@ class ReportBuilder
         $orientation = $account->purchase == 1 ? 'cr' : 'dr';
 
         // 1. Calculate Opening Balance before $fromDate
-        $openingBalance = $this->calculateOpeningBalance($accountId, $fromDate, $orientation);
+        $openingBalance = $this->calculateOpeningBalance($accountId, $fromDate, $orientation, $params);
 
         // 2. Fetch Transactions within range
         $sales = Sales::where('customer_id', $accountId)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+            $sales->where('firm_id', $params['firmId']);
+        }
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $sales->where('salesman_id', $params['salemanId']);
+        }
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $sales->where(function($q) use ($params) {
+                $q->where('invoice', 'like', "%{$params['remarks']}%")
+                  ->orWhere('id', 'like', "%{$params['remarks']}%");
+            });
+        }
+        $sales->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchases = Purchase::where('supplier_id', $accountId)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Purchase' as type, id, date, CONCAT('Purchase #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+            $purchases->where('firm_id', $params['firmId']);
+        }
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $purchases->where('salesman_id', $params['salemanId']);
+        }
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $purchases->where(function($q) use ($params) {
+                $q->where('invoice', 'like', "%{$params['remarks']}%")
+                  ->orWhere('id', 'like', "%{$params['remarks']}%");
+            });
+        }
+        $purchases->selectRaw("'Purchase' as type, id, date, CONCAT('Purchase #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         // Determine which column to query in payments table
         $isAsset = in_array($account->type, [1, 2, 14]);
@@ -62,6 +88,19 @@ class ReportBuilder
         $payments = Payment::where($paymentColumn, $accountId)
             ->whereBetween('date', [$fromDate, $toDate])
             ->where('cheque_status', '!=', 'Canceled');
+
+        if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+            $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
+            $payments->where($otherCol, $params['contraId']);
+        }
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $payments->where(function($q) use ($params) {
+                $q->where('remarks', 'like', "%{$params['remarks']}%")
+                  ->orWhere('cheque_no', 'like', "%{$params['remarks']}%")
+                  ->orWhere('voucher_no', 'like', "%{$params['remarks']}%")
+                  ->orWhere('id', 'like', "%{$params['remarks']}%");
+            });
+        }
 
         if ($isAsset) {
             $payments->where(function($q) {
@@ -80,19 +119,48 @@ class ReportBuilder
         }
 
         $salesReturns = SalesReturn::where('customer_id', $accountId)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $salesReturns->where('salesman_id', $params['salemanId']);
+        }
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $salesReturns->where(function($q) use ($params) {
+                $q->where('remarks', 'like', "%{$params['remarks']}%")
+                  ->orWhere('invoice', 'like', "%{$params['remarks']}%")
+                  ->orWhere('id', 'like', "%{$params['remarks']}%");
+            });
+        }
+        $salesReturns->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchaseReturns = PurchaseReturn::where('supplier_id', $accountId)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $purchaseReturns->where('salesman_id', $params['salemanId']);
+        }
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $purchaseReturns->where(function($q) use ($params) {
+                $q->where('remarks', 'like', "%{$params['remarks']}%")
+                  ->orWhere('invoice', 'like', "%{$params['remarks']}%")
+                  ->orWhere('id', 'like', "%{$params['remarks']}%");
+            });
+        }
+        $purchaseReturns->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $query = $sales->unionAll($purchases)
             ->unionAll($payments)
             ->unionAll($salesReturns)
-            ->unionAll($purchaseReturns)
-            ->orderBy('date')
-            ->orderBy('created_at');
+            ->unionAll($purchaseReturns);
+
+        if (isset($params['sortBy'])) {
+            if ($params['sortBy'] === 'ID') {
+                $query->orderBy('id', 'asc');
+            } elseif ($params['sortBy'] === 'REMARKS') {
+                $query->orderBy('description', 'asc');
+            }
+        }
+        $query->orderBy('date', 'asc')->orderBy('created_at', 'asc');
 
         $transactions = $query->paginate($perPage);
 
@@ -142,12 +210,10 @@ class ReportBuilder
             'from_date' => $fromDate,
             'to_date' => $toDate
         ];
-    }
-
-    public function accountDetailLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50)
+    }    public function accountDetailLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50, $params = [])
     {
         // Get the base paginated ledger and totals
-        $base = $this->accountLedger($accountId, $fromDate, $toDate, $perPage);
+        $base = $this->accountLedger($accountId, $fromDate, $toDate, $perPage, $params);
         
         $transactions = $base['data']->getCollection();
         
@@ -246,21 +312,50 @@ class ReportBuilder
         return $debit - $credit;
     }
 
-    private function calculateOpeningBalance($accountId, $date, $orientation = 'dr')
+    private function calculateOpeningBalance($accountId, $date, $orientation = 'dr', $params = [])
     {
         $account = Account::find($accountId);
         $manualOpening = $account->opening_balance ?? 0;
         
         // Sum all transactions before $date
-        $sales = Sales::where('customer_id', $accountId)->where('date', '<', $date)->sum('net_total');
-        $purchases = Purchase::where('supplier_id', $accountId)->where('date', '<', $date)->sum('net_total');
+        $salesQuery = Sales::where('customer_id', $accountId)->where('date', '<', $date);
+        if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+            $salesQuery->where('firm_id', $params['firmId']);
+        }
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $salesQuery->where('salesman_id', $params['salemanId']);
+        }
+        $sales = $salesQuery->sum('net_total');
+
+        $purchasesQuery = Purchase::where('supplier_id', $accountId)->where('date', '<', $date);
+        if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+            $purchasesQuery->where('firm_id', $params['firmId']);
+        }
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $purchasesQuery->where('salesman_id', $params['salemanId']);
+        }
+        $purchases = $purchasesQuery->sum('net_total');
 
         $isAsset = in_array($account->type, [1, 2, 14]);
         $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
 
         $pQuery = Payment::where($paymentColumn, $accountId)->where('date', '<', $date)->where('cheque_status', '!=', 'Canceled');
-        $salesReturns = SalesReturn::where('customer_id', $accountId)->where('date', '<', $date)->sum('net_total');
-        $purchaseReturns = PurchaseReturn::where('supplier_id', $accountId)->where('date', '<', $date)->sum('net_total');
+        if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+            $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
+            $pQuery->where($otherCol, $params['contraId']);
+        }
+
+        $salesReturnsQuery = SalesReturn::where('customer_id', $accountId)->where('date', '<', $date);
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $salesReturnsQuery->where('salesman_id', $params['salemanId']);
+        }
+        $salesReturns = $salesReturnsQuery->sum('net_total');
+
+        $purchaseReturnsQuery = PurchaseReturn::where('supplier_id', $accountId)->where('date', '<', $date);
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $purchaseReturnsQuery->where('salesman_id', $params['salemanId']);
+        }
+        $purchaseReturns = $purchaseReturnsQuery->sum('net_total');
 
         if ($isAsset) {
             $pQuery->where(function($q) {
@@ -281,6 +376,46 @@ class ReportBuilder
         } else {
             return $manualOpening + ($debit - $credit);
         }
+    }
+
+    /**
+     * Apply standard filters to an Account query.
+     */
+    public function applyAccountFilters($query, $params)
+    {
+        if (isset($params['areaId']) && $params['areaId'] !== 'ALL') {
+            $query->where('area_id', $params['areaId']);
+        } elseif (isset($params['area_id']) && $params['area_id'] !== 'ALL') {
+            $query->where('area_id', $params['area_id']);
+        }
+
+        if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
+            $query->where('saleman_id', $params['salemanId']);
+        } elseif (isset($params['saleman_id']) && $params['saleman_id'] !== 'ALL') {
+            $query->where('saleman_id', $params['saleman_id']);
+        }
+
+        if (isset($params['subareaId']) && $params['subareaId'] !== 'ALL') {
+            $query->where('subarea_id', $params['subareaId']);
+        } elseif (isset($params['subarea_id']) && $params['subarea_id'] !== 'ALL') {
+            $query->where('subarea_id', $params['subarea_id']);
+        }
+
+        if (isset($params['type']) && $params['type'] !== 'ALL') {
+            $query->where('type', $params['type']);
+        }
+
+        if (isset($params['noteHead']) && $params['noteHead'] !== 'ALL') {
+            $query->where('note_head', $params['noteHead']);
+        }
+
+        if (isset($params['nature']) && $params['nature'] !== 'ALL') {
+            $query->where('category', $params['nature']);
+        } elseif (isset($params['category']) && $params['category'] !== 'ALL') {
+            $query->where('category', $params['category']);
+        }
+
+        return $query;
     }
 
     // Placeholder for other methods
@@ -852,7 +987,6 @@ class ReportBuilder
             ->orderByDesc('total')
             ->limit(10)
             ->get();
-
         return [
             'summary' => [
                 'total_returns' => $totalReturns,
@@ -867,7 +1001,9 @@ class ReportBuilder
             'from' => $fromDate,
             'to' => $toDate
         ];
-    }    public function accountAging($accountId = 'ALL', $toDate = null)
+    }
+
+    public function accountAging($accountId = 'ALL', $toDate = null, $filters = [])
     {
         $toDate = $toDate ?? date('Y-m-d');
         
@@ -882,14 +1018,16 @@ class ReportBuilder
             $query->where('accounts.id', $accountId);
         }
 
+        $this->applyAccountFilters($query, $filters);
+
         $accounts = $query->get();
 
-        $data = $accounts->map(function ($account) use ($toDate) {
+        $data = $accounts->map(function ($account) use ($toDate, $filters) {
             // Determine the orientation (Customer=dr, Supplier=cr)
             // Priority: if sale=1, treat as Customer (dr)
             $orientation = $account->sale == 1 ? 'dr' : 'cr';
             
-            $netBalance = $this->calculateOpeningBalance($account->id, date('Y-m-d', strtotime($toDate . ' +1 day')), $orientation);
+            $netBalance = $this->calculateOpeningBalance($account->id, date('Y-m-d', strtotime($toDate . ' +1 day')), $orientation, $filters);
 
             // Initial bucket values
             $buckets = [
@@ -912,25 +1050,74 @@ class ReportBuilder
             }
 
             // Fetch transactions for aging
-            $transactions = DB::table(function ($q) use ($account, $toDate) {
-                $q->from('sales')->where('customer_id', $account->id)->where('date', '<=', $toDate)
-                    ->select('date', 'net_total as debit', DB::raw('0 as credit'))
-                    ->unionAll(
-                        DB::table('purchases')->where('supplier_id', $account->id)->where('date', '<=', $toDate)
-                        ->select('date', DB::raw('0 as debit'), 'net_total as credit')
-                    )
-                    ->unionAll(
-                        DB::table('payments')->where('account_id', $account->id)->where('date', '<=', $toDate)
-                        ->select('date', DB::raw('CASE WHEN type = "RECEIPT" THEN 0 ELSE amount END as debit'), DB::raw('CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END as credit'))
-                    )
-                    ->unionAll(
-                        DB::table('sales_returns')->where('customer_id', $account->id)->where('date', '<=', $toDate)
-                        ->select('date', DB::raw('0 as debit'), 'net_total as credit')
-                    )
-                    ->unionAll(
-                        DB::table('purchase_returns')->where('supplier_id', $account->id)->where('date', '<=', $toDate)
-                        ->select('date', 'net_total as debit', DB::raw('0 as credit'))
-                    );
+            $transactions = DB::table(function ($q) use ($account, $toDate, $filters) {
+                $salesQuery = DB::table('sales')
+                    ->where('customer_id', $account->id)
+                    ->where('date', '<=', $toDate);
+                if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+                    $salesQuery->where('firm_id', $filters['firmId']);
+                }
+                if (isset($filters['salemanId']) && $filters['salemanId'] !== 'ALL') {
+                    $salesQuery->where('salesman_id', $filters['salemanId']);
+                }
+                $salesQuery->select('date', 'net_total as debit', DB::raw('0 as credit'));
+
+                $purchasesQuery = DB::table('purchases')
+                    ->where('supplier_id', $account->id)
+                    ->where('date', '<=', $toDate);
+                if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+                    $purchasesQuery->where('firm_id', $filters['firmId']);
+                }
+                if (isset($filters['salemanId']) && $filters['salemanId'] !== 'ALL') {
+                    $purchasesQuery->where('salesman_id', $filters['salemanId']);
+                }
+                $purchasesQuery->select('date', DB::raw('0 as debit'), 'net_total as credit');
+
+                $isAsset = in_array($account->type_id, [1, 2, 14]);
+                $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
+                $paymentsQuery = DB::table('payments')
+                    ->where($paymentColumn, $account->id)
+                    ->where('date', '<=', $toDate)
+                    ->where('cheque_status', '!=', 'Canceled');
+                if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+                    $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
+                    $paymentsQuery->where($otherCol, $filters['contraId']);
+                }
+                if ($isAsset) {
+                    $paymentsQuery->where(function($subQ) {
+                        $subQ->whereNotIn('payment_method', ['Cheque', 'Online'])
+                             ->orWhereNull('cheque_status')
+                             ->orWhere('cheque_status', '')
+                             ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                    });
+                    $paymentsQuery->select('date', DB::raw('CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END as debit'), DB::raw('CASE WHEN type = "RECEIPT" THEN 0 ELSE amount END as credit'));
+                } else {
+                    $paymentsQuery->select('date', DB::raw('CASE WHEN type = "RECEIPT" THEN 0 ELSE (amount + discount) END as debit'), DB::raw('CASE WHEN type = "RECEIPT" THEN (amount + discount) ELSE 0 END as credit'));
+                }
+
+                $salesReturnsQuery = DB::table('sales_returns')
+                    ->where('customer_id', $account->id)
+                    ->where('date', '<=', $toDate);
+                if (isset($filters['salemanId']) && $filters['salemanId'] !== 'ALL') {
+                    $salesReturnsQuery->where('salesman_id', $filters['salemanId']);
+                }
+                $salesReturnsQuery->select('date', DB::raw('0 as debit'), 'net_total as credit');
+
+                $purchaseReturnsQuery = DB::table('purchase_returns')
+                    ->where('supplier_id', $account->id)
+                    ->where('date', '<=', $toDate);
+                if (isset($filters['salemanId']) && $filters['salemanId'] !== 'ALL') {
+                    $purchaseReturnsQuery->where('salesman_id', $filters['salemanId']);
+                }
+                $purchaseReturnsQuery->select('date', 'net_total as debit', DB::raw('0 as credit'));
+
+                $subQuery = $salesQuery->unionAll($purchasesQuery)
+                                     ->unionAll($paymentsQuery)
+                                     ->unionAll($salesReturnsQuery)
+                                     ->unionAll($purchaseReturnsQuery);
+
+                $q->from(DB::raw('(' . $subQuery->toSql() . ') as temp_union'))
+                  ->mergeBindings($subQuery);
             }, 'temp')
             ->orderBy('date', 'desc')
             ->get();
@@ -975,7 +1162,7 @@ class ReportBuilder
         return $data->values();
     }
 
-    public function dueBills($accountId = 'ALL', $toDate = null)
+    public function dueBills($accountId = 'ALL', $toDate = null, $filters = [])
     {
         $toDate = $toDate ?? date('Y-m-d');
         
@@ -991,6 +1178,14 @@ class ReportBuilder
         if (!empty($toDate)) {
              $query->whereDate('date', '<=', $toDate);
         }
+
+        if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+            $query->where('firm_id', $filters['firmId']);
+        }
+
+        $query->whereHas('customer', function($q) use ($filters) {
+            $this->applyAccountFilters($q, $filters);
+        });
         
         $sales = $query->orderBy('date', 'asc')->get();
         
@@ -1411,24 +1606,11 @@ class ReportBuilder
         
         $applyFilters = function($query, $partyRel, $params) {
             $query->whereHas($partyRel, function($q) use ($params) {
-                if (isset($params['areaId']) && $params['areaId'] !== 'ALL') {
-                    $q->where('area_id', $params['areaId']);
+                $subParams = $params;
+                if (isset($subParams['type']) && in_array($subParams['type'], ['Receivable', 'Payable'])) {
+                    unset($subParams['type']);
                 }
-                if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
-                    $q->where('saleman_id', $params['salemanId']);
-                }
-                if (isset($params['subareaId']) && $params['subareaId'] !== 'ALL') {
-                    $q->where('subarea_id', $params['subareaId']);
-                }
-                if (isset($params['type']) && $params['type'] !== 'ALL' && !in_array($params['type'], ['Receivable', 'Payable'])) {
-                    $q->where('type', $params['type']);
-                }
-                if (isset($params['noteHead']) && $params['noteHead'] !== 'ALL') {
-                    $q->where('note_head', $params['noteHead']);
-                }
-                if (isset($params['category']) && $params['category'] !== 'ALL') {
-                    $q->where('category', $params['category']);
-                }
+                $this->applyAccountFilters($q, $subParams);
             });
 
             if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
@@ -1548,23 +1730,23 @@ class ReportBuilder
     /**
      * Generate detailed payment report for a specific period.
      */
-    public function paymentDetail($accountId = null, $fromDate = null, $toDate = null)
+    public function paymentDetail($accountId = null, $fromDate = null, $toDate = null, $filters = [])
     {
-        return $this->processPaymentReport('PAYMENT', $accountId, $fromDate, $toDate);
+        return $this->processPaymentReport('PAYMENT', $accountId, $fromDate, $toDate, $filters);
     }
 
     /**
      * Generate detailed receiving report for a specific period.
      */
-    public function receivingDetail($accountId = null, $fromDate = null, $toDate = null)
+    public function receivingDetail($accountId = null, $fromDate = null, $toDate = null, $filters = [])
     {
-        return $this->processPaymentReport('RECEIPT', $accountId, $fromDate, $toDate);
+        return $this->processPaymentReport('RECEIPT', $accountId, $fromDate, $toDate, $filters);
     }
 
     /**
      * Internal helper to process payment/receipt reports.
      */
-    private function processPaymentReport($type, $accountId = null, $fromDate = null, $toDate = null)
+    private function processPaymentReport($type, $accountId = null, $fromDate = null, $toDate = null, $filters = [])
     {
         $fromDate = $fromDate ?? date('Y-m-d', strtotime('-30 days'));
         $toDate = $toDate ?? date('Y-m-d');
@@ -1577,6 +1759,22 @@ class ReportBuilder
             $query->where('account_id', $accountId);
         }
 
+        $query->whereHas('account', function($q) use ($filters) {
+            $this->applyAccountFilters($q, $filters);
+        });
+
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $query->where('payment_account_id', $filters['contraId']);
+        }
+        if (isset($filters['remarks']) && trim($filters['remarks']) !== '') {
+            $query->where(function($q) use ($filters) {
+                $q->where('remarks', 'like', "%{$filters['remarks']}%")
+                  ->orWhere('cheque_no', 'like', "%{$filters['remarks']}%")
+                  ->orWhere('voucher_no', 'like', "%{$filters['remarks']}%")
+                  ->orWhere('id', 'like', "%{$filters['remarks']}%");
+            });
+        }
+
         $payments = $query->orderBy('date')->orderBy('created_at')->get();
 
         // Efficiently compute balances for all parties involved up to $toDate
@@ -1584,17 +1782,27 @@ class ReportBuilder
         $partyBalances = [];
         
         if (!empty($partyIds)) {
-            $sales = Sales::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate)
-                ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
-                
-            $purchases = Purchase::whereIn('supplier_id', $partyIds)->where('date', '<=', $toDate)
-                ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+            $salesQuery = Sales::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate);
+            $purchasesQuery = Purchase::whereIn('supplier_id', $partyIds)->where('date', '<=', $toDate);
+            
+            if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+                $salesQuery->where('firm_id', $filters['firmId']);
+                $purchasesQuery->where('firm_id', $filters['firmId']);
+            }
 
-            $paymentsRec = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT')
-                ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
-                
-            $paymentsPaid = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT')
-                ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+            $sales = $salesQuery->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
+            $purchases = $purchasesQuery->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+
+            $paymentsRecQuery = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT');
+            $paymentsPaidQuery = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT');
+
+            if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+                $paymentsRecQuery->where('payment_account_id', $filters['contraId']);
+                $paymentsPaidQuery->where('payment_account_id', $filters['contraId']);
+            }
+
+            $paymentsRec = $paymentsRecQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+            $paymentsPaid = $paymentsPaidQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
 
             $salesReturns = SalesReturn::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate)
                 ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
@@ -1676,30 +1884,40 @@ class ReportBuilder
 
         $accountQuery = Account::with('accountType');
         
-        if (!empty($filters['area_id'])) $accountQuery->where('area_id', $filters['area_id']);
-        if (!empty($filters['saleman_id'])) $accountQuery->where('saleman_id', $filters['saleman_id']);
-        if (!empty($filters['category_id'])) $accountQuery->where('category', $filters['category_id']);
+        $this->applyAccountFilters($accountQuery, $filters);
 
         $accounts = $accountQuery->get();
         $accountIds = $accounts->pluck('id')->toArray();
 
         // --- OPENING BALANCES (Before FROM DATE) ---
-        $openSales = Sales::whereIn('customer_id', $accountIds)->where('date', '<', $fromDate)
-            ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
-        $openPurchases = Purchase::whereIn('supplier_id', $accountIds)->where('date', '<', $fromDate)
-            ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+        $openSalesQuery = Sales::whereIn('customer_id', $accountIds)->where('date', '<', $fromDate);
+        $openPurchasesQuery = Purchase::whereIn('supplier_id', $accountIds)->where('date', '<', $fromDate);
         
-        $openPaymentsRec = Payment::whereIn('account_id', $accountIds)->where('date', '<', $fromDate)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
-        $openPaymentsPaid = Payment::whereIn('account_id', $accountIds)->where('date', '<', $fromDate)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+            $openSalesQuery->where('firm_id', $filters['firmId']);
+            $openPurchasesQuery->where('firm_id', $filters['firmId']);
+        }
+        
+        $openSales = $openSalesQuery->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
+        $openPurchases = $openPurchasesQuery->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+        
+        $openPaymentsRecQuery = Payment::whereIn('account_id', $accountIds)->where('date', '<', $fromDate)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+        $openPaymentsPaidQuery = Payment::whereIn('account_id', $accountIds)->where('date', '<', $fromDate)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+        
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $openPaymentsRecQuery->where('payment_account_id', $filters['contraId']);
+            $openPaymentsPaidQuery->where('payment_account_id', $filters['contraId']);
+        }
+
+        $openPaymentsRec = $openPaymentsRecQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        $openPaymentsPaid = $openPaymentsPaidQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
 
         $openSalesReturns = SalesReturn::whereIn('customer_id', $accountIds)->where('date', '<', $fromDate)
             ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
         $openPurchaseReturns = PurchaseReturn::whereIn('supplier_id', $accountIds)->where('date', '<', $fromDate)
             ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
 
-        $openAssetPayments = DB::table('payments')
+        $openAssetPaymentsQuery = DB::table('payments')
             ->whereIn('payment_account_id', $accountIds)->where('date', '<', $fromDate)
             ->where('cheque_status', '!=', 'Canceled')
             ->where(function($q) {
@@ -1707,28 +1925,45 @@ class ReportBuilder
                   ->orWhereNull('cheque_status')
                   ->orWhere('cheque_status', '')
                   ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
-            })
-            ->groupBy('payment_account_id')
+            });
+
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $openAssetPaymentsQuery->where('payment_account_id', $filters['contraId']);
+        }
+
+        $openAssetPayments = $openAssetPaymentsQuery->groupBy('payment_account_id')
             ->selectRaw('payment_account_id, SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts, SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
             ->get()->keyBy('payment_account_id');
 
         // --- PERIOD TRANSACTIONS (Between FROM DATE and TO DATE) ---
-        $rangeSales = Sales::whereIn('customer_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])
-            ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
-        $rangePurchases = Purchase::whereIn('supplier_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])
-            ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+        $rangeSalesQuery = Sales::whereIn('customer_id', $accountIds)->whereBetween('date', [$fromDate, $toDate]);
+        $rangePurchasesQuery = Purchase::whereIn('supplier_id', $accountIds)->whereBetween('date', [$fromDate, $toDate]);
         
-        $rangePaymentsRec = Payment::whereIn('account_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
-        $rangePaymentsPaid = Payment::whereIn('account_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+            $rangeSalesQuery->where('firm_id', $filters['firmId']);
+            $rangePurchasesQuery->where('firm_id', $filters['firmId']);
+        }
+
+        $rangeSales = $rangeSalesQuery->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
+        $rangePurchases = $rangePurchasesQuery->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+        
+        $rangePaymentsRecQuery = Payment::whereIn('account_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+        $rangePaymentsPaidQuery = Payment::whereIn('account_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+        
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $rangePaymentsRecQuery->where('payment_account_id', $filters['contraId']);
+            $rangePaymentsPaidQuery->where('payment_account_id', $filters['contraId']);
+        }
+
+        $rangePaymentsRec = $rangePaymentsRecQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        $rangePaymentsPaid = $rangePaymentsPaidQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
 
         $rangeSalesReturns = SalesReturn::whereIn('customer_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])
             ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
         $rangePurchaseReturns = PurchaseReturn::whereIn('supplier_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])
             ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
 
-        $rangeAssetPayments = DB::table('payments')
+        $rangeAssetPaymentsQuery = DB::table('payments')
             ->whereIn('payment_account_id', $accountIds)->whereBetween('date', [$fromDate, $toDate])
             ->where('cheque_status', '!=', 'Canceled')
             ->where(function($q) {
@@ -1736,8 +1971,13 @@ class ReportBuilder
                   ->orWhereNull('cheque_status')
                   ->orWhere('cheque_status', '')
                   ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
-            })
-            ->groupBy('payment_account_id')
+            });
+
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $rangeAssetPaymentsQuery->where('payment_account_id', $filters['contraId']);
+        }
+
+        $rangeAssetPayments = $rangeAssetPaymentsQuery->groupBy('payment_account_id')
             ->selectRaw('payment_account_id, SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts, SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
             ->get()->keyBy('payment_account_id');
 
@@ -1828,25 +2068,33 @@ class ReportBuilder
             $accountQuery->whereNotIn('type', [1, 2, 14]); // Exclude Cash/Bank/Cheque
         }
 
-        if (!empty($filters['area_id'])) $accountQuery->where('area_id', $filters['area_id']);
-        if (!empty($filters['saleman_id'])) $accountQuery->where('saleman_id', $filters['saleman_id']);
-        if (!empty($filters['category_id'])) $accountQuery->where('category', $filters['category_id']);
+        $this->applyAccountFilters($accountQuery, $filters);
 
         $accounts = $accountQuery->get();
         $accountIds = $accounts->pluck('id')->toArray();
 
         // 2. Aggregate Transactions in bulk to avoid N+1 issues
-        $sales = Sales::whereIn('customer_id', $accountIds)->where('date', '<=', $toDate)
-            ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
-            
-        $purchases = Purchase::whereIn('supplier_id', $accountIds)->where('date', '<=', $toDate)
-            ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+        $salesQuery = Sales::whereIn('customer_id', $accountIds)->where('date', '<=', $toDate);
+        $purchasesQuery = Purchase::whereIn('supplier_id', $accountIds)->where('date', '<=', $toDate);
+        
+        if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+            $salesQuery->where('firm_id', $filters['firmId']);
+            $purchasesQuery->where('firm_id', $filters['firmId']);
+        }
 
-        $paymentsRec = Payment::whereIn('account_id', $accountIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
-            
-        $paymentsPaid = Payment::whereIn('account_id', $accountIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')
-            ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        $sales = $salesQuery->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
+        $purchases = $purchasesQuery->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
+
+        $paymentsRecQuery = Payment::whereIn('account_id', $accountIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+        $paymentsPaidQuery = Payment::whereIn('account_id', $accountIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+
+        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+            $paymentsRecQuery->where('payment_account_id', $filters['contraId']);
+            $paymentsPaidQuery->where('payment_account_id', $filters['contraId']);
+        }
+
+        $paymentsRec = $paymentsRecQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+        $paymentsPaid = $paymentsPaidQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
 
         $salesReturns = SalesReturn::whereIn('customer_id', $accountIds)->where('date', '<=', $toDate)
             ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
@@ -1856,7 +2104,7 @@ class ReportBuilder
 
         $assetPayments = collect([]);
         if (!$excludeAssets) {
-            $assetPayments = DB::table('payments')
+            $assetPaymentsQuery = DB::table('payments')
                 ->whereIn('payment_account_id', $accountIds)
                 ->where('date', '<=', $toDate)
                 ->where('cheque_status', '!=', 'Canceled')
@@ -1865,8 +2113,13 @@ class ReportBuilder
                       ->orWhereNull('cheque_status')
                       ->orWhere('cheque_status', '')
                       ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
-                })
-                ->groupBy('payment_account_id')
+                });
+
+            if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
+                $assetPaymentsQuery->where('payment_account_id', $filters['contraId']);
+            }
+
+            $assetPayments = $assetPaymentsQuery->groupBy('payment_account_id')
                 ->selectRaw('payment_account_id, SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts, SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
                 ->get()->keyBy('payment_account_id');
         }

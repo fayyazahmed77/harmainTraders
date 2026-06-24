@@ -15,6 +15,11 @@ class MessageLine extends Model
         'status',
         'created_by',
     ];
+
+    protected $casts = [
+        'category' => 'array',
+    ];
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

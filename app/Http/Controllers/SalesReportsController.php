@@ -103,6 +103,30 @@ class SalesReportsController extends Controller implements HasMiddleware
         );
     }
 
+    public function print(Request $request)
+    {
+        $params = $request->all();
+        $params['fromDate'] = isset($params['fromDate']) ? Carbon::parse($params['fromDate']) : Carbon::now()->startOfMonth();
+        $params['toDate'] = isset($params['toDate']) ? Carbon::parse($params['toDate']) : Carbon::now();
+
+        $data = $this->salesBuilder->calculate($params['reportId'] ?? 'bill', $params);
+        $reportId = $params['reportId'] ?? 'bill';
+
+        $viewPath = "pdf.sales.types.{$reportId}";
+        if (!view()->exists($viewPath)) {
+            $viewPath = 'pdf.sales.types.default';
+        }
+
+        return view($viewPath, [
+            'data' => $data,
+            'params' => $params,
+            'type' => $reportId,
+            'title' => $this->getReportTitle($reportId),
+            'logo_base64' => $this->getLogoBase64(),
+            'is_print_mode' => true
+        ]);
+    }
+
     private function getLogoBase64()
     {
         $logo_path = public_path('storage/img/favicon.png');

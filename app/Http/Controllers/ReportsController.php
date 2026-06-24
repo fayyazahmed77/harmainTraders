@@ -55,17 +55,19 @@ class ReportsController extends Controller implements HasMiddleware
             $reportId = strtolower($request->input('reportId') ?? $request->input('report_id') ?? 'ledger');
 
             if ($reportId === 'accounts_aging') {
-                $data = $this->reportBuilder->accountAging($accountId, $validated['to'] ?? null);
+                $data = $this->reportBuilder->accountAging($accountId, $validated['to'] ?? null, $request->all());
                 return response()->json(['data' => $data]);
             }
 
             if ($reportId === 'due_bills') {
-                $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null);
+                $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null, $request->all());
                 return response()->json(['data' => $data]);
             }
 
             if ($reportId === 'account_list') {
-                $data = Account::with(['accountType', 'area', 'subarea'])->get();
+                $query = Account::with(['accountType', 'area', 'subarea']);
+                $this->reportBuilder->applyAccountFilters($query, $request->all());
+                $data = $query->get();
                 return response()->json(['data' => $data]);
             }
 
@@ -88,7 +90,8 @@ class ReportsController extends Controller implements HasMiddleware
                 $data = $this->reportBuilder->paymentDetail(
                     $accountId,
                     $validated['from'] ?? null,
-                    $validated['to'] ?? null
+                    $validated['to'] ?? null,
+                    $request->all()
                 );
                 return response()->json(['data' => $data]);
             }
@@ -97,7 +100,8 @@ class ReportsController extends Controller implements HasMiddleware
                 $data = $this->reportBuilder->receivingDetail(
                     $accountId,
                     $validated['from'] ?? null,
-                    $validated['to'] ?? null
+                    $validated['to'] ?? null,
+                    $request->all()
                 );
                 return response()->json(['data' => $data]);
             }
@@ -168,14 +172,16 @@ class ReportsController extends Controller implements HasMiddleware
                     (int)$accountId,
                     $validated['from'] ?? null,
                     $validated['to'] ?? null,
-                    $request->input('per_page', 50)
+                    $request->input('per_page', 50),
+                    $request->all()
                 );
             } else {
                 $data = $this->reportBuilder->accountLedger(
                     (int)$accountId,
                     $validated['from'] ?? null,
                     $validated['to'] ?? null,
-                    $request->input('per_page', 50)
+                    $request->input('per_page', 50),
+                    $request->all()
                 );
             }
 
@@ -206,7 +212,7 @@ class ReportsController extends Controller implements HasMiddleware
         $accountId = $validated['account_id'];
         $account = $accountId !== 'ALL' ? Account::findOrFail($accountId) : null;
         
-        $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null);
+        $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null, $request->all());
 
         $pdfData = [
             'account' => $account,
@@ -230,7 +236,7 @@ class ReportsController extends Controller implements HasMiddleware
         $accountId = $validated['account_id'];
         $account = $accountId !== 'ALL' ? Account::findOrFail($accountId) : null;
         
-        $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null);
+        $data = $this->reportBuilder->dueBills($accountId, $validated['to'] ?? null, $request->all());
 
         $pdfData = [
             'account' => $account,
@@ -261,14 +267,16 @@ class ReportsController extends Controller implements HasMiddleware
                 $accountId,
                 $validated['from'] ?? null,
                 $validated['to'] ?? null,
-                10000
+                10000,
+                $request->all()
             );
         } else {
             $data = $this->reportBuilder->accountLedger(
                 $accountId,
                 $validated['from'] ?? null,
                 $validated['to'] ?? null,
-                10000
+                10000,
+                $request->all()
             );
         }
 
@@ -325,14 +333,16 @@ class ReportsController extends Controller implements HasMiddleware
                 $accountId,
                 $validated['from'] ?? null,
                 $validated['to'] ?? null,
-                10000
+                10000,
+                $request->all()
             );
         } else {
             $data = $this->reportBuilder->accountLedger(
                 $accountId,
                 $validated['from'] ?? null,
                 $validated['to'] ?? null,
-                10000
+                10000,
+                $request->all()
             );
         }
 
@@ -378,7 +388,8 @@ class ReportsController extends Controller implements HasMiddleware
 
         $data = $this->reportBuilder->accountAging(
             $validated['account_id'],
-            $validated['to'] ?? null
+            $validated['to'] ?? null,
+            $request->all()
         );
 
         $firm = Firm::where('defult', 1)->first() ?? Firm::first();
@@ -405,7 +416,8 @@ class ReportsController extends Controller implements HasMiddleware
 
         $data = $this->reportBuilder->accountAging(
             $validated['account_id'],
-            $validated['to'] ?? null
+            $validated['to'] ?? null,
+            $request->all()
         );
 
         $firm = Firm::where('defult', 1)->first() ?? Firm::first();
@@ -731,8 +743,8 @@ class ReportsController extends Controller implements HasMiddleware
         $account = $accountId !== 'ALL' ? Account::findOrFail($accountId) : null;
         
         $data = $type === 'PAYMENT' 
-            ? $this->reportBuilder->paymentDetail($accountId, $validated['from'], $validated['to'])
-            : $this->reportBuilder->receivingDetail($accountId, $validated['from'], $validated['to']);
+            ? $this->reportBuilder->paymentDetail($accountId, $validated['from'], $validated['to'], $request->all())
+            : $this->reportBuilder->receivingDetail($accountId, $validated['from'], $validated['to'], $request->all());
 
         $pdfData = [
             'account' => $account,

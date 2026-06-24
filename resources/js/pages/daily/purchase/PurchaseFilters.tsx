@@ -56,21 +56,32 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
     const [status, setStatus] = useState(filters.status || "all");
     const [search, setSearch] = useState(filters.search || "");
 
+    // Sync local state when server-side props change (e.g. after clearFilters)
+    React.useEffect(() => {
+        setDate({
+            from: filters.start_date ? new Date(filters.start_date) : undefined,
+            to: filters.end_date ? new Date(filters.end_date) : undefined,
+        });
+        setSupplierId(filters.supplier_id || "all");
+        setStatus(filters.status || "all");
+        setSearch(filters.search || "");
+    }, [filters.start_date, filters.end_date, filters.supplier_id, filters.status, filters.search]);
+
+    const buildParams = () => {
+        const params: Record<string, string> = {};
+        if (date?.from) params.start_date = format(date.from, "yyyy-MM-dd");
+        if (date?.to)   params.end_date   = format(date.to,   "yyyy-MM-dd");
+        if (supplierId && supplierId !== "all") params.supplier_id = supplierId;
+        if (status     && status     !== "all") params.status      = status;
+        if (search.trim()) params.search = search.trim();
+        return params;
+    };
+
     const applyFilters = () => {
-        router.get(
-            "/purchase",
-            {
-                start_date: date?.from ? format(date.from, "yyyy-MM-dd") : "",
-                end_date: date?.to ? format(date.to, "yyyy-MM-dd") : "",
-                supplier_id: supplierId === "all" ? "" : supplierId,
-                status: status === "all" ? "" : status,
-                search: search,
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-            }
-        );
+        router.get("/purchase", buildParams(), {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const clearFilters = () => {
@@ -78,7 +89,7 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
         setSupplierId("all");
         setStatus("all");
         setSearch("");
-        router.get("/purchase");
+        router.get("/purchase", {}, { preserveState: false });
     };
 
     return (
@@ -170,10 +181,11 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                     <div className="relative">
                         <Input
                             type="text"
-                            placeholder="Bill No / ID"
+                            placeholder="Bill No / ID / Supplier"
                             className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 focus:border-orange-500/50 focus-visible:ring-0 transition-all text-xs font-bold tabular-nums"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
                         />
                         <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
                     </div>

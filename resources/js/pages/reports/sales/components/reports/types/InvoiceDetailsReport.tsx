@@ -48,7 +48,7 @@ export default function InvoiceDetailsReport({ data, formatCurrency }: Props) {
                                     {(() => {
                                         try {
                                             const d = new Date(inv.invDate);
-                                            return !isNaN(d.getTime()) ? format(d, 'dd-MMMM-yyyy') : 'N/A';
+                                            return !isNaN(d.getTime()) ? format(d, 'dd MMM yy').toUpperCase() : 'N/A';
                                         } catch (e) {
                                             return 'N/A';
                                         }

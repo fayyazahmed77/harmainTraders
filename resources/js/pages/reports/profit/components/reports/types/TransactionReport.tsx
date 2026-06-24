@@ -46,7 +46,7 @@ const TransactionReport: React.FC<Props> = ({ data, formatCurrency }) => {
                         <TableCell className="text-[10px] font-bold text-text-muted tabular-nums">{idx + 1}</TableCell>
                         <TableCell className="text-[10px] font-black text-indigo-600 dark:text-indigo-400">{row.invoice}</TableCell>
                         <TableCell className="text-[10px] items-center font-bold text-text-muted tabular-nums whitespace-nowrap">
-                            {row.date ? format(new Date(row.date), 'dd/MM/yy') : '---'}
+                            {row.date ? format(new Date(row.date), 'dd MMM yy').toUpperCase() : '---'}
                         </TableCell>
                         <TableCell className="text-[10px] font-bold text-text-primary">{row.customer_name}</TableCell>
                         <TableCell className="text-[10px] font-black text-text-primary uppercase truncate max-w-[150px]">{row.product_name}</TableCell>

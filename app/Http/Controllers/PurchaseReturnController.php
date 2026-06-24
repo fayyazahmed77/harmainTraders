@@ -158,7 +158,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             }
 
             DB::commit();
-            return redirect()->route('purchase_return.index')->with('success', 'Purchase Return saved successfully!');
+            return redirect()->back()->with('success', 'Purchase Return saved successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -228,6 +228,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     public function getInvoiceItems($invoiceId)
     {
         try {
+            /** @var \App\Models\Purchase|null $purchase */
             $purchase = Purchase::with('items.item')->find($invoiceId);
             if (!$purchase) {
                 return response()->json(['error' => 'Invoice not found'], 404);
@@ -264,12 +265,17 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         try {
             $purchases = Purchase::where('supplier_id', $supplierId)->pluck('id');
 
-            $purchasedItems = \App\Models\PurchaseItem::whereIn('purchase_id', $purchases)
+            $purchasedItems = \App\Models\PurchaseItem::select('purchase_items.*')
+                ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
+                ->whereIn('purchase_items.purchase_id', $purchases)
+                ->orderBy('purchases.date', 'desc')
+                ->orderBy('purchases.id', 'desc')
                 ->with(['item', 'purchase:id,invoice,date'])
                 ->get()
                 ->map(function ($pi) {
                     return [
                         'id'               => $pi->id,
+                        'purchase_id'      => $pi->purchase_id,
                         'item_id'          => $pi->item_id,
                         'item'             => $pi->item,
                         'invoice_no'       => $pi->purchase->invoice ?? 'N/A',
@@ -435,7 +441,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             }
 
             DB::commit();
-            return redirect()->route('purchase_return.index')->with('success', 'Purchase Return updated successfully!');
+            return redirect()->back()->with('success', 'Purchase Return updated successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -488,11 +494,20 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         }
     }
 
-    public function pdf($id)
+    public function pdf(Request $request, $id)
     {
         $purchaseReturn = PurchaseReturn::with(['supplier', 'salesman', 'items.item'])->findOrFail($id);
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.purchase_return', compact('purchaseReturn'));
-        $pdf->setPaper('A4', 'portrait');
+        $format = $request->get('format', 'big');
+        $view = $format === 'small' ? 'pdf.purchase_return_half' : 'pdf.purchase_return';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('purchaseReturn'));
+
+        if ($format === 'small') {
+            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+        } else {
+            $pdf->setPaper('A4', 'portrait');
+        }
+
         return $pdf->stream("Purchase-Return-{$purchaseReturn->invoice}.pdf");
     }
 }

@@ -23,7 +23,7 @@
                 $profitText = $row['profit_loss'] != 0 ? number_format($row['profit_loss'], 2) : '-';
             @endphp
             <tr>
-                <td style="padding: 5px; border: 1px solid #ddd;">{{ \Carbon\Carbon::parse($row['date'])->format('d-M-y') }}</td>
+                <td style="padding: 5px; border: 1px solid #ddd;">{{ strtoupper(\Carbon\Carbon::parse($row['date'])->format('d M y')) }}</td>
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ $row['voucher_no'] }}</td>
                 <td style="padding: 5px; border: 1px solid #ddd;">
                     @if(isset($is_excel) && $is_excel)

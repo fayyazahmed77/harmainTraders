@@ -51,10 +51,8 @@ class SalesReturnController extends Controller implements HasMiddleware
         $salemans = Saleman::get();
         $messageLines = MessageLine::get(['id', 'messageline']);
 
-        // Auto-generate next return invoice number
-        $lastReturn = SalesReturn::latest('id')->first();
-        $nextId = $lastReturn ? $lastReturn->id + 1 : 1;
-        $nextInvoiceNo = 'RET-' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
+        // Suggest next return invoice number (final sequential ID is generated at save time)
+        $nextInvoiceNo = $this->generateNextReturnInvoice();
 
         // Payment accounts for refunds
         $paymentAccounts = Account::whereHas('accountType', function($q) {
@@ -73,39 +71,96 @@ class SalesReturnController extends Controller implements HasMiddleware
     //store
     public function store(Request $request)
     {
-        $request->validate([
-            'date'            => 'required|date',
-            'invoice'         => 'nullable|string',
-            'original_invoice' => 'nullable|string',
-            'customer_id'     => 'required|integer',
-            'no_of_items'     => 'required|integer',
-            'gross_total'     => 'required|numeric',
-            'discount_total'  => 'required|numeric',
-            'tax_total'       => 'required|numeric',
-            'net_total'       => 'required|numeric',
-            'paid_amount'     => 'required|numeric',
-            'remaining_amount' => 'required|numeric',
-            'payment_account_id' => 'nullable|integer|exists:accounts,id',
+        try {
+            $request->validate([
+                'date'            => 'required|date',
+                'invoice'         => 'nullable|string',
+                'original_invoice' => 'required|string|exists:sales,invoice',
+                'customer_id'     => 'required|integer',
+                'no_of_items'     => 'required|integer',
+                'gross_total'     => 'required|numeric',
+                'discount_total'  => 'required|numeric',
+                'tax_total'       => 'required|numeric',
+                'net_total'       => 'required|numeric',
+                'paid_amount'     => 'required|numeric',
+                'remaining_amount' => 'required|numeric',
+                'payment_account_id' => 'nullable|integer|exists:accounts,id',
+                'sale_id'         => 'nullable|integer|exists:sales,id',
 
-            // items array validation
-            'items'                   => 'required|array',
-            'items.*.item_id'         => 'required|integer',
-            'items.*.qty_carton'      => 'required|numeric',
-            'items.*.qty_pcs'         => 'required|numeric',
-            'items.*.total_pcs'       => 'required|numeric',
-            'items.*.trade_price'     => 'required|numeric',
-            'items.*.discount'        => 'required|numeric',
-            'items.*.gst_amount'      => 'required|numeric',
-            'items.*.subtotal'        => 'required|numeric',
-        ]);
+                // items array validation
+                'items'                   => 'required|array',
+                'items.*.item_id'         => 'required|integer',
+                'items.*.qty_carton'      => 'required|numeric',
+                'items.*.qty_pcs'         => 'required|numeric',
+                'items.*.total_pcs'       => 'required|numeric',
+                'items.*.trade_price'     => 'required|numeric',
+                'items.*.discount'        => 'required|numeric',
+                'items.*.gst_amount'      => 'required|numeric',
+                'items.*.subtotal'        => 'required|numeric',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Illuminate\Support\Facades\Log::error('SalesReturn validation failed', [
+                'errors' => $e->errors(),
+                'input' => $request->all()
+            ]);
+            throw $e;
+        }
+
+        $sale = null;
+        if ($request->filled('sale_id')) {
+            $sale = Sales::find($request->sale_id);
+        }
+        if (!$sale) {
+            $sale = Sales::where('invoice', $request->original_invoice)
+                ->where('customer_id', $request->customer_id)
+                ->first();
+        }
+        if (!$sale) {
+            $sale = Sales::where('invoice', $request->original_invoice)->first();
+        }
+
+        if (!$sale) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The selected original invoice does not exist.'
+            ]);
+        }
+        if ($sale->customer_id != $request->customer_id) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The original invoice does not belong to the selected customer.'
+            ]);
+        }
+        // B6 Fix: Calculate LIVE remaining amount from source-of-truth data instead of
+        // trusting the denormalized remaining_amount column which may be stale.
+        $liveAllocated = \App\Models\PaymentAllocation::where('bill_id', $sale->id)
+            ->where('bill_type', 'App\Models\Sales')
+            ->sum('amount');
+        $liveReturned = SalesReturn::where(function($q) use ($sale) {
+            $q->where('sale_id', $sale->id)
+              ->orWhere(function($sub) use ($sale) {
+                  $sub->whereNull('sale_id')
+                      ->where('original_invoice', $sale->invoice)
+                      ->where('customer_id', $sale->customer_id);
+              });
+        })->sum('net_total');
+        $liveRemaining = max(0, $sale->net_total - $liveAllocated - $liveReturned);
+
+        if (round($request->net_total, 2) > round($liveRemaining, 2) + 0.01) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'net_total' => 'Return amount (' . number_format($request->net_total, 2) . ') cannot exceed invoice outstanding balance (' . number_format($liveRemaining, 2) . ').'
+            ]);
+        }
 
         DB::beginTransaction();
 
         try {
+            // B5 Fix: Generate sequential invoice number inside the transaction to prevent duplicates
+            $finalInvoice = $request->invoice ?? $this->generateNextReturnInvoice();
+
             $return = SalesReturn::create([
                 'date'            => $request->date,
-                'invoice'         => $request->invoice ?? 'RET-' . time(),
+                'invoice'         => $finalInvoice,
                 'original_invoice' => $request->original_invoice,
+                'sale_id'         => $sale->id,
                 'customer_id'     => $request->customer_id,
                 'salesman_id'     => $request->salesman_id ?? 0,
                 'no_of_items'     => $request->no_of_items,
@@ -145,84 +200,36 @@ class SalesReturnController extends Controller implements HasMiddleware
             }
 
             // ─────────────────────────────────────────────────────────────────────────────
-            // Update Sales Status & Payment Status
+            // Update Sales Status & Balance
             // ─────────────────────────────────────────────────────────────────────────────
-            if ($request->original_invoice) {
-                $sale = Sales::where('invoice', $request->original_invoice)->first();
-                if ($sale) {
-                    // 1. Calculate Total Sold Qty
-                    $totalSoldQty = SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
-
-                    // 2. Calculate Total Returned Qty (Previous + Current)
-                    // Find all returns for this invoice
-                    $allReturnIds = SalesReturn::where('original_invoice', $sale->invoice)->pluck('id');
-                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
-
-                    // Determine Status
-                    $status = 'Partial Return';
-                    if ($totalReturnedQty >= $totalSoldQty) {
-                        $status = 'Returned';
-                    }
-
-                    // Update Sales Status
-                    $sale->status = $status;
-
-                    // Update Remaining Amount (Reduce debt)
-                    // We reduce the remaining amount by the Net Total of the return
-                    // If the customer returns items, they owe us less.
-                    $sale->remaining_amount = $sale->remaining_amount - $request->net_total;
-
-                    // Optional: Prevent negative remaining amount if you don't want credit balance on the invoice itself
-                    // But allowing negative implies a credit which is often correct.
-                    // For now, we allow it to go negative or zero.
-
-                    $sale->save();
-
-                    // Update Related Payment Status (if any)
-                    $allocation = PaymentAllocation::where('bill_type', 'App\Models\Sales')
-                        ->where('bill_id', $sale->id)
-                        ->first();
-
-                    if ($allocation && $allocation->payment) {
-                        $payment = $allocation->payment;
-                        // Only set to 'Returned' if the invoice is fully returned.
-                        // 'Partial Return' is not a valid ENUM for cheque_status.
-                        if ($status === 'Returned') {
-                            $payment->cheque_status = 'Returned';
-                            $payment->save();
-                        }
-                    }
-                }
-            }
+            $this->updateSaleStatusAndBalance($request->original_invoice, $sale->id);
 
             // ─────────────────────────────────────────────────────────────────────────────
             // Handle Cash Refund (Payment Record)
+            // B1 Fix: Mark refund payments with is_return_refund=true so Account::getCurrentBalanceAttribute()
+            // excludes them from $totalPayments. Without this flag the refund's +$totalPayments addition
+            // would cancel out the return's -$totalReturns credit, leaving customer balance unchanged.
+            // B4 Fix: Generate voucher number with a database lock to prevent race conditions.
             // ─────────────────────────────────────────────────────────────────────────────
-            if ($request->paid_amount > 0) {
-                // Create a Payment record (Type: PAYMENT, as we are paying the customer back)
-                // We need a Voucher No
-                $count = Payment::where('type', 'PAYMENT')->count() + 1;
-                $voucherNo = 'CPV-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+            if ($request->paid_amount > 0 && $request->payment_account_id) {
+                $voucherNo = $this->generateNextVoucherNo('CPV');
 
-                $payment = Payment::create([
-                    'date' => $request->date,
-                    'voucher_no' => $voucherNo,
-                    'account_id' => $request->customer_id,
+                Payment::create([
+                    'date'               => $request->date,
+                    'voucher_no'         => $voucherNo,
+                    'account_id'         => $request->customer_id,
                     'payment_account_id' => $request->payment_account_id,
-                    'amount' => $request->paid_amount,
-                    'net_amount' => $request->paid_amount,
-                    'type' => 'PAYMENT', // We are paying the customer
-                    'remarks' => 'Refund for Return Invoice: ' . ($request->invoice ?? 'N/A'),
-                    'payment_method' => 'Cash', // Default to Cash for now
+                    'amount'             => $request->paid_amount,
+                    'net_amount'         => $request->paid_amount,
+                    'type'               => 'PAYMENT',
+                    'payment_method'     => $request->payment_method ?? 'Cash',
+                    'remarks'            => 'Refund for Return Invoice: ' . $finalInvoice,
+                    'is_return_refund'   => true, // B1: exclude from customer ledger balance formula
                 ]);
-
-                // Note: We are NOT allocating this payment to the Sale because the Sale's remaining amount 
-                // was already reduced by the Return itself. This payment is just the cash flow side.
-                // If we allocated it, we would be double-counting the reduction (once for return, once for payment).
             }
 
             DB::commit();
-            return redirect()->route('sales_return.index')->with('success', 'Sales Return saved successfully!');
+            return redirect()->back()->with('success', 'Sales Return saved successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -258,6 +265,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     public function getInvoiceItems($invoiceId)
     {
         try {
+            /** @var \App\Models\Sales|null $sale */
             $sale = Sales::with('items.item')->find($invoiceId);
             if (!$sale) {
                 return response()->json(['error' => 'Invoice not found'], 404);
@@ -294,12 +302,17 @@ class SalesReturnController extends Controller implements HasMiddleware
         try {
             $sales = Sales::where('customer_id', $customerId)->pluck('id');
 
-            $purchasedItems = SalesItem::whereIn('sale_id', $sales)
+            $purchasedItems = SalesItem::select('sales_items.*')
+                ->join('sales', 'sales.id', '=', 'sales_items.sale_id')
+                ->whereIn('sales_items.sale_id', $sales)
+                ->orderBy('sales.date', 'desc')
+                ->orderBy('sales.id', 'desc')
                 ->with(['item', 'sale:id,invoice,date'])
                 ->get()
                 ->map(function ($si) {
                     return [
                         'id'               => $si->id,
+                        'sale_id'          => $si->sale_id,
                         'item_id'          => $si->item_id,
                         'item'             => $si->item,
                         'invoice_no'       => $si->sale->invoice ?? 'N/A',
@@ -356,49 +369,108 @@ class SalesReturnController extends Controller implements HasMiddleware
     //update
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'date'            => 'required|date',
-            'invoice'         => 'required|string',
-            'customer_id'     => 'required|integer',
-            'no_of_items'     => 'required|integer',
-            'gross_total'     => 'required|numeric',
-            'discount_total'  => 'required|numeric',
-            'tax_total'       => 'required|numeric',
-            'net_total'       => 'required|numeric',
-            'items'           => 'required|array',
-        ]);
+        try {
+            $request->validate([
+                'date'            => 'required|date',
+                'invoice'         => 'required|string',
+                'original_invoice' => 'required|string|exists:sales,invoice',
+                'customer_id'     => 'required|integer',
+                'no_of_items'     => 'required|integer',
+                'gross_total'     => 'required|numeric',
+                'discount_total'  => 'required|numeric',
+                'tax_total'       => 'required|numeric',
+                'net_total'       => 'required|numeric',
+                'items'           => 'required|array',
+                'sale_id'         => 'nullable|integer|exists:sales,id',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Illuminate\Support\Facades\Log::error('SalesReturn update validation failed', [
+                'errors' => $e->errors(),
+                'input' => $request->all()
+            ]);
+            throw $e;
+        }
+
+        $newSale = null;
+        if ($request->filled('sale_id')) {
+            $newSale = Sales::find($request->sale_id);
+        }
+        if (!$newSale) {
+            $newSale = Sales::where('invoice', $request->original_invoice)
+                ->where('customer_id', $request->customer_id)
+                ->first();
+        }
+        if (!$newSale) {
+            $newSale = Sales::where('invoice', $request->original_invoice)->first();
+        }
+
+        if (!$newSale) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The selected original invoice does not exist.'
+            ]);
+        }
+        if ($newSale->customer_id != $request->customer_id) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The original invoice does not belong to the selected customer.'
+            ]);
+        }
+
+        $return = SalesReturn::findOrFail($id);
+        $oldNetTotal = $return->net_total;
+        $oldOriginalInvoice = $return->original_invoice;
+        $oldSaleId = $return->sale_id;
+
+        // B6 Fix: Calculate LIVE outstanding balance for target invoice.
+        // Add back the current return's contribution to get the true available remaining.
+        $liveAllocated = \App\Models\PaymentAllocation::where('bill_id', $newSale->id)
+            ->where('bill_type', 'App\Models\Sales')
+            ->sum('amount');
+        $liveReturnedTotal = SalesReturn::where(function($q) use ($newSale) {
+            $q->where('sale_id', $newSale->id)
+              ->orWhere(function($sub) use ($newSale) {
+                  $sub->whereNull('sale_id')
+                      ->where('original_invoice', $newSale->invoice)
+                      ->where('customer_id', $newSale->customer_id);
+              });
+        })->sum('net_total');
+        $liveRemaining = max(0, $newSale->net_total - $liveAllocated - $liveReturnedTotal);
+
+        // If editing the same invoice return, add back the old return amount to get available space
+        $availableRemaining = $liveRemaining;
+        if ($request->original_invoice === $oldOriginalInvoice) {
+            $availableRemaining = $liveRemaining + $oldNetTotal;
+        }
+
+        if (round($request->net_total, 2) > round($availableRemaining, 2) + 0.01) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'net_total' => 'Return amount (' . number_format($request->net_total, 2) . ') cannot exceed invoice outstanding balance (' . number_format($availableRemaining, 2) . ').'
+            ]);
+        }
 
         DB::beginTransaction();
 
         try {
-            $return = SalesReturn::findOrFail($id);
-            $oldNetTotal = $return->net_total;
-            $oldOriginalInvoice = $return->original_invoice;
-
             // 1. Revert Stock for Old Items
+            // B2 Fix: Use updateStockFromPcs() instead of direct stock_1 manipulation.
+            // Direct stock_1 manipulation ignores stock_2 (loose pcs) and packing_qty,
+            // corrupting stock for items with packing_qty > 1.
             $oldItems = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $oldItem->total_pcs;
-                    $item->save();
+                    $packing = $item->packing_qty ?: 1;
+                    $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
+                    $totalToRevert = $oldItem->total_pcs + $bonusUnits;
+                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - $totalToRevert));
                 }
             }
 
-            // 2. Revert Original Invoice Balance
-            if ($oldOriginalInvoice) {
-                $oldSale = Sales::where('invoice', $oldOriginalInvoice)->first();
-                if ($oldSale) {
-                    $oldSale->remaining_amount += $oldNetTotal;
-                    $oldSale->save();
-                }
-            }
-
-            // 3. Update Return Record
+            // 2. Update Return Record
             $return->update([
                 'date'            => $request->date,
                 'invoice'         => $request->invoice,
                 'original_invoice' => $request->original_invoice,
+                'sale_id'         => $newSale->id,
                 'customer_id'     => $request->customer_id,
                 'salesman_id'     => $request->salesman_id ?? 0,
                 'no_of_items'     => $request->no_of_items,
@@ -409,7 +481,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'remarks'         => $request->remarks,
             ]);
 
-            // 4. Delete Old Items & Insert New Ones
+            // 3. Delete Old Items & Insert New Ones
             SalesReturnItem::where('sales_return_id', $id)->delete();
 
             foreach ($request->items as $it) {
@@ -427,41 +499,19 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ]);
 
                 // Update Stock (Increase for Return)
+                // B2 Fix: Use updateStockFromPcs() with bonus calculation
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $it['total_pcs'];
-                    $item->save();
+                    $packing = $item->packing_qty ?: 1;
+                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+                    $totalToAdd = $it['total_pcs'] + $bonusUnits;
+                    $item->updateStockFromPcs($item->total_stock_pcs + $totalToAdd);
                 }
             }
 
-            // 5. Update New Original Invoice Balance
-            if ($request->original_invoice) {
-                $newSale = Sales::where('invoice', $request->original_invoice)->first();
-                if ($newSale) {
-                    $newSale->remaining_amount -= $request->net_total;
-
-                    // Update Status
-                    $totalSoldQty = SalesItem::where('sale_id', $newSale->id)->sum('total_pcs');
-                    $allReturnIds = SalesReturn::where('original_invoice', $newSale->invoice)->pluck('id');
-                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
-                    $newSale->status = ($totalReturnedQty >= $totalSoldQty) ? 'Returned' : 'Partial Return';
-                    $newSale->save();
-
-                    // Update Related Payment Status (for parity with store method)
-                    $allocation = PaymentAllocation::where('bill_type', 'App\Models\Sales')
-                        ->where('bill_id', $newSale->id)
-                        ->first();
-
-                    if ($allocation && $allocation->payment) {
-                        $payment = $allocation->payment;
-                        // Only sync to 'Returned' if the invoice is fully returned.
-                        if ($newSale->status === 'Returned') {
-                            $payment->cheque_status = 'Returned';
-                            $payment->save();
-                        }
-                    }
-                }
-            }
+            // 4. Update Status & Balance for Old and New Invoices
+            $this->updateSaleStatusAndBalance($oldOriginalInvoice, $oldSaleId);
+            $this->updateSaleStatusAndBalance($request->original_invoice, $newSale->id);
 
             DB::commit();
             return redirect()->route('sales_return.index')->with('success', 'Sales Return updated successfully!');
@@ -480,45 +530,28 @@ class SalesReturnController extends Controller implements HasMiddleware
             $return = SalesReturn::findOrFail($id);
             $netTotal = $return->net_total;
             $originalInvoice = $return->original_invoice;
+            $saleId = $return->sale_id;
 
             // 1. Revert Stock (Decrease because return added stock)
+            // B3 Fix: Use updateStockFromPcs() instead of direct stock_1 manipulation.
+            // This correctly handles items with packing_qty > 1 and bonus quantities.
             $items = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($items as $si) {
                 $product = Items::find($si->item_id);
                 if ($product) {
-                    $product->stock_1 = ($product->stock_1 ?? 0) - $si->total_pcs;
-                    $product->save();
+                    $packing = $product->packing_qty ?: 1;
+                    $bonusUnits = (($si->bonus_qty_carton ?? 0) * $packing) + ($si->bonus_qty_pcs ?? 0);
+                    $totalToRevert = $si->total_pcs + $bonusUnits;
+                    $product->updateStockFromPcs(max(0, $product->total_stock_pcs - $totalToRevert));
                 }
             }
 
-            // 2. Revert Original Invoice Balance & Status
-            if ($originalInvoice) {
-                $sale = Sales::where('invoice', $originalInvoice)->first();
-                if ($sale) {
-                    $sale->remaining_amount += $netTotal;
-
-                    // Recalculate Status
-                    $totalSoldQty = SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
-                    $allReturnIds = SalesReturn::where('original_invoice', $sale->invoice)
-                        ->where('id', '!=', $id)
-                        ->pluck('id');
-                    $totalReturnedQty = SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
-
-                    if ($totalReturnedQty <= 0) {
-                        $sale->status = 'Active';
-                    } elseif ($totalReturnedQty < $totalSoldQty) {
-                        $sale->status = 'Partial Return';
-                    } else {
-                        $sale->status = 'Returned';
-                    }
-
-                    $sale->save();
-                }
-            }
-
-            // 3. Delete Return Items & Return
+            // 2. Delete Return Items & Return record
             SalesReturnItem::where('sales_return_id', $id)->delete();
             $return->delete();
+
+            // 3. Recalculate Balance and Status for the Invoice
+            $this->updateSaleStatusAndBalance($originalInvoice, $saleId);
 
             DB::commit();
             return redirect()->back()->with('success', 'Sales Return deleted and stock/balances reverted successfully!');
@@ -528,11 +561,118 @@ class SalesReturnController extends Controller implements HasMiddleware
         }
     }
 
-    public function pdf($id)
+    public function pdf(Request $request, $id)
     {
         $salesReturn = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.sales_return', compact('salesReturn'));
-        $pdf->setPaper('A4', 'portrait');
+        $format = $request->get('format', 'big');
+        $view = $format === 'small' ? 'pdf.sales_return_half' : 'pdf.sales_return';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('salesReturn'));
+
+        if ($format === 'small') {
+            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+        } else {
+            $pdf->setPaper('A4', 'portrait');
+        }
+
         return $pdf->stream("Sales-Return-{$salesReturn->invoice}.pdf");
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Private Helpers
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * B5 Fix: Generate a sequential return invoice number using MySQL advisory lock
+     * to prevent race conditions when multiple users create returns simultaneously.
+     */
+    private function generateNextReturnInvoice(): string
+    {
+        $lastReturn = SalesReturn::orderByDesc('id')->lockForUpdate()->first();
+        $nextId = $lastReturn ? ($lastReturn->id + 1) : 1;
+        return 'RET-' . str_pad($nextId, 6, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * B4 Fix: Generate a sequential voucher number using SELECT MAX(id) inside
+     * the current DB transaction. lockForUpdate() on Payment table ensures
+     * no two concurrent requests can generate the same voucher number.
+     *
+     * @param string $prefix e.g. 'CPV' → CPV-0001
+     */
+    private function generateNextVoucherNo(string $prefix): string
+    {
+        // Lock the latest payment for this prefix within the current transaction
+        $last = Payment::where('voucher_no', 'LIKE', $prefix . '-%')
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->value('voucher_no');
+
+        $nextNum = 1;
+        if ($last && preg_match('/' . preg_quote($prefix, '/') . '-(\d+)/', $last, $matches)) {
+            $nextNum = (int)$matches[1] + 1;
+        }
+
+        return $prefix . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Recalculate Sale Remaining Amount and Status based on all allocations and returns
+     */
+    private function updateSaleStatusAndBalance($invoiceNo, ?int $saleId = null)
+    {
+        if (!$invoiceNo && !$saleId) return;
+
+        $sale = $saleId ? Sales::find($saleId) : Sales::where('invoice', $invoiceNo)->first();
+        if ($sale) {
+            // Calculate Total Returns for this invoice
+            $totalReturns = SalesReturn::where(function($q) use ($sale) {
+                $q->where('sale_id', $sale->id)
+                  ->orWhere(function($sub) use ($sale) {
+                      $sub->whereNull('sale_id')
+                          ->where('original_invoice', $sale->invoice)
+                          ->where('customer_id', $sale->customer_id);
+                  });
+            })->sum('net_total');
+
+            // Calculate Total Payments for this invoice
+            $totalPayments = \App\Models\PaymentAllocation::where('bill_id', $sale->id)
+                ->where('bill_type', 'App\Models\Sales')
+                ->sum('amount');
+
+            // Recalculate remaining balance
+            $sale->remaining_amount = max(0, $sale->net_total - ($totalPayments + $totalReturns));
+
+            // Determine status based on returned quantity vs sold quantity
+            $totalSoldQty = \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+            $allReturnIds = SalesReturn::where(function($q) use ($sale) {
+                $q->where('sale_id', $sale->id)
+                  ->orWhere(function($sub) use ($sale) {
+                      $sub->whereNull('sale_id')
+                          ->where('original_invoice', $sale->invoice)
+                          ->where('customer_id', $sale->customer_id);
+                  });
+            })->pluck('id');
+            $totalReturnedQty = \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+
+            if ($totalReturnedQty >= $totalSoldQty && $totalSoldQty > 0) {
+                $sale->status = 'Returned';
+            } elseif ($totalReturnedQty > 0) {
+                if ($sale->remaining_amount <= 0) {
+                    $sale->status = ($totalReturns >= $sale->net_total) ? 'Returned' : 'Paid';
+                } else {
+                    $sale->status = 'Partial Return';
+                }
+            } elseif ($sale->remaining_amount <= 0) {
+                $sale->status = 'Paid';
+            } elseif ($totalPayments > 0) {
+                $sale->status = 'Partial';
+            } else {
+                $sale->status = 'Completed';
+            }
+
+            $sale->save();
+        }
+    }
 }
+

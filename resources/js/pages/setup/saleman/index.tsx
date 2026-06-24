@@ -143,7 +143,7 @@ export default function SalemanIndex({ salemen }: IndexProps) {
     });
   };
 
-  const canCreate = Array.isArray(permissions) && permissions.includes("create saleman");
+  const canCreate = Array.isArray(permissions) && permissions.includes("create salemen");
 
   return (
     <>

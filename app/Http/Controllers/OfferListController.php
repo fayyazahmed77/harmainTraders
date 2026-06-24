@@ -45,7 +45,7 @@ class OfferListController extends Controller implements HasMiddleware
         })
             ->get();
 
-        $messageLines = \App\Models\MessageLine::where('category', 'Offer List')
+        $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Offer List')
             ->where('status', 'active')
             ->get();
 

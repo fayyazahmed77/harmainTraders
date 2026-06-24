@@ -36,7 +36,7 @@ const DetailsReport = ({ data, formatCurrency }: any) => {
                         <TableCell className="py-1.5 font-bold text-text-muted">{index + 1}</TableCell>
                         <TableCell className="py-1.5 font-black text-emerald-500 uppercase">{row.invoice}</TableCell>
                         <TableCell className="py-1.5 font-bold text-text-muted whitespace-nowrap">
-                            {formatSafeDate(row.date)}
+                            {formatSafeDate(row.date).toUpperCase()}
                         </TableCell>
                         <TableCell className="py-1.5 font-bold text-text-primary uppercase">{row.account_name}</TableCell>
                         <TableCell className="py-1.5 font-bold text-text-primary uppercase">{row.product_name}</TableCell>

@@ -1,6 +1,7 @@
 // purchase_return/create.tsx
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
+import { SuccessDialog } from "./components/SuccessDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -288,6 +289,8 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
 
 export default function PurchaseReturnCreatePage({ items, accounts, salemans, purchase }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [successData, setSuccessData] = useState<any>(null);
 
     // ── Header state ──────────────────────────
     const [date, setDate] = useState<Date>(new Date());
@@ -311,6 +314,10 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [assignItemDialogOpen, setAssignItemDialogOpen] = useState(false);
     const [assignSearch, setAssignSearch] = useState("");
     const [selectedAssignIds, setSelectedAssignIds] = useState<number[]>([]);
+    // Tracks which purchase_id is locked when the user selects from catalog
+    const [activeAssignPurchaseId, setActiveAssignPurchaseId] = useState<number | null>(null);
+    const [activeAssignInvoiceNo, setActiveAssignInvoiceNo] = useState<string>("");
+    const [activeAssignInvoiceDate, setActiveAssignInvoiceDate] = useState<string>("");
     const [supplierItems, setSupplierItems] = useState<any[]>([]);
 
     // ── Mobile specific states ────────────────
@@ -550,14 +557,30 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         setFocusedRowId(rowId);
     };
 
-    const toggleAssignSelection = (id: number) => {
-        setSelectedAssignIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
+    const toggleAssignSelection = (pi: any) => {
+        const id = pi.id;
+        setSelectedAssignIds(prev => {
+            if (prev.includes(id)) {
+                const remaining = prev.filter(x => x !== id);
+                if (remaining.length === 0) {
+                    setActiveAssignPurchaseId(null);
+                    setActiveAssignInvoiceNo("");
+                    setActiveAssignInvoiceDate("");
+                }
+                return remaining;
+            } else {
+                if (prev.length === 0) {
+                    setActiveAssignPurchaseId(pi.purchase_id ?? null);
+                    setActiveAssignInvoiceNo(pi.invoice_no ?? "");
+                    setActiveAssignInvoiceDate(pi.date ?? "");
+                }
+                return [...prev, id];
+            }
+        });
     };
 
     const handleBulkAddItems = () => {
-        const itemsToAdd = supplierItems.filter(ci => selectedAssignIds.includes(ci.id));
+        const itemsToAdd = (supplierItems ?? []).filter(ci => selectedAssignIds.includes(ci.id));
         const newRows = itemsToAdd.map(pi => {
             const it = pi.item;
             const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
@@ -586,6 +609,24 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             };
         });
 
+        // Auto-assign the source invoice from selected catalog items
+        if (activeAssignInvoiceNo && !originalInvoiceNo) {
+            setOriginalInvoiceNo(activeAssignInvoiceNo);
+            const matchedInvoice = invoices.find(inv => inv.invoice === activeAssignInvoiceNo);
+            if (matchedInvoice) {
+                setSelectedInvoice(matchedInvoice);
+            } else {
+                setSelectedInvoice({
+                    id: activeAssignPurchaseId ?? 0,
+                    invoice: activeAssignInvoiceNo,
+                    date: activeAssignInvoiceDate,
+                    net_total: 0,
+                    remaining_amount: 1,
+                    status: 'Pending',
+                });
+            }
+        }
+
         setRows(p => {
             const cleanRows = p.filter(r => r.item_id);
             const combined = [...newRows, ...cleanRows];
@@ -594,6 +635,9 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
         setAssignItemDialogOpen(false);
         setSelectedAssignIds([]);
+        setActiveAssignPurchaseId(null);
+        setActiveAssignInvoiceNo("");
+        setActiveAssignInvoiceDate("");
         setAssignSearch("");
     };
 
@@ -636,7 +680,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     }, [invoices, invoiceSearch]);
 
     const filteredSupplierItems = useMemo(() => {
-        const sorted = [...supplierItems].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sorted = [...(supplierItems ?? [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return sorted.filter(ci =>
             !assignSearch ||
             ci.item?.title.toLowerCase().includes(assignSearch.toLowerCase()) ||
@@ -723,9 +767,20 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         };
 
         router.post("/purchase-return", payload, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsSaving(false);
-                router.get("/purchase-return");
+                const id = (page.props as any).id || (page.props as any).flash?.id;
+                
+                setSuccessData({
+                    supplierName: selectedAccount?.title || "Supplier",
+                    totalAmount: totals.net,
+                    itemCount: validRows.length,
+                    totalFull: validRows.reduce((acc, r) => acc + toNum(r.full), 0),
+                    totalPcs: validRows.reduce((acc, r) => acc + toNum(r.pcs), 0),
+                    totalDiscount: totals.disc,
+                    purchaseReturnId: id,
+                });
+                setShowSuccessDialog(true);
             },
             onError: () => setIsSaving(false),
         });
@@ -1266,12 +1321,32 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 </div>
                             </div>
 
+                            {/* Active invoice lock indicator */}
+                            {activeAssignPurchaseId && (
+                                <div className="px-4 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center gap-2">
+                                    <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest">🔒 Locked to Invoice:</span>
+                                    <span className="text-[10px] font-mono font-black text-orange-600">{activeAssignInvoiceNo}</span>
+                                    <span className="text-[9px] text-orange-500/70 ml-1">— Items from other invoices are disabled</span>
+                                </div>
+                            )}
                             <div className="max-h-[450px] overflow-auto p-4 custom-scrollbar relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {filteredSupplierItems.map((pi, idx) => (
+                                {filteredSupplierItems.map((pi, idx) => {
+                                    const isLocked = activeAssignPurchaseId !== null && pi.purchase_id !== activeAssignPurchaseId;
+                                    const isSelected = selectedAssignIds.includes(pi.id);
+                                    return (
                                     <motion.div key={pi.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}
-                                        className={`flex items-center gap-4 p-3 border ${selectedAssignIds.includes(pi.id) ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5'} ${PREMIUM_ROUNDING_MD} transition-all cursor-pointer group`}
-                                        onClick={() => toggleAssignSelection(pi.id)}>
-                                        <Checkbox checked={selectedAssignIds.includes(pi.id)} onCheckedChange={() => toggleAssignSelection(pi.id)} className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500" />
+                                        title={isLocked ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` : undefined}
+                                        className={`flex items-center gap-4 p-3 border ${
+                                            isSelected ? 'border-orange-500 bg-orange-500/5' :
+                                            isLocked ? 'border-zinc-100 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30 opacity-40 cursor-not-allowed' :
+                                            'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 cursor-pointer'
+                                        } ${PREMIUM_ROUNDING_MD} transition-all group`}
+                                        onClick={() => !isLocked && toggleAssignSelection(pi)}>
+                                        <Checkbox
+                                            checked={isSelected}
+                                            disabled={isLocked}
+                                            onCheckedChange={() => !isLocked && toggleAssignSelection(pi)}
+                                            className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500 disabled:opacity-30" />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="text-[11px] font-black text-zinc-900 dark:text-white uppercase truncate tracking-tighter">{pi.item?.title}</div>
@@ -1285,7 +1360,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                             <div className="text-[10px] font-mono text-zinc-600/100 mt-1 uppercase">Purchased: <span className="text-zinc-600 dark:text-zinc-300 font-bold">{fmtDate(pi.date)}</span></div>
                                         </div>
                                     </motion.div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center relative z-10">
@@ -1293,7 +1369,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     {selectedAssignIds.length} Items Selected for Manifest
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button variant="ghost" className="h-9 text-[10px] font-black uppercase text-zinc-500" onClick={() => { setAssignItemDialogOpen(false); setSelectedAssignIds([]); }}>
+                                    <Button variant="ghost" className="h-9 text-[10px] font-black uppercase text-zinc-500" onClick={() => { setAssignItemDialogOpen(false); setSelectedAssignIds([]); setActiveAssignPurchaseId(null); setActiveAssignInvoiceNo(""); setActiveAssignInvoiceDate(""); }}>
                                         Cancel
                                     </Button>
                                     <Button className={`${ACCENT_GRADIENT} h-9 px-6 text-[10px] font-black uppercase text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-all`}
@@ -1322,6 +1398,25 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                     }
                 `}</style>
+                {successData && (
+                    <SuccessDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        invoiceNo={invoiceNo}
+                        saleId={successData.purchaseReturnId}
+                        customerName={successData.supplierName}
+                        totalAmount={successData.totalAmount}
+                        countItems={successData.itemCount}
+                        countFull={successData.totalFull}
+                        countPcs={successData.totalPcs}
+                        totalDiscount={successData.totalDiscount}
+                        type="create"
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            router.get("/purchase-return/create");
+                        }}
+                    />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

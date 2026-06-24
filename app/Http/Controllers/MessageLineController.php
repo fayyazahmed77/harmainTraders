@@ -27,7 +27,7 @@ class MessageLineController extends Controller implements HasMiddleware
         }
 
         if ($request->has('category') && $request->category && $request->category !== 'all') {
-            $query->where('category', $request->category);
+            $query->whereJsonContains('category', $request->category);
         }
 
         $messagesline = $query->latest()
@@ -52,7 +52,8 @@ class MessageLineController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'messageline' => 'required|string|max:255',
-            'category' => 'nullable|string|in:Sales,Purchase,Receipt,Payments,Offer List',
+            'category' => 'nullable|array',
+            'category.*' => 'string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
         ]);
 
@@ -71,7 +72,8 @@ class MessageLineController extends Controller implements HasMiddleware
     {
         $validated = $request->validate([
             'messageline' => 'required|string|max:255',
-            'category' => 'nullable|string|in:Sales,Purchase,Receipt,Payments,Offer List',
+            'category' => 'nullable|array',
+            'category.*' => 'string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
         ]);
 

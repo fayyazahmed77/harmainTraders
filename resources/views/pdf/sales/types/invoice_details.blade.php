@@ -20,7 +20,7 @@
                 </td>
                 <td style="border: none; border-bottom: 1px solid #000; width: 25%; padding: 4px;">
                     <span style="font-size: 6px; color: #666; text-transform: uppercase;">Date</span><br>
-                    <strong style="font-size: 9px;">{{ \Carbon\Carbon::parse($firstItem['inv_date'])->format('d-M-Y') }}</strong>
+                    <strong style="font-size: 9px;">{{ strtoupper(\Carbon\Carbon::parse($firstItem['inv_date'])->format('d M y')) }}</strong>
                 </td>
                 <td style="border: none; border-bottom: 1px solid #000; width: 30%; padding: 4px;">
                     <span style="font-size: 6px; color: #666; text-transform: uppercase;">Account</span><br>

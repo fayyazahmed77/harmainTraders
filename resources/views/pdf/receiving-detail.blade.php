@@ -82,7 +82,7 @@ if (file_exists($logo_path)) {
             @foreach($data as $row)
             <tr>
                 <td class="text-center font-bold" style="color: #059669;">{{ $row['voucher_no'] }}</td>
-                <td class="text-center">{{ date('d-M-y', strtotime($row['date'])) }}</td>
+                <td class="text-center">{{ strtoupper(date('d M y', strtotime($row['date']))) }}</td>
                 <td class="font-bold">{{ strtoupper($row['party_name']) }}</td>
                 <td style="color: #059669; font-weight: bold;">{{ $row['bank_name'] }}</td>
                 <td class="text-right font-bold" style="font-size: 10px; color: #065f46;">{{ number_format($row['amount'], 2) }}</td>

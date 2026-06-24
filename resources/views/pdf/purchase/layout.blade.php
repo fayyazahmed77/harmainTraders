@@ -179,5 +179,12 @@ if ($logo_path) {
         <p>Procurement Audit Statement - Confidential & Proprietary - Harmain Traders Reporting Engine</p>
         <p>Level 4 Security Validation: Success - End of Report</p>
     </div>
+    
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+   
 </body>
 </html>

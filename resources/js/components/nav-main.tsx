@@ -26,20 +26,48 @@ export function NavMain({
     icon?: LucideIcon
     isActive?: boolean
     roles?: string[]
+    permissions?: string[]
     items?: {
       title: string
       url: string
+      permissions?: string[]
     }[]
   }[]
 }) {
   const { url, props } = usePage()
   const auth = props.auth as any;
   const userRoles = auth.roles || [];
+  const userPermissions = auth.permissions || [];
 
-  const filteredItems = items.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.some(role => userRoles.includes(role));
-  });
+  const hasAccess = (itemPermissions?: string[], itemRoles?: string[]) => {
+    if (!itemPermissions && !itemRoles) return true;
+
+    const matchPermission = itemPermissions
+      ? itemPermissions.some(p => userPermissions.includes(p))
+      : false;
+
+    const matchRole = itemRoles
+      ? itemRoles.some(r => userRoles.includes(r))
+      : false;
+
+    return matchPermission || matchRole;
+  };
+
+  const filteredItems = items
+    .map(item => {
+      // 1. Check top-level access
+      if (!hasAccess(item.permissions, item.roles)) return null;
+
+      // 2. Filter sub-items
+      if (item.items && item.items.length > 0) {
+        const visibleSubItems = item.items.filter(sub => hasAccess(sub.permissions));
+        if (visibleSubItems.length === 0) return null;
+        return { ...item, items: visibleSubItems };
+      }
+
+      return item;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
     <SidebarGroup>

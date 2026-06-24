@@ -1,8 +1,10 @@
 // sales_return/create.tsx
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { SuccessDialog } from "./components/SuccessDialog";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -275,6 +277,17 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
 // ───────────────────────────────────────────
 export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceNo, paymentAccounts }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const { errors } = usePage().props as any;
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [successData, setSuccessData] = useState<any>(null);
+
+    useEffect(() => {
+        if (errors && Object.keys(errors).length > 0) {
+            Object.keys(errors).forEach((key) => {
+                toast.error(`${key}: ${errors[key]}`);
+            });
+        }
+    }, [errors]);
 
     // ── Header state ──────────────────────────
     const [date, setDate] = useState<Date>(new Date());
@@ -319,11 +332,33 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const [assignItemDialogOpen, setAssignItemDialogOpen] = useState(false);
     const [assignSearch, setAssignSearch] = useState("");
     const [selectedAssignIds, setSelectedAssignIds] = useState<number[]>([]);
+    // Tracks which sale_id is locked when the user selects from catalog
+    const [activeAssignSaleId, setActiveAssignSaleId] = useState<number | null>(null);
+    const [activeAssignInvoiceNo, setActiveAssignInvoiceNo] = useState<string>("");
+    const [activeAssignInvoiceDate, setActiveAssignInvoiceDate] = useState<string>("");
 
-    const toggleAssignSelection = (id: number) => {
-        setSelectedAssignIds(prev =>
-            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-        );
+    const toggleAssignSelection = (ci: any) => {
+        const id = ci.id;
+        setSelectedAssignIds(prev => {
+            if (prev.includes(id)) {
+                // Deselecting – if no more items remain from this invoice, clear lock
+                const remaining = prev.filter(x => x !== id);
+                if (remaining.length === 0) {
+                    setActiveAssignSaleId(null);
+                    setActiveAssignInvoiceNo("");
+                    setActiveAssignInvoiceDate("");
+                }
+                return remaining;
+            } else {
+                // Selecting – lock to this item's sale_id on first selection
+                if (prev.length === 0) {
+                    setActiveAssignSaleId(ci.sale_id ?? null);
+                    setActiveAssignInvoiceNo(ci.invoice_no ?? "");
+                    setActiveAssignInvoiceDate(ci.date ?? "");
+                }
+                return [...prev, id];
+            }
+        });
     };
 
     useEffect(() => {
@@ -443,7 +478,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         const s_full = toNum(si.qty_carton);
                         const s_pcs = toNum(si.qty_pcs);
                         const rate = toNum(si.trade_price);
-                        const packing = toNum(si.item?.packing_full ?? 1);
+                        const packing = toNum(si.item?.packing_qty || si.item?.packing_full || 1);
                         const base = (s_full * packing + s_pcs) * rate;
 
                         const taxAmt = toNum(si.gst_amount || 0);
@@ -495,7 +530,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         const s_full = toNum(found.qty_carton);
         const s_pcs = toNum(found.qty_pcs);
         const rate = toNum(found.last_trade_price ?? 0);
-        const packing = toNum(it?.packing_full ?? 1);
+        const packing = toNum(it?.packing_qty || it?.packing_full || 1);
         const base = (s_full * packing + s_pcs) * rate;
 
         const taxAmt = toNum(found.gst_amount || 0);
@@ -539,7 +574,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             const s_pcs = toNum(ci.qty_pcs);
             const rate = toNum(ci.last_trade_price ?? 0);
             const it = ci.item;
-            const packing = toNum(it?.packing_full ?? 1);
+            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
             const base = (s_full * packing + s_pcs) * rate;
 
             const taxAmt = toNum(ci.gst_amount || 0);
@@ -575,8 +610,27 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             };
         });
 
+        // Auto-assign the source invoice from the selected catalog items
+        if (activeAssignInvoiceNo && !originalInvoiceNo) {
+            setOriginalInvoiceNo(activeAssignInvoiceNo);
+            // Build a minimal invoice object so the transaction bar renders correctly
+            const matchedInvoice = invoices.find(inv => inv.invoice === activeAssignInvoiceNo);
+            if (matchedInvoice) {
+                setSelectedInvoice(matchedInvoice);
+            } else {
+                // Invoices list may not be loaded; create a stub so UI shows the invoice number
+                setSelectedInvoice({
+                    id: activeAssignSaleId ?? 0,
+                    invoice: activeAssignInvoiceNo,
+                    date: activeAssignInvoiceDate,
+                    net_total: 0,
+                    remaining_amount: 1, // non-zero → balance adjustment mode (safe default)
+                    status: 'Pending',
+                });
+            }
+        }
+
         setRows(p => {
-            const existingIds = p.map(r => r.id);
             const cleanRows = p.filter(r => r.item_id);
             const combined = [...newRows, ...cleanRows];
             if (combined.length === 0) combined.push(getEmptyRow());
@@ -586,6 +640,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
         setAssignItemDialogOpen(false);
         setSelectedAssignIds([]);
+        setActiveAssignSaleId(null);
+        setActiveAssignInvoiceNo("");
+        setActiveAssignInvoiceDate("");
         setAssignSearch("");
     };
 
@@ -648,10 +705,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
 
         if (!selectedAccount) { alert("Please identify the customer first."); return; }
+        if (!originalInvoiceNo) { alert("Please select a source invoice to attach this return."); return; }
         if (rowCount === 0) { alert("Please assign items to the manifest before executing return."); return; }
         if (validRows.length === 0) { alert("Please enter return quantities (Cartons or PCS) for the assigned items."); return; }
-
-        setIsSaving(true);
         const payload = {
             date: date.toISOString().split('T')[0],
             invoice: invoiceNo,
@@ -666,6 +722,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             paid_amount: refundAmount,
             payment_account_id: selectedPaymentAccountId,
             remaining_amount: totals.net - refundAmount,
+            sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
                 const base = (r.full * r.packing + r.pcs) * r.rate;
                 const d = (toNum(r.discPercent) / 100) * base;
@@ -686,9 +743,20 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         };
 
         router.post("/sales-return", payload, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsSaving(false);
-                router.get("/sales-return");
+                const id = (page.props as any).id || (page.props as any).flash?.id;
+                
+                setSuccessData({
+                    customerName: selectedAccount?.title || "Customer",
+                    totalAmount: totals.net,
+                    itemCount: validRows.length,
+                    totalFull: validRows.reduce((acc, r) => acc + toNum(r.full), 0),
+                    totalPcs: validRows.reduce((acc, r) => acc + toNum(r.pcs), 0),
+                    totalDiscount: totals.disc,
+                    saleId: id,
+                });
+                setShowSuccessDialog(true);
             },
             onError: () => setIsSaving(false),
         });
@@ -1327,7 +1395,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-1">
                                                             <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Unit Config</div>
-                                                            <div className="text-sm font-bold tracking-tighter text-zinc-800">1 x {toNum(details.item?.packing_full || 1)} PCS</div>
+                                                            <div className="text-sm font-bold tracking-tighter text-zinc-800">1 x {toNum(details.item?.packing_qty || details.item?.packing_full || 1)} PCS</div>
                                                         </div>
                                                         <div className="space-y-1 text-right">
                                                             <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Shelf Stock</div>
@@ -1394,12 +1462,32 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                 </div>
                             </div>
 
+                            {/* Active invoice lock indicator */}
+                            {activeAssignSaleId && (
+                                <div className="px-4 py-2 bg-orange-500/10 border-b border-orange-500/20 flex items-center gap-2">
+                                    <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest">🔒 Locked to Invoice:</span>
+                                    <span className="text-[10px] font-mono font-black text-orange-600">{activeAssignInvoiceNo}</span>
+                                    <span className="text-[9px] text-orange-500/70 ml-1">— Items from other invoices are disabled</span>
+                                </div>
+                            )}
                             <div className="max-h-[450px] overflow-auto p-4 custom-scrollbar relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {customerItems.filter(ci => !assignSearch || ci.item?.title.toLowerCase().includes(assignSearch.toLowerCase()) || ci.invoice_no?.toLowerCase().includes(assignSearch.toLowerCase())).map((ci, idx) => (
+                                {customerItems.filter(ci => !assignSearch || ci.item?.title.toLowerCase().includes(assignSearch.toLowerCase()) || ci.invoice_no?.toLowerCase().includes(assignSearch.toLowerCase())).map((ci, idx) => {
+                                    const isLocked = activeAssignSaleId !== null && ci.sale_id !== activeAssignSaleId;
+                                    const isSelected = selectedAssignIds.includes(ci.id);
+                                    return (
                                     <motion.div key={ci.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}
-                                        className={`flex items-center gap-4 p-3 border ${selectedAssignIds.includes(ci.id) ? 'border-orange-500 bg-orange-500/5' : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5'} ${PREMIUM_ROUNDING_MD} transition-all cursor-pointer group`}
-                                        onClick={() => toggleAssignSelection(ci.id)}>
-                                        <Checkbox checked={selectedAssignIds.includes(ci.id)} onCheckedChange={() => toggleAssignSelection(ci.id)} className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500" />
+                                        title={isLocked ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` : undefined}
+                                        className={`flex items-center gap-4 p-3 border ${
+                                            isSelected ? 'border-orange-500 bg-orange-500/5' :
+                                            isLocked ? 'border-zinc-100 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30 opacity-40 cursor-not-allowed' :
+                                            'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 cursor-pointer'
+                                        } ${PREMIUM_ROUNDING_MD} transition-all group`}
+                                        onClick={() => !isLocked && toggleAssignSelection(ci)}>
+                                        <Checkbox
+                                            checked={isSelected}
+                                            disabled={isLocked}
+                                            onCheckedChange={() => !isLocked && toggleAssignSelection(ci)}
+                                            className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500 disabled:opacity-30" />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="text-[11px] font-black text-zinc-900 dark:text-white uppercase truncate tracking-tighter">{ci.item?.title}</div>
@@ -1413,7 +1501,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             <div className="text-[10px] font-mono text-zinc-600/100 mt-1 uppercase">Purchased: <span className="text-zinc-600 dark:text-zinc-300 font-bold">{fmtDate(ci.date)}</span></div>
                                         </div>
                                     </motion.div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center relative z-10">
@@ -1421,7 +1510,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     {selectedAssignIds.length} Items Selected for Identification
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button variant="ghost" className="h-9 text-[10px] font-black uppercase text-zinc-500" onClick={() => { setAssignItemDialogOpen(false); setSelectedAssignIds([]); }}>
+                                    <Button variant="ghost" className="h-9 text-[10px] font-black uppercase text-zinc-500" onClick={() => { setAssignItemDialogOpen(false); setSelectedAssignIds([]); setActiveAssignSaleId(null); setActiveAssignInvoiceNo(""); setActiveAssignInvoiceDate(""); }}>
                                         Cancel
                                     </Button>
                                     <Button className={`${ACCENT_GRADIENT} h-9 px-6 text-[10px] font-black uppercase text-white shadow-lg shadow-orange-500/20 active:scale-95 transition-all`}
@@ -1519,6 +1608,26 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                     }
                 `}</style>
+
+                {successData && (
+                    <SuccessDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        invoiceNo={invoiceNo}
+                        saleId={successData.saleId}
+                        customerName={successData.customerName}
+                        totalAmount={successData.totalAmount}
+                        countItems={successData.itemCount}
+                        countFull={successData.totalFull}
+                        countPcs={successData.totalPcs}
+                        totalDiscount={successData.totalDiscount}
+                        type="create"
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            router.get("/sales-return/create");
+                        }}
+                    />
+                )}
 
             </SidebarInset>
         </SidebarProvider>

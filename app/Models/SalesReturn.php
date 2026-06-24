@@ -16,6 +16,7 @@ class SalesReturn extends Model
         'date',
         'invoice',
         'original_invoice',
+        'sale_id',
         'customer_id',
         'salesman_id',
         'no_of_items',
@@ -41,5 +42,10 @@ class SalesReturn extends Model
     public function salesman()
     {
         return $this->belongsTo(Saleman::class, 'salesman_id');
+    }
+
+    public function sale()
+    {
+        return $this->belongsTo(Sales::class, 'sale_id');
     }
 }

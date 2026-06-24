@@ -1,5 +1,6 @@
 import React from 'react';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { formatSafeDate } from '@/lib/utils';
 
 interface DetailsReportProps {
     data: any[];
@@ -27,7 +28,7 @@ export default function DetailsReport({ data, formatCurrency }: DetailsReportPro
                     <TableRow key={index} className="hover:bg-orange-500/5 transition-colors group border-border/10">
                         <TableCell className="text-center text-[11px] font-bold text-text-muted/60">{index + 1}</TableCell>
                         <TableCell className="text-[11px] font-black text-orange-600 uppercase tracking-tighter">{row.voucher_no}</TableCell>
-                        <TableCell className="text-[11px] font-bold text-text-primary uppercase">{row.date}</TableCell>
+                        <TableCell className="text-[11px] font-bold text-text-primary uppercase">{formatSafeDate(row.date).toUpperCase()}</TableCell>
                         <TableCell className="text-[11px] font-black text-text-primary uppercase italic tracking-tight">{row.customer_name}</TableCell>
                         <TableCell className="text-[11px] font-black text-text-primary uppercase italic tracking-tight text-blue-600">{row.product_name}</TableCell>
                         <TableCell className="text-right text-[11px] font-bold text-text-primary">{row.qty_full}</TableCell>

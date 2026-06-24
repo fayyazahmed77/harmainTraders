@@ -1,7 +1,7 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, formatSafeDate } from '@/lib/utils';
 
 interface Props {
     data: any[];
@@ -9,6 +9,9 @@ interface Props {
 }
 
 export default function BillReport({ data, formatCurrency }: Props) {
+    // Deduplicate by invoice number as a safety net
+    const uniqueData = data.filter((row, idx, arr) => arr.findIndex(r => r.invoice === row.invoice) === idx);
+
     return (
         <>
             <TableHeader>
@@ -26,9 +29,9 @@ export default function BillReport({ data, formatCurrency }: Props) {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((row, idx) => (
+                {uniqueData.map((row, idx) => (
                     <TableRow 
-                        key={idx} 
+                        key={row.id ?? row.invoice ?? idx} 
                         className="relative group border-b border-border/10 hover:bg-surface-1/50 transition-colors duration-150 animate-slide-up will-change-transform"
                         style={{ animationDelay: `${Math.min(idx, 15) * 40}ms`, animationDuration: '280ms' }}
                     >
@@ -42,7 +45,7 @@ export default function BillReport({ data, formatCurrency }: Props) {
                                 {row.invoice}
                             </span>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{row.date}</TableCell>
+                        <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{formatSafeDate(row.date).toUpperCase()}</TableCell>
                         <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{row.customer_name}</TableCell>
                         <TableCell className="py-4 px-4 text-[11px] font-bold text-text-primary uppercase">{row.salesman_name}</TableCell>
                         

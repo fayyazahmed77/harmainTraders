@@ -344,7 +344,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Return Date :</td>
-                        <td class="detail-value-cell">{{ \Carbon\Carbon::parse($salesReturn->date)->format('d-M-y') }}</td>
+                        <td class="detail-value-cell">{{ strtoupper(\Carbon\Carbon::parse($salesReturn->date)->format('d M y')) }}</td>
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Salesman :</td>

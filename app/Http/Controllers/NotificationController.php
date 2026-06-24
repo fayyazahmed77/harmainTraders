@@ -28,6 +28,11 @@ class NotificationController extends Controller
     {
         $query = $request->user()->notifications();
 
+        // Filter by unread status
+        if ($request->boolean('unread') || $request->input('unread') === 'true') {
+            $query->whereNull('read_at');
+        }
+
         // Filter by category
         if ($request->filled('category') && $request->input('category') !== 'all') {
             $query->where('category', $request->input('category'));

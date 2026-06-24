@@ -259,5 +259,12 @@ if (file_exists($logo_path)) {
         </tr>
     </table>
 
+    @if(isset($is_print_mode) && $is_print_mode)
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+    @endif
 </body>
 </html>

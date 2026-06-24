@@ -90,12 +90,12 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel' | 'print', currentSort?: string) => {
+    const handleExport = async (type: 'pdf' | 'excel' | 'print', currentSort?: string) => {
         let baseUrl = '';
         switch(type) {
-            case 'pdf': baseUrl = route('reports.purchase.export'); break;
-            case 'excel': baseUrl = route('reports.purchase.excel'); break;
-            case 'print': baseUrl = route('reports.purchase.print'); break;
+            case 'pdf':   baseUrl = route('reports.purchase.export'); break;
+            case 'excel': baseUrl = route('reports.purchase.excel');  break;
+            case 'print': baseUrl = route('reports.purchase.print');  break;
         }
 
         const queryParams = new URLSearchParams({
@@ -105,7 +105,39 @@ export default function PurchaseReports({ accounts, items, firms, areas, sub_are
             toDate: params.toDate.toISOString(),
         });
 
-        window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
+        const fullUrl = `${baseUrl}?${queryParams.toString()}`;
+
+        if (type === 'print') {
+            const toastId = toast.loading('Preparing print...');
+            try {
+                const response = await fetch(fullUrl, { credentials: 'same-origin' });
+                if (!response.ok) throw new Error('Failed to load print document');
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                const printWindow = window.open(blobUrl, '_blank');
+                if (!printWindow) {
+                    toast.error('Pop-up blocked', { id: toastId, description: 'Please allow pop-ups for this site.' });
+                    URL.revokeObjectURL(blobUrl);
+                    return;
+                }
+
+                printWindow.addEventListener('load', () => {
+                    printWindow.focus();
+                    printWindow.print();
+                    // Clean up blob URL after a delay to ensure print dialog has opened
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+                });
+
+                toast.success('Print dialog opened', { id: toastId });
+            } catch (err) {
+                console.error('Print failed', err);
+                toast.error('Print failed', { id: toastId, description: 'Could not load report for printing.' });
+            }
+            return;
+        }
+
+        window.open(fullUrl, '_blank');
     };
 
     const getCriteriaString = () => {

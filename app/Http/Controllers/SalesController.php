@@ -123,8 +123,9 @@ class SalesController extends Controller implements HasMiddleware
                 return $item;
             });
 
-        // Calculate Next Invoice Number
-        $lastSale = Sales::latest()->first();
+        // B5 Fix: Suggest invoice number based on MAX id to avoid created_at ordering issues.
+        // The actual invoice number is locked and generated at save time (in store()).
+        $lastSale = Sales::orderByDesc('id')->first();
         $nextInvoiceNo = 'SLS-000001';
 
         if ($lastSale && preg_match('/SLS-(\d+)/', $lastSale->invoice, $matches)) {
@@ -141,7 +142,7 @@ class SalesController extends Controller implements HasMiddleware
         $firms = Firm::select('id', 'name', 'defult')->get();
 
         // Fetch Message Lines (Category: Sales, Status: active)
-        $messageLines = MessageLine::where('category', 'Sales')
+        $messageLines = MessageLine::whereJsonContains('category', 'Sales')
             ->where('status', 'active')
             ->get();
 
@@ -199,12 +200,30 @@ class SalesController extends Controller implements HasMiddleware
         try {
 
             // Create sale
-            // Note: Adjusting fields based on what's available in the request from create.tsx
-            // create.tsx sends: date, invoice, code, party (string), salesman (string), items...
-            // But Sales model expects customer_id, salesman_id.
-            // For now, I will use defaults or try to parse.
-            // Since the user said "make a good show me first", I will assume the frontend will be updated to send IDs later.
-            // For now, I'll map what I can.
+            // B9 Fix: Server-side financial verification — never trust frontend totals.
+            // Recalculate gross_total from item subtotals and net_total from all components.
+            $calcGross = collect($request->items)->sum(fn($i) => (float)($i['subtotal'] ?? 0));
+            $calcNet   = $calcGross
+                + (float)($request->tax_total ?? 0)
+                + (float)($request->courier_charges ?? 0)
+                - (float)($request->extra_discount ?? 0);
+
+            if (abs((float)$request->gross_total - $calcGross) > 1) {
+                DB::rollBack();
+                \Illuminate\Support\Facades\Log::warning('B9 gross_total mismatch attempt', [
+                    'client_gross' => $request->gross_total, 'server_gross' => $calcGross,
+                    'customer_id'  => $request->customer_id, 'ip' => request()->ip(),
+                ]);
+                return redirect()->back()->withErrors(['gross_total' => 'Invoice total mismatch. Please refresh and recalculate.'])->withInput();
+            }
+            if (abs((float)$request->net_total - $calcNet) > 2) {
+                DB::rollBack();
+                \Illuminate\Support\Facades\Log::warning('B9 net_total mismatch attempt', [
+                    'client_net' => $request->net_total, 'server_net' => $calcNet,
+                    'customer_id' => $request->customer_id, 'ip' => request()->ip(),
+                ]);
+                return redirect()->back()->withErrors(['net_total' => 'Net total mismatch. Please refresh and recalculate.'])->withInput();
+            }
 
             $netTotal = $request->net_total;
             $extraDiscount = $request->extra_discount ?? 0;
@@ -322,8 +341,9 @@ class SalesController extends Controller implements HasMiddleware
             // --- Process Payments & Allocations ---
             if (count($splitsData) > 0) {
                 $prefix = 'CRV-';
-                $count = Payment::where('type', 'RECEIPT')->count() + 1;
-                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                // B4 Fix: Use lockForUpdate() inside the current DB transaction to prevent
+                // two concurrent requests from generating the same CRV voucher number.
+                $baseVoucherNo = $this->generateNextSaleVoucherNo($prefix);
                 $groupId = null;
                 $createdPayments = [];
 
@@ -513,7 +533,7 @@ class SalesController extends Controller implements HasMiddleware
         $firms = Firm::select('id', 'name', 'defult')->get();
 
         // Fetch Message Lines (Category: Sales, Status: active)
-        $messageLines = MessageLine::where('category', 'Sales')
+        $messageLines = MessageLine::whereJsonContains('category', 'Sales')
             ->where('status', 'active')
             ->get();
 
@@ -656,8 +676,8 @@ class SalesController extends Controller implements HasMiddleware
             // --- Process New Payments & Allocations (Similar to store) ---
             if (count($splitsData) > 0 && $totalNewPaid > 0) {
                 $prefix = 'CRV-';
-                $count = Payment::where('type', 'RECEIPT')->count() + 1;
-                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                // B4 Fix: Use lockForUpdate() inside the current DB transaction
+                $baseVoucherNo = $this->generateNextSaleVoucherNo($prefix);
                 $groupId = null;
                 $createdPayments = [];
 
@@ -971,5 +991,26 @@ class SalesController extends Controller implements HasMiddleware
         $sale->save();
 
         return redirect()->back()->with('success', "Order #{$sale->invoice} has been canceled.");
+    }
+
+    /**
+     * B4 Fix: Generate a sequential CRV voucher number inside the current DB transaction.
+     * Uses lockForUpdate() so concurrent requests serialize and never produce duplicates.
+     *
+     * @param string $prefix e.g. 'CRV-' → CRV-0001
+     */
+    private function generateNextSaleVoucherNo(string $prefix): string
+    {
+        $last = Payment::where('voucher_no', 'LIKE', $prefix . '%')
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->value('voucher_no');
+
+        $nextNum = 1;
+        if ($last && preg_match('/' . preg_quote(rtrim($prefix, '-'), '/') . '-(\d+)/', $last, $matches)) {
+            $nextNum = (int)$matches[1] + 1;
+        }
+
+        return $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
     }
 }

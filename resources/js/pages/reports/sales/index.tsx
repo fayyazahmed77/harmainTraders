@@ -101,10 +101,11 @@ export default function SalesReportsIndex({ customers, items, firms, salesmen, a
         }
     };
 
-    const handleExport = (type: 'pdf' | 'excel', currentSort?: string) => {
+    const handleExport = (type: 'pdf' | 'excel' | 'print', currentSort?: string) => {
         let baseUrl = '';
         switch(type) {
             case 'pdf': baseUrl = route('reports.sales.export'); break;
+            case 'print': baseUrl = route('reports.sales.print'); break;
             case 'excel': baseUrl = route('reports.sales.excel'); break;
         }
 
@@ -235,6 +236,7 @@ export default function SalesReportsIndex({ customers, items, firms, salesmen, a
                                         loading={loading}
                                         onExportPdf={(sort) => handleExport('pdf', sort)}
                                         onExportExcel={(sort) => handleExport('excel', sort)}
+                                        onPrint={(sort) => handleExport('print', sort)}
                                         params={params}
                                     />
                                 </motion.div>

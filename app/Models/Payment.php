@@ -28,6 +28,7 @@ class Payment extends Model
         'group_id',
         'cheque_status',
         'message_line_id',
+        'is_return_refund', // B1: marks cash refunds from SalesReturn to exclude from ledger formula
     ];
 
     public function messageLine()

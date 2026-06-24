@@ -58,6 +58,7 @@ interface ReportViewProps {
     loading: boolean;
     onExportPdf: (sortBy?: string) => void;
     onExportExcel: (sortBy?: string) => void;
+    onPrint: (sortBy?: string) => void;
     params: any;
 }
 
@@ -205,10 +206,12 @@ export function ReportView({
     loading, 
     onExportPdf, 
     onExportExcel,
+    onPrint,
     params
 }: ReportViewProps) {
     const [sortBy, setSortBy] = useState<string>('default');
     const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+    const [printFlash, setPrintFlash] = useState(false);
     const [pdfFlash, setPdfFlash] = useState(false);
     const [excelFlash, setExcelFlash] = useState(false);
     
@@ -332,6 +335,12 @@ export function ReportView({
     ];
 
     const criteria = `${params.fromDate} TO ${params.toDate} | DIMENSION: ${activeReport.title}`;
+
+    const handlePrintClick = () => {
+        setPrintFlash(true);
+        onPrint(sortBy);
+        setTimeout(() => setPrintFlash(false), 600);
+    };
 
     const handlePdfClick = () => {
         setPdfFlash(true);
@@ -461,7 +470,7 @@ export function ReportView({
                     </div>
                     <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                         {/* [ANIMATION] Analytics Button heartbeat */}
-                        <div className="animate-breathe">
+                        {/* <div className="animate-breathe">
                             <AnalyticsButton 
                                 onClick={() => setIsAnalyticsOpen(true)} 
                                 className="border-indigo-600/20 bg-indigo-600/10 text-indigo-600 hover:bg-indigo-600 hover:text-white"
@@ -472,7 +481,7 @@ export function ReportView({
                                     </div>
                                 } 
                             />
-                        </div>
+                        </div> */}
                         
                         <div className="h-4 w-[1px] bg-border mx-1 hidden lg:block" />
 
@@ -494,13 +503,25 @@ export function ReportView({
                         <Button 
                             variant="outline" 
                             size="sm" 
+                            onClick={handlePrintClick} 
+                            className={cn(
+                                "h-9 rounded-none border-border/50 bg-surface-1 hover:bg-surface-2 text-[10px] font-black uppercase tracking-tight flex items-center gap-2 italic transition-all active:scale-95 duration-150",
+                                printFlash ? "bg-indigo-600 text-white border-indigo-600" : ""
+                            )}
+                        >
+                            <Printer className={cn("h-3.5 w-3.5 transition-colors", printFlash ? "text-white" : "text-indigo-500")} /> Print
+                        </Button>
+
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
                             onClick={handlePdfClick} 
                             className={cn(
                                 "h-9 rounded-none border-border/50 bg-surface-1 hover:bg-surface-2 text-[10px] font-black uppercase tracking-tight flex items-center gap-2 italic transition-all active:scale-95 duration-150",
-                                pdfFlash ? "bg-indigo-600 text-white border-indigo-600" : ""
+                                pdfFlash ? "bg-rose-600 text-white border-rose-600" : ""
                             )}
                         >
-                            <Printer className={cn("h-3.5 w-3.5 transition-colors", pdfFlash ? "text-white" : "text-indigo-500")} /> Print PDF
+                            <FileText className={cn("h-3.5 w-3.5 transition-colors", pdfFlash ? "text-white" : "text-rose-500")} /> PDF
                         </Button>
                         
                         <Button 

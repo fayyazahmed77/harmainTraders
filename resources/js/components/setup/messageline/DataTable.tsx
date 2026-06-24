@@ -12,7 +12,17 @@ import {
   useReactTable,
   flexRender,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown, Eye, Pencil, Trash2, MessageSquare } from "lucide-react";
+import {
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Pencil,
+  Trash2,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+} from "lucide-react";
 import { router, usePage } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +42,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -40,12 +52,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface MessageLine {
   id: number;
   messageline: string;
-  category?: string;
+  category?: string[] | string | null;
   status: string;
   created_by_name?: string;
   created_at: string;
@@ -55,164 +67,222 @@ interface DataTableProps {
   messagesline: MessageLine[];
 }
 
+const CATEGORIES = ["Offer List", "Sales", "Purchase", "Receipt", "Payments"];
+
 export function DataTable({ messagesline }: DataTableProps) {
   const pageProps = usePage().props as unknown as {
     auth: { user: any; permissions: string[] };
   };
   const permissions = pageProps.auth.permissions;
+  const canEdit   = Array.isArray(permissions) && permissions.includes("edit message");
+  const canDelete = Array.isArray(permissions) && permissions.includes("delete message");
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting]         = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection]         = useState({});
 
-  // edit/delete/view states
-  const [editMessage, setEditMessage] = useState<MessageLine | null>(null);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [viewMessage, setViewMessage] = useState<MessageLine | null>(null);
-  const [selectedMessage, setSelectedMessage] = useState<MessageLine | null>(null);
+  // Dialog states
+  const [editMessage,      setEditMessage]      = useState<MessageLine | null>(null);
+  const [viewMessage,      setViewMessage]      = useState<MessageLine | null>(null);
+  const [deleteTarget,     setDeleteTarget]     = useState<MessageLine | null>(null);
 
-  // form states
-  const [messageline, setMessageLine] = useState("");
-  const [category, setCategory] = useState("Sales");
-  const [status, setStatus] = useState("active");
+  // Edit form state
+  const [editText,     setEditText]     = useState("");
+  const [editCategories, setEditCategories] = useState<string[]>(["Sales"]);
+  const [editStatus,   setEditStatus]   = useState("active");
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
+
+  // ── Open edit dialog ──────────────────────────────────────────
+  const openEdit = (msg: MessageLine) => {
+    setEditMessage(msg);
+    setEditText(msg.messageline || "");
+    
+    let cats: string[] = ["Sales"];
+    if (Array.isArray(msg.category)) {
+      cats = msg.category;
+    } else if (typeof msg.category === "string") {
+      try {
+        const parsed = JSON.parse(msg.category);
+        cats = Array.isArray(parsed) ? parsed : [msg.category];
+      } catch {
+        cats = [msg.category];
+      }
+    }
+    setEditCategories(cats);
+    setEditStatus(msg.status || "active");
   };
 
-  // 🧩 Handle update
+  // ── Save changes ──────────────────────────────────────────────
   const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editMessage) return;
 
     router.put(
       `/message-lines/${editMessage.id}`,
-      { messageline, category, status },
+      { messageline: editText, category: editCategories, status: editStatus },
       {
         onSuccess: () => {
-          toast.success("Protocol updated successfully!");
+          toast.success("Message line updated.");
           setEditMessage(null);
         },
-        onError: () => toast.error("Update failed"),
+        onError: () => toast.error("Could not save changes. Please try again."),
       }
     );
   };
 
-  // 🗑 Handle delete
+  // ── Delete ────────────────────────────────────────────────────
   const handleDelete = () => {
-    if (!selectedMessage) return;
-    router.delete(`/message-lines/${selectedMessage.id}`, {
+    if (!deleteTarget) return;
+    router.delete(`/message-lines/${deleteTarget.id}`, {
       onSuccess: () => {
-        toast.success("Protocol purged successfully!");
-        setOpenDeleteDialog(false);
+        toast.success("Message line deleted.");
+        setDeleteTarget(null);
       },
-      onError: () => toast.error("Purge failed"),
+      onError: () => toast.error("Could not delete. Please try again."),
     });
   };
 
-  // 📊 Table columns
+  // ── Status badge ──────────────────────────────────────────────
+  const StatusBadge = ({ status }: { status: string }) => (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+        status === "active"
+          ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+          : "bg-muted text-muted-foreground border border-border"
+      }`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          status === "active" ? "bg-emerald-500" : "bg-muted-foreground"
+        }`}
+      />
+      {status === "active" ? "Active" : "Inactive"}
+    </span>
+  );
+
+  // ── Table columns ─────────────────────────────────────────────
   const columns: ColumnDef<MessageLine>[] = [
     {
       accessorKey: "messageline",
-      header: "Protocol Content",
+      header: "Message Text",
       cell: ({ row }) => (
-        <div className="group/text flex items-start gap-3">
-          <div className="mt-1 h-3 w-px bg-orange-400 opacity-0 group-hover/text:opacity-100 transition-opacity" />
-          <p className="font-bold text-sm tracking-tight text-foreground/90 leading-relaxed font-mono italic">
-            "{row.original.messageline}"
-          </p>
-        </div>
+        <p className="text-sm font-medium text-foreground/90 leading-relaxed max-w-sm truncate">
+          {row.original.messageline}
+        </p>
       ),
-      size: 500,
+      size: 450,
     },
     {
       accessorKey: "category",
-      header: "Domain",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{row.original.category || "General"}</span>
-        </div>
-      ),
+      header: "Used For",
+      cell: ({ row }) => {
+        const cat = row.original.category;
+        let cats: string[] = [];
+        if (Array.isArray(cat)) {
+          cats = cat;
+        } else if (typeof cat === "string") {
+          try {
+            const parsed = JSON.parse(cat);
+            cats = Array.isArray(parsed) ? parsed : [cat];
+          } catch {
+            cats = [cat];
+          }
+        }
+
+        if (cats.length > 0) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              {cats.map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] font-bold uppercase tracking-wide"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          );
+        }
+
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] font-bold uppercase tracking-wide">
+            General
+          </span>
+        );
+      },
     },
     {
       accessorKey: "status",
-      header: "State",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: "created_by_name",
+      header: "Added By",
       cell: ({ row }) => (
-        <span
-          className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[9px] font-black uppercase tracking-tighter ${row.original.status === "active"
-            ? "bg-orange-500/10 text-orange-600 border border-orange-500/20"
-            : "bg-muted text-muted-foreground border border-border"
-            }`}
-        >
-          {row.original.status}
+        <span className="text-sm text-muted-foreground">
+          {row.original.created_by_name || "—"}
         </span>
       ),
     },
     {
-      accessorKey: "created_by_name",
-      header: "Operator",
-      cell: ({ row }) => <span className="text-[11px] font-bold text-foreground/70">{row.original.created_by_name}</span>
-    },
-    {
       accessorKey: "created_at",
-      header: "Timestamp",
+      header: "Date Added",
       cell: ({ row }) => (
-        <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
+        <span className="text-sm text-muted-foreground tabular-nums">
           {formatDate(row.original.created_at)}
         </span>
       ),
     },
     {
       id: "actions",
-      header: () => <div className="text-right px-2">Operations</div>,
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => {
         const msg = row.original;
         return (
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-1.5">
+            {/* View */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="h-9 w-9 border-border/40 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group/btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setViewMessage(msg);
-              }}
+              className="h-8 w-8 rounded-lg hover:bg-muted"
+              title="View"
+              onClick={(e) => { e.stopPropagation(); setViewMessage(msg); }}
             >
-              <Eye className="h-4 w-4 text-muted-foreground group-hover/btn:text-orange-600 transition-colors" />
+              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-border/40 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group/btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditMessage(msg);
-                setMessageLine(msg.messageline || "");
-                setCategory(msg.category || "Sales");
-                setStatus(msg.status || "active");
-              }}
-            >
-              <Pencil className="h-4 w-4 text-muted-foreground group-hover/btn:text-emerald-600 transition-colors" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-border/40 hover:border-rose-500/50 hover:bg-rose-500/5 transition-all group/btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMessage(msg);
-                setOpenDeleteDialog(true);
-              }}
-            >
-              <Trash2 className="h-4 w-4 text-muted-foreground group-hover/btn:text-rose-600 transition-colors" />
-            </Button>
+
+            {/* Edit */}
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg hover:bg-blue-500/10"
+                title="Edit"
+                onClick={(e) => { e.stopPropagation(); openEdit(msg); }}
+              >
+                <Pencil className="h-3.5 w-3.5 text-blue-500" />
+              </Button>
+            )}
+
+            {/* Delete */}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg hover:bg-rose-500/10"
+                title="Delete"
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget(msg); }}
+              >
+                <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+              </Button>
+            )}
           </div>
         );
       },
@@ -229,77 +299,101 @@ export function DataTable({ messagesline }: DataTableProps) {
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: { sorting, columnVisibility, rowSelection },
+    initialState: { pagination: { pageSize: 10 } },
   });
 
   return (
     <div className="w-full">
-      {/* ✏️ Edit Dialog */}
+
+      {/* ══════════════════════════════════════════════════════════
+          EDIT DIALOG
+      ══════════════════════════════════════════════════════════ */}
       <Dialog open={!!editMessage} onOpenChange={() => setEditMessage(null)}>
-        <DialogContent className="sm:max-w-[500px] border-border/60 rounded-sm p-0 overflow-hidden">
-          <div className="h-1.5 bg-orange-500" />
-          <div className="p-8">
-            <DialogHeader>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-orange-500 text-white rounded-sm">
-                  <Pencil className="w-5 h-5" />
+        <DialogContent className="sm:max-w-[620px] rounded-2xl border-border/60 p-0 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-blue-400 to-blue-600" />
+          <div className="p-6">
+            <DialogHeader className="mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                  <Pencil className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <DialogTitle className="text-2xl font-black tracking-tight uppercase">Update Protocol</DialogTitle>
-                  <DialogDescription className="font-medium">Modify existing communication instruction.</DialogDescription>
+                  <DialogTitle className="text-lg font-bold">Edit Message Line</DialogTitle>
+                  <DialogDescription className="text-xs mt-0.5">
+                    Update the message and its settings below.
+                  </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
 
-            <form onSubmit={handleUpdate} className="space-y-6">
+            <form onSubmit={handleUpdate} className="space-y-5">
+              {/* Message Text */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold">
+                  Message Text <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  placeholder="Enter your message..."
+                  className="h-11 rounded-xl border-border/60 bg-muted/30"
+                  required
+                />
+              </div>
+
               <div className="space-y-4">
+                {/* Categories Checkboxes */}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Instruction String</Label>
-                  <Input
-                    value={messageline}
-                    onChange={(e) => setMessageLine(e.target.value)}
-                    className="bg-muted/30 border-muted-foreground/10 focus:ring-1 focus:ring-orange-500/50 h-12 rounded-sm font-mono italic"
-                    required
-                  />
+                  <Label className="text-sm font-semibold">Used For</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-muted/20 border border-border/60 rounded-xl">
+                    {CATEGORIES.map((c) => {
+                      const isChecked = editCategories.includes(c);
+                      return (
+                        <div key={c} className="flex items-center space-x-2.5">
+                          <Checkbox
+                            id={`edit-cat-${c}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEditCategories([...editCategories, c]);
+                              } else {
+                                setEditCategories(editCategories.filter((cat) => cat !== c));
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`edit-cat-${c}`}
+                            className="text-sm font-medium cursor-pointer select-none text-foreground/80 hover:text-foreground"
+                          >
+                            {c}
+                          </Label>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Target Domain</Label>
-                    <ShadSelect value={category} onValueChange={setCategory}>
-                      <SelectTrigger className="w-full bg-muted/30 border-muted-foreground/10 h-11 rounded-sm font-bold text-xs uppercase tracking-wider">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-sm">
-                        <SelectItem value="Offer List">Offer List</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                        <SelectItem value="Purchase">Purchase</SelectItem>
-                        <SelectItem value="Receipt">Receipt</SelectItem>
-                        <SelectItem value="Payments">Payments</SelectItem>
-                      </SelectContent>
-                    </ShadSelect>
+                {/* Status Switch */}
+                <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/60 rounded-xl">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold">Active Status</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enable or disable this message line on printed documents.
+                    </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Operation Status</Label>
-                    <ShadSelect value={status} onValueChange={setStatus}>
-                      <SelectTrigger className="w-full bg-muted/30 border-muted-foreground/10 h-11 rounded-sm font-bold text-xs uppercase tracking-wider">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-sm">
-                        <SelectItem value="active">Active System</SelectItem>
-                        <SelectItem value="inactive">Suspended</SelectItem>
-                      </SelectContent>
-                    </ShadSelect>
-                  </div>
+                  <Switch
+                    checked={editStatus === "active"}
+                    onCheckedChange={(checked) => setEditStatus(checked ? "active" : "inactive")}
+                  />
                 </div>
               </div>
 
-              <DialogFooter className="pt-6 border-t border-border/40">
-                <Button type="button" variant="ghost" className="font-bold text-xs uppercase tracking-widest" onClick={() => setEditMessage(null)}>
-                  Abort
+              <DialogFooter className="pt-4 border-t border-border/40 gap-2">
+                <Button type="button" variant="ghost" className="rounded-xl font-semibold" onClick={() => setEditMessage(null)}>
+                  Cancel
                 </Button>
-                <Button type="submit" className="bg-orange-600 hover:bg-orange-700 h-12 px-8 rounded-sm font-black uppercase tracking-wide shadow-xl shadow-orange-600/10">
-                  Commit Update
+                <Button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white h-11 px-6 rounded-xl font-semibold shadow-lg shadow-blue-500/20 transition-all active:scale-95">
+                  Save Changes
                 </Button>
               </DialogFooter>
             </form>
@@ -307,176 +401,257 @@ export function DataTable({ messagesline }: DataTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* 🗑 Delete Dialog */}
-      <Dialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
-        <DialogContent className="rounded-sm border-2 border-rose-500/20">
-          <DialogHeader>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-rose-500 text-white rounded-sm animate-pulse">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-black tracking-tight uppercase">Purge Protocol?</DialogTitle>
-                <DialogDescription className="font-semibold text-rose-600/70">Critical operation: This action is irreversible.</DialogDescription>
-              </div>
-            </div>
-            <div className="p-4 bg-muted/50 border border-muted-foreground/10 rounded-sm font-mono text-sm italic py-6">
-              "{selectedMessage?.messageline}"
-            </div>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" className="font-bold text-xs uppercase tracking-widest" onClick={() => setOpenDeleteDialog(false)}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700 h-12 px-8 rounded-sm font-black uppercase tracking-wide" onClick={handleDelete}>
-              Confirm Purge
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 👁️ View Dialog */}
-      <Dialog open={!!viewMessage} onOpenChange={() => setViewMessage(null)}>
-        <DialogContent className="sm:max-w-[600px] border-border/60 rounded-sm p-0 overflow-hidden">
-          <div className="h-1.5 bg-orange-500" />
-          <div className="p-8 space-y-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500/10 rounded-sm">
-                  <MessageSquare className="w-6 h-6 text-orange-600" />
+      {/* ══════════════════════════════════════════════════════════
+          DELETE DIALOG
+      ══════════════════════════════════════════════════════════ */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl border-rose-200 dark:border-rose-900/40 p-0 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-rose-400 to-rose-600" />
+          <div className="p-6">
+            <DialogHeader className="mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                  <AlertTriangle className="w-5 h-5 text-rose-500" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black tracking-tight uppercase">Protocol Preview</h2>
-                  <span className="text-[10px] font-black tracking-widest uppercase text-muted-foreground">ID: #MSL-{viewMessage?.id}</span>
+                  <DialogTitle className="text-lg font-bold">Delete Message Line?</DialogTitle>
+                  <DialogDescription className="text-xs mt-0.5 text-rose-600/80">
+                    This cannot be undone.
+                  </DialogDescription>
                 </div>
               </div>
-              <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${viewMessage?.status === 'active' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-muted text-muted-foreground'
-                }`}>
-                {viewMessage?.status}
-              </div>
-            </div>
 
-            <div className="relative p-10 bg-muted/30 border border-border/40 rounded-sm group overflow-hidden">
-              <div className="absolute top-0 left-0 h-full w-1.5 bg-orange-500 opacity-20 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute top-4 right-6 text-[40px] font-black text-orange-500/10 pointer-events-none italic tracking-tighter">"</div>
-              <p className="text-2xl font-black italic tracking-tight text-foreground leading-snug break-words">
-                {viewMessage?.messageline}
-              </p>
-            </div>
+              {/* Preview the message being deleted */}
+              <div className="p-4 bg-muted/50 border border-border/60 rounded-xl">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Message to be deleted:</p>
+                <p className="text-sm font-medium text-foreground leading-relaxed">
+                  "{deleteTarget?.messageline}"
+                </p>
+              </div>
+            </DialogHeader>
 
-            <div className="grid grid-cols-3 gap-6">
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Domain</Label>
-                <p className="text-sm font-black uppercase tracking-tighter text-orange-600">{viewMessage?.category || "General"}</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Operator</Label>
-                <p className="text-sm font-bold text-foreground/80">{viewMessage?.created_by_name}</p>
-              </div>
-              <div className="space-y-1 text-right">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Timestamp</Label>
-                <p className="text-sm font-bold text-foreground/80 tabular-nums">{viewMessage ? formatDate(viewMessage.created_at) : ''}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-border/40">
-              <Button onClick={() => setViewMessage(null)} variant="secondary" className="font-bold text-xs uppercase tracking-widest h-12 flex-1 rounded-sm">
-                Dismiss
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" className="font-semibold rounded-xl" onClick={() => setDeleteTarget(null)}>
+                Keep It
               </Button>
               <Button
-                onClick={() => {
-                  const msg = viewMessage!;
-                  setViewMessage(null);
-                  setEditMessage(msg);
-                  setMessageLine(msg.messageline || "");
-                  setCategory(msg.category || "Sales");
-                  setStatus(msg.status || "active");
-                }}
-                className="bg-orange-500 hover:bg-orange-600 h-12 flex-1 rounded-sm font-black uppercase tracking-widest shadow-xl shadow-orange-500/10 transition-all active:scale-95"
+                className="bg-rose-500 hover:bg-rose-600 text-white h-11 px-6 rounded-xl font-semibold shadow-lg shadow-rose-500/20 transition-all active:scale-95"
+                onClick={handleDelete}
               >
-                Modify Line
+                Yes, Delete
               </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ══════════════════════════════════════════════════════════
+          VIEW DIALOG
+      ══════════════════════════════════════════════════════════ */}
+      <Dialog open={!!viewMessage} onOpenChange={() => setViewMessage(null)}>
+        <DialogContent className="sm:max-w-[520px] rounded-2xl border-border/60 p-0 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-orange-400 to-orange-600" />
+          <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                  <MessageSquare className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Message Line Details</h2>
+                  <span className="text-xs text-muted-foreground">ID #{viewMessage?.id}</span>
+                </div>
+              </div>
+              {viewMessage && <StatusBadge status={viewMessage.status} />}
+            </div>
+
+            {/* Message preview */}
+            <div className="p-5 bg-muted/40 border border-border/60 rounded-xl relative">
+              <span className="absolute top-3 left-4 text-4xl font-black text-orange-500/15 leading-none select-none">"</span>
+              <p className="text-base font-semibold text-foreground leading-relaxed pt-4 break-words">
+                {viewMessage?.messageline}
+              </p>
+              <span className="absolute bottom-2 right-4 text-4xl font-black text-orange-500/15 leading-none select-none">"</span>
+            </div>
+
+            {/* Meta info */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/20 rounded-xl border border-border/40">
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Used For</p>
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {(() => {
+                    const cat = viewMessage?.category;
+                    let cats: string[] = [];
+                    if (Array.isArray(cat)) {
+                      cats = cat;
+                    } else if (typeof cat === "string") {
+                      try {
+                        const parsed = JSON.parse(cat);
+                        cats = Array.isArray(parsed) ? parsed : [cat];
+                      } catch {
+                        cats = [cat];
+                      }
+                    }
+
+                    if (cats.length > 0) {
+                      return cats.map((c) => (
+                        <span key={c} className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] font-bold uppercase tracking-wide">
+                          {c}
+                        </span>
+                      ));
+                    }
+                    return <span className="text-sm font-semibold text-orange-600">General</span>;
+                  })()}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Added By</p>
+                <p className="text-sm font-semibold">{viewMessage?.created_by_name || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Date Added</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {viewMessage ? formatDate(viewMessage.created_at) : ""}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2 border-t border-border/40">
+              <Button
+                variant="secondary"
+                className="flex-1 h-11 rounded-xl font-semibold"
+                onClick={() => setViewMessage(null)}
+              >
+                Close
+              </Button>
+              {canEdit && (
+                <Button
+                  className="flex-1 h-11 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/20 transition-all active:scale-95"
+                  onClick={() => {
+                    const msg = viewMessage!;
+                    setViewMessage(null);
+                    openEdit(msg);
+                  }}
+                >
+                  Edit This Message
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 📋 Table Section */}
-      <div className="w-full rounded-sm border border-border/60 bg-card overflow-hidden">
-        <Table>
-          <TableHeader className="bg-orange-50 border-b border-border/60 h-14">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent border-0">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground py-0">
-                    <div
-                      onClick={() => header.column.toggleSorting()}
-                      className={`flex items-center gap-2 cursor-pointer select-none h-full hover:text-foreground transition-colors ${header.id === "actions" ? "justify-end" : ""
-                        }`}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getIsSorted() && (
-                        <div className="bg-orange-500/10 p-1 rounded-sm">
-                          {header.column.getIsSorted() === "asc" ? <ChevronUp className="w-3 h-3 text-orange-500" /> : <ChevronDown className="w-3 h-3 text-orange-500" />}
-                        </div>
-                      )}
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-
-          <TableBody>
-            <AnimatePresence>
-              {table.getRowModel().rows.map((row, idx) => (
-                <motion.tr
-                  key={row.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className="group border-b border-border/40 last:border-0 hover:bg-orange-500/[0.02] cursor-pointer transition-colors"
-                  onClick={() => setViewMessage(row.original)}
+      {/* ══════════════════════════════════════════════════════════
+          TABLE
+      ══════════════════════════════════════════════════════════ */}
+      <Table>
+        {/* Header */}
+        <TableHeader className="bg-muted/40 border-b border-border/60">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="hover:bg-transparent border-0">
+              {headerGroup.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground h-12 px-4 first:pl-6 last:pr-6"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-5 px-4 first:pl-6 last:pr-6">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </motion.tr>
+                  <div
+                    onClick={() => header.column.toggleSorting()}
+                    className={`flex items-center gap-1.5 cursor-pointer select-none hover:text-foreground transition-colors w-fit ${
+                      header.id === "actions" ? "ml-auto" : ""
+                    }`}
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.column.getIsSorted() && (
+                      <span className="text-orange-500">
+                        {header.column.getIsSorted() === "asc"
+                          ? <ChevronUp className="w-3.5 h-3.5" />
+                          : <ChevronDown className="w-3.5 h-3.5" />}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
               ))}
-            </AnimatePresence>
-          </TableBody>
-        </Table>
+            </TableRow>
+          ))}
+        </TableHeader>
 
-        {/* Pagination Console */}
-        <div className="flex items-center justify-between px-6 py-4 bg-muted/20 border-t border-border/40">
-          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-            Showing <span className="text-foreground">{table.getRowModel().rows.length}</span> entries per cycle
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-sm font-black text-[9px] uppercase tracking-tighter disabled:opacity-30"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+        {/* Body */}
+        <TableBody>
+          <AnimatePresence>
+            {table.getRowModel().rows.map((row, idx) => (
+              <motion.tr
+                key={row.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="border-b border-border/40 last:border-0 hover:bg-muted/30 cursor-pointer transition-colors duration-150"
+                onClick={() => setViewMessage(row.original)}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="py-4 px-4 first:pl-6 last:pr-6">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </motion.tr>
+            ))}
+          </AnimatePresence>
+        </TableBody>
+      </Table>
+
+      {/* ── Pagination ── */}
+      <div className="flex items-center justify-between px-6 py-4 border-t border-border/40 bg-muted/20">
+        <p className="text-xs text-muted-foreground">
+          Showing{" "}
+          <span className="font-semibold text-foreground">
+            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}
+          </span>{" "}
+          –{" "}
+          <span className="font-semibold text-foreground">
+            {Math.min(
+              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+              messagesline.length
+            )}
+          </span>{" "}
+          of{" "}
+          <span className="font-semibold text-foreground">{messagesline.length}</span> records
+        </p>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+
+          {[...Array(table.getPageCount())].map((_, i) => (
+            <button
+              key={i}
+              onClick={() => table.setPageIndex(i)}
+              className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold transition-all ${
+                table.getState().pagination.pageIndex === i
+                  ? "bg-orange-500 text-white shadow-sm shadow-orange-500/30"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
             >
-              PREV
-            </Button>
-            <div className="flex gap-1">
-              {[...Array(table.getPageCount())].map((_, i) => (
-                <div key={i} className={`h-1.5 w-4 rounded-sm transition-all ${table.getState().pagination.pageIndex === i ? 'bg-orange-500 w-8' : 'bg-border'}`} />
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-sm font-black text-[9px] uppercase tracking-tighter disabled:opacity-30"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              NEXT
-            </Button>
-          </div>
+              {i + 1}
+            </button>
+          ))}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg disabled:opacity-30"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

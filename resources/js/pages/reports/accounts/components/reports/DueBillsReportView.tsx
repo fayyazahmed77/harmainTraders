@@ -95,7 +95,7 @@ export function DueBillsReportView({
                                         <tbody className="divide-y divide-border/10">
                                             {bills.map((row: any, i: number) => (
                                                 <tr key={i} className="hover:bg-surface-1/50">
-                                                    <td className="px-4 py-2 font-black text-text-secondary tabular-nums border-r border-border/10">{format(new Date(row.date), 'dd-MMM-yy').toUpperCase()}</td>
+                                                    <td className="px-4 py-2 font-black text-text-secondary tabular-nums border-r border-border/10">{format(new Date(row.date), 'dd MMM yy').toUpperCase()}</td>
                                                     <td className="px-4 py-2 font-bold text-text-muted border-r border-border/10">{row.voucher_no}</td>
                                                     <td className="px-4 py-2 font-medium text-text-secondary border-r border-border/10">{row.party_name}</td>
                                                     <td className="px-3 py-2 text-center border-r border-border/10">
@@ -106,7 +106,7 @@ export function DueBillsReportView({
                                                             {row.type || 'CREDIT'}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-2 text-center tabular-nums text-text-muted border-r border-border/10">{format(new Date(row.due_date), 'dd-MMM-yy').toUpperCase()}</td>
+                                                    <td className="px-4 py-2 text-center tabular-nums text-text-muted border-r border-border/10">{format(new Date(row.due_date), 'dd MMM yy').toUpperCase()}</td>
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.paid)}</td>

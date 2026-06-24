@@ -490,7 +490,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/data', [SalesReportsController::class, 'getData'])->name('reports.sales.data');
             Route::get('/export', [SalesReportsController::class, 'exportPdf'])->name('reports.sales.export');
             Route::get('/excel', [SalesReportsController::class, 'exportExcel'])->name('reports.sales.excel');
-            Route::get('/print', [SalesReportsController::class, 'exportPdf'])->name('reports.sales.print');
+            Route::get('/print', [SalesReportsController::class, 'print'])->name('reports.sales.print');
         });
     });
 

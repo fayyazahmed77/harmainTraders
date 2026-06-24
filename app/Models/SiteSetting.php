@@ -29,10 +29,12 @@ class SiteSetting extends Model
         'pusher_app_key',
         'pusher_app_secret',
         'pusher_app_cluster',
+        'two_factor_enabled',
     ];
 
     protected $casts = [
         'notification_settings' => 'array',
+        'two_factor_enabled' => 'boolean',
     ];
 
     public static function get()

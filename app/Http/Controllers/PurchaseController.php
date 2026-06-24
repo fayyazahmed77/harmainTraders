@@ -36,24 +36,36 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $query = Purchase::with('supplier', 'salesman', 'messageLine');
 
-        // Filter by Date Range
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        // Filter by Date Range — use end-of-day to include all records on the end date
+        if (!empty($request->start_date) && !empty($request->end_date)) {
+            $query->whereBetween('date', [
+                $request->start_date . ' 00:00:00',
+                $request->end_date   . ' 23:59:59',
+            ]);
+        } elseif (!empty($request->start_date)) {
+            $query->whereDate('date', '>=', $request->start_date);
+        } elseif (!empty($request->end_date)) {
+            $query->whereDate('date', '<=', $request->end_date);
         }
 
         // Filter by Supplier
-        if ($request->has('supplier_id') && $request->supplier_id && $request->supplier_id !== 'all') {
+        if (!empty($request->supplier_id) && $request->supplier_id !== 'all') {
             $query->where('supplier_id', $request->supplier_id);
         }
 
-        // Filter by Status
-        if ($request->has('status') && $request->status !== 'all') {
+        // Filter by Status — guard against empty string coming from cleared filter
+        if (!empty($request->status) && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
-        // Filter by Search (Invoice or Supplier Name?)
-        if ($request->has('search') && $request->search) {
-            $query->where('invoice', 'like', '%' . $request->search . '%');
+        // Filter by Search — matches invoice number, supplier code, or supplier name
+        if (!empty($request->search)) {
+            $term = '%' . $request->search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('invoice', 'like', $term)
+                  ->orWhere('code', 'like', $term)
+                  ->orWhereHas('supplier', fn ($s) => $s->where('title', 'like', $term));
+            });
         }
 
         $purchases = $query->latest()->get();
@@ -63,10 +75,13 @@ class PurchaseController extends Controller implements HasMiddleware
         // For Returns, we must also apply similar filters (date, supplier) to PurchaseReturn model to match context.
 
         $returnQuery = \App\Models\PurchaseReturn::query();
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $returnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+        if (!empty($request->start_date) && !empty($request->end_date)) {
+            $returnQuery->whereBetween('date', [
+                $request->start_date . ' 00:00:00',
+                $request->end_date   . ' 23:59:59',
+            ]);
         }
-        if ($request->has('supplier_id') && $request->supplier_id && $request->supplier_id !== 'all') {
+        if (!empty($request->supplier_id) && $request->supplier_id !== 'all') {
             $returnQuery->where('supplier_id', $request->supplier_id);
         }
 
@@ -119,7 +134,7 @@ class PurchaseController extends Controller implements HasMiddleware
             $nextInvoiceNo = 'PUR-' . str_pad($number + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        $messageLines = \App\Models\MessageLine::where('category', 'Purchase')
+        $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
             ->where('status', 'active')
             ->get();
 
@@ -448,7 +463,7 @@ class PurchaseController extends Controller implements HasMiddleware
             })
             ->get();
         $salemans = Saleman::get();
-        $messageLines = \App\Models\MessageLine::where('category', 'Purchase')
+        $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
             ->where('status', 'active')
             ->get();
 

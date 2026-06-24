@@ -1,6 +1,7 @@
 // sales_return/edit.tsx
 import React, { useState, useMemo, useEffect } from "react";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +95,7 @@ interface SalesReturn {
     paid_amount: number;
     payment_account_id?: number | null;
     items: any[];
+    sale_id?: number | null;
 }
 
 interface Props {
@@ -144,6 +146,15 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 // ───────────────────────────────────────────
 export default function SalesReturnEditPage({ returnData, accounts, salemans, paymentAccounts }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const { errors } = usePage().props as any;
+
+    useEffect(() => {
+        if (errors && Object.keys(errors).length > 0) {
+            Object.keys(errors).forEach((key) => {
+                toast.error(`${key}: ${errors[key]}`);
+            });
+        }
+    }, [errors]);
 
     // ── Header state ──────────────────────────
     const [date, setDate] = useState<Date>(new Date(returnData.date));
@@ -153,7 +164,19 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(toNum(returnData.paid_amount));
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(() => {
+        if (returnData.sale_id) {
+            return {
+                id: returnData.sale_id,
+                invoice: returnData.original_invoice,
+                date: returnData.date,
+                net_total: 0,
+                remaining_amount: 0,
+                status: ""
+            };
+        }
+        return null;
+    });
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -224,7 +247,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     useEffect(() => {
         if (returnData.items) {
             const initialRows = returnData.items.map(it => {
-                const packing = toNum(it.item?.packing_full ?? 1);
+                const packing = toNum(it.item?.packing_qty || it.item?.packing_full || 1);
 
                 // Calculate percentages back from amounts for display if possible,
                 // otherwise use the strict logic. For Edit, we should probably 
@@ -316,7 +339,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                         const s_full = toNum(si.qty_carton);
                         const s_pcs = toNum(si.qty_pcs);
                         const rate = toNum(si.trade_price);
-                        const packing = toNum(si.item?.packing_full ?? 1);
+                        const packing = toNum(si.item?.packing_qty || si.item?.packing_full || 1);
                         const base = (s_full * packing + s_pcs) * rate;
                         const taxAmt = toNum(si.gst_amount || 0);
                         const discAmt = toNum(si.discount || 0);
@@ -392,7 +415,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             const s_pcs = toNum(ci.qty_pcs);
             const rate = toNum(ci.last_trade_price ?? 0);
             const it = ci.item;
-            const packing = toNum(it?.packing_full ?? 1);
+            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
             const base = (s_full * packing + s_pcs) * rate;
             const taxAmt = toNum(ci.gst_amount || 0);
             const discAmt = toNum(ci.discount || 0);
@@ -486,6 +509,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
 
         if (!selectedAccount) { alert("Please identify the customer first."); return; }
+        if (!originalInvoiceNo) { alert("Please select a source invoice to attach this return."); return; }
         if (validRows.length === 0) { alert("Please enter return quantities."); return; }
 
         setIsSaving(true);
@@ -503,6 +527,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             paid_amount: refundAmount,
             remaining_amount: totals.net - refundAmount,
             payment_account_id: selectedPaymentAccountId,
+            sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
                 const base = (r.full * r.packing + r.pcs) * r.rate;
                 const d = (toNum(r.discPercent) / 100) * base;

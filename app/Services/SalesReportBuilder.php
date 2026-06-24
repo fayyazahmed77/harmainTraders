@@ -179,6 +179,7 @@ class SalesReportBuilder
         }
 
         $results = $query->select(
+            'sales.id',
             'sales.invoice',
             'sales.date',
             'accounts.title as customer_name',
@@ -189,7 +190,9 @@ class SalesReportBuilder
             'sales.paid_amount',
             'sales.status'
         )
+        ->distinct()
         ->orderBy('sales.date', 'desc')
+        ->orderBy('sales.id', 'desc')
         ->get();
 
         return $this->transformToArray($results);

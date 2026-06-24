@@ -19,7 +19,7 @@ const DateReport = ({ data, formatCurrency }: any) => {
                     <TableRow key={index} className="border-b border-border/10 hover:bg-emerald-500/5 transition-colors group">
                         <TableCell className="py-2.5 text-[10px] font-bold text-text-muted">{index + 1}</TableCell>
                         <TableCell className="py-2.5 text-[11px] font-black text-text-primary uppercase tracking-tight">
-                            {formatSafeDate(row.date)}
+                            {formatSafeDate(row.date).toUpperCase()}
                         </TableCell>
                         <TableCell className="py-2.5 text-[11px] font-black text-right tabular-nums text-emerald-500">
                             {formatCurrency(row.total_amount)}

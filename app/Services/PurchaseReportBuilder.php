@@ -45,6 +45,7 @@ class PurchaseReportBuilder
         }
 
         $results = $query->select(
+            'purchases.id',
             'purchases.invoice',
             'purchases.date',
             'accounts.title as account_name',
@@ -54,7 +55,9 @@ class PurchaseReportBuilder
             'purchases.paid_amount',
             'purchases.status'
         )
-        ->orderBy('date', 'desc')
+        ->distinct()
+        ->orderBy('purchases.date', 'desc')
+        ->orderBy('purchases.id', 'desc')
         ->get();
 
         return $this->transformToArray($results);

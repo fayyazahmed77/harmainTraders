@@ -1,6 +1,7 @@
 // purchase_return/edit.tsx
 import React, { useState, useMemo, useEffect } from "react";
 import { router } from "@inertiajs/react";
+import { SuccessDialog } from "./components/SuccessDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +120,8 @@ const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode,
 // ───────────────────────────────────────────
 export default function PurchaseReturnEditPage({ returnData, accounts, salemans }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [successData, setSuccessData] = useState<any>(null);
 
     // ── Header state ──────────────────────────
     const [date, setDate] = useState<Date>(new Date(returnData.date));
@@ -415,9 +418,19 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
         };
 
         router.put(`/purchase-return/${returnData.id}`, payload, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsSaving(false);
-                router.get("/purchase-return");
+                const id = (page.props as any).id || (page.props as any).flash?.id || returnData.id;
+                setSuccessData({
+                    supplierName: selectedAccount?.title || "Supplier",
+                    totalAmount: totals.net,
+                    itemCount: validRows.length,
+                    totalFull: validRows.reduce((acc, r) => acc + toNum(r.full), 0),
+                    totalPcs: validRows.reduce((acc, r) => acc + toNum(r.pcs), 0),
+                    totalDiscount: totals.disc,
+                    purchaseReturnId: id,
+                });
+                setShowSuccessDialog(true);
             },
             onError: (err) => {
                 setIsSaving(false);
@@ -677,6 +690,25 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
                 `}</style>
+                {successData && (
+                    <SuccessDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        invoiceNo={invoiceNo}
+                        saleId={successData.purchaseReturnId}
+                        customerName={successData.supplierName}
+                        totalAmount={successData.totalAmount}
+                        countItems={successData.itemCount}
+                        countFull={successData.totalFull}
+                        countPcs={successData.totalPcs}
+                        totalDiscount={successData.totalDiscount}
+                        type="edit"
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            router.get("/purchase-return");
+                        }}
+                    />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

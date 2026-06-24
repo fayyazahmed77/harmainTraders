@@ -40,7 +40,7 @@
     <tr>
         <td class="text-center">{{ $index + 1 }}</td>
         <td class="text-center font-black">{{ $row['invoice'] }}</td>
-        <td class="text-center">{{ \Carbon\Carbon::parse($row['date'])->format('d-M-y') }}</td>
+        <td class="text-center">{{ strtoupper(\Carbon\Carbon::parse($row['date'])->format('d M y')) }}</td>
         <td class="uppercase wrap-text">{{ $row['account_name'] }}</td>
         <td class="uppercase wrap-text">{{ $row['product_name'] }}</td>
         <td class="text-center">{{ number_format($row['tp'], 2) }}</td>

@@ -117,7 +117,7 @@ export default function StockLedger({ items }: PageProps) {
         {
             accessorKey: 'date',
             header: 'Date',
-            cell: ({ row }) => format(new Date(row.original.date), 'dd-MMM-yyyy'),
+            cell: ({ row }) => format(new Date(row.original.date), 'dd MMM yy').toUpperCase(),
         },
         {
             accessorKey: 'type',

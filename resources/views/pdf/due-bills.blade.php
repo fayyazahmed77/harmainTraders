@@ -249,5 +249,12 @@ if (file_exists($logo_path)) {
     <p class="text-center" style="margin-top: 50px;">No Due Bills Found.</p>
     @endif
 
+    @if(isset($is_print_mode) && $is_print_mode)
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+    @endif
 </body>
 </html>

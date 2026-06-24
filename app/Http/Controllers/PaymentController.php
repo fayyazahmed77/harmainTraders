@@ -206,9 +206,10 @@ class PaymentController extends Controller implements HasMiddleware
             })
             ->get();
 
-        $messageLines = \App\Models\MessageLine::whereIn('category', ['Payments', 'Receipt'])
-            ->where('status', 'active')
-            ->get();
+        $messageLines = \App\Models\MessageLine::where(function ($query) {
+            $query->whereJsonContains('category', 'Payments')
+                  ->orWhereJsonContains('category', 'Receipt');
+        })->where('status', 'active')->get();
 
         return Inertia::render('daily/payment/edit', [
             'payment' => $payment,
@@ -251,9 +252,18 @@ class PaymentController extends Controller implements HasMiddleware
     private function getTotalReturns($bill, string $billType): float
     {
         if ($billType === 'App\Models\Sales') {
-            return (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+            return (float) \App\Models\SalesReturn::where(function($q) use ($bill) {
+                $q->where('sale_id', $bill->id)
+                  ->orWhere(function($sub) use ($bill) {
+                      $sub->whereNull('sale_id')
+                          ->where('original_invoice', $bill->invoice)
+                          ->where('customer_id', $bill->customer_id);
+                  });
+            })->sum('net_total');
         } else {
-            return (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+            return (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)
+                ->where('supplier_id', $bill->supplier_id)
+                ->sum('net_total');
         }
     }
 
@@ -328,9 +338,11 @@ class PaymentController extends Controller implements HasMiddleware
     }
 
     // Generate PDF (Print View)
-    public function pdf($id)
+    public function pdf(Request $request, $id)
     {
         $payment = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine'])->findOrFail($id);
+        $format = $request->get('format', 'big');
+        $view = $format === 'small' ? 'pdf.payment-voucher_half' : 'pdf.payment-voucher';
 
         if ($payment->group_id) {
             $groupPayments = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine'])
@@ -338,13 +350,19 @@ class PaymentController extends Controller implements HasMiddleware
                 ->get();
 
             // For combined slip, we pass the collection
-            $pdf = PDF::loadView('pdf.payment-voucher', [
+            $pdf = PDF::loadView($view, [
                 'payment' => $payment,
                 'groupPayments' => $groupPayments,
                 'isCombined' => true
             ]);
         } else {
-            $pdf = PDF::loadView('pdf.payment-voucher', compact('payment'));
+            $pdf = PDF::loadView($view, compact('payment'));
+        }
+
+        if ($format === 'small') {
+            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+        } else {
+            $pdf->setPaper('A4', 'portrait');
         }
 
         return $pdf->stream($payment->voucher_no . '.pdf');
@@ -371,9 +389,10 @@ class PaymentController extends Controller implements HasMiddleware
 
 
 
-        $messageLines = \App\Models\MessageLine::whereIn('category', ['Payments', 'Receipt'])
-            ->where('status', 'active')
-            ->get();
+        $messageLines = \App\Models\MessageLine::where(function ($query) {
+            $query->whereJsonContains('category', 'Payments')
+                  ->orWhereJsonContains('category', 'Receipt');
+        })->where('status', 'active')->get();
 
         return Inertia::render("daily/payment/create", [
             'accounts' => $accounts,

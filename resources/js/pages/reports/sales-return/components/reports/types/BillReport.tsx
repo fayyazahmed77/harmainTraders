@@ -1,5 +1,6 @@
 import React from 'react';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { formatSafeDate } from '@/lib/utils';
 
 interface BillReportProps {
     data: any[];
@@ -27,7 +28,7 @@ export default function BillReport({ data, formatCurrency }: BillReportProps) {
                         <TableCell className="text-[11px] font-black text-orange-600 group-hover:underline underline-offset-4 cursor-pointer">
                             {row.voucher_no}
                         </TableCell>
-                        <TableCell className="text-[11px] font-bold text-text-primary uppercase">{row.date}</TableCell>
+                        <TableCell className="text-[11px] font-bold text-text-primary uppercase">{formatSafeDate(row.date).toUpperCase()}</TableCell>
                         <TableCell className="text-[11px] font-black text-text-primary uppercase italic tracking-tight">{row.customer_name}</TableCell>
                         <TableCell className="text-right text-[11px] font-bold text-text-muted">{formatCurrency(row.gross)}</TableCell>
                         <TableCell className="text-right text-[11px] font-bold text-red-500/80">-{formatCurrency(row.discount)}</TableCell>

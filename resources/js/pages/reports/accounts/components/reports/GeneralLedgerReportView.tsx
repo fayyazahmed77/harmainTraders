@@ -159,7 +159,7 @@ export function GeneralLedgerReportView({
                                             {row.cheque_no || ''}
                                         </td>
                                         <td className="px-3 py-2.5 text-center text-text-muted border-r border-border/10 tabular-nums">
-                                            {formatSafeDate(row.cheque_date, 'dd-MM-yy', '')}
+                                            {formatSafeDate(row.cheque_date, 'dd MMM yy', '').toUpperCase()}
                                         </td>
                                         <td className="px-4 py-2.5 text-right font-bold text-rose-500 border-r border-border/10 tabular-nums">
                                             {debit > 0 ? formatCurrency(debit) : ''}

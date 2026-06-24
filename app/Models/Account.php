@@ -151,7 +151,13 @@ class Account extends Model
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
+            // Exclude is_return_refund payments from balance calculation (B1 Fix):
+            // When a Sales Return creates a cash refund payment (type=PAYMENT, is_return_refund=1),
+            // including it in +$totalPayments would cancel out the return's -$totalReturns credit,
+            // leaving the customer balance unchanged when it should decrease by the return amount.
+            // The return's effect on balance is already fully captured by -$totalReturns.
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where('is_return_refund', false)
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));

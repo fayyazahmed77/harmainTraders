@@ -28,7 +28,7 @@
     <tr>
         <td class="text-center">{{ $index + 1 }}</td>
         <td class="text-center font-black">{{ $row['invoice'] }}</td>
-        <td class="text-center">{{ \Carbon\Carbon::parse($row['date'])->format('d-M-y H:i:s') }}</td>
+        <td class="text-center">{{ strtoupper(\Carbon\Carbon::parse($row['date'])->format('d M y')) }}</td>
         <td class="uppercase">{{ $row['account_name'] }}</td>
         <td class="text-right">{{ $row['gross'] > 0 ? number_format($row['gross'], 2) : '' }}</td>
         <td class="text-right text-rose">{{ $row['discount'] != 0 ? number_format($row['discount'], 2) : '' }}</td>

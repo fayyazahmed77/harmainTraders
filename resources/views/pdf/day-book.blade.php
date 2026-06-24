@@ -484,5 +484,12 @@ $style_profit_footer = "color: #64748b; font-size: 8px; font-weight: 900; border
         </table>
     </div>
 
+    @if(isset($is_print_mode) && $is_print_mode)
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+    @endif
 </body>
 </html>

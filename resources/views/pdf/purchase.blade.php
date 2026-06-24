@@ -361,11 +361,11 @@ if (file_exists($logo_path)) {
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Invoice Date :</td>
-                        <td class="detail-value-cell">{{ \Carbon\Carbon::parse($purchase->date)->format('d-M-y') }}</td>
+                        <td class="detail-value-cell">{{ strtoupper(\Carbon\Carbon::parse($purchase->date)->format('d M y')) }}</td>
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Due Date :</td>
-                        <td class="detail-value-cell">{{ \Carbon\Carbon::parse($purchase->date)->addDays((int)($purchase->supplier->aging_days ?? 0))->format('d-M-y') }}</td>
+                        <td class="detail-value-cell">{{ strtoupper(\Carbon\Carbon::parse($purchase->date)->addDays((int)($purchase->supplier->aging_days ?? 0))->format('d M y')) }}</td>
                     </tr>
                 </table>
             </div>

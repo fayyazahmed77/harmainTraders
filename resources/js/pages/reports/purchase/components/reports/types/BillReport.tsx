@@ -3,7 +3,12 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/compon
 import { formatSafeDate } from '@/lib/utils';
 
 const BillReport = ({ data, formatCurrency }: any) => {
-    const totals = data.reduce((acc: any, row: any) => ({
+    // Deduplicate by invoice number as a safety net
+    const uniqueData = data.filter((row: any, idx: number, arr: any[]) =>
+        arr.findIndex((r: any) => r.invoice === row.invoice) === idx
+    );
+
+    const totals = uniqueData.reduce((acc: any, row: any) => ({
         gross: acc.gross + (Number(row.gross) || 0),
         discount: acc.discount + (Number(row.discount) || 0),
         net: acc.net + (Number(row.amount) || 0),
@@ -25,12 +30,12 @@ const BillReport = ({ data, formatCurrency }: any) => {
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((row: any, index: number) => (
-                    <TableRow key={index} className="border-b border-border/10 hover:bg-emerald-500/5 transition-colors">
+                {uniqueData.map((row: any, index: number) => (
+                    <TableRow key={row.id ?? row.invoice ?? index} className="border-b border-border/10 hover:bg-emerald-500/5 transition-colors">
                         <TableCell className="py-2 text-[10px] font-bold text-text-muted">{index + 1}</TableCell>
                         <TableCell className="py-2 text-[10px] font-black text-emerald-500 uppercase">{row.invoice}</TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-text-muted whitespace-nowrap">
-                            {formatSafeDate(row.date, 'dd-MMM-yy HH:mm:ss')}
+                            {formatSafeDate(row.date).toUpperCase()}
                         </TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-text-primary uppercase">{row.account_name}</TableCell>
                         <TableCell className="py-2 text-[10px] font-bold text-right tabular-nums text-text-secondary">{row.gross > 0 ? formatCurrency(row.gross) : ''}</TableCell>

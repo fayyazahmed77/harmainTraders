@@ -134,7 +134,7 @@
         <tbody>
             @foreach($returns as $return)
             <tr>
-                <td>{{ date('d M Y', strtotime($return->date)) }}</td>
+                <td>{{ strtoupper(date('d M y', strtotime($return->date))) }}</td>
                 <td>{{ $return->invoice }}</td>
                 <td>{{ $return->supplier_name }}</td>
                 <td class="text-right">{{ $return->no_of_items }}</td>

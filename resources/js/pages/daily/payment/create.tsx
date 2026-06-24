@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -33,7 +33,7 @@ import {
   Search, ChevronRight, Hash, User as UserIcon,
   ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
   Navigation, Clock, Terminal, Scale, Hash as HashIcon, ArrowUpRight, ArrowDownLeft,
-  CreditCard, ClipboardList, Printer
+  CreditCard, ClipboardList, Printer, Receipt, Layout
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -162,6 +162,93 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, [errors]);
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printFormat, setPrintFormat] = useState<'small' | 'big'>('small');
+  const [countdown, setCountdown] = useState(10);
+  const timerRef = useRef<any>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (iframeRef.current && document.body.contains(iframeRef.current)) {
+        document.body.removeChild(iframeRef.current);
+      }
+    };
+  }, []);
+
+  const handleDirectPrint = (format: 'small' | 'big') => {
+    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
+    if (!printId) {
+      toast.error("Voucher ID not found. Please check reports.");
+      return;
+    }
+
+    setIsPrinting(true);
+    setPrintFormat(format);
+    setCountdown(10);
+
+    // 1. Create a hidden iframe
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.style.opacity = "0";
+    iframe.src = `/payments/${printId}/pdf?format=${format}`;
+    
+    iframeRef.current = iframe;
+    document.body.appendChild(iframe);
+
+    // 2. Trigger print when loaded
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.error("Direct print failed, fallback to new tab:", e);
+        window.open(iframe.src, '_blank');
+      }
+    };
+
+    // 3. Start countdown timer
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setSuccessDialogOpen(false);
+          // Reset form states like in the "Create New" action
+          setAmount(0);
+          setDiscount(0);
+          setSelectedBillIds(new Set());
+          setAllocations({});
+          setRemarks("");
+          setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
+          setSelectedAccountId("");
+          
+          setTimeout(() => {
+            setIsPrinting(false);
+            if (iframeRef.current && document.body.contains(iframeRef.current)) {
+              document.body.removeChild(iframeRef.current);
+              iframeRef.current = null;
+            }
+          }, 300);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleCancelPrint = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsPrinting(false);
+    if (iframeRef.current && document.body.contains(iframeRef.current)) {
+      document.body.removeChild(iframeRef.current);
+      iframeRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (flash?.success) {
@@ -1575,132 +1662,198 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
         </Dialog>
 
         {/* ── PREMIUM SUCCESS DIALOG ── */}
-        <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+        <Dialog open={successDialogOpen} onOpenChange={(val) => {
+          if (!val && isPrinting) {
+            handleCancelPrint();
+          }
+          setSuccessDialogOpen(val);
+        }}>
           <DialogContent className="sm:max-w-[450px] p-0 border-none bg-white dark:bg-zinc-950 shadow-2xl rounded-[2rem] overflow-hidden">
-            <div className={`relative h-56 ${t.gradient} flex flex-col items-center justify-center text-white p-8 text-center overflow-hidden`}>
-              {/* Animated Background Blobs */}
-              <motion.div 
-                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
-              />
-              <motion.div 
-                animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
-              />
-
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="flex gap-3 mb-6">
-                  <motion.div 
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
-                    className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30"
-                  >
-                    <CheckCircle2 size={32} className="text-white drop-shadow-md" />
-                  </motion.div>
-                  
-                </div>
-                
-                <motion.h2 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-2xl font-black tracking-tight mb-2"
-                >
-                  Payment Completed Successfully!
-                </motion.h2>
-                <motion.p 
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 0.8 }}
-                  transition={{ delay: 0.4 }}
-                  className="text-sm font-medium tracking-wide uppercase opacity-80"
-                >
-                  Voucher record saved with ID: {flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---'}
-                </motion.p>
-              </div>
-            </div>
-
-            <div className="p-8 space-y-6">
-              <div className="flex justify-between items-start pt-2">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Ledger Account</span>
-                  <h3 className="text-lg font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter leading-none">
-                    {accounts.find(a => a.id.toString() === selectedAccountId)?.title || "General Party"}
-                  </h3>
-                </div>
-                <div className="text-right space-y-1">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Settlement Amount</span>
-                  <div className={`text-2xl font-mono font-black ${t.text} items-center flex gap-1 justify-end leading-none`}>
-                    <span className="text-xs opacity-50 font-bold">Rs</span>
-                    {flash?.saved_payments 
-                      ? (flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0)).toLocaleString()
-                      : ((isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : (amount || 0)) - (discount || 0)).toLocaleString()
-                    }
+            {isPrinting ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center space-y-6 min-h-[350px] bg-white dark:bg-zinc-950 text-zinc-800 dark:text-white rounded-[2rem]">
+                <div className="relative flex items-center justify-center mt-4">
+                  <div className={cn("animate-ping absolute inline-flex h-20 w-20 rounded-full opacity-20", paymentType === 'RECEIPT' ? 'bg-emerald-500' : 'bg-rose-500')}></div>
+                  <div className={cn("relative rounded-full p-6 border", paymentType === 'RECEIPT' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20')}>
+                    <Printer size={40} className="animate-pulse" />
                   </div>
                 </div>
-              </div>
+                
+                <div className="space-y-2">
+                  <DialogTitle className="text-xl font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                    Printing Voucher...
+                  </DialogTitle>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium px-4">
+                    Directing voucher layout payload to {printFormat === 'big' ? 'A4' : 'thermal'} output stream.
+                  </p>
+                </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
-                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Invoices</span>
-                  <span className="text-xl font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{selectedBillIds.size}</span>
+                {/* Progress Bar */}
+                <div className="w-full max-w-[280px] bg-zinc-100 dark:bg-zinc-800/80 h-2 rounded-full overflow-hidden relative">
+                  <div 
+                    className={cn("h-full rounded-full transition-all duration-1000 ease-linear", paymentType === 'RECEIPT' ? 'bg-emerald-500' : 'bg-rose-500')} 
+                    style={{ width: `${(countdown / 10) * 100}%` }}
+                  />
                 </div>
-                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
-                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Method</span>
-                  <span className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate w-full pt-1">
-                    {isMultiPayment ? "Multi" : (paymentMethod || "Cash")}
-                  </span>
-                </div>
-                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
-                  <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Total Adj</span>
-                  <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{discount?.toLocaleString() || '0'}</span>
-                </div>
-              </div>
 
-              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 flex justify-between items-center">
-                <span className="text-xs font-black text-emerald-600/60 uppercase tracking-widest">Total Discount</span>
-                <div className="text-lg font-mono font-black text-emerald-600 flex items-center gap-1">
-                  <span className="text-[10px] font-bold">Rs</span>
-                  {discount?.toLocaleString() || '0'}
+                <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none">
+                  Closing automatically in <span className={cn("font-black text-sm", t.text)}>{countdown}</span> seconds
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-4">
                 <Button 
-                  onClick={() => {
-                    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
-                    if (printId) {
-                      window.open(`/payments/${printId}/pdf`, '_blank');
-                    } else {
-                      toast.error("Voucher ID not found. Please check reports.");
-                    }
-                  }} 
-                  className={`h-14 ${t.gradient} text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl ${t.gradientShadow} flex items-center justify-center gap-2 group transition-all active:scale-[0.98] hover:opacity-90`}
-                >
-                  <Printer size={18} className="group-hover:scale-110 transition-transform" />
-                  Print Voucher
-                </Button>
-                <Button 
-                  onClick={() => {
-                     setSuccessDialogOpen(false);
-                     setAmount(0);
-                     setDiscount(0);
-                     setSelectedBillIds(new Set());
-                     setAllocations({});
-                     setRemarks("");
-                     setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
-                     setSelectedAccountId("");
-                  }} 
                   variant="outline"
-                  className="h-14 border-orange-200 dark:border-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-orange-50 dark:hover:bg-orange-500/10"
+                  className="h-10 border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-500 dark:text-zinc-400 font-black rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white transition-all px-6 text-xs uppercase tracking-widest"
+                  onClick={handleCancelPrint}
                 >
-                  <Plus size={18} />
-                  Create New
+                  Cancel
                 </Button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className={`relative h-56 ${t.gradient} flex flex-col items-center justify-center text-white p-8 text-center overflow-hidden`}>
+                  {/* Animated Background Blobs */}
+                  <motion.div 
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
+                  />
+                  <motion.div 
+                    animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"
+                  />
+
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="flex gap-3 mb-6">
+                      <motion.div 
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+                        className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30"
+                      >
+                        <CheckCircle2 size={32} className="text-white drop-shadow-md" />
+                      </motion.div>
+                      
+                    </div>
+                    
+                    <motion.h2 
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-2xl font-black tracking-tight mb-2"
+                    >
+                      Payment Completed Successfully!
+                    </motion.h2>
+                    <motion.p 
+                      initial={{ y: 10, opacity: 0 }}
+                      animate={{ y: 0, opacity: 0.8 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-sm font-medium tracking-wide uppercase opacity-80"
+                    >
+                      Voucher record saved with ID: {flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---'}
+                    </motion.p>
+                  </div>
+                </div>
+
+                <div className="p-8 space-y-6">
+                  <div className="flex justify-between items-start pt-2">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Ledger Account</span>
+                      <h3 className="text-lg font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter leading-none">
+                        {accounts.find(a => a.id.toString() === selectedAccountId)?.title || "General Party"}
+                      </h3>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Settlement Amount</span>
+                      <div className={`text-2xl font-mono font-black ${t.text} items-center flex gap-1 justify-end leading-none`}>
+                        <span className="text-xs opacity-50 font-bold">Rs</span>
+                        {flash?.saved_payments 
+                          ? (flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0)).toLocaleString()
+                          : ((isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : (amount || 0)) - (discount || 0)).toLocaleString()
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Invoices</span>
+                      <span className="text-xl font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{selectedBillIds.size}</span>
+                    </div>
+                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Method</span>
+                      <span className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate w-full pt-1">
+                        {isMultiPayment ? "Multi" : (paymentMethod || "Cash")}
+                      </span>
+                    </div>
+                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
+                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Total Adj</span>
+                      <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{discount?.toLocaleString() || '0'}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 flex justify-between items-center">
+                    <span className="text-xs font-black text-emerald-600/60 uppercase tracking-widest">Total Discount</span>
+                    <div className="text-lg font-mono font-black text-emerald-600 flex items-center gap-1">
+                      <span className="text-[10px] font-bold">Rs</span>
+                      {discount?.toLocaleString() || '0'}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <Button 
+                      onClick={() => handleDirectPrint('small')}
+                      variant="outline" 
+                      className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-800 dark:text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all group"
+                    >
+                      <Receipt size={18} className="text-zinc-500 group-hover:scale-110 transition-transform" />
+                      Thermal Print
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => handleDirectPrint('big')}
+                      className={`h-14 rounded-2xl ${t.gradient} text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:opacity-90 shadow-xl ${t.gradientShadow} active:scale-[0.98] transition-all`}
+                    >
+                      <Layout size={18} />
+                      A4 Print
+                    </Button>
+
+                    <Button 
+                      onClick={() => {
+                        const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
+                        if (printId) {
+                          window.open(`/payments/${printId}/view`, '_blank');
+                        } else {
+                          toast.error("Voucher ID not found. Please check reports.");
+                        }
+                      }}
+                      variant="outline" 
+                      className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-500 font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all group"
+                    >
+                      <FileText size={18} className="text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                      View Voucher
+                    </Button>
+
+                    <Button 
+                      onClick={() => {
+                         setSuccessDialogOpen(false);
+                         setAmount(0);
+                         setDiscount(0);
+                         setSelectedBillIds(new Set());
+                         setAllocations({});
+                         setRemarks("");
+                         setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
+                         setSelectedAccountId("");
+                      }} 
+                      variant="outline"
+                      className="h-14 border-orange-200 dark:border-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-orange-50 dark:hover:bg-orange-500/10"
+                    >
+                      <Plus size={18} />
+                      Create New
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
 
