@@ -916,8 +916,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">INCOME (IN/CR)</SelectItem>
-                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">EXPENSE (OUT/DR)</SelectItem>
+                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">RECEIPT (IN/CR)</SelectItem>
+                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">PAYMENT (OUT/DR)</SelectItem>
                         </SelectContent>
                       </Select>
                     </TechLabel>

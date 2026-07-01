@@ -226,33 +226,163 @@ class PaymentController extends Controller implements HasMiddleware
     // Update payment
     public function update(Request $request, $id)
     {
-        // For now, simple update of basic fields. 
-        // Complex allocation updates might require resetting allocations which is risky.
-        // Let's allow updating basic info and remarks.
-
-        $payment = Payment::findOrFail($id);
-
         $request->validate([
             'date' => 'required|date',
-            'remarks' => 'nullable|string',
+            'account_id' => 'required|integer',
+            'payment_account_id' => 'nullable|integer',
+            'amount' => 'required|numeric',
+            'discount' => 'nullable|numeric',
+            'type' => 'required|string|in:RECEIPT,PAYMENT',
+            'payment_method' => 'nullable|string',
             'cheque_no' => 'nullable|string',
             'cheque_date' => 'nullable|date',
             'clear_date' => 'nullable|date',
+            'remarks' => 'nullable|string',
             'message_line_id' => 'nullable|integer',
             'firm_id' => 'nullable|integer',
+            'allocations' => 'nullable|array',
+            'original_cheque_id' => 'nullable|string',
         ]);
 
-        $payment->update($request->only([
-            'date',
-            'remarks',
-            'cheque_no',
-            'cheque_date',
-            'clear_date',
-            'message_line_id',
-            'firm_id',
-        ]));
+        $payment = Payment::with('allocations')->findOrFail($id);
 
-        return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
+        DB::beginTransaction();
+
+        try {
+            // 1. Reverse old allocations
+            foreach ($payment->allocations as $allocation) {
+                $bill = $allocation->bill_type === 'App\Models\Sales'
+                    ? Sales::find($allocation->bill_id)
+                    : Purchase::find($allocation->bill_id);
+
+                if ($bill) {
+                    $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
+                    $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
+                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+
+                    $isSale = ($allocation->bill_type === 'App\Models\Sales');
+                    if ($bill->remaining_amount <= 0) {
+                        $bill->status = $isSale ? 'Paid' : 'Completed';
+                    } elseif ($bill->paid_amount > 0) {
+                        $bill->status = $isSale ? 'Partial' : 'Completed';
+                    } else {
+                        $bill->status = $isSale ? 'Unpaid' : 'Completed';
+                    }
+                    $bill->save();
+                }
+            }
+
+            // 2. Delete old allocations
+            PaymentAllocation::where('payment_id', $payment->id)->delete();
+
+            // 3. Reset old cheque status in Chequebook if it exists
+            if ($payment->cheque_id) {
+                $cheque = \App\Models\Chequebook::find($payment->cheque_id);
+                if ($cheque) {
+                    $cheque->update(['status' => 'unused']);
+                }
+            }
+
+            // 4. Restore distributed cheque in hand status if type was PAYMENT and method was Cheque
+            if ($payment->type === 'PAYMENT' && $payment->payment_method === 'Cheque') {
+                $paymentAccount = Account::with('accountType')->find($payment->payment_account_id);
+                if ($paymentAccount && $paymentAccount->accountType && $paymentAccount->accountType->name === 'Cheque in hand') {
+                    $source = Payment::where('type', 'RECEIPT')
+                        ->where('cheque_no', $payment->cheque_no)
+                        ->where('cheque_status', 'Distributed')
+                        ->first();
+                    if ($source) {
+                        $source->update(['cheque_status' => 'In Hand']);
+                    }
+                }
+            }
+
+            // 5. Check/issue new cheque if applicable
+            $chequeId = null;
+            if ($request->payment_method === 'Cheque' && $request->payment_account_id) {
+                $chequeNoParts = explode('-', $request->cheque_no);
+                if (count($chequeNoParts) >= 2) {
+                    $cPrefix = $chequeNoParts[0];
+                    $cNum = implode('-', array_slice($chequeNoParts, 1));
+                    $cheque = \App\Models\Chequebook::where('bank_id', $request->payment_account_id)
+                        ->where('prefix', $cPrefix)->where('cheque_no', $cNum)->where('status', 'unused')->first();
+                } else {
+                    $cheque = \App\Models\Chequebook::where('bank_id', $request->payment_account_id)
+                        ->where('cheque_no', $request->cheque_no)->where('status', 'unused')->first();
+                }
+                if ($cheque) {
+                    $chequeId = $cheque->id;
+                    $cheque->update(['status' => 'issued']);
+                }
+            }
+
+            // 6. Update payment
+            $payment->update([
+                'date' => $request->date,
+                'account_id' => $request->account_id,
+                'payment_account_id' => $request->payment_account_id,
+                'amount' => max(0, $request->amount - ($request->discount ?? 0)),
+                'discount' => $request->discount ?? 0,
+                'net_amount' => $request->amount,
+                'type' => $request->type,
+                'cheque_no' => $request->cheque_no,
+                'cheque_date' => $request->cheque_date,
+                'clear_date' => $request->clear_date,
+                'remarks' => $request->remarks,
+                'payment_method' => $request->payment_method,
+                'cheque_id' => $chequeId ?? $payment->cheque_id,
+                'message_line_id' => $request->message_line_id,
+                'firm_id' => $request->firm_id,
+            ]);
+
+            // 7. Handle Cheque in hand state
+            if ($payment->paymentAccount && $payment->paymentAccount->accountType?->name === 'Cheque in hand') {
+                if ($request->type === 'RECEIPT' && $payment->payment_method === 'Cheque') {
+                    $payment->update(['cheque_status' => 'In Hand']);
+                } elseif ($request->type === 'PAYMENT') {
+                    if ($request->original_cheque_id) {
+                        Payment::where('id', $request->original_cheque_id)->update(['cheque_status' => 'Distributed']);
+                    }
+                }
+            }
+
+            // 8. Add new allocations
+            $allocationPayload = $request->allocations ?? [];
+            foreach ($allocationPayload as $alloc) {
+                PaymentAllocation::create([
+                    'payment_id' => $payment->id,
+                    'bill_id' => $alloc['bill_id'],
+                    'bill_type' => $alloc['bill_type'],
+                    'amount' => $alloc['amount'],
+                ]);
+
+                $bill = ($alloc['bill_type'] === 'App\Models\Sales')
+                    ? Sales::find($alloc['bill_id'])
+                    : Purchase::find($alloc['bill_id']);
+
+                if ($bill) {
+                    $bill->paid_amount      += $alloc['amount'];
+                    $bill->remaining_amount -= $alloc['amount'];
+
+                    $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
+                    if ($bill->remaining_amount <= 0) {
+                        $bill->status = $isSale ? 'Paid' : 'Completed';
+                    } elseif ($bill->paid_amount > 0) {
+                        $bill->status = $isSale ? 'Partial' : 'Completed';
+                    } else {
+                        $bill->status = $isSale ? 'Unpaid' : 'Completed';
+                    }
+                    $bill->save();
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Payment Update Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return back()->withErrors(['error' => 'Failed to update payment: ' . $e->getMessage()]);
+        }
     }
 
     private function getTotalReturns($bill, string $billType): float
@@ -391,9 +521,6 @@ class PaymentController extends Controller implements HasMiddleware
                 $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
             })
             ->get();
-        // dd($accounts->toArray());
-
-
 
         $messageLines = \App\Models\MessageLine::where(function ($query) {
             $query->whereJsonContains('category', 'Payments')
@@ -410,36 +537,53 @@ class PaymentController extends Controller implements HasMiddleware
         ]);
     }
 
-    // Get unpaid bills for a specific account
     public function getUnpaidBills(Request $request)
     {
         try {
             $accountId = $request->input('account_id');
+            $paymentId = $request->input('payment_id');
             $account = Account::with('accountType')->find($accountId);
 
             if (!$account) {
                 return response()->json([]);
             }
 
+            $allocatedBills = [];
+            $paymentObj = null;
+            if ($paymentId) {
+                $paymentObj = Payment::find($paymentId);
+                if ($paymentObj) {
+                    $allocatedBills = \App\Models\PaymentAllocation::where('payment_id', $paymentId)->get()->keyBy(function($item) {
+                        return $item->bill_type . '_' . $item->bill_id;
+                    });
+                }
+            }
+
             $bills = [];
 
-            // Logic: If Customer -> Fetch Sales. If Supplier -> Fetch Purchases.
-            // Assuming 'Customer' type or similar. Adjust 'type' check as per actual Account model.
-            // If no strict type, maybe check both or rely on user intent?
-            // For now, let's assume:
-            // Sales are for Customers (receivable)
-            // Purchases are for Suppliers (payable)
+            // Fetch Unpaid Sales (Remaining Amount > 0 OR allocated to this payment)
+            $salesQuery = Sales::where('customer_id', $accountId);
+            if ($paymentObj) {
+                $allocatedSaleIds = \App\Models\PaymentAllocation::where('payment_id', $paymentId)
+                    ->where('bill_type', 'App\Models\Sales')
+                    ->pluck('bill_id');
+                $salesQuery->where(function($q) use ($allocatedSaleIds) {
+                    $q->where('remaining_amount', '>', 0)
+                      ->orWhereIn('id', $allocatedSaleIds);
+                });
+            } else {
+                $salesQuery->where('remaining_amount', '>', 0);
+            }
 
-            // We can fetch both and let frontend decide, or fetch based on account type if known.
-            // Let's try to fetch based on account type if possible.
-
-            // Fetch Unpaid Sales (Remaining Amount > 0)
-            $sales = Sales::where('customer_id', $accountId)
-                ->where('remaining_amount', '>', 0)
-                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
+            $sales = $salesQuery->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
                 ->get()
-                ->map(function ($sale) {
+                ->map(function ($sale) use ($allocatedBills) {
                     $returnAmount = $this->getTotalReturns($sale, 'App\Models\Sales');
+                    $allocatedAmount = 0;
+                    $key = 'App\Models\Sales_' . $sale->id;
+                    if (isset($allocatedBills[$key])) {
+                        $allocatedAmount = $allocatedBills[$key]->amount;
+                    }
                     return [
                         'id' => $sale->id,
                         'type' => 'App\Models\Sales',
@@ -448,19 +592,36 @@ class PaymentController extends Controller implements HasMiddleware
                         'net_total' => $sale->net_total,
                         'discount_total' => $sale->discount_total,
                         'return_amount' => $returnAmount,
-                        'remaining_amount' => $sale->remaining_amount,
-                        'bill_type_label' => 'Sale'
+                        'remaining_amount' => $sale->remaining_amount + $allocatedAmount,
+                        'bill_type_label' => 'Sale',
+                        'allocated_amount' => $allocatedAmount
                     ];
                 })
                 ->toArray();
 
-            // Fetch Unpaid Purchases (Remaining Amount > 0)
-            $purchases = Purchase::where('supplier_id', $accountId)
-                ->where('remaining_amount', '>', 0)
-                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
+            // Fetch Unpaid Purchases (Remaining Amount > 0 OR allocated to this payment)
+            $purchasesQuery = Purchase::where('supplier_id', $accountId);
+            if ($paymentObj) {
+                $allocatedPurchaseIds = \App\Models\PaymentAllocation::where('payment_id', $paymentId)
+                    ->where('bill_type', 'App\Models\Purchase')
+                    ->pluck('bill_id');
+                $purchasesQuery->where(function($q) use ($allocatedPurchaseIds) {
+                    $q->where('remaining_amount', '>', 0)
+                      ->orWhereIn('id', $allocatedPurchaseIds);
+                });
+            } else {
+                $purchasesQuery->where('remaining_amount', '>', 0);
+            }
+
+            $purchases = $purchasesQuery->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
                 ->get()
-                ->map(function ($purchase) {
+                ->map(function ($purchase) use ($allocatedBills) {
                     $returnAmount = $this->getTotalReturns($purchase, 'App\Models\Purchase');
+                    $allocatedAmount = 0;
+                    $key = 'App\Models\Purchase_' . $purchase->id;
+                    if (isset($allocatedBills[$key])) {
+                        $allocatedAmount = $allocatedBills[$key]->amount;
+                    }
                     return [
                         'id' => $purchase->id,
                         'type' => 'App\Models\Purchase',
@@ -469,8 +630,9 @@ class PaymentController extends Controller implements HasMiddleware
                         'net_total' => $purchase->net_total,
                         'discount_total' => $purchase->discount_total,
                         'return_amount' => $returnAmount,
-                        'remaining_amount' => $purchase->remaining_amount,
-                        'bill_type_label' => 'Purchase'
+                        'remaining_amount' => $purchase->remaining_amount + $allocatedAmount,
+                        'bill_type_label' => 'Purchase',
+                        'allocated_amount' => $allocatedAmount
                     ];
                 })
                 ->toArray();
@@ -478,17 +640,17 @@ class PaymentController extends Controller implements HasMiddleware
             $bills = array_merge($sales, $purchases);
 
             // Use the centralized current_balance logic from Account model
-            // This correctly handles discounts, canceled cheques, and orientations
             $netLedgerBalance = (float) $account->current_balance;
+            if ($paymentObj) {
+                $netLedgerBalance += ($paymentObj->amount + $paymentObj->discount);
+            }
+
             $orientation = $account->purchase == 1 ? 'cr' : 'dr';
 
             // Calculate Unpaid Billed Balance (Sum of remaining amounts on invoices)
             $totalUnpaidBilled = collect($bills)->sum('remaining_amount');
 
             // Advance calculation:
-            // If Billed Unpaid > Adjusted Ledger Balance, the difference is unallocated payments (Advance)
-            // Example Supplier: Billed 17032, Ledger Balance 16968.25 => Adv 63.75
-            // Example Customer: Billed 1100, Ledger Balance 480 => Adv 620
             $advanceAmount = max(0, $totalUnpaidBilled - $netLedgerBalance);
 
             // Compute Financial Auditor Stats based on Account Type
@@ -514,6 +676,10 @@ class PaymentController extends Controller implements HasMiddleware
                     })->sum(DB::raw('amount + discount'));
                 $totalReceivedOrPaid = $totalReceiptsVal - $totalPaymentsVal;
 
+                if ($paymentObj) {
+                    $totalReceivedOrPaid -= ($paymentObj->amount + $paymentObj->discount);
+                }
+
                 if ($netLedgerBalance >= 0) {
                     $totalBalance = $netLedgerBalance;
                     $advancePaid = 0;
@@ -535,6 +701,10 @@ class PaymentController extends Controller implements HasMiddleware
                         $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                     })->sum(DB::raw('amount + discount'));
                 $totalReceivedOrPaid = $totalPaymentsVal - $totalReceiptsVal;
+
+                if ($paymentObj) {
+                    $totalReceivedOrPaid -= ($paymentObj->amount + $paymentObj->discount);
+                }
 
                 if ($netLedgerBalance >= 0) {
                     $totalBalance = $netLedgerBalance;

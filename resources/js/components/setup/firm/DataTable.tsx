@@ -176,7 +176,7 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
                 <span className="text-[10px] font-mono text-zinc-400 font-bold uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded">
                   {firm.code || `FIRM-${firm.id}`}
                 </span>
-                {firm.defult && (
+                {!!firm.defult && (
                   <span className="text-[10px] font-black text-orange-500 uppercase tracking-tighter bg-orange-500/10 px-2 py-0.5 rounded-full">Primary</span>
                 )}
               </div>

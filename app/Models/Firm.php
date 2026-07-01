@@ -32,6 +32,13 @@ class Firm extends Model
         'created_by',
         'logo',
     ];
+
+    protected $casts = [
+        'defult'       => 'boolean',
+        'status'       => 'boolean',
+        'printinvoice' => 'boolean',
+    ];
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
