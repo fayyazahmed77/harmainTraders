@@ -119,8 +119,8 @@ if (file_exists($logo_path)) {
 
     <div class="info-section">
         <div class="info-box">
-            <p><strong>Supplier:</strong> {{ $order->supplier->title ?? 'N/A' }}</p>
-            @if($order->supplier->phone)
+            <p><strong>{{ (isset($order->supplier) && $order->supplier->type == 5) ? 'Company:' : 'Supplier:' }}</strong> {{ $order->supplier->title ?? 'N/A' }}</p>
+            @if($order->supplier && $order->supplier->phone)
             <p><strong>Phone:</strong> {{ $order->supplier->phone }}</p>
             @endif
         </div>

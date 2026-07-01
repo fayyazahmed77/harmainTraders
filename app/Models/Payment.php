@@ -29,11 +29,17 @@ class Payment extends Model
         'cheque_status',
         'message_line_id',
         'is_return_refund', // B1: marks cash refunds from SalesReturn to exclude from ledger formula
+        'firm_id',
     ];
 
     public function messageLine()
     {
         return $this->belongsTo(MessageLine::class);
+    }
+
+    public function firm()
+    {
+        return $this->belongsTo(Firm::class);
     }
 
     public function account()

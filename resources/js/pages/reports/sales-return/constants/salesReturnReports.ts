@@ -13,7 +13,7 @@ export const salesReturnReports = [
     },
     {
         id: 'details_wise',
-        title: 'Details Wise',
+        title: 'Invoice details Wise',
         description: 'Complete line-item breakdown of all sales returns',
         icon: 'List'
     },

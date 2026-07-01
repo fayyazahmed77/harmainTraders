@@ -175,7 +175,7 @@ class StockReportBuilder
             DB::raw('COALESCE(p.total, 0) + COALESCE(sr.total, 0) as in_qty'),
             DB::raw('COALESCE(s.total, 0) + COALESCE(pr.total, 0) as out_qty'),
             DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
-            DB::raw('COALESCE(p.avg_rate, items.trade_price) as avg_rate'),
+            DB::raw('COALESCE(p.avg_rate * items.packing_qty, items.trade_price) as avg_rate'),
             DB::raw('COALESCE(p.last_rate, items.trade_price) as last_rate')
         )
         ->leftJoinSub($purchaseQty, 'p', 'items.id', '=', 'p.item_id')
@@ -191,7 +191,7 @@ class StockReportBuilder
             $row['rate'] = ($filters['valuation'] === 'average') ? $row['avg_rate'] : $row['last_rate'];
             if (!$row['rate'] || $row['rate'] == 0) $row['rate'] = $row['base_tp'];
 
-            $row['amount'] = $row['balance_qty'] * $row['rate'];
+            $row['amount'] = ($row['balance_qty'] / ($row['packing_qty'] ?: 1)) * $row['rate'];
             
             return $row;
         });

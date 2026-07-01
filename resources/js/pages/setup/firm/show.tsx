@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import { Heading } from "@/components/ui/Heading";
 import { Label } from "@/components/ui/label";
@@ -87,28 +88,43 @@ export default function FirmShow() {
         <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
           <SiteHeader breadcrumbs={breadcrumbs} />
 
-          <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar text-zinc-900 dark:text-zinc-100 pb-20">
-            <div className="max-w-[1200px] mx-auto p-4 md:p-8 space-y-10">
-
-              {/* Actions & Navigation */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
-                  <Link href="/firms" className="inline-flex items-center gap-2 group text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                    <div className="h-8 w-8 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center group-hover:bg-zinc-100 dark:group-hover:bg-zinc-900 transition-all">
-                      <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Sticky Professional Header Bar */}
+            <div className="border-b bg-white dark:bg-zinc-900 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400">
+                        <Building2 size={20} strokeWidth={2.5} />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Exit Dossier</span>
-                  </Link>
-                </motion.div>
+                    <div>
+                        <h1 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                            {firm.name}
+                            <Badge variant={firm.status ? "default" : "secondary"} className="text-[10px] h-5 py-0">
+                                {firm.status ? "Active" : "Dormant"}
+                            </Badge>
+                        </h1>
+                        <p className="text-xs text-zinc-500 font-medium">{firm.business || "General Commercial"} &bull; {firm.code}</p>
+                    </div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-4">
-                  <Link href={`/firms/${firm.id}/edit`}>
-                    <Button className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 h-11 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-zinc-200/50 dark:shadow-none hover:scale-105 transition-transform">
-                      <Pencil className="mr-2 h-3.5 w-3.5" /> Modify Parameters
-                    </Button>
-                  </Link>
-                </motion.div>
-              </div>
+                <div className="flex items-center gap-3">
+                    <Link href="/firms">
+                        <Button variant="outline" size="sm" className="h-9 font-semibold">
+                            <ArrowLeft size={14} className="mr-2" />
+                            Back to List
+                        </Button>
+                    </Link>
+                    <Separator orientation="vertical" className="h-6" />
+                    <Link href={`/firms/${firm.id}/edit`}>
+                        <Button className="h-9 font-semibold">
+                            <Pencil size={14} className="mr-2" />
+                            Edit Firm
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+
+            <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar text-zinc-900 dark:text-zinc-100 pb-20 p-4 md:p-8">
+              <div className="max-w-[1200px] mx-auto space-y-10">
 
               {/* Header Profile Section */}
               <motion.div
@@ -330,6 +346,7 @@ export default function FirmShow() {
               </div>
             </div>
           </div>
+        </div>
 
           <style dangerouslySetInnerHTML={{
             __html: `

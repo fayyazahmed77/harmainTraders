@@ -83,10 +83,34 @@ export default function FirmCreate() {
   });
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
+  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
+
+  // Autogenerate Firm Code on name change
+  React.useEffect(() => {
+    if (!isCodeManuallyEdited && form.name) {
+      const words = form.name.trim().split(/\s+/);
+      let initials = "";
+      if (words.length === 1) {
+        initials = words[0].substring(0, 3).toUpperCase();
+      } else {
+        initials = words.map(w => w[0]).join("").toUpperCase();
+      }
+      initials = initials.replace(/[^A-Z0-9]/g, "");
+
+      if (initials) {
+        setForm("code", `${initials}-01`);
+      }
+    } else if (!form.name && !isCodeManuallyEdited) {
+      setForm("code", "");
+    }
+  }, [form.name, isCodeManuallyEdited]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setForm(name as any, type === "checkbox" ? checked : value);
+    if (name === "code") {
+      setIsCodeManuallyEdited(true);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +149,7 @@ export default function FirmCreate() {
   return (
     <>
       <SidebarProvider>
-        <Head title="Generate Identity Node | Finance Core" />
+        <Head title="Firms | Add New" />
         <AppSidebar variant="inset" />
         <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
           <SiteHeader breadcrumbs={breadcrumbs} />

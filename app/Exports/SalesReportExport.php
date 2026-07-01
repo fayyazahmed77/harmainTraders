@@ -59,12 +59,14 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
             case 'recovery':
                 return [
                     'A' => 10,
-                    'B' => 25,
-                    'C' => 45,
-                    'D' => 20,
-                    'E' => 20,
-                    'F' => 20,
-                    'G' => 20,
+                    'B' => 20,
+                    'C' => 40,
+                    'D' => 15,
+                    'E' => 15,
+                    'F' => 15,
+                    'G' => 15,
+                    'H' => 15,
+                    'I' => 20,
                 ];
             default:
                 return [
@@ -89,6 +91,8 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
                     'E' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                     'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                     'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                 ];
             case 'salesman':
                 return [

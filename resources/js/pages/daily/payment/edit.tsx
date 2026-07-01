@@ -30,17 +30,20 @@ interface PaymentProps {
         voucher_no: string;
         payment_method: string;
         message_line_id?: number | null;
+        firm_id?: number | null;
     };
     messageLines?: { id: number; messageline: string }[];
+    firms?: { id: number; name: string }[];
 }
 
-export default function PaymentEdit({ payment, messageLines }: PaymentProps) {
+export default function PaymentEdit({ payment, messageLines, firms }: PaymentProps) {
     const [date, setDate] = useState(payment.date);
     const [remarks, setRemarks] = useState(payment.remarks || "");
     const [chequeNo, setChequeNo] = useState(payment.cheque_no || "");
     const [chequeDate, setChequeDate] = useState(payment.cheque_date || "");
     const [clearDate, setClearDate] = useState(payment.clear_date || "");
     const [selectedMessageId, setSelectedMessageId] = useState<string>(payment.message_line_id?.toString() ?? "0");
+    const [selectedFirmId, setSelectedFirmId] = useState<string>(payment.firm_id?.toString() ?? "0");
 
     const handleUpdate = () => {
         router.put(route("payment.update", payment.id), {
@@ -50,6 +53,7 @@ export default function PaymentEdit({ payment, messageLines }: PaymentProps) {
             cheque_date: chequeDate,
             clear_date: clearDate,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
+            firm_id: selectedFirmId !== "0" ? Number(selectedFirmId) : null,
         });
     };
 
@@ -81,6 +85,7 @@ export default function PaymentEdit({ payment, messageLines }: PaymentProps) {
                                     type="date"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
+                                
                                 />
                             </div>
 
@@ -100,6 +105,23 @@ export default function PaymentEdit({ payment, messageLines }: PaymentProps) {
                                 value={remarks}
                                 onChange={(e) => setRemarks(e.target.value)}
                             />
+                        </div>
+
+                        <div>
+                            <Label>Firm / Entity</Label>
+                            <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                <SelectTrigger className="w-full bg-sky-50/50">
+                                    <SelectValue placeholder="Select Firm..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="0">No Firm (Optional)</SelectItem>
+                                    {firms?.map((firm) => (
+                                        <SelectItem key={firm.id} value={firm.id.toString()}>
+                                            {firm.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div>

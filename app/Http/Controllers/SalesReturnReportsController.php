@@ -123,7 +123,7 @@ class SalesReturnReportsController extends Controller implements HasMiddleware
         $titles = [
             'area_item_party' => 'Area Wise Item Party Summary',
             'bill' => 'Bill Wise',
-            'details_wise' => 'Details Wise',
+            'details_wise' => 'Invoice details Wise',
             'detail' => 'Detail',
             'item_summary' => 'Item Wise Summary',
             'month' => 'Month Wise',

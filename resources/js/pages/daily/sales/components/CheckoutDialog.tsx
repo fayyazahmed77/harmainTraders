@@ -83,7 +83,17 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   };
 
   const totalPaid = splits.reduce((acc, s) => acc + toNumber(s.amount), 0);
-  const totalReceivable = totals.net + previousBalance;
+  
+  const isAdvance = previousBalance < 0;
+  const appliedAdv = totals.appliedAdvance || 0;
+  const totalReceivable = isAdvance 
+    ? (appliedAdv > 0 ? totals.net - appliedAdv : totals.net)
+    : (totals.net + previousBalance);
+
+  const prevBalanceDisplay = isAdvance
+    ? (appliedAdv > 0 ? -appliedAdv : 0)
+    : previousBalance;
+
   const remaining = totalReceivable - totalPaid;
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
@@ -135,11 +145,13 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
             <span className="text-xl font-black text-white font-mono tracking-tighter">Rs {totals.net.toLocaleString()}</span>
           </div>
           <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">Prev. Balance</span>
+            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">
+              {isAdvance && appliedAdv > 0 ? "Applied Adv." : "Prev. Balance"}
+            </span>
             <span className={cn(
               "text-xl font-black font-mono tracking-tighter",
-              previousBalance > 0 ? "text-rose-400" : "text-emerald-400"
-            )}>Rs {previousBalance.toLocaleString()}</span>
+              prevBalanceDisplay > 0 ? "text-rose-400" : (prevBalanceDisplay < 0 ? "text-emerald-400" : "text-zinc-400")
+            )}>Rs {prevBalanceDisplay.toLocaleString()}</span>
           </div>
           <div className="p-6 flex flex-col items-center">
             <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">Allocated</span>

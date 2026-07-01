@@ -85,6 +85,7 @@ export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending 
 interface Sales {
     id: number;
     date: string;
+    created_at?: string;
     invoice: string;
     code: string;
     status: SaleStatus; // <-- FIXED HERE
@@ -158,6 +159,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: "Date",
             cell: ({ row }) => {
                 const date = new Date(row.original.date);
+                const createdAt = row.original.created_at ? new Date(row.original.created_at) : null;
 
                 const dateStr = date.toLocaleDateString("en-GB", {
                     day: "2-digit",
@@ -165,16 +167,18 @@ export default function DataTable({ data }: DataTableProps) {
                     year: "numeric",
                 });
 
-                const timeStr = date.toLocaleTimeString("en-GB", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                });
+                const timeStr = createdAt
+                    ? createdAt.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : "---";
 
                 return (
                     <div>
                         <div>{dateStr}</div>
-                        <div className="text-xs text-muted-foreground">Time : {timeStr}</div>
+                        <div className="text-xs text-muted-foreground font-medium">Time : {timeStr}</div>
                     </div>
                 );
             },

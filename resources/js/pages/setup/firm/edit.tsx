@@ -145,7 +145,7 @@ export default function FirmEdit({ firm }: { firm: Firm }) {
   return (
     <>
       <SidebarProvider>
-        <Head title={`Modify ${firm.name} | Finance Core`} />
+        <Head title="Firms | Edit" />
         <AppSidebar variant="inset" />
         <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
           <SiteHeader breadcrumbs={breadcrumbs} />

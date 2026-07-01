@@ -166,9 +166,12 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
               </div>
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none mb-1">
+              <Link
+                href={`/firms/${firm.id}/show`}
+                className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 hover:text-blue-600 hover:underline leading-none mb-1"
+              >
                 {firm.name}
-              </span>
+              </Link>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-zinc-400 font-bold uppercase tracking-widest bg-zinc-100 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded">
                   {firm.code || `FIRM-${firm.id}`}
@@ -232,6 +235,35 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
               </span>
             </div>
           </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Active",
+      cell: ({ row }) => {
+        const isActive = !!row.original.status;
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              router.patch(`/firms/${row.original.id}/toggle-active`, {}, {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Status updated')
+              });
+            }}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+              isActive ? 'bg-emerald-500' : 'bg-zinc-200 dark:bg-zinc-700'
+            }`}
+            role="switch"
+            aria-checked={isActive}
+          >
+            <span
+              className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${
+                isActive ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
         );
       },
     },
@@ -371,13 +403,13 @@ export function DataTable({ data, searchTerm, filterType }: DataTableProps) {
       </Dialog>
 
       {/* ✅ Premium DataTable UI */}
-      <div className={cn(PREMIUM_ROUNDING, "overflow-hidden border border-zinc-200 dark:border-zinc-800/50 bg-white/70 dark:bg-black/20 backdrop-blur-xl shadow-inner")}>
+      <div className={cn(PREMIUM_ROUNDING, "overflow-hidden border border-zinc-200 dark:border-zinc-800/50 bg-white dark:bg-zinc-900 shadow-md shadow-zinc-200/50 dark:shadow-none")}>
         <Table>
-          <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
+          <TableHeader className="bg-muted sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-400 h-16 px-6">
+                  <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-950 dark:text-zinc-50 h-16 px-6">
                     <div
                       className={cn(
                         "flex items-center gap-2 select-none",

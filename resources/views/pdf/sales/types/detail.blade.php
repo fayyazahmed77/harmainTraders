@@ -11,7 +11,8 @@
             <th>Product Description</th>
             <th style="width: 50px;" class="text-right">Qty F</th>
             <th style="width: 50px;" class="text-right">Qty P</th>
-            <th style="width: 70px;" class="text-right">Rate</th>
+            <th style="width: 65px;" class="text-right">Rate</th>
+            <th style="width: 65px;" class="text-right">Discount</th>
             <th style="width: 80px;" class="text-right">Subtotal</th>
         </tr>
     </thead>
@@ -26,7 +27,8 @@
             <td class="text-right">{{ $row['qty_full'] }}</td>
             <td class="text-right">{{ $row['qty_pcs'] }}</td>
             <td class="text-right">{{ number_format($row['tp'], 2) }}</td>
-            <td class="text-right font-bold">{{ number_format($row['amount'], 2) }}</td>
+            <td class="text-right">{{ number_format($row['discount'], 2) }}</td>
+            <td class="text-right font-bold">{{ number_format($row['amount'] - $row['discount'], 2) }}</td>
         </tr>
         @endforeach
     </tbody>
@@ -36,7 +38,8 @@
             <td class="text-right">{{ collect($data)->sum('qty_full') }}</td>
             <td class="text-right">{{ collect($data)->sum('qty_pcs') }}</td>
             <td></td>
-            <td class="text-right">{{ number_format(collect($data)->sum('amount'), 2) }}</td>
+            <td class="text-right">{{ number_format(collect($data)->sum('discount'), 2) }}</td>
+            <td class="text-right">{{ number_format(collect($data)->sum('amount') - collect($data)->sum('discount'), 2) }}</td>
         </tr>
     </tfoot>
 </table>

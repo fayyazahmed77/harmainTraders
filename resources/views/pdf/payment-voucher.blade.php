@@ -350,10 +350,18 @@
     <div class="voucher">
 
         {{-- ═══ HEADER ═══ --}}
+        @php
+            $f_name = $payment->firm ? $payment->firm->name : 'Harmain Traders';
+            $f_sub = $payment->firm ? $payment->firm->business : 'Wholesale & Supply Chain';
+            $f_addr = $payment->firm ? trim($payment->firm->address1 . ' ' . $payment->firm->address2) : 'Karachi, Pakistan';
+            $f_phone = $payment->firm ? $payment->firm->phone : '+92 300 0000000';
+            $f_email = $payment->firm ? $payment->firm->email : 'info@harmaintraders.com';
+            $f_website = $payment->firm ? $payment->firm->website : 'aishtycoons.agency';
+        @endphp
         <div class="header">
             <div class="header-left">
-                <div class="company-name">Harmain Traders</div>
-                <div class="company-sub">Wholesale &amp; Supply Chain · Karachi, Pakistan</div>
+                <div class="company-name">{{ $f_name }}</div>
+                <div class="company-sub">{{ $f_sub }} &middot; {{ $f_addr }}</div>
             </div>
             <div class="header-right">
                 <div class="voucher-title">{{ $payment->type === 'RECEIPT' ? 'Receipt Voucher' : 'Payment Voucher' }}</div>
@@ -369,16 +377,35 @@
         </div>
 
         {{-- ═══ PARTY + PAYMENT DETAILS ROW ═══ --}}
+        @php
+            $bal = (float) $payment->account->current_balance;
+            $is_purchase = (bool) $payment->account->purchase;
+            if ($bal < 0) {
+                $top_balance_label = "Paid in Advance";
+                $top_balance_value = "PKR " . number_format(abs($bal), 2);
+            } else {
+                $top_balance_label = "Balance";
+                $top_balance_value = "PKR " . number_format($bal, 2) . " " . ($is_purchase ? 'CR' : 'DR');
+            }
+        @endphp
         <div class="info-row">
             <div class="info-cell">
                 <div class="info-label">{{ $payment->type === 'RECEIPT' ? 'Received From' : 'Paid To' }}</div>
                 <div class="info-value">{{ $payment->account->title }}</div>
+               
             </div>
             <div class="info-cell info-cell-right">
                 @if(isset($isCombined) && $isCombined)
                     <div class="info-label">Payment Distribution</div>
                     @foreach($groupPayments as $gp)
-                        <div class="info-value-sm">{{ $gp->paymentAccount->title ?? 'Cash' }} ({{ $gp->payment_method ?: 'Cash' }}): PKR {{ number_format($gp->amount, 2) }}</div>
+                        @php
+                            $method_lbl = $gp->payment_method ?: 'Cash';
+                            $details = '';
+                            if (strtolower($method_lbl) === 'cheque') {
+                                $details = ' (Chq #' . ($gp->cheque_no ?: '-') . ($gp->cheque_date ? ' · ' . \Carbon\Carbon::parse($gp->cheque_date)->format('d M Y') : '') . ')';
+                            }
+                        @endphp
+                        <div class="info-value-sm">{{ $gp->paymentAccount->title ?? 'Cash' }} ({{ $method_lbl }}){{ $details }}</div>
                     @endforeach
                 @else
                     <div style="display:table;width:100%;">
@@ -403,30 +430,6 @@
             </div>
         </div>
 
-        {{-- ═══ AMOUNT BOX ═══ --}}
-        <div class="amount-box">
-            <div class="amount-label-cell">
-                <div class="amount-label-title">Total Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}</div>
-                <div class="amount-words">
-                    @if($payment->amount_in_words)
-                        {{ $payment->amount_in_words }}
-                    @else
-                        {{ \NumberFormatter::create('en', \NumberFormatter::SPELLOUT)->format(isset($isCombined) && $isCombined ? $groupPayments->sum('amount') : $payment->amount) }} rupees only
-                    @endif
-                </div>
-            </div>
-            <div class="amount-value-cell">
-                <div class="amount-currency">PKR</div>
-                <div class="amount-number">
-                    @if(isset($isCombined) && $isCombined)
-                        {{ number_format($groupPayments->sum('amount'), 2) }}
-                    @else
-                        {{ number_format($payment->amount, 2) }}
-                    @endif
-                </div>
-            </div>
-        </div>
-
         {{-- ═══ PAYMENT ALLOCATION TABLE ═══ --}}
         @php
             $displayAllocations = isset($isCombined) && $isCombined
@@ -438,8 +441,25 @@
             });
 
             $totalAmount = isset($isCombined) && $isCombined
-                ? $groupPayments->sum('amount')
-                : $payment->amount;
+                ? $groupPayments->sum('net_amount')
+                : $payment->net_amount;
+
+            // Compute allocated invoices total sum
+            $invoiceTotalSum = 0;
+            foreach($mergedAllocations as $group) {
+                $first = $group->first();
+                $invoiceTotalSum += $first->bill ? ($first->bill->net_total ?? $first->bill->total ?? $group->sum('amount')) : $group->sum('amount');
+            }
+
+            // Calculations for Financial Summary
+            $current_balance = (float) $payment->account->current_balance;
+            $amount_applied = $totalAmount;
+            $is_receipt = $payment->type === 'RECEIPT';
+            $orientation = $payment->account->purchase == 1 ? 'CR' : 'DR';
+
+            // Previous Balance = Current Balance - Invoice Total + Payout/Receipt Gross
+            $previous_balance = $current_balance - $invoiceTotalSum + $amount_applied;
+            $net_balance = $current_balance;
         @endphp
 
         @if($displayAllocations->count() > 0)
@@ -483,16 +503,89 @@
             </table>
         @endif
 
-        {{-- ═══ REMARKS ═══ --}}
-        @if($payment->remarks || $payment->message_line)
+        {{-- ═══ REDESIGNED SUMMARY & AMOUNT IN WORDS SECTION ═══ --}}
+        <div class="summary-section" style="display: table; width: 100%; margin-top: 6px; margin-bottom: 8px; border: 1px solid #bbbbbb; border-collapse: collapse;">
+            <div style="display: table-cell; width: 55%; padding: 6px 8px; vertical-align: top; border-right: 1px solid #bbbbbb;">
+                <div class="amount-label-title" style="font-size: 8px; font-weight: 700; text-transform: uppercase; color: #555555; letter-spacing: 0.5px;">Amount in Words</div>
+                <div class="amount-words" style="font-size: 11px; font-weight: 700; color: #000000; font-style: italic; margin-top: 4px; line-height: 1.3;">
+                    @if($payment->amount_in_words)
+                        {{ $payment->amount_in_words }}
+                    @else
+                        {{ \NumberFormatter::create('en', \NumberFormatter::SPELLOUT)->format($totalAmount) }} rupees only
+                    @endif
+                </div>
+                @php
+                    $totalDiscount = isset($isCombined) && $isCombined ? $groupPayments->sum('discount') : $payment->discount;
+                    $totalAmountReceived = isset($isCombined) && $isCombined ? $groupPayments->sum('amount') : $payment->amount;
+                @endphp
+                @if($totalDiscount > 0)
+                    <div style="font-size: 8px; color: #444444; margin-top: 8px; border-top: 0.5px solid #cccccc; padding-top: 4px;">
+                        Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}: <strong>PKR {{ number_format($totalAmountReceived, 2) }}</strong> &nbsp;|&nbsp; 
+                        Discount (Adj): <strong>PKR {{ number_format($totalDiscount, 2) }}</strong>
+                    </div>
+                @endif
+            </div>
+            <div style="display: table-cell; width: 45%; padding: 0; vertical-align: top;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                    <tr>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Total:</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold;">PKR {{ number_format($invoiceTotalSum, 2) }}</td>
+                    </tr>
+                    @php
+                        $prev_is_advance = $previous_balance < 0;
+                        $prev_label = $prev_is_advance ? 'Prev Advance:' : 'Previous Balance:';
+                        $prev_val_formatted = "PKR " . number_format(abs($previous_balance), 2);
+                        if (!$prev_is_advance) {
+                            $prev_val_formatted .= " " . $orientation;
+                        }
+
+                        $is_advance = $net_balance < 0;
+                        $net_label = $is_advance ? 'Paid in Advance:' : 'Net Balance:';
+                        $net_val_formatted = "PKR " . number_format(abs($net_balance), 2);
+                        if (!$is_advance) {
+                            $net_val_formatted .= " " . $orientation;
+                        }
+
+                        $totalDiscount = isset($isCombined) && $isCombined ? $groupPayments->sum('discount') : $payment->discount;
+                        $totalActualPaid = isset($isCombined) && $isCombined ? $groupPayments->sum('amount') : $payment->amount;
+                    @endphp
+                    <tr>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">{{ $prev_label }}</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold;">{{ $prev_val_formatted }}</td>
+                    </tr>
+                    @if($totalDiscount > 0)
+                        <tr>
+                            <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Discount (Adj):</td>
+                            <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #111111ff;">PKR {{ number_format($totalDiscount, 2) }}</td>
+                        </tr>
+                    @endif
+                    <tr>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">{{ $payment->type === 'RECEIPT' ? 'Paid/Receipt (Cr):' : 'Paid/Receipt (Dr):' }}</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #0d0f0eff;">PKR {{ number_format($totalActualPaid, 2) }}</td>
+                    </tr>
+                    <tr style="background-color: #f7f9fa;">
+                        <td style="padding: 5px 6px; font-weight: 800; color: #000000; font-size: 11px; border-top: 1px solid #bbbbbb;">{{ $net_label }}</td>
+                        <td style="padding: 5px 6px; text-align: right; font-weight: 900; font-size: 11px; color: #000000; border-top: 1px solid #bbbbbb;">{{ $net_val_formatted }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        {{-- ═══ REMARKS & COMMUNICATION ═══ --}}
+        @php
+            $msgLine = $payment->messageLine ?? $payment->message_line ?? null;
+        @endphp
+        @if($payment->remarks || $msgLine)
             <div class="remarks-row">
-                <div class="remarks-label-cell">Remarks</div>
+                <div class="remarks-label-cell">Remarks / Note</div>
                 <div class="remarks-value-cell">
                     @if($payment->remarks)
-                        {{ $payment->remarks }}
+                        <div style="margin-bottom: 2px;">{{ $payment->remarks }}</div>
                     @endif
-                    @if($payment->message_line)
-                        &nbsp;—&nbsp;"{{ $payment->message_line->messageline ?? $payment->message_line }}"
+                    @if($msgLine)
+                        <div style="font-weight: bold; font-style: italic; color: #333333; {{ $payment->remarks ? 'margin-top: 3px; padding-top: 2px; border-top: 0.5px dashed #dddddd;' : '' }}">
+                            "{{ $msgLine->messageline ?? (is_string($msgLine) ? $msgLine : '') }}"
+                        </div>
                     @endif
                 </div>
             </div>
@@ -501,10 +594,11 @@
         {{-- ═══ SIGNATURES ═══ --}}
         <div class="signatures-grid">
             <div class="sig-cell">
-                <div class="sig-space"></div>
+                <div class="sig-space" style="font-size: 10px; font-weight: bold; padding-top: 12px; height: 28px;">
+                    {{ $payment->created_by_user->name ?? 'Fayyaz Ahmed' }}
+                </div>
                 <div class="sig-line"></div>
                 <div class="sig-label">Prepared By</div>
-                <div class="sig-name">{{ $payment->created_by_user->name ?? 'Fayyaz Ahmed' }}</div>
             </div>
             <div class="sig-cell">
                 <div class="sig-space"></div>
@@ -521,7 +615,7 @@
         {{-- ═══ FOOTER ═══ --}}
         <div class="voucher-footer">
             <div class="footer-left">
-                📞 +92 300 0000000 &nbsp;·&nbsp; ✉ info@harmaintraders.com &nbsp;·&nbsp; Karachi, Pakistan
+                Phone: {{ $f_phone }} &nbsp;·&nbsp; Email: {{ $f_email }} &nbsp;·&nbsp; Address: {{ $f_addr }}
             </div>
             <div class="footer-right">
                 Computer-generated · {{ $payment->voucher_no }} · {{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}

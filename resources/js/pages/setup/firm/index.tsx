@@ -82,90 +82,76 @@ export default function FirmIndex() {
           <SiteHeader breadcrumbs={breadcrumbs} />
 
           <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar text-zinc-900 dark:text-zinc-100">
-            <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8">
+            <div className="max-w-[1400px] mx-auto p-6 space-y-6">
               {/* Header Section */}
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col md:flex-row md:items-center justify-between gap-6"
-              >
-                <Heading
-                  title="Firms"
-                  description="Manage your firms, branding, and business details"
-                />
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h1 className="text-2xl font-bold mb-1">Firms List</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Manage and view all your firms, branding, and business details.
+                  </p>
+                </div>
 
                 {canCreate && (
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Link href="/firms/create">
-                      <Button
-                        className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 h-12 px-6 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-zinc-200/50 dark:shadow-none"
-                      >
-                        <Plus className="mr-2 h-4 w-4" /> Add Firm
-                      </Button>
-                    </Link>
-                  </motion.div>
+                  <Link href="/firms/create">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" /> Add Firm
+                    </Button>
+                  </Link>
                 )}
-              </motion.div>
+              </div>
 
               {/* Filtering Command Bar */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"
-              >
-                <div className="md:col-span-4 relative group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
+              <div className="p-4 rounded-xl shadow-sm border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
+                <div className="flex-1 min-w-[200px] relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search Firms..."
+                    placeholder="Search name, code, business type..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-12 bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-orange-500/20 transition-all text-xs font-bold"
+                    className="pl-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm transition-all focus-visible:ring-primary text-sm font-semibold"
                   />
                 </div>
 
-                <div className="md:col-span-3">
+                <div className="w-[200px]">
                   <ShadSelect value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="h-12 bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-orange-500/20 transition-all text-xs font-bold">
+                    <SelectTrigger className="w-full bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm text-sm font-semibold">
                       <div className="flex items-center gap-2">
-                        <Filter className="h-3.5 w-3.5 text-zinc-400" />
+                        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
                         <SelectValue placeholder="Filter By" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl">
-                      <SelectItem value="all" className="text-xs font-bold uppercase">All Firms</SelectItem>
-                      <SelectItem value="primary" className="text-xs font-bold uppercase text-orange-600">Primary Only</SelectItem>
-                      <SelectItem value="standard" className="text-xs font-bold uppercase">Others</SelectItem>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="all" className="text-xs font-semibold">All Firms</SelectItem>
+                      <SelectItem value="primary" className="text-xs font-semibold text-orange-600">Primary Only</SelectItem>
+                      <SelectItem value="standard" className="text-xs font-semibold">Others</SelectItem>
                     </SelectContent>
                   </ShadSelect>
                 </div>
 
-                <div className="md:col-span-5 flex items-center justify-end gap-6 px-4">
+                <div className="flex items-center justify-end gap-6 px-4">
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">Total Count</span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-black text-orange-500 tabular-nums">{firms.length.toString().padStart(2, '0')}</span>
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">Firms Found</span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">Firms</span>
                     </div>
                   </div>
-                  <div className="h-10 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-                  <div className="h-10 w-10 bg-zinc-900 dark:bg-zinc-100 rounded-xl flex items-center justify-center shadow-lg">
-                    <Activity className="h-5 w-5 text-white dark:text-zinc-900" />
+                  <div className="h-8 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center border">
+                    <Activity className="h-4 w-4 text-zinc-500" />
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Data Table Section */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
+              <div
                 className={cn(
                   PREMIUM_ROUNDING,
-                  "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl shadow-2xl shadow-zinc-200/50 dark:shadow-none overflow-hidden"
+                  "border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden"
                 )}
               >
-                <div className="p-6 md:p-8">
+                <div className="">
                   {firms.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
                       <div className="h-20 w-20 rounded-3xl bg-white dark:bg-zinc-950 flex items-center justify-center shadow-xl mb-6">
@@ -193,7 +179,7 @@ export default function FirmIndex() {
                     />
                   )}
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
 

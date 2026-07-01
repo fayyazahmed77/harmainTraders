@@ -391,7 +391,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 
 <body>
     @if($firm)
-    @if($firm->name == 'Harmain Traders')
+    @if($firm->name == 'Haramain Traders')
     <div class="watermark-container">
         <img src="{{ $logo_base64 }}" alt="watermark">
     </div>
@@ -399,11 +399,11 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
-            @if($firm->name == 'Harmain Traders')
+            @if($firm->name == 'Haramain Traders')
             <div class="logo-section">
                 <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"></div>
                 <div class="brand-text">
-                    <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+                    <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
                     <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
                 </div>
             </div>

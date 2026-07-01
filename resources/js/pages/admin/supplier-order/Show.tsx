@@ -37,6 +37,7 @@ interface Order {
   supplier: {
     id: number;
     title: string;
+    type?: number;
   };
   items: OrderItem[];
 }
@@ -101,8 +102,10 @@ export default function SupplierOrderShow({ order }: ShowProps) {
             {/* Meta Info */}
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold mb-1">Supplier</p>
-                <p className="text-lg font-bold text-zinc-900 dark:text-zinc-200">{order.supplier?.title || 'Unknown Supplier'}</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold mb-1">
+                  {order.supplier?.type === 5 ? 'Company' : 'Supplier'}
+                </p>
+                <p className="text-lg font-bold text-zinc-900 dark:text-zinc-200">{order.supplier?.title || 'N/A'}</p>
               </div>
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold mb-1">Status</p>

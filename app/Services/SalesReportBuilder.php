@@ -219,6 +219,7 @@ class SalesReportBuilder
             'sales_items.qty_carton as qty_full',
             'sales_items.qty_pcs',
             'sales_items.trade_price as tp',
+            'sales_items.discount as discount',
             'sales_items.subtotal as amount'
         )
         ->orderBy('sales.date', 'desc')
@@ -504,9 +505,10 @@ class SalesReportBuilder
     public function salesRecoverySummary($fromDate, $toDate, $filters = [])
     {
         $query = DB::table('accounts')
+            ->join('account_types', 'accounts.type', '=', 'account_types.id')
             ->leftJoin('areas', 'accounts.area_id', '=', 'areas.id')
             ->leftJoin('subareas', 'accounts.subarea_id', '=', 'subareas.id')
-            ->where('accounts.sale', 1);
+            ->whereRaw("LOWER(account_types.name) = 'customers'");
 
         if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
         if ($filters['customer_id']) $query->where('accounts.id', $filters['customer_id']);
@@ -517,7 +519,9 @@ class SalesReportBuilder
             'accounts.title as account_name',
             'accounts.mobile as contact',
             DB::raw("(SELECT COALESCE(SUM(net_total), 0) FROM sales WHERE customer_id = accounts.id AND date BETWEEN '$fromDate' AND '$toDate') as sales"),
-            DB::raw("(SELECT COALESCE(SUM(amount + discount), 0) FROM payments WHERE account_id = accounts.id AND type = 'RECEIPT' AND date BETWEEN '$fromDate' AND '$toDate' AND (cheque_status IS NULL OR cheque_status != 'Canceled')) as received"),
+            DB::raw("(SELECT COALESCE(SUM(net_total), 0) FROM sales_returns WHERE customer_id = accounts.id AND date BETWEEN '$fromDate' AND '$toDate') as returns"),
+            DB::raw("(SELECT COALESCE(SUM(discount), 0) FROM payments WHERE account_id = accounts.id AND type = 'RECEIPT' AND date BETWEEN '$fromDate' AND '$toDate' AND (cheque_status IS NULL OR cheque_status != 'Canceled')) as discount"),
+            DB::raw("(SELECT COALESCE(SUM(amount), 0) FROM payments WHERE account_id = accounts.id AND type = 'RECEIPT' AND date BETWEEN '$fromDate' AND '$toDate' AND (cheque_status IS NULL OR cheque_status != 'Canceled')) as received"),
             DB::raw("
                 CAST(accounts.opening_balance AS DECIMAL(15,2)) + 
                 COALESCE((SELECT SUM(net_total) FROM sales WHERE customer_id = accounts.id), 0) + 
@@ -530,7 +534,15 @@ class SalesReportBuilder
         ->orderBy('accounts.title')
         ->get();
 
-        return $this->transformToArray($results);
+        // Option B: Filter out customers with zero activity in the date range
+        $filtered = $results->filter(function($row) {
+            return (float)$row->sales != 0 
+                || (float)$row->returns != 0 
+                || (float)$row->discount != 0 
+                || (float)$row->received != 0;
+        });
+
+        return $this->transformToArray($filtered->values());
     }
 
     public function salesmanWiseSummary($fromDate, $toDate, $filters = [])

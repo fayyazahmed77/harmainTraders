@@ -65,7 +65,7 @@ class SalesController extends Controller implements HasMiddleware
             });
         }
 
-        $sales = $query->orderBy('date', 'desc')->get();
+        $sales = $query->orderBy('date', 'desc')->orderBy('id', 'desc')->get();
 
         // Calculate Summary
         // For returns, we need a separate query that matches the same filters (Date, Customer) if possible.
@@ -204,9 +204,9 @@ class SalesController extends Controller implements HasMiddleware
             // Recalculate gross_total from item subtotals and net_total from all components.
             $calcGross = collect($request->items)->sum(fn($i) => (float)($i['subtotal'] ?? 0));
             $calcNet   = $calcGross
+                - (float)($request->discount_total ?? 0)
                 + (float)($request->tax_total ?? 0)
-                + (float)($request->courier_charges ?? 0)
-                - (float)($request->extra_discount ?? 0);
+                + (float)($request->courier_charges ?? 0);
 
             if (abs((float)$request->gross_total - $calcGross) > 1) {
                 DB::rollBack();

@@ -33,22 +33,45 @@ class SupplierOrderController extends Controller implements HasMiddleware
             ->orderBy('title')
             ->get();
 
+        // Fetch company IDs that have items in purchase_items
+        $companyIds = DB::table('purchase_items')
+            ->join('items', 'purchase_items.item_id', '=', 'items.id')
+            ->distinct()
+            ->pluck('items.company');
+
+        $companies = Account::where('type', 5) // Company
+            ->whereIn('id', $companyIds)
+            ->withCount('items')
+            ->orderBy('title')
+            ->get();
+
         return Inertia::render('admin/supplier-order/index', [
             'suppliers' => $suppliers,
+            'companies' => $companies,
         ]);
     }
 
     public function getItems(Request $request)
     {
         $request->validate([
-            'supplier_id' => 'required|exists:accounts,id',
+            'supplier_id' => 'nullable|exists:accounts,id',
+            'selection_id' => 'nullable|exists:accounts,id',
+            'selection_mode' => 'nullable|string|in:supplier,company',
             'mode' => 'nullable|string|in:reorder,sales',
+            'sales_start_date' => 'nullable|date',
         ]);
 
+        $selectionId = $request->get('selection_id') ?: $request->get('supplier_id');
+        $selectionMode = $request->get('selection_mode', 'supplier');
         $mode = $request->get('mode', 'reorder');
-        $supplier = Account::with('assignedCompanies')->findOrFail($request->supplier_id);
-        $companyIds = $supplier->assignedCompanies->pluck('id');
-        $fifteenDaysAgo = now()->subDays(15)->format('Y-m-d');
+        $salesStartDate = $request->get('sales_start_date') ? date('Y-m-d', strtotime($request->sales_start_date)) : now()->subDays(15)->format('Y-m-d');
+
+        if ($selectionMode === 'company') {
+            $companyIds = [$selectionId];
+        } else {
+            $supplier = Account::with('assignedCompanies')->findOrFail($selectionId);
+            $companyIds = $supplier->assignedCompanies->pluck('id');
+        }
 
         // Calculate real-time stock based on transactions (matching report logic)
         $purchased = DB::table('purchase_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchased'))->groupBy('item_id');
@@ -56,10 +79,10 @@ class SupplierOrderController extends Controller implements HasMiddleware
         $purchaseReturned = DB::table('purchase_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchase_returned'))->groupBy('item_id');
         $salesReturned = DB::table('sales_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sales_returned'))->groupBy('item_id');
         
-        // Sales in last 15 days (Aggregated for joining)
+        // Sales in selected period (Aggregated for joining)
         $sales15Agg = DB::table('sales_items')
             ->join('sales', 'sales.id', '=', 'sales_items.sale_id')
-            ->where('sales.date', '>=', $fifteenDaysAgo)
+            ->where('sales.date', '>=', $salesStartDate)
             ->select('item_id', DB::raw('SUM(total_pcs) as total_sales_15'))
             ->groupBy('item_id');
 

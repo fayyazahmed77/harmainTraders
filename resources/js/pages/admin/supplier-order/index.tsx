@@ -60,17 +60,47 @@ interface OrderItem {
 
 interface Props {
   suppliers: Supplier[];
+  companies: Company[];
 }
 
-export default function SupplierOrder({ suppliers }: Props) {
+export default function SupplierOrder({ suppliers, companies }: Props) {
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark';
   const [currentDate, setCurrentDate] = useState("");
   const [currentTime, setCurrentTime] = useState("");
+  const [selectionMode, setSelectionMode] = useState<'supplier' | 'company'>('supplier');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [supplierSearch, setSupplierSearch] = useState("");
+
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+  const [companySearch, setCompanySearch] = useState("");
   
+  const getFifteenDaysAgo = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 15);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getTodayDateString = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const [salesStartDate, setSalesStartDate] = useState(getFifteenDaysAgo());
+
+  const salesDaysCount = useMemo(() => {
+    const start = new Date(salesStartDate);
+    const today = new Date();
+    start.setHours(0,0,0,0);
+    today.setHours(0,0,0,0);
+    // Use sign to determine if it is in future or past
+    const isFuture = start.getTime() > today.getTime();
+    const diffTime = Math.abs(today.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return isFuture ? 0 : diffDays;
+  }, [salesStartDate]);
+
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -95,19 +125,25 @@ export default function SupplierOrder({ suppliers }: Props) {
     return suppliers.filter(s => s.title.toLowerCase().includes(supplierSearch.toLowerCase()));
   }, [suppliers, supplierSearch]);
 
-  useEffect(() => {
-    if (selectedSupplier) {
-      loadSupplierItems(selectedSupplier);
-    }
-  }, [filterMode]);
+  const filteredCompanies = useMemo(() => {
+    return companies.filter(c => c.title.toLowerCase().includes(companySearch.toLowerCase()));
+  }, [companies, companySearch]);
 
-  const loadSupplierItems = async (supplier: Supplier) => {
-    if (!supplier) return;
+  useEffect(() => {
+    const selectionId = selectionMode === 'supplier' ? selectedSupplier?.id : selectedCompany?.id;
+    if (selectionId) {
+      loadItems(selectionId, selectionMode);
+    }
+  }, [selectedSupplier, selectedCompany, filterMode, selectionMode, salesStartDate]);
+
+  const loadItems = async (selectionId: number, selMode: 'supplier' | 'company') => {
     setIsLoadingItems(true);
     try {
       const response = await axios.post('/admin/api/supplier-order/items', {
-        supplier_id: supplier.id,
-        mode: filterMode
+        selection_id: selectionId,
+        selection_mode: selMode,
+        mode: filterMode,
+        sales_start_date: salesStartDate
       });
       
       const newItems = response.data.items.map((item: any) => ({
@@ -119,7 +155,14 @@ export default function SupplierOrder({ suppliers }: Props) {
         disc_percent: 0,
       }));
       setOrderItems(newItems);
-      if (newItems.length > 0) setSelectedRowId(newItems[0].id);
+      if (newItems.length > 0) {
+        const stillExists = newItems.some((item: any) => item.id === selectedRowId);
+        if (!stillExists) {
+          setSelectedRowId(newItems[0].id);
+        }
+      } else {
+        setSelectedRowId(null);
+      }
     } catch (error) {
       console.error("Failed to load items", error);
     } finally {
@@ -143,6 +186,7 @@ export default function SupplierOrder({ suppliers }: Props) {
     setOrderItems([]);
     setSelectedRowId(null);
     setSelectedSupplier(null);
+    setSelectedCompany(null);
   };
 
   const selectedItem = useMemo(() => 
@@ -181,11 +225,12 @@ export default function SupplierOrder({ suppliers }: Props) {
   };
 
   const handleSaveOrder = async () => {
-    if (!selectedSupplier || orderItems.length === 0) return;
+    const selectionId = selectionMode === 'supplier' ? selectedSupplier?.id : selectedCompany?.id;
+    if (!selectionId || orderItems.length === 0) return;
     setIsSaving(true);
     try {
       const response = await axios.post('/admin/api/supplier-order/store', {
-        supplier_id: selectedSupplier.id,
+        supplier_id: selectionId,
         order_date: currentDate,
         items: orderItems,
       });
@@ -227,54 +272,127 @@ export default function SupplierOrder({ suppliers }: Props) {
               </div>
             </div>
 
+            {/* Order Target Switcher */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">Order Target</label>
+              <div className="flex items-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-1 shadow-sm h-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectionMode('supplier');
+                    setOrderItems([]);
+                    setSelectedRowId(null);
+                  }}
+                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${selectionMode === 'supplier' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                >
+                  Supplier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectionMode('company');
+                    setOrderItems([]);
+                    setSelectedRowId(null);
+                  }}
+                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${selectionMode === 'company' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                >
+                  Company
+                </button>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1.5 flex-1 max-w-sm">
-              <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">Select Supplier</label>
-              <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
-                <DialogTrigger asChild>
-                  <button className="flex items-center justify-between bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-bold transition-colors w-full text-left shadow-sm">
-                    <span className={selectedSupplier ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
-                      {selectedSupplier ? selectedSupplier.title : "Select Supplier..."}
-                    </span>
-                    <ChevronDown size={14} className="text-zinc-400 dark:text-zinc-600" />
-                  </button>
-                </DialogTrigger>
-                <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
-                  <DialogHeader>
-                    <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-300">Select Supplier</DialogTitle>
-                  </DialogHeader>
-                  <div className="py-2">
-                    <Input 
-                      placeholder="Search..." 
-                      value={supplierSearch}
-                      onChange={e => setSupplierSearch(e.target.value)}
-                      className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-sm h-10 mb-4 focus-visible:ring-orange-500/50"
-                    />
-                    <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-1">
-                      {filteredSuppliers.map(sup => {
-                        const totalItems = sup.assigned_companies?.reduce((acc, comp) => acc + (comp.items_count || 0), 0) || 0;
-                        return (
+              <label className="text-[10px] text-zinc-500 uppercase tracking-widest pl-1 font-bold">
+                {selectionMode === 'supplier' ? 'Select Supplier' : 'Select Company'}
+              </label>
+              {selectionMode === 'supplier' ? (
+                <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button className="flex items-center justify-between bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-bold transition-colors w-full text-left shadow-sm">
+                      <span className={selectedSupplier ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
+                        {selectedSupplier ? selectedSupplier.title : "Select Supplier..."}
+                      </span>
+                      <ChevronDown size={14} className="text-zinc-400 dark:text-zinc-600" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                    <DialogHeader>
+                      <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-300">Select Supplier</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2">
+                      <Input 
+                        placeholder="Search..." 
+                        value={supplierSearch}
+                        onChange={e => setSupplierSearch(e.target.value)}
+                        className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-sm h-10 mb-4 focus-visible:ring-orange-500/50"
+                      />
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+                        {filteredSuppliers.map(sup => {
+                          const totalItems = sup.assigned_companies?.reduce((acc, comp) => acc + (comp.items_count || 0), 0) || 0;
+                          return (
+                            <button
+                              key={sup.id}
+                              onClick={() => {
+                                setSelectedSupplier(sup);
+                                setIsSupplierDialogOpen(false);
+                              }}
+                              className="text-left px-3 py-2.5 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 flex flex-col gap-1"
+                            >
+                              <span className="text-sm font-bold text-zinc-900 dark:text-zinc-200">{sup.title}</span>
+                              {sup.assigned_companies && sup.assigned_companies.length > 0 && (
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                  {sup.assigned_companies.map(c => c.title).join(', ')} <span className="text-orange-500 font-bold ml-1">({totalItems} items)</span>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              ) : (
+                <Dialog open={isCompanyDialogOpen} onOpenChange={setIsCompanyDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button className="flex items-center justify-between bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-lg h-10 px-4 text-xs font-bold transition-colors w-full text-left shadow-sm">
+                      <span className={selectedCompany ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-400 dark:text-zinc-500"}>
+                        {selectedCompany ? selectedCompany.title : "Select Company..."}
+                      </span>
+                      <ChevronDown size={14} className="text-zinc-400 dark:text-zinc-600" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
+                    <DialogHeader>
+                      <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-300">Select Company</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-2">
+                      <Input 
+                        placeholder="Search..." 
+                        value={companySearch}
+                        onChange={e => setCompanySearch(e.target.value)}
+                        className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-sm h-10 mb-4 focus-visible:ring-orange-500/50"
+                      />
+                      <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+                        {filteredCompanies.map(comp => (
                           <button
-                            key={sup.id}
+                            key={comp.id}
                             onClick={() => {
-                              setSelectedSupplier(sup);
-                              setIsSupplierDialogOpen(false);
-                              loadSupplierItems(sup);
+                              setSelectedCompany(comp);
+                              setIsCompanyDialogOpen(false);
                             }}
                             className="text-left px-3 py-2.5 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 flex flex-col gap-1"
                           >
-                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-200">{sup.title}</span>
-                            {sup.assigned_companies && sup.assigned_companies.length > 0 && (
-                              <span className="text-[10px] text-zinc-500 font-mono">
-                                {sup.assigned_companies.map(c => c.title).join(', ')} <span className="text-orange-500 font-bold ml-1">({totalItems} items)</span>
-                              </span>
-                            )}
+                            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-200">{comp.title}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              <span className="text-orange-500 font-bold">({comp.items_count || 0} items)</span>
+                            </span>
                           </button>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -294,13 +412,26 @@ export default function SupplierOrder({ suppliers }: Props) {
                   <RotateCcw size={12} className={filterMode === 'reorder' ? 'animate-spin-slow' : ''} />
                   Re-Order Wise
                 </button>
-                <button 
-                  onClick={() => setFilterMode('sales')}
-                  className={`px-4 h-full text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 ${filterMode === 'sales' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
+                <div 
+                  className={`flex items-center gap-2 h-full rounded-md px-3 transition-all ${filterMode === 'sales' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}`}
                 >
-                  <Search size={12} />
-                  Sales Wise
-                </button>
+                  <button 
+                    onClick={() => setFilterMode('sales')}
+                    className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 h-full"
+                  >
+                    <Search size={12} />
+                    Sales ({salesDaysCount} Days)
+                  </button>
+                  {filterMode === 'sales' && (
+                    <input 
+                      type="date"
+                      value={salesStartDate}
+                      max={getTodayDateString()}
+                      onChange={e => setSalesStartDate(e.target.value)}
+                      className="text-[9px] font-mono bg-blue-700/50 dark:bg-zinc-950 border border-blue-400 dark:border-zinc-800 rounded px-1 py-0.5 text-white focus:outline-none focus:border-white w-[100px] cursor-pointer h-6"
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -414,7 +545,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                   {orderItems.length === 0 && (
                     <tr>
                       <td colSpan={10} className="px-4 py-12 text-center text-zinc-400 dark:text-zinc-600 text-xs font-bold uppercase tracking-widest">
-                        {isLoadingItems ? 'Loading items...' : 'Select a supplier and load items to begin'}
+                        {isLoadingItems ? 'Loading items...' : `Select a ${selectionMode === 'supplier' ? 'supplier' : 'company'} and load items to begin`}
                       </td>
                     </tr>
                   )}
@@ -484,7 +615,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Pur. Date</span>
-                    <span className="text-xs font-mono text-zinc-100 font-bold">{selectedItem.last_purchase_date || 'N/A'}</span>
+                    <span className="text-xs font-mono text-zinc-500 font-bold">{selectedItem.last_purchase_date || 'N/A'}</span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Qty</span>
@@ -519,12 +650,7 @@ export default function SupplierOrder({ suppliers }: Props) {
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Supplier</span>
                     <span className="text-xs text-zinc-900 dark:text-zinc-300 font-bold truncate max-w-[120px]">{selectedItem.last_supplier || 'N/A'}</span>
                   </div>
-                  <div className="flex flex-col gap-1 border-l border-zinc-100 dark:border-zinc-800 pl-4">
-                    <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Sales (15 Days)</span>
-                    <span className={`text-xs font-mono font-black ${Number(selectedItem.sales_15_days) > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-300 dark:text-zinc-600'}`}>
-                      {selectedItem.sales_15_full} <span className="text-[9px] font-sans font-bold">Full</span>, {selectedItem.sales_15_pcs} <span className="text-[9px] font-sans font-bold">PCS</span>
-                    </span>
-                  </div>
+                 
                 </div>
               </div>
             ) : (

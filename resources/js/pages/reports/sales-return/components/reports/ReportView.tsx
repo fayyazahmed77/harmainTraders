@@ -464,7 +464,7 @@ export function ReportView({
                                     const components: { [key: string]: React.FC<any> } = {
                                         bill: Reports.BillReport,
                                         detail: Reports.DetailsReport,
-                                        details_wise: Reports.DetailsReport,
+                                        details_wise: Reports.InvoiceDetailsReport,
                                         area_item_party: Reports.AreaItemPartyReport,
                                         item_summary: Reports.ItemSummaryReport,
                                         month: Reports.MonthReport,

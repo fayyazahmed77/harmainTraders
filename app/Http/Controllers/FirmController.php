@@ -184,6 +184,16 @@ class FirmController extends Controller implements HasMiddleware
         return redirect()->route('firms.index')->with('success', 'Firm updated successfully.');
     }
 
+    // ✅ Toggle active status
+    public function toggleActive($id)
+    {
+        $firm = Firm::findOrFail($id);
+        $firm->status = !$firm->status;
+        $firm->save();
+
+        return redirect()->back()->with('success', 'Firm status updated successfully.');
+    }
+
     // ✅ Delete firm
     public function destroy($id)
     {

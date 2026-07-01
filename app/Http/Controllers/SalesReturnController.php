@@ -244,6 +244,8 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status')
                 ->orderBy('created_at', 'desc')
                 ->get()
+                ->unique('invoice')
+                ->values()
                 ->map(function ($sale) {
                     return [
                         'id'               => $sale->id,

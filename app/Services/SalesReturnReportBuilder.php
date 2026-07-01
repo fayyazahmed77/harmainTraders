@@ -45,7 +45,7 @@ class SalesReturnReportBuilder
 
         switch ($reportId) {
             case 'bill': $data = $this->billWise($fromDate, $toDate, $filters); break;
-            case 'details_wise':
+            case 'details_wise': $data = $this->invoiceDetails($fromDate, $toDate, $filters); break;
             case 'detail': $data = $this->details($fromDate, $toDate, $filters); break;
             case 'area_item_party': $data = $this->areaWiseItemPartySummary($fromDate, $toDate, $filters); break;
             case 'month': $data = $this->monthWiseMatrix($fromDate, $toDate, $filters); break;
@@ -188,6 +188,42 @@ class SalesReturnReportBuilder
             'sales_return_items.subtotal as amount'
         )
         ->orderBy('sales_returns.date', 'desc')
+        ->get();
+
+        return $this->transformToArray($results);
+    }
+
+    public function invoiceDetails($fromDate, $toDate, $filters = [])
+    {
+        $query = $this->getSalesReturnItemsQuery($fromDate, $toDate)
+            ->join('items', 'sales_return_items.item_id', '=', 'items.id')
+            ->join('accounts', 'sales_returns.customer_id', '=', 'accounts.id')
+            ->leftJoin('salemen', 'sales_returns.salesman_id', '=', 'salemen.id');
+
+        if ($filters['customer_id']) $query->where('sales_returns.customer_id', $filters['customer_id']);
+        if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
+
+        $results = $query->select(
+            'sales_returns.id as sale_id',
+            'sales_returns.invoice as inv_no',
+            'sales_returns.date as inv_date',
+            'accounts.title as account_title',
+            'salemen.name as salesman_name',
+            'sales_returns.net_total as inv_amount',
+            'items.title as item_name',
+            'sales_return_items.trade_price',
+            'sales_return_items.qty_carton as qty_full',
+            'sales_return_items.qty_pcs',
+            'sales_return_items.trade_price as rate',
+            'sales_return_items.bonus_qty_carton as bonus_full',
+            'sales_return_items.bonus_qty_pcs as bonus_pcs',
+            'sales_return_items.discount as disc_1',
+            DB::raw('0 as disc_2'),
+            DB::raw('0 as tax'),
+            'sales_return_items.subtotal as amount'
+        )
+        ->orderBy('sales_returns.date', 'desc')
+        ->orderBy('sales_returns.invoice', 'desc')
         ->get();
 
         return $this->transformToArray($results);

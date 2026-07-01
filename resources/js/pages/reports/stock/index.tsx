@@ -105,7 +105,35 @@ export default function StockReportsIndex({ items, companies, categories, firms 
             fromDate: params.fromDate,
             toDate: params.toDate,
         });
-        window.open(`${baseUrl}?${queryParams.toString()}`, '_blank');
+        const url = `${baseUrl}?${queryParams.toString()}`;
+
+        if (type === 'pdf') {
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = 'none';
+            iframe.style.opacity = '0';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow?.focus();
+                    iframe.contentWindow?.print();
+                } catch (e) {
+                    console.error("Iframe print failed, falling back to window.open", e);
+                    window.open(url, '_blank');
+                }
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 60000);
+            };
+        } else {
+            window.open(url, '_blank');
+        }
     };
 
     return (

@@ -10,6 +10,7 @@ interface Props {
 export default function DetailsReport({ data, formatCurrency }: Props) {
     const totalQtyFull = data.reduce((sum, row) => sum + (Number(row.qty_full) || 0), 0);
     const totalQtyPcs = data.reduce((sum, row) => sum + (Number(row.qty_pcs) || 0), 0);
+    const totalDiscount = data.reduce((sum, row) => sum + (Number(row.discount) || 0), 0);
     const totalAmount = data.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
 
     return (
@@ -24,6 +25,7 @@ export default function DetailsReport({ data, formatCurrency }: Props) {
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Qty (Ctn)</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Qty (Pcs)</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">TP</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic text-amber-500">Discount</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Amount</TableHead>
                 </TableRow>
             </TableHeader>
@@ -42,7 +44,8 @@ export default function DetailsReport({ data, formatCurrency }: Props) {
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{row.qty_full}</TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{row.qty_pcs}</TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-muted text-[11px] tabular-nums">{formatCurrency(row.tp)}</TableCell>
-                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(row.amount)}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-amber-500 text-[11px] tabular-nums">{formatCurrency(row.discount)}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(row.amount - row.discount)}</TableCell>
                     </TableRow>
                 ))}
                 {data.length > 0 && (
@@ -51,7 +54,8 @@ export default function DetailsReport({ data, formatCurrency }: Props) {
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{totalQtyFull}</TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">{totalQtyPcs}</TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-muted text-[11px] tabular-nums"></TableCell>
-                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(totalAmount)}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-amber-500 text-[11px] tabular-nums">{formatCurrency(totalDiscount)}</TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 dark:text-indigo-400 text-[11px] bg-surface-1/20 tabular-nums">{formatCurrency(totalAmount - totalDiscount)}</TableCell>
                     </TableRow>
                 )}
             </TableBody>

@@ -12,9 +12,11 @@ export default function RecoveryReport({ data, formatCurrency }: Props) {
 
     const totals = data.reduce((acc, row) => ({
         sales: acc.sales + Number(row.sales || 0),
+        returns: acc.returns + Number(row.returns || 0),
+        discount: acc.discount + Number(row.discount || 0),
         received: acc.received + Number(row.received || 0),
         balance: acc.balance + Number(row.balance || 0),
-    }), { sales: 0, received: 0, balance: 0 });
+    }), { sales: 0, returns: 0, discount: 0, received: 0, balance: 0 });
 
     return (
         <>
@@ -23,9 +25,11 @@ export default function RecoveryReport({ data, formatCurrency }: Props) {
                     <TableHead className="py-4 px-6 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic w-[60px]">S.#</TableHead>
                     <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic">Area</TableHead>
                     <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic">Account</TableHead>
-                    <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic">Contact</TableHead>
+                    <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic w-[110px] max-w-[110px]">Contact</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Sales</TableHead>
-                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Received</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic text-rose-500">Return</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic text-amber-500">Discount</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic text-emerald-500">Received</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Balance</TableHead>
                 </TableRow>
             </TableHeader>
@@ -43,13 +47,19 @@ export default function RecoveryReport({ data, formatCurrency }: Props) {
                                 {row.account_name}
                             </span>
                         </TableCell>
-                        <TableCell className="py-4 px-4">
-                            <span className="text-[10px] font-bold text-text-muted/60 tabular-nums">
+                        <TableCell className="py-4 px-4 w-[110px] max-w-[110px]">
+                            <span className="text-[10px] font-bold text-text-muted/60 tabular-nums truncate block">
                                 {row.contact || '---'}
                             </span>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">
                             {formatCurrency(Number(row.sales))}
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-rose-500 text-[11px] tabular-nums">
+                            {formatCurrency(Number(row.returns))}
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-amber-500 text-[11px] tabular-nums">
+                            {formatCurrency(Number(row.discount))}
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-emerald-600 dark:text-emerald-400 text-[11px] tabular-nums">
                             {formatCurrency(Number(row.received))}
@@ -72,6 +82,12 @@ export default function RecoveryReport({ data, formatCurrency }: Props) {
                     </TableCell>
                     <TableCell className="py-4 px-4 text-right text-[12px] text-text-primary tabular-nums">
                         {formatCurrency(totals.sales)}
+                    </TableCell>
+                    <TableCell className="py-4 px-4 text-right text-[12px] text-rose-500 tabular-nums">
+                        {formatCurrency(totals.returns)}
+                    </TableCell>
+                    <TableCell className="py-4 px-4 text-right text-[12px] text-amber-500 tabular-nums">
+                        {formatCurrency(totals.discount)}
                     </TableCell>
                     <TableCell className="py-4 px-4 text-right text-[12px] text-emerald-600 tabular-nums">
                         {formatCurrency(totals.received)}

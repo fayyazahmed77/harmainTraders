@@ -149,6 +149,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{firm}/edit', [FirmController::class, 'edit'])->name('firms.edit');
         Route::get('/{firm}/show', [FirmController::class, 'show'])->name('firms.show');
         Route::put('/{firm}', [FirmController::class, 'update'])->name('firms.update');
+        Route::patch('/{firm}/toggle-active', [FirmController::class, 'toggleActive'])->name('firms.toggle-active');
         Route::delete('/{firm}', [FirmController::class, 'destroy'])->name('firms.destroy');
     });
     //---------------------Account Type------------------------------------------------------------------

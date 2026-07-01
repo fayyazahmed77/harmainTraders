@@ -1,44 +1,69 @@
 @extends('pdf.sales-return.layout')
 
 @section('content')
-<table style="border: 1px solid #000;">
-    <thead>
-        <tr>
-            <th style="width: 25px; border: 1px solid #000;">S#</th>
-            <th style="width: 50px; border: 1px solid #000;">Voucher #</th>
-            <th style="width: 55px; border: 1px solid #000;">Date</th>
-            <th style="border: 1px solid #000;">Customer / Product</th>
-            <th style="width: 40px; border: 1px solid #000;" class="text-right">Qty F</th>
-            <th style="width: 40px; border: 1px solid #000;" class="text-right">Qty P</th>
-            <th style="width: 50px; border: 1px solid #000;" class="text-right">Rate</th>
-            <th style="width: 60px; border: 1px solid #000;" class="text-right">Net Amt</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach($data as $index => $row)
-        <tr>
-            <td style="text-align: center; font-size: 7px; border: 0.5px solid #eee;">{{ $index + 1 }}</td>
-            <td style="font-size: 8px; font-weight: bold; border: 0.5px solid #eee;">{{ $row['voucher_no'] }}</td>
-            <td style="font-size: 7px; border: 0.5px solid #eee;">{{ strtoupper(date('d M y', strtotime($row['date']))) }}</td>
-            <td style="border: 0.5px solid #eee; padding: 2px 4px;">
-                <div style="font-size: 8px; font-weight: bold; text-transform: uppercase;">{{ $row['customer_name'] }}</div>
-                <div style="font-size: 7px; color: #666; text-transform: uppercase;">{{ $row['product_name'] }}</div>
-            </td>
-            <td style="text-align: right; font-size: 8px; border: 0.5px solid #eee;">{{ $row['qty_full'] }}</td>
-            <td style="text-align: right; font-size: 8px; border: 0.5px solid #eee;">{{ $row['qty_pcs'] }}</td>
-            <td style="text-align: right; font-size: 8px; border: 0.5px solid #eee;">{{ number_format($row['tp'], 2) }}</td>
-            <td style="text-align: right; font-size: 8px; font-weight: bold; border: 0.5px solid #eee;">{{ number_format($row['amount'], 2) }}</td>
-        </tr>
-        @endforeach
-    </tbody>
-    <tfoot>
-        <tr style="border-top: 2px solid #000; font-weight: 900;">
-            <td colspan="4" class="text-right uppercase" style="font-size: 9px; padding: 6px;">Total Summarized</td>
-            <td class="text-right" style="font-size: 9px; padding: 6px;">{{ number_format(collect($data)->sum('qty_full'), 0) }}</td>
-            <td class="text-right" style="font-size: 9px; padding: 6px;">{{ number_format(collect($data)->sum('qty_pcs'), 0) }}</td>
-            <td></td>
-            <td class="text-right" style="font-size: 11px; padding: 6px;">{{ number_format(collect($data)->sum('amount'), 2) }}</td>
-        </tr>
-    </tfoot>
-</table>
+@php
+    $invoices = collect($data)->groupBy('sale_id');
+@endphp
+
+@foreach($invoices as $invId => $items)
+    @php 
+        $firstItem = $items->first(); 
+    @endphp
+    
+    <div style="margin-bottom: 15px; page-break-inside: avoid; border: 1px solid #000;">
+        <!-- Invoice Header Table -->
+        <table style="width: 100%; border-collapse: collapse; border: none;">
+            <tr>
+                <td style="border: none; border-bottom: 1px solid #000; width: 25%; padding: 4px;">
+                    <span style="font-size: 6px; color: #666; text-transform: uppercase;">Inv #</span><br>
+                    <strong style="font-size: 10px;">{{ $firstItem['inv_no'] }}</strong>
+                </td>
+                <td style="border: none; border-bottom: 1px solid #000; width: 25%; padding: 4px;">
+                    <span style="font-size: 6px; color: #666; text-transform: uppercase;">Date</span><br>
+                    <strong style="font-size: 9px;">{{ strtoupper(\Carbon\Carbon::parse($firstItem['inv_date'])->format('d M y')) }}</strong>
+                </td>
+                <td style="border: none; border-bottom: 1px solid #000; width: 30%; padding: 4px;">
+                    <span style="font-size: 6px; color: #666; text-transform: uppercase;">Account</span><br>
+                    <strong style="font-size: 9px; text-transform: uppercase;">{{ $firstItem['account_title'] }}</strong>
+                </td>
+                <td style="border: none; border-bottom: 1px solid #000; width: 20%; text-align: right; padding: 4px;">
+                    <span style="font-size: 6px; color: #666; text-transform: uppercase;">Total</span><br>
+                    <strong style="font-size: 10px;">{{ number_format($firstItem['inv_amount'], 2) }}</strong>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Items Table -->
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="width: 20px; border: 1px solid #000;">S#</th>
+                    <th style="text-align: left; border: 1px solid #000;">Item Description</th>
+                    <th style="width: 35px; border: 1px solid #000;" class="text-right">T.P.</th>
+                    <th style="width: 20px; border: 1px solid #000;" class="text-center">QF</th>
+                    <th style="width: 20px; border: 1px solid #000;" class="text-center">QP</th>
+                    <th style="width: 35px; border: 1px solid #000;" class="text-right">Rate</th>
+                    <th style="width: 20px; border: 1px solid #000;" class="text-center">BF</th>
+                    <th style="width: 30px; border: 1px solid #000;" class="text-right">Disc</th>
+                    <th style="width: 50px; border: 1px solid #000;" class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($items as $idx => $item)
+                    <tr>
+                        <td style="font-size: 7px; text-align: center; border: 1px solid #eee;">{{ $idx + 1 }}</td>
+                        <td style="font-size: 8px; font-weight: bold; text-transform: uppercase; padding: 2px; border: 1px solid #eee;">{{ $item['item_name'] }}</td>
+                        <td style="font-size: 7px; text-align: right; border: 1px solid #eee;">{{ number_format($item['trade_price'], 1) }}</td>
+                        <td style="font-size: 7px; text-align: center; border: 1px solid #eee;">{{ (int)$item['qty_full'] }}</td>
+                        <td style="font-size: 7px; text-align: center; border: 1px solid #eee;">{{ (int)$item['qty_pcs'] }}</td>
+                        <td style="font-size: 7px; text-align: right; border: 1px solid #eee;">{{ number_format($item['rate'], 1) }}</td>
+                        <td style="font-size: 7px; text-align: center; border: 1px solid #eee;">{{ (int)$item['bonus_full'] }}</td>
+                        <td style="font-size: 7px; text-align: right; border: 1px solid #eee;">{{ number_format($item['disc_1'], 1) }}</td>
+                        <td style="font-size: 8px; font-weight: 900; text-align: right; border: 1px solid #eee;">{{ number_format($item['amount'], 2) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+@endforeach
 @endsection

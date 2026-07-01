@@ -726,7 +726,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
                           <TooltipTrigger asChild>
                             <div className="w-full col-span-2">
                               <TechLabel label="P. Qty (Units in 1 Full)" icon={Box} required error={errors.packing_qty}>
-                                <Input type="number" value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_qty && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} />
+                                <Input type="number" value={data.packing_qty} onChange={(e) => onInputChange("packing_qty", e.target.value)} placeholder="Qty" className={cn("h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800", errors.packing_qty && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]")} readOnly />
                               </TechLabel>
                             </div>
                           </TooltipTrigger>

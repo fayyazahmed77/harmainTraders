@@ -105,7 +105,7 @@ export default function SupplierOrdersList({ orders }: ListProps) {
                   <TableHeader className="bg-zinc-50 dark:bg-zinc-950">
                     <TableRow className="border-zinc-200 dark:border-zinc-800 hover:bg-transparent">
                       <TableHead className="text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Order #</TableHead>
-                      <TableHead className="text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Supplier Name</TableHead>
+                      <TableHead className="text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Supplier / Company</TableHead>
                       <TableHead className="text-center text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Total Items</TableHead>
                       <TableHead className="text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Order Date</TableHead>
                       <TableHead className="text-right text-zinc-500 dark:text-zinc-400 font-black tracking-widest uppercase text-[10px]">Total Discount</TableHead>

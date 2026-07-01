@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Purchase;
 use App\Models\Sales;
+use App\Models\Firm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -190,7 +191,7 @@ class PaymentController extends Controller implements HasMiddleware
     // Show payment details
     public function show($id)
     {
-        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque', 'messageLine'])->findOrFail($id);
+        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque', 'messageLine', 'firm'])->findOrFail($id);
         return Inertia::render('daily/payment/view', ['payment' => $payment]);
     }
 
@@ -211,11 +212,14 @@ class PaymentController extends Controller implements HasMiddleware
                   ->orWhereJsonContains('category', 'Receipt');
         })->where('status', 'active')->get();
 
+        $firms = Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render('daily/payment/edit', [
             'payment' => $payment,
             'accounts' => $accounts,
             'paymentAccounts' => $paymentAccounts,
             'messageLines' => $messageLines,
+            'firms' => $firms,
         ]);
     }
 
@@ -235,6 +239,7 @@ class PaymentController extends Controller implements HasMiddleware
             'cheque_date' => 'nullable|date',
             'clear_date' => 'nullable|date',
             'message_line_id' => 'nullable|integer',
+            'firm_id' => 'nullable|integer',
         ]);
 
         $payment->update($request->only([
@@ -243,7 +248,8 @@ class PaymentController extends Controller implements HasMiddleware
             'cheque_no',
             'cheque_date',
             'clear_date',
-            'message_line_id'
+            'message_line_id',
+            'firm_id',
         ]));
 
         return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
@@ -340,12 +346,12 @@ class PaymentController extends Controller implements HasMiddleware
     // Generate PDF (Print View)
     public function pdf(Request $request, $id)
     {
-        $payment = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine'])->findOrFail($id);
+        $payment = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine', 'firm'])->findOrFail($id);
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.payment-voucher_half' : 'pdf.payment-voucher';
 
         if ($payment->group_id) {
-            $groupPayments = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine'])
+            $groupPayments = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine', 'firm'])
                 ->where('group_id', $payment->group_id)
                 ->get();
 
@@ -394,10 +400,13 @@ class PaymentController extends Controller implements HasMiddleware
                   ->orWhereJsonContains('category', 'Receipt');
         })->where('status', 'active')->get();
 
+        $firms = Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/payment/create", [
             'accounts' => $accounts,
             'paymentAccounts' => $paymentAccounts,
             'messageLines' => $messageLines,
+            'firms' => $firms,
         ]);
     }
 
@@ -427,15 +436,18 @@ class PaymentController extends Controller implements HasMiddleware
             // Fetch Unpaid Sales (Remaining Amount > 0)
             $sales = Sales::where('customer_id', $accountId)
                 ->where('remaining_amount', '>', 0)
-                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount')
+                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
                 ->get()
                 ->map(function ($sale) {
+                    $returnAmount = $this->getTotalReturns($sale, 'App\Models\Sales');
                     return [
                         'id' => $sale->id,
                         'type' => 'App\Models\Sales',
                         'invoice_no' => $sale->invoice,
                         'date' => $sale->date,
                         'net_total' => $sale->net_total,
+                        'discount_total' => $sale->discount_total,
+                        'return_amount' => $returnAmount,
                         'remaining_amount' => $sale->remaining_amount,
                         'bill_type_label' => 'Sale'
                     ];
@@ -445,15 +457,18 @@ class PaymentController extends Controller implements HasMiddleware
             // Fetch Unpaid Purchases (Remaining Amount > 0)
             $purchases = Purchase::where('supplier_id', $accountId)
                 ->where('remaining_amount', '>', 0)
-                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount')
+                ->select('id', 'date', 'invoice', 'net_total', 'remaining_amount', 'discount_total')
                 ->get()
                 ->map(function ($purchase) {
+                    $returnAmount = $this->getTotalReturns($purchase, 'App\Models\Purchase');
                     return [
                         'id' => $purchase->id,
                         'type' => 'App\Models\Purchase',
                         'invoice_no' => $purchase->invoice,
                         'date' => $purchase->date,
                         'net_total' => $purchase->net_total,
+                        'discount_total' => $purchase->discount_total,
+                        'return_amount' => $returnAmount,
                         'remaining_amount' => $purchase->remaining_amount,
                         'bill_type_label' => 'Purchase'
                     ];
@@ -464,7 +479,7 @@ class PaymentController extends Controller implements HasMiddleware
 
             // Use the centralized current_balance logic from Account model
             // This correctly handles discounts, canceled cheques, and orientations
-            $netLedgerBalance = $account->current_balance;
+            $netLedgerBalance = (float) $account->current_balance;
             $orientation = $account->purchase == 1 ? 'cr' : 'dr';
 
             // Calculate Unpaid Billed Balance (Sum of remaining amounts on invoices)
@@ -476,11 +491,69 @@ class PaymentController extends Controller implements HasMiddleware
             // Example Customer: Billed 1100, Ledger Balance 480 => Adv 620
             $advanceAmount = max(0, $totalUnpaidBilled - $netLedgerBalance);
 
+            // Compute Financial Auditor Stats based on Account Type
+            $type = strtolower($account->accountType->name ?? '');
+            $totalSalesOrPurchases = 0;
+            $totalReceivedOrPaid = 0;
+            $totalBalance = 0;
+            $advancePaid = 0;
+
+            if ($type === 'customers') {
+                $totalSalesVal = (float) $account->sales()->sum('net_total');
+                $totalReturnsVal = (float) $account->salesReturns()->sum('net_total');
+                $totalSalesOrPurchases = $totalSalesVal - $totalReturnsVal + (float) $account->opening_balance;
+
+                $totalReceiptsVal = (float) $account->partyPayments()->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    })->sum(DB::raw('amount + discount'));
+                $totalPaymentsVal = (float) $account->partyPayments()->where('type', 'PAYMENT')
+                    ->where('is_return_refund', false)
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    })->sum(DB::raw('amount + discount'));
+                $totalReceivedOrPaid = $totalReceiptsVal - $totalPaymentsVal;
+
+                if ($netLedgerBalance >= 0) {
+                    $totalBalance = $netLedgerBalance;
+                    $advancePaid = 0;
+                } else {
+                    $totalBalance = 0;
+                    $advancePaid = abs($netLedgerBalance);
+                }
+            } elseif ($type === 'supplier') {
+                $totalPurchasesVal = (float) $account->purchases()->sum('net_total');
+                $totalReturnsVal = (float) $account->purchaseReturns()->sum('net_total');
+                $totalSalesOrPurchases = $totalPurchasesVal - $totalReturnsVal + (float) $account->opening_balance;
+
+                $totalPaymentsVal = (float) $account->partyPayments()->where('type', 'PAYMENT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    })->sum(DB::raw('amount + discount'));
+                $totalReceiptsVal = (float) $account->partyPayments()->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    })->sum(DB::raw('amount + discount'));
+                $totalReceivedOrPaid = $totalPaymentsVal - $totalReceiptsVal;
+
+                if ($netLedgerBalance >= 0) {
+                    $totalBalance = $netLedgerBalance;
+                    $advancePaid = 0;
+                } else {
+                    $totalBalance = 0;
+                    $advancePaid = abs($netLedgerBalance);
+                }
+            }
+
             return response()->json([
                 'bills' => $bills,
                 'current_balance' => $netLedgerBalance,
                 'advance_amount' => $advanceAmount,
-                'orientation' => $orientation
+                'orientation' => $orientation,
+                'total_sales_purchases' => $totalSalesOrPurchases,
+                'total_received_paid' => $totalReceivedOrPaid,
+                'total_balance' => $totalBalance,
+                'advance_paid' => $advancePaid
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -607,18 +680,18 @@ class PaymentController extends Controller implements HasMiddleware
 
         try {
             // Safety checks (Total aggregate)
-            $totalAmount = collect($splitsData)->sum('amount');
+            $totalAmount = collect($splitsData)->sum('amount'); // Gross amount total
             $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
-            $netPaid = $totalAmount + $totalDiscount;
+            $netPaid = $totalAmount - $totalDiscount; // Net cash paid/received
 
             $account = Account::findOrFail($request->account_id);
             // ... (keep ledger balance checks if necessary, but use totalAmount)
 
             // Simplified sum logic for performance or use existing if reliable
             $totalAllocated = collect($request->allocations)->sum('amount');
-            if ($totalAllocated > ($netPaid + 0.01)) {
+            if ($totalAllocated > ($totalAmount + 0.01)) {
                 DB::rollBack();
-                return back()->withErrors(['error' => 'Allocation total exceeds net payment.']);
+                return back()->withErrors(['error' => 'Allocation total exceeds gross payment.']);
             }
 
             // Generate Base Voucher No - Robust logic
@@ -676,9 +749,9 @@ class PaymentController extends Controller implements HasMiddleware
                     'voucher_no' => $voucherNo,
                     'account_id' => $request->account_id,
                     'payment_account_id' => !empty($split['payment_account_id']) ? $split['payment_account_id'] : null,
-                    'amount' => $split['amount'],
+                    'amount' => max(0, $split['amount'] - $currentSplitDiscount), // Net cash paid
                     'discount' => $currentSplitDiscount,
-                    'net_amount' => ($split['amount'] + $currentSplitDiscount),
+                    'net_amount' => $split['amount'], // Gross amount settled
                     'type' => $request->type,
                     'cheque_no' => !empty($split['cheque_no']) ? $split['cheque_no'] : null,
                     'cheque_date' => !empty($split['cheque_date']) ? $split['cheque_date'] : null,
@@ -688,6 +761,7 @@ class PaymentController extends Controller implements HasMiddleware
                     'cheque_id' => $chequeId,
                     'cheque_status' => ($split['payment_method'] ?? null) === 'Cheque' ? 'Pending' : 'Pending',
                     'message_line_id' => !empty($request->message_line_id) ? $request->message_line_id : null,
+                    'firm_id' => !empty($request->firm_id) ? $request->firm_id : null,
                 ]);
 
                 // Handle "Cheque in hand" Logic
