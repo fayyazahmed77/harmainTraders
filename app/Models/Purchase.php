@@ -23,6 +23,7 @@ class Purchase extends Model
         'status',
         'gross_total',
         'discount_total',
+        'extra_discount',
         'tax_total',
         'courier_charges',
         'net_total',

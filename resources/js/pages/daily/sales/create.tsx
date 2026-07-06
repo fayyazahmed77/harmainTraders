@@ -679,12 +679,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     console.log(payload);
     setProcessing(true);
     router.post("/sales", payload, {
+      preserveState: true,
       onSuccess: (page) => {
         const id = (page.props as any).id || (page.props as any).flash?.id;
 
         setSuccessData({
           customerName: accountType?.label || "Walking Customer",
-          totalAmount: totals.net,
+          totalAmount: totals.net - extraDiscount,
           itemCount: rowsWithComputed.length,
           totalFull: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.full), 0),
           totalPcs: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.pcs), 0),
@@ -1789,6 +1790,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             }}
             invoiceNo={invoiceNo}
             previousBalance={previousBalance}
+            extraDiscount={extraDiscount}
           />
 
           <SuccessDialog

@@ -350,7 +350,7 @@ class SalesController extends Controller implements HasMiddleware
                 foreach ($splitsData as $index => $split) {
                     if (($split['amount'] ?? 0) <= 0) continue;
 
-                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    $voucherNo = $baseVoucherNo;
                     
                     $payment = Payment::create([
                         'date' => $request->date,
@@ -684,7 +684,7 @@ class SalesController extends Controller implements HasMiddleware
 
                 foreach ($splitsData as $index => $split) {
                     if (($split['amount'] ?? 0) <= 0) continue;
-                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    $voucherNo = $baseVoucherNo;
                     
                     $payment = Payment::create([
                         'date' => $request->date,

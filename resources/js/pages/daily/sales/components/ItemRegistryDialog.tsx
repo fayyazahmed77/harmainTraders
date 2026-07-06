@@ -23,6 +23,8 @@ interface Item {
   discount?: number;
   total_stock_pcs?: number;
   pt2?: number; pt3?: number; pt4?: number; pt5?: number; pt6?: number; pt7?: number;
+  scheme?: string;
+  scheme2?: string;
 }
 
 interface ItemRegistryDialogProps {
@@ -251,84 +253,99 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
             initial={{ y: "100%", opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: "100%", opacity: 0 }} 
-            className="absolute inset-x-0 bottom-0 p-8 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t-2 border-[#FF5C00] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex items-center gap-10 z-[100]"
+            className="absolute inset-x-0 bottom-0 py-3.5 px-6 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 border-[#FF5C00] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex items-center justify-between gap-4 z-[100]"
           >
-            <div className="flex-1 min-w-0">
-               <span className="text-[10px] font-black text-[#FF5C00] uppercase tracking-[0.3em] mb-1 block">Configuring Sequence</span>
-               <h3 className="text-3xl font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tighter italic">
+            <div className="flex-1 min-w-0 max-w-[280px]">
+               <span className="text-[8px] font-black text-[#FF5C00] uppercase tracking-[0.2em] mb-0.5 block">Configuring Sequence</span>
+               <h3 className="text-lg font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tight italic">
                   {selectedItemForQty.title}
                </h3>
-               <div className="flex items-center gap-3 text-[9px] font-bold text-zinc-400 uppercase tracking-[0.1em]">
-                  Registry Node: #{String(selectedItemForQty.id).padStart(4, '0')} | Cloud Stock: {selectedItemForQty.total_stock_pcs} Units
+               <div className="flex items-center gap-2 text-[8px] font-bold text-zinc-400 uppercase tracking-tight">
+                  Node: #{String(selectedItemForQty.id).padStart(4, '0')} | Stock: {selectedItemForQty.total_stock_pcs} Units
                </div>
+               
+               {(selectedItemForQty.scheme || selectedItemForQty.scheme2) && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                     {selectedItemForQty.scheme && (
+                        <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">
+                           {selectedItemForQty.scheme}
+                        </span>
+                     )}
+                     {selectedItemForQty.scheme2 && (
+                        <span className="bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">
+                           {selectedItemForQty.scheme2}
+                        </span>
+                     )}
+                  </div>
+               )}
             </div>
 
-            <div className="flex gap-4 p-2 items-end">
+            <div className="flex gap-3 p-1 items-end shrink-0">
               <div className="flex flex-col gap-1 items-center">
-                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Full Units</span>
+                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Full Units</span>
                  <Input 
                     type="number" 
                     value={dialogFull || ""} 
                     onChange={e => setDialogFull(toNumber(e.target.value))} 
-                    className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all" 
+                    className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
                     autoFocus 
                  />
               </div>
               {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                 <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                   <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Loose Pcs</span>
+                   <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Loose Pcs</span>
                    <Input 
                       type="number" 
                       value={dialogPcs || ""} 
                       onChange={e => setDialogPcs(toNumber(e.target.value))} 
-                      className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all" 
+                      className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
                    />
                 </div>
               )}
               <div className="flex flex-col gap-1 items-center">
-                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">B. Full</span>
+                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">B. Full</span>
                  <Input 
                     type="number" 
                     value={dialogBonusFull || ""} 
                     onChange={e => setDialogBonusFull(toNumber(e.target.value))} 
-                    className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all" 
+                    className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
                  />
               </div>
               {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                 <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                   <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">B. PCS</span>
+                   <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">B. PCS</span>
                    <Input 
                       type="number" 
                       value={dialogBonusPcs || ""} 
                       onChange={e => setDialogBonusPcs(toNumber(e.target.value))} 
-                      className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all" 
+                      className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
                    />
                 </div>
               )}
               <div className="flex flex-col gap-1 items-center">
-                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Rate (Rs)</span>
+                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Rate (Rs)</span>
                  <Input 
                     type="number" 
                     value={dialogRate || ""} 
                     onChange={e => setDialogRate(toNumber(e.target.value))} 
-                    className="w-28 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[#FF5C00] focus:ring-[#FF5C00] transition-all" 
+                    className="w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[#FF5C00] focus:ring-[#FF5C00] transition-all font-mono" 
                  />
               </div>
               {/* discount */}
               <div className="flex flex-col gap-1 items-center">
-                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Discount (%)</span>
+                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Discount (%)</span>
                  <Input 
                     type="number" 
                     value={dialogDiscount || ""} 
                     onChange={e => setDialogDiscount(toNumber(e.target.value))} 
-                    className="w-28 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[#FF5C00] focus:ring-[#FF5C00] transition-all" 
+                    className="w-20 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[#FF5C00] focus:ring-[#FF5C00] transition-all font-mono" 
                  />
               </div>
               <Button 
                 onClick={handleCommit} 
-                className="h-12 px-8 bg-[#FF5C00] hover:bg-[#E05200] text-white font-black text-base uppercase tracking-widest rounded-xl shadow-xl shadow-orange-500/20 active:scale-95 transition-all ml-2"
+                className="h-10 px-6 bg-[#FF5C00] hover:bg-[#E05200] text-white font-black text-sm uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all ml-2"
               >
-                Sync Node
+                Add
               </Button>
             </div>
           </motion.div>

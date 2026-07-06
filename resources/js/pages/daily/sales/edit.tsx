@@ -660,7 +660,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       onSuccess: () => {
         setSuccessData({
           customerName: accountType?.label || "Unknown Customer",
-          totalAmount: totals.net,
+          totalAmount: totals.net - extraDiscount,
           itemCount: rowsWithComputed.length,
           totalFull: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.full), 0),
           totalPcs: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.pcs), 0),
@@ -1750,6 +1750,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               }}
               invoiceNo={invoiceNo}
               previousBalance={previousBalance}
+              extraDiscount={extraDiscount}
             />
 
             <SuccessDialog

@@ -178,6 +178,7 @@ class PurchaseController extends Controller implements HasMiddleware
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
+            'extra_discount'  => 'nullable|numeric',
             'tax_total'       => 'nullable|numeric',
             'courier_charges' => 'nullable|numeric',
             'net_total'       => 'required|numeric',
@@ -245,6 +246,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
+                'extra_discount'  => $request->extra_discount ?? 0,
                 'tax_total'       => 0,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
@@ -301,7 +303,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 foreach ($splitsData as $index => $split) {
                     if (($split['amount'] ?? 0) <= 0) continue;
 
-                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    $voucherNo = $baseVoucherNo;
                     
                     $payment = Payment::create([
                         'date' => $request->date,
@@ -508,6 +510,7 @@ class PurchaseController extends Controller implements HasMiddleware
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
+            'extra_discount'  => 'nullable|numeric',
             'tax_total'       => 'nullable|numeric',
             'courier_charges' => 'nullable|numeric',
             'net_total'       => 'required|numeric',
@@ -576,6 +579,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
+                'extra_discount'  => $request->extra_discount ?? 0,
                 'tax_total'       => 0,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
@@ -631,7 +635,7 @@ class PurchaseController extends Controller implements HasMiddleware
 
                 foreach ($splitsData as $index => $split) {
                     if (($split['amount'] ?? 0) <= 0) continue;
-                    $voucherNo = (count($splitsData) > 1) ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                    $voucherNo = $baseVoucherNo;
                     
                     $payment = Payment::create([
                         'date' => $request->date,

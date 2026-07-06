@@ -559,6 +559,11 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
             <div class="footer-right">
                 <div style="display: inline-block; width: 100%;">
                     <table class="footer-totals-table" align="right">
+                        <!-- Gross Amount -->
+                        <tr>
+                            <td class="label">Gross Amount :-</td>
+                            <td class="value">{{ number_format($sale->net_total - ($sale->courier_charges ?? 0), 2) }}</td>
+                        </tr>
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>
@@ -578,7 +583,9 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         @endif
                         <!-- Previous Balance -->
                         @php
-                        $prev_balance = $sale->customer->opening_balance ?? 0;
+                        $current_balance = (float) ($sale->customer->current_balance ?? 0);
+                        $invoice_net = $sale->net_total - $sale->extra_discount;
+                        $prev_balance = $current_balance - $invoice_net + $sale->paid_amount;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>

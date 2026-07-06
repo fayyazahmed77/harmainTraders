@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Combobox } from "@/components/ui/combobox";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -224,6 +224,7 @@ export default function Purchase({
         discount: number;
         net: number;
         purchaseId?: number;
+        nextInvoiceNo?: string;
     } | null>(null);
 
     // Price Update Confirmation Dialog State
@@ -317,6 +318,7 @@ export default function Purchase({
     const [cashCredit, setCashCredit] = useState<string>("CREDIT");
     const [accountType, setAccountType] = useState<Option | null>(null);
     const [courier, setCourier] = useState<number>(0);
+    const [extraDiscount, setExtraDiscount] = useState<number>(0);
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
     const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
     const [selectedFirmId, setSelectedFirmId] = useState<string>(() => {
@@ -553,20 +555,21 @@ export default function Purchase({
             }
         });
 
-        const previousBalance = 0;
+        const prevBal = advanceAvailable > 0 ? advanceAvailable : 0;
         const cashReceived = 0;
 
         const roundedGross = Math.round(gross);
         const roundedDisc = Math.round(discTotal);
 
         const net = Math.round(roundedGross - roundedDisc + courier);
+        const netAfterExtraDiscount = Math.max(0, net - extraDiscount);
 
         // Advance Logic:
         // In this system, a negative balance for a supplier means they owe us (Advance).
         // e.g. -103,768 means we have 103,768 in advance.
         const absAdvance = Math.max(0, -advanceAvailable);
-        const appliedAdvance = useAdvance ? Math.min(net, absAdvance) : 0;
-        const netSettlement = Math.max(0, net - appliedAdvance);
+        const appliedAdvance = useAdvance ? Math.min(netAfterExtraDiscount, absAdvance) : 0;
+        const netSettlement = Math.max(0, netAfterExtraDiscount - appliedAdvance);
 
         return {
             gross: roundedGross,
@@ -575,14 +578,14 @@ export default function Purchase({
             net: net,
             appliedAdvance,
             netSettlement,
-            previousBalance,
+            previousBalance: prevBal,
             cashReceived,
-            totalReceivable: Math.round(net + previousBalance - cashReceived),
+            totalReceivable: Math.round(netSettlement + prevBal),
             totalFull,
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier, advanceAvailable, useAdvance]);
+    }, [rowsWithComputed, items, courier, advanceAvailable, useAdvance, extraDiscount]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -605,6 +608,7 @@ export default function Purchase({
 
             gross_total: totals.gross,
             discount_total: totals.discTotal,
+            extra_discount: extraDiscount,
             courier_charges: totals.courier,
             net_total: totals.net,
             paid_amount: (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
@@ -639,6 +643,7 @@ export default function Purchase({
         };
 
         router.post("/purchase", payload, {
+            preserveState: true,
             onSuccess: (page) => {
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
@@ -650,26 +655,9 @@ export default function Purchase({
                     gross: totals.gross,
                     discount: totals.discTotal,
                     net: totals.net,
-                    purchaseId: (page.props as any).flash?.id // Assuming ID is flashed or in props
+                    purchaseId: (page.props as any).flash?.id, // Assuming ID is flashed or in props
+                    nextInvoiceNo: newProps.nextInvoiceNo
                 });
-
-                // Reset Form
-                resetRows();
-                setInvoiceNo(newProps.nextInvoiceNo); // Update with new invoice number from server
-                setAccountType(null);
-                setSalesman(null);
-                setSelectedFirmId(firms?.find(f => f.defult === 1)?.id.toString() || "");
-                setCreditLimit("");
-                setCreditDays(0);
-                setMarkupPercentage(0);
-                setCourier(0);
-                setDate(new Date());
-                setSelectedMessageId("0");
-                
-                // Reset Payment
-                setIsPayNow(false);
-                setPaymentSplits([]);
-                setShowPaymentDialog(false);
 
                 setShowSuccessDialog(true);
                 setShowPriceDialog(false); // Close price dialog if open
@@ -679,6 +667,28 @@ export default function Purchase({
                 alert("Failed to save purchase. Check console for details.");
             }
         });
+    };
+
+    const resetForm = (nextInvoiceNo?: string) => {
+        resetRows();
+        if (nextInvoiceNo) {
+            setInvoiceNo(nextInvoiceNo);
+        }
+        setAccountType(null);
+        setSalesman(null);
+        setSelectedFirmId(firms?.find(f => f.defult === 1)?.id.toString() || "");
+        setCreditLimit("");
+        setCreditDays(0);
+        setMarkupPercentage(0);
+        setCourier(0);
+        setExtraDiscount(0);
+        setDate(new Date());
+        setSelectedMessageId("0");
+        
+        // Reset Payment
+        setIsPayNow(false);
+        setPaymentSplits([]);
+        setShowPaymentDialog(false);
     };
 
     const handleSave = async () => {
@@ -738,7 +748,7 @@ console.log(lastPurchaseInfo);
             <SidebarInset>
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="w-full pt-0 p-2 md:p-6 md:pt-0 flex flex-col gap-1.5 pb-20 md:pb-4">
+                <div className="w-full pt-0 p-2 md:px-6 md:py-1 md:pt-0 flex flex-col gap-1 pb-20 md:pb-4">
                     {/* Mobile Header Card (Visible only on mobile) */}
                     <Card className="block md:hidden p-0 overflow-hidden border-none shadow-md bg-white dark:bg-[#0a0a0a]">
                         <div className="p-4 bg-gradient-to-r from-orange-500/10 to-transparent dark:from-orange-500/5">
@@ -823,10 +833,10 @@ console.log(lastPurchaseInfo);
                     </Card>
 
                     {/* Desktop Header card (Hidden on mobile) */}
-                    <Card className="hidden md:block overflow-hidden border-x-0 mt-3 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
+                    <Card className="hidden md:block overflow-hidden border-x-0 mt-1 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
                        
 
-                        <div className="p-4 grid grid-cols-6  lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
+                        <div className="py-2 px-4 grid grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-3.5 items-end">
                             {/* Date & Time Picker */}
                             <FieldWrapper label="Purchase Date" className="lg:col-span-3">
                                 <div className="flex gap-1">
@@ -1414,14 +1424,7 @@ console.log(lastPurchaseInfo);
                                                         </div>
                                                     </div>
  
-                                                    {/* Total Stock */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1 bg-orange-500/5">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Total Inventory</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-orange-700 dark:text-orange-400 italic font-mono">{toNumber(selectedItem.total_stock_pcs)}</span>
-                                                            <span className="text-[10px] text-zinc-500 font-bold">total</span>
-                                                        </div>
-                                                    </div>
+                                                   
  
                                                     {/* Trade Price */}
                                                     <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
@@ -1530,18 +1533,6 @@ console.log(lastPurchaseInfo);
                                     </div>
 
                                     <div className="p-4 space-y-5">
-                                        {/* Row 1: Item Counts */}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Full</span>
-                                                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 leading-none">{totals.totalFull}</div>
-                                            </div>
-                                            <div className="flex flex-col bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Pieces</span>
-                                                <div className="text-xl font-black text-zinc-900 dark:text-zinc-100 leading-none">{totals.totalPcs}</div>
-                                            </div>
-                                        </div>
-
                                         {/* Financials List */}
                                         <div className="space-y-2.5">
                                             <div className="flex items-center justify-between text-[11px] font-bold">
@@ -1554,7 +1545,7 @@ console.log(lastPurchaseInfo);
                                             </div>
                                             <div className="flex flex-col gap-1.5 pt-1">
                                                 <div className="flex items-center justify-between text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                                                    <span>Extra Courier</span>
+                                                    <span>Courier Charges</span>
                                                 </div>
                                                 <Input
                                                     className="h-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-bold focus:border-blue-300"
@@ -1563,6 +1554,23 @@ console.log(lastPurchaseInfo);
                                                     onChange={(e) => setCourier(toNumber(e.target.value))}
                                                 />
                                             </div>
+                                            <div className="flex flex-col gap-1.5 pt-1">
+                                                <div className="flex items-center justify-between text-[11px] font-bold text-red-600 dark:text-red-400">
+                                                    <span>Extra Discount</span>
+                                                </div>
+                                                <Input
+                                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-bold focus:border-red-300"
+                                                    placeholder="0.00"
+                                                    value={extraDiscount}
+                                                    onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                                                />
+                                            </div>
+                                            {totals.previousBalance > 0 && (
+                                                <div className="flex items-center justify-between text-[11px] font-bold pt-1">
+                                                    <span className="text-zinc-500">Previous Balance</span>
+                                                    <span className="text-zinc-900 dark:text-zinc-200">Rs {totals.previousBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
@@ -1715,13 +1723,29 @@ console.log(lastPurchaseInfo);
                             </div>
 
                             <div className="flex flex-col w-32">
-                                <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier Expense</span>
+                                <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier Charges</span>
                                 <Input
                                     className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
                                     value={courier}
                                     onChange={(e) => setCourier(toNumber(e.target.value))}
                                 />
                             </div>
+
+                            <div className="flex flex-col w-32">
+                                <span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 leading-none">Extra Discount</span>
+                                <Input
+                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
+                                    value={extraDiscount}
+                                    onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                                />
+                            </div>
+
+                            {totals.previousBalance > 0 && (
+                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6">
+                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Prev Balance</span>
+                                    <div className="text-base font-bold text-foreground">Rs {totals.previousBalance.toLocaleString()}</div>
+                                </div>
+                            )}
 
                             <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6">
                                 <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Net Settlement</span>
@@ -1849,7 +1873,15 @@ console.log(lastPurchaseInfo);
                 <SuccessSummaryDialog
                     open={showSuccessDialog}
                     onOpenChange={setShowSuccessDialog}
-                    successData={successData}
+                    supplierName={successData?.supplierName}
+                    totalItems={successData?.totalItems}
+                    totalFull={successData?.totalFull}
+                    totalPcs={successData?.totalPcs}
+                    gross={successData?.gross}
+                    discount={successData?.discount}
+                    net={successData?.net}
+                    purchaseId={successData?.purchaseId}
+                    onReturn={() => resetForm(successData?.nextInvoiceNo)}
                 />
             </SidebarInset >
         </SidebarProvider >

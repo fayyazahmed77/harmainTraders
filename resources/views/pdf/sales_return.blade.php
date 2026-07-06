@@ -426,13 +426,32 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td class="label">NET CREDIT :-</td>
                         <td class="value">{{ number_format($salesReturn->net_total, 2) }}</td>
                     </tr>
+                    @php
+                    $current_balance = (float) ($salesReturn->customer->current_balance ?? 0);
+                    $prev_balance = $current_balance + $salesReturn->net_total - $salesReturn->paid_amount;
+                    $total_balance = $prev_balance - $salesReturn->net_total;
+                    @endphp
+                    <tr>
+                        <td class="label">Previous Balance :-</td>
+                        <td class="value">{{ number_format($prev_balance, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
+                    </tr>
+                    <tr style="font-size: 12px;">
+                        <td class="label">TOTAL BALANCE :-</td>
+                        <td class="value">{{ number_format($total_balance, 2) }}</td>
+                    </tr>
                     <tr>
                         <td class="label">Cash Refunded :-</td>
                         <td class="value">{{ number_format($salesReturn->paid_amount, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="label">Balance Adjusted :-</td>
-                        <td class="value">{{ number_format($salesReturn->remaining_amount, 2) }}</td>
+                        <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
+                    </tr>
+                    <tr style="font-size: 12px; font-weight: bold;">
+                        <td class="label">NET RECEIVABLE :</td>
+                        <td class="value">{{ number_format($current_balance, 2) }}</td>
                     </tr>
                 </table>
             </div>

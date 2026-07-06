@@ -1,7 +1,7 @@
 // sales.tsx
 import React, { useState, useMemo, useEffect } from "react";
 import ReactSelect from "react-select";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -329,6 +329,7 @@ export default function PurchaseEdit({
         return null;
     });
     const [courier, setCourier] = useState<number>(toNumber(purchase?.courier_charges));
+    const [extraDiscount, setExtraDiscount] = useState<number>(toNumber(purchase?.extra_discount));
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
     const [selectedMessageId, setSelectedMessageId] = useState<string>(purchase?.message_line_id?.toString() ?? "0");
     const [selectedFirmId, setSelectedFirmId] = useState<string>(() => {
@@ -587,27 +588,29 @@ export default function PurchaseEdit({
             }
         });
 
-        const previousBalance = 0;
+        const selectedAccount = accounts.find(a => a.id === accountType?.value);
+        const prevBal = selectedAccount ? toNumber(selectedAccount.current_balance) : 0;
         const cashReceived = 0;
 
         const roundedGross = Math.round(gross);
         const roundedDisc = Math.round(discTotal);
 
         const net = roundedGross - roundedDisc + courier;
+        const netAfterExtraDiscount = Math.max(0, net - extraDiscount);
 
         return {
             gross: roundedGross,
             discTotal: roundedDisc,
             courier: courier,
             net: Math.round(net),
-            previousBalance,
+            previousBalance: prevBal,
             cashReceived,
-            totalReceivable: Math.round(net + previousBalance - cashReceived),
+            totalReceivable: Math.round(netAfterExtraDiscount + prevBal - cashReceived),
             totalFull,
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier]);
+    }, [rowsWithComputed, items, courier, accounts, accountType, extraDiscount]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -630,6 +633,7 @@ export default function PurchaseEdit({
 
             gross_total: totals.gross,
             discount_total: totals.discTotal,
+            extra_discount: extraDiscount,
             courier_charges: totals.courier,
             net_total: totals.net,
             paid_amount: isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
@@ -744,7 +748,7 @@ export default function PurchaseEdit({
             <SidebarInset>
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="w-full pt-0 p-2 md:p-6 md:pt-0 flex flex-col gap-1.5 pb-20 md:pb-4">
+                <div className="w-full pt-0 p-2 md:px-6 md:py-1 md:pt-0 flex flex-col gap-1 pb-20 md:pb-4">
                     {/* Mobile Header Card (Visible only on mobile) */}
                     <Card className="block md:hidden p-0 overflow-hidden border-none shadow-md bg-white dark:bg-[#0a0a0a]">
                         <div className="p-4 bg-gradient-to-r from-orange-500/10 to-transparent dark:from-orange-500/5">
@@ -1569,6 +1573,23 @@ export default function PurchaseEdit({
                                                     onChange={(e) => setCourier(toNumber(e.target.value))}
                                                 />
                                             </div>
+                                            <div className="flex flex-col gap-1.5 pt-1">
+                                                <div className="flex items-center justify-between text-[11px] font-bold text-red-600 dark:text-red-400">
+                                                    <span>Extra Discount</span>
+                                                </div>
+                                                <Input
+                                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-bold focus:border-red-300"
+                                                    placeholder="0.00"
+                                                    value={extraDiscount}
+                                                    onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                                                />
+                                            </div>
+                                            {totals.previousBalance > 0 && (
+                                                <div className="flex items-center justify-between text-[11px] font-bold pt-1">
+                                                    <span className="text-zinc-500">Previous Balance</span>
+                                                    <span className="text-zinc-900 dark:text-zinc-200">Rs {totals.previousBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
@@ -1687,6 +1708,22 @@ export default function PurchaseEdit({
                                 />
                             </div>
 
+                            <div className="flex flex-col w-32">
+                                <span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 leading-none">Extra Discount</span>
+                                <Input
+                                    className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
+                                    value={extraDiscount}
+                                    onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                                />
+                            </div>
+
+                            {totals.previousBalance > 0 && (
+                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6">
+                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Prev Balance</span>
+                                    <div className="text-base font-bold text-foreground">Rs {totals.previousBalance.toLocaleString()}</div>
+                                </div>
+                            )}
+
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Confirmed Net Total</span>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
@@ -1798,8 +1835,16 @@ export default function PurchaseEdit({
                 <SuccessSummaryDialog
                     open={showSuccessDialog}
                     onOpenChange={setShowSuccessDialog}
-                    successData={successData}
+                    supplierName={successData?.supplierName}
+                    totalItems={successData?.totalItems}
+                    totalFull={successData?.totalFull}
+                    totalPcs={successData?.totalPcs}
+                    gross={successData?.gross}
+                    discount={successData?.discount}
+                    net={successData?.net}
+                    purchaseId={successData?.purchaseId}
                     mode="edit"
+                    onReturn={() => router.get('/purchase')}
                 />
             </SidebarInset >
         </SidebarProvider >

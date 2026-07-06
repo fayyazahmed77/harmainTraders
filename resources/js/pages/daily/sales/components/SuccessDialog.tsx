@@ -119,7 +119,7 @@ export const SuccessDialog: React.FC<SuccessDialogProps> = ({
            {/* Contact & Amount Row */}
            <div className="flex justify-between items-end">
               <div className="flex flex-col gap-1">
-                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Supplier</span>
+                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Customer</span>
                  <span className="text-xl font-black text-white uppercase tracking-tight">{customerName}</span>
               </div>
               <div className="flex flex-col items-end gap-1">
@@ -146,14 +146,6 @@ export const SuccessDialog: React.FC<SuccessDialogProps> = ({
                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Pcs</span>
                  <span className="text-2xl font-black text-white">{countPcs}</span>
               </div>
-           </div>
-
-           {/* Discount Box */}
-           <div className="bg-[#10B981]/5 border border-[#10B981]/30 p-5 rounded-2xl flex justify-between items-center group hover:bg-[#10B981]/10 transition-all">
-              <span className="text-xs font-black text-[#10B981] uppercase tracking-widest leading-none">Total Discount</span>
-              <span className="text-xl font-black text-[#10B981] tracking-tighter">
-                 <span className="text-sm mr-1">Rs</span>{totalDiscount.toLocaleString()}
-              </span>
            </div>
 
            {/* Action Buttons Grid (2x2) */}

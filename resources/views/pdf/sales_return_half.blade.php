@@ -278,14 +278,34 @@
                 <span class="total-value">{{ number_format($salesReturn->net_total, 2) }}</span>
             </div>
 
+            @php
+            $current_balance = (float) ($salesReturn->customer->current_balance ?? 0);
+            $prev_balance = $current_balance + $salesReturn->net_total - $salesReturn->paid_amount;
+            $total_balance = $prev_balance - $salesReturn->net_total;
+            @endphp
+
+            <div class="total-row clearfix">
+                <span class="total-label">Previous Balance :-</span>
+                <span class="total-value">{{ number_format($prev_balance, 2) }}</span>
+            </div>
+
+            <div class="dashed-bottom" style="margin: 2px 0;"></div>
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Total Balance :-</span>
+                <span class="total-value">{{ number_format($total_balance, 2) }}</span>
+            </div>
+
             <div class="total-row clearfix">
                 <span class="total-label">Cash Refunded :-</span>
                 <span class="total-value">{{ number_format($salesReturn->paid_amount, 2) }}</span>
             </div>
 
-            <div class="total-row clearfix">
-                <span class="total-label">Balance Adjusted :-</span>
-                <span class="total-value">{{ number_format($salesReturn->remaining_amount, 2) }}</span>
+            <div class="dashed-bottom" style="margin: 2px 0;"></div>
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Net Receivable :</span>
+                <span class="total-value">{{ number_format($current_balance, 2) }}</span>
             </div>
         </div>
 

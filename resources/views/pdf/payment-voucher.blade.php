@@ -366,7 +366,7 @@
             <div class="header-right">
                 <div class="voucher-title">{{ $payment->type === 'RECEIPT' ? 'Receipt Voucher' : 'Payment Voucher' }}</div>
                 <div class="voucher-meta">
-                    <strong>{{ $payment->voucher_no }}</strong>
+                    Voucher #: <strong>{{ $payment->voucher_no }}</strong>
                     &nbsp;&nbsp;|&nbsp;&nbsp;
                     Date: <strong>{{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}</strong>
                     &nbsp;&nbsp;
@@ -388,119 +388,81 @@
             }
         @endphp
         <div class="info-row">
-            <div class="info-cell">
+            <div class="info-cell" style="width: 100%;">
                 <div class="info-label">{{ $payment->type === 'RECEIPT' ? 'Received From' : 'Paid To' }}</div>
                 <div class="info-value">{{ $payment->account->title }}</div>
-               
-            </div>
-            <div class="info-cell info-cell-right">
-                @if(isset($isCombined) && $isCombined)
-                    <div class="info-label">Payment Distribution</div>
-                    @foreach($groupPayments as $gp)
-                        @php
-                            $method_lbl = $gp->payment_method ?: 'Cash';
-                            $details = '';
-                            if (strtolower($method_lbl) === 'cheque') {
-                                $details = ' (Chq #' . ($gp->cheque_no ?: '-') . ($gp->cheque_date ? ' · ' . \Carbon\Carbon::parse($gp->cheque_date)->format('d M Y') : '') . ')';
-                            }
-                        @endphp
-                        <div class="info-value-sm">{{ $gp->paymentAccount->title ?? 'Cash' }} ({{ $method_lbl }}){{ $details }}</div>
-                    @endforeach
-                @else
-                    <div style="display:table;width:100%;">
-                        <div style="display:table-cell;width:50%;">
-                            <div class="info-label">Method</div>
-                            <div class="info-value-sm">{{ $payment->payment_method ?: 'Cash' }}</div>
-                            @if($payment->cheque_no)
-                                <div class="info-label" style="margin-top:3px;">Cheque #</div>
-                                <div class="info-value-sm">{{ $payment->cheque_no }}</div>
-                            @endif
-                        </div>
-                        <div style="display:table-cell;width:50%;">
-                            <div class="info-label">Account</div>
-                            <div class="info-value-sm">{{ $payment->paymentAccount ? $payment->paymentAccount->title : 'Cash' }}</div>
-                            @if($payment->cheque_date)
-                                <div class="info-label" style="margin-top:3px;">Cheque Date</div>
-                                <div class="info-value-sm">{{ \Carbon\Carbon::parse($payment->cheque_date)->format('d M Y') }}</div>
-                            @endif
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
 
-        {{-- ═══ PAYMENT ALLOCATION TABLE ═══ --}}
+        {{-- ═══ PAYMENT DETAILS TABLE ═══ --}}
         @php
-            $displayAllocations = isset($isCombined) && $isCombined
-                ? $groupPayments->flatMap->allocations
-                : $payment->allocations;
-
-            $mergedAllocations = $displayAllocations->groupBy(function($a) {
-                return $a->bill_type . $a->bill_id;
-            });
+            $displayPayments = isset($isCombined) && $isCombined
+                ? $groupPayments
+                : collect([$payment]);
 
             $totalAmount = isset($isCombined) && $isCombined
                 ? $groupPayments->sum('net_amount')
                 : $payment->net_amount;
 
-            // Compute allocated invoices total sum
-            $invoiceTotalSum = 0;
-            foreach($mergedAllocations as $group) {
-                $first = $group->first();
-                $invoiceTotalSum += $first->bill ? ($first->bill->net_total ?? $first->bill->total ?? $group->sum('amount')) : $group->sum('amount');
-            }
+            $totalDiscount = isset($isCombined) && $isCombined
+                ? $groupPayments->sum('discount')
+                : $payment->discount;
+
+            $totalActualPaid = isset($isCombined) && $isCombined
+                ? $groupPayments->sum('amount')
+                : $payment->amount;
 
             // Calculations for Financial Summary
             $current_balance = (float) $payment->account->current_balance;
-            $amount_applied = $totalAmount;
             $is_receipt = $payment->type === 'RECEIPT';
             $orientation = $payment->account->purchase == 1 ? 'CR' : 'DR';
 
-            // Previous Balance = Current Balance - Invoice Total + Payout/Receipt Gross
-            $previous_balance = $current_balance - $invoiceTotalSum + $amount_applied;
+            // Previous Balance calculation:
+            // Since this transaction is already saved, the current_balance contains the effect of the payment.
+            // A receipt/payment reduces the balance, so before this transaction, the balance was higher:
+            $previous_balance = $current_balance + $totalAmount;
             $net_balance = $current_balance;
         @endphp
 
-        @if($displayAllocations->count() > 0)
-            <div class="alloc-section-label">Payment Allocation</div>
-            <table class="alloc-table">
-                <thead>
+        <div class="alloc-section-label">Payment Details</div>
+        <table class="alloc-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th>
+                    <th>Account</th>
+                    <th>Method</th>
+                    <th>Remarks</th>
+                    <th>Cheque #</th>
+                    <th>Cheque Date</th>
+                    <th class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $idx = 0; @endphp
+                @foreach($displayPayments as $p)
+                    @php
+                        $idx++;
+                        $acctTitle = $p->paymentAccount ? $p->paymentAccount->title : 'Cash';
+                        $methodTitle = $p->payment_method ?: 'Cash';
+                    @endphp
                     <tr>
-                        <th style="width:30px;">#</th>
-                        <th>Invoice / Reference</th>
-                        <th>Date</th>
-                        <th class="text-right">Invoice Total</th>
-                        <th class="text-right">Amount Applied</th>
+                        <td>{{ $idx }}</td>
+                        <td><strong>{{ $acctTitle }}</strong></td>
+                        <td>{{ $methodTitle }}</td>
+                        <td>{{ $p->remarks ?: '-' }}</td>
+                        <td>{{ $p->cheque_no ?: '-' }}</td>
+                        <td>{{ $p->cheque_date ? \Carbon\Carbon::parse($p->cheque_date)->format('d M Y') : '-' }}</td>
+                        <td class="text-right"><strong>PKR {{ number_format($p->net_amount, 2) }}</strong></td>
                     </tr>
-                </thead>
-                <tbody>
-                    @php $idx = 0; @endphp
-                    @foreach($mergedAllocations as $group)
-                        @php
-                            $first = $group->first();
-                            $idx++;
-                            $refLabel = $first->bill->invoice ?? ($first->bill->invoice_no ?? class_basename($first->bill_type) . ' #' . $first->bill_id);
-                            $invoiceDate = $first->bill ? \Carbon\Carbon::parse($first->bill->date)->format('d M Y') : '-';
-                            $invoiceTotal = $first->bill ? ($first->bill->net_total ?? $first->bill->total ?? $group->sum('amount')) : $group->sum('amount');
-                            $amountApplied = $group->sum('amount');
-                        @endphp
-                        <tr>
-                            <td>{{ $idx }}</td>
-                            <td><strong>{{ $refLabel }}</strong></td>
-                            <td>{{ $invoiceDate }}</td>
-                            <td class="text-right">{{ number_format($invoiceTotal, 2) }}</td>
-                            <td class="text-right"><strong>{{ number_format($amountApplied, 2) }}</strong></td>
-                        </tr>
-                    @endforeach
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="4">Total Allocated</td>
-                        <td class="text-right">PKR {{ number_format($totalAmount, 2) }}</td>
-                    </tr>
-                </tfoot>
-            </table>
-        @endif
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="6">Total</td>
+                    <td class="text-right">PKR {{ number_format($totalAmount, 2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
 
         {{-- ═══ REDESIGNED SUMMARY & AMOUNT IN WORDS SECTION ═══ --}}
         <div class="summary-section" style="display: table; width: 100%; margin-top: 6px; margin-bottom: 8px; border: 1px solid #bbbbbb; border-collapse: collapse;">
@@ -513,13 +475,9 @@
                         {{ \NumberFormatter::create('en', \NumberFormatter::SPELLOUT)->format($totalAmount) }} rupees only
                     @endif
                 </div>
-                @php
-                    $totalDiscount = isset($isCombined) && $isCombined ? $groupPayments->sum('discount') : $payment->discount;
-                    $totalAmountReceived = isset($isCombined) && $isCombined ? $groupPayments->sum('amount') : $payment->amount;
-                @endphp
                 @if($totalDiscount > 0)
                     <div style="font-size: 8px; color: #444444; margin-top: 8px; border-top: 0.5px solid #cccccc; padding-top: 4px;">
-                        Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}: <strong>PKR {{ number_format($totalAmountReceived, 2) }}</strong> &nbsp;|&nbsp; 
+                        Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}: <strong>PKR {{ number_format($totalActualPaid, 2) }}</strong> &nbsp;|&nbsp; 
                         Discount (Adj): <strong>PKR {{ number_format($totalDiscount, 2) }}</strong>
                     </div>
                 @endif
@@ -527,26 +485,23 @@
             <div style="display: table-cell; width: 45%; padding: 0; vertical-align: top;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
                     <tr>
-                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Total:</td>
-                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold;">PKR {{ number_format($invoiceTotalSum, 2) }}</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Voucher Total:</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold;">PKR {{ number_format($totalAmount, 2) }}</td>
                     </tr>
                     @php
                         $prev_is_advance = $previous_balance < 0;
-                        $prev_label = $prev_is_advance ? 'Prev Advance:' : 'Previous Balance:';
+                        $prev_label = $prev_is_advance ? ($is_receipt ? 'Prev Advance:' : 'Prev Balance (CR):') : 'Previous Balance:';
                         $prev_val_formatted = "PKR " . number_format(abs($previous_balance), 2);
                         if (!$prev_is_advance) {
                             $prev_val_formatted .= " " . $orientation;
                         }
 
                         $is_advance = $net_balance < 0;
-                        $net_label = $is_advance ? 'Paid in Advance:' : 'Net Balance:';
+                        $net_label = $is_advance ? ($is_receipt ? 'Paid in Advance:' : 'Net Balance (CR):') : 'Net Balance:';
                         $net_val_formatted = "PKR " . number_format(abs($net_balance), 2);
                         if (!$is_advance) {
                             $net_val_formatted .= " " . $orientation;
                         }
-
-                        $totalDiscount = isset($isCombined) && $isCombined ? $groupPayments->sum('discount') : $payment->discount;
-                        $totalActualPaid = isset($isCombined) && $isCombined ? $groupPayments->sum('amount') : $payment->amount;
                     @endphp
                     <tr>
                         <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">{{ $prev_label }}</td>

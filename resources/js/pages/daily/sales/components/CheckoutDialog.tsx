@@ -59,10 +59,10 @@ interface CheckoutDialogProps {
   onCommit: () => void;
   invoiceNo: string;
   previousBalance?: number;
+  extraDiscount?: number;
 }
 
 const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-500 via-orange-600 to-red-600";
-const GLASS_BG = "bg-white/5 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(31,38,135,0.37)]";
 
 export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   open,
@@ -75,7 +75,8 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   updateSplitRow,
   onCommit,
   invoiceNo,
-  previousBalance = 0
+  previousBalance = 0,
+  extraDiscount = 0
 }) => {
   const toNumber = (v: any) => {
     const n = Number(v);
@@ -86,82 +87,87 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   
   const isAdvance = previousBalance < 0;
   const appliedAdv = totals.appliedAdvance || 0;
-  const totalReceivable = isAdvance 
-    ? (appliedAdv > 0 ? totals.net - appliedAdv : totals.net)
-    : (totals.net + previousBalance);
+  
+  // Outstanding Base is finalAmount (net + previousBalance - extraDiscount)
+  const netPayable = totals.finalAmount; 
 
   const prevBalanceDisplay = isAdvance
     ? (appliedAdv > 0 ? -appliedAdv : 0)
     : previousBalance;
 
-  const remaining = totalReceivable - totalPaid;
+  const remaining = netPayable - totalPaid;
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[99vw] md:max-w-[50vw] w-full bg-[#0F111A] border-none shadow-2xl p-0 overflow-hidden rounded-md">
+      <DialogContent className="max-w-[95vw] md:max-w-[65vw] lg:max-w-[55vw] w-full bg-background border border-border shadow-2xl p-0 overflow-hidden rounded-2xl transition-all duration-300">
         
-        {/* Superior Matrix Header */}
-        <div className={cn("p-8 relative overflow-hidden", ACCENT_GRADIENT)}>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <DialogTitle className="text-3xl font-black uppercase tracking-tighter flex items-center gap-4 text-white">
-                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/30 rotate-3 transition-transform hover:rotate-0">
-                   <Banknote className="w-7 h-7 text-white" />
-                </div>
-                Financial Payment
-              </DialogTitle>
-              <DialogDescription className="text-white/60 font-black uppercase text-[10px] tracking-[0.3em] mt-4 ml-2">
-                Verify and complete your payment • {invoiceNo}
-              </DialogDescription>
+        {/* Superior Header */}
+        <div className="bg-gradient-to-r from-orange-600 to-red-600 px-6 py-6 text-white relative overflow-hidden shrink-0">
+          <div className="flex justify-between items-center relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/20 shadow-inner">
+                 <Banknote className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-extrabold uppercase tracking-tight text-white m-0">
+                  Financial Payment
+                </DialogTitle>
+                <DialogDescription className="text-white/80 font-medium text-[9px] tracking-wider mt-0.5">
+                  Verify and complete payment for Invoice: <span className="font-mono font-bold text-white">{invoiceNo}</span>
+                </DialogDescription>
+              </div>
             </div>
             
-            {/* Real-time Status Glyph */}
+            {/* Real-time Status */}
             <div className={cn(
-              "px-6 py-3 rounded-2xl flex items-center gap-3 border backdrop-blur-md transition-all duration-500",
+              "px-3 py-1.5 rounded-lg flex items-center gap-2 border backdrop-blur-sm transition-all duration-500 text-[10px] font-black uppercase tracking-widest",
               isFullyPaid 
-                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" 
+                ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-200" 
                 : isOverpaid 
-                  ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
-                  : "bg-orange-500/20 border-orange-500/40 text-orange-400"
+                  ? "bg-blue-500/20 border-blue-400/40 text-blue-200"
+                  : "bg-amber-500/20 border-amber-400/40 text-amber-200"
             )}>
-              <Fingerprint className="w-5 h-5 animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-widest">
-                {isFullyPaid ? "Payment Complete" : isOverpaid ? "Overpaid" : "Payment Pending"}
+              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isFullyPaid ? "bg-emerald-400" : isOverpaid ? "bg-blue-400" : "bg-amber-400")} />
+              <span>
+                {isFullyPaid ? "Fully Paid" : isOverpaid ? "Overpaid" : "Pending"}
               </span>
             </div>
           </div>
           
-          {/* Abstract background elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+          {/* Subtle backgrounds */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none" />
         </div>
 
         {/* Dynamic Balance Tracker */}
-        <div className="grid grid-cols-4 divide-x divide-white/5 bg-[#161925] border-b border-white/5">
-          <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">Invoice</span>
-            <span className="text-xl font-black text-white font-mono tracking-tighter">Rs {totals.net.toLocaleString()}</span>
+        <div className="grid grid-cols-2 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-border bg-muted/40 dark:bg-zinc-900/30 border-b border-border select-none">
+          <div className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-wider mb-1">Invoice Net</span>
+            <span className="text-sm font-extrabold text-foreground font-mono">Rs {totals.net.toLocaleString()}</span>
           </div>
-          <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">
+          <div className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-wider mb-1">
               {isAdvance && appliedAdv > 0 ? "Applied Adv." : "Prev. Balance"}
             </span>
             <span className={cn(
-              "text-xl font-black font-mono tracking-tighter",
-              prevBalanceDisplay > 0 ? "text-rose-400" : (prevBalanceDisplay < 0 ? "text-emerald-400" : "text-zinc-400")
+              "text-sm font-extrabold font-mono",
+              prevBalanceDisplay > 0 ? "text-destructive" : (prevBalanceDisplay < 0 ? "text-emerald-500" : "text-muted-foreground")
             )}>Rs {prevBalanceDisplay.toLocaleString()}</span>
           </div>
-          <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">Allocated</span>
-            <span className="text-xl font-black text-emerald-400 font-mono tracking-tighter">Rs {totalPaid.toLocaleString()}</span>
+          <div className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-wider mb-1">Extra Discount</span>
+            <span className="text-sm font-extrabold text-orange-500 font-mono">Rs {extraDiscount.toLocaleString()}</span>
           </div>
-          <div className="p-6 flex flex-col items-center">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-2">Outstanding</span>
+          <div className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-wider mb-1">Allocated (Paid)</span>
+            <span className="text-sm font-extrabold text-emerald-500 font-mono">Rs {totalPaid.toLocaleString()}</span>
+          </div>
+          <div className="p-4 flex flex-col items-center justify-center col-span-2 md:col-span-1 text-center">
+            <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-wider mb-1">Outstanding</span>
             <span className={cn(
-              "text-xl font-black font-mono tracking-tighter",
-              remaining > 0 ? "text-orange-500" : "text-emerald-400"
+              "text-sm font-extrabold font-mono",
+              remaining > 0 ? "text-orange-500" : "text-emerald-500"
             )}>
               Rs {remaining.toLocaleString()}
             </span>
@@ -169,7 +175,7 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
         </div>
 
         {/* Multi-Payment Rows */}
-        <div className="p-8 max-h-[400px] overflow-y-auto bg-[#0F111A] space-y-4 custom-scrollbar">
+        <div className="p-6 max-h-[350px] overflow-y-auto space-y-4 bg-background/50 custom-scrollbar">
           {splits.map((split, index) => {
             const acc = paymentAccounts.find(a => a.id.toString() === split.payment_account_id);
             const typeLower = (acc?.account_type?.name || acc?.title || '').toLowerCase();
@@ -179,17 +185,17 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
             return (
               <div 
                 key={split.id} 
-                className="group relative p-6 rounded-md bg-[#161925] border border-white/5 hover:border-orange-500/30 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="group relative p-4 rounded-xl bg-card border border-border/80 hover:border-orange-500/30 dark:hover:border-orange-500/20 transition-all duration-200 shadow-sm animate-in fade-in slide-in-from-bottom-2"
+                style={{ animationDelay: `${index * 30}ms` }}
               >
-                  <div className="grid grid-cols-12 gap-x-4 gap-y-4 items-end">
+                  <div className="grid grid-cols-12 gap-3 items-end">
                     
                     {/* Account Selector */}
                     <div className={cn(
-                      "col-span-12 flex flex-col gap-2",
+                      "col-span-12 flex flex-col gap-1.5",
                       isChequeInHand ? "lg:col-span-3" : isBank ? "lg:col-span-4" : "lg:col-span-7"
                     )}>
-                      <Label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest ml-1">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-wider ml-0.5">
                         Payment From {split.voucher_no && <span className="text-orange-500/50">({split.voucher_no})</span>}
                       </Label>
                       <Select 
@@ -208,14 +214,14 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                         }}
                       >
                         <SelectTrigger className={cn(
-                          "h-15 w-full rounded-sm bg-black/40 border-white/10 text-white font-bold",
+                          "h-10 w-full rounded-lg bg-background border-border text-foreground font-bold text-xs",
                           split.voucher_no && "opacity-60 cursor-not-allowed"
                         )}>
                           <SelectValue placeholder="Select Origin..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#161925]  w-full border-white/10 text-white rounded-xl">
+                        <SelectContent className="bg-popover border-border text-popover-foreground rounded-lg">
                           {paymentAccounts.map((p) => (
-                            <SelectItem key={p.id} value={p.id.toString()} className="font-bold p-3">
+                            <SelectItem key={p.id} value={p.id.toString()} className="font-bold text-xs p-2.5">
                               {p.title}
                             </SelectItem>
                           ))}
@@ -225,12 +231,12 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
 
                     {/* Amount Input */}
                     <div className={cn(
-                      "col-span-12 flex flex-col gap-2",
+                      "col-span-12 flex flex-col gap-1.5",
                       isChequeInHand ? "lg:col-span-2" : isBank ? "lg:col-span-3" : "lg:col-span-4"
                     )}>
-                      <Label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest ml-1">Amount</Label>
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-wider ml-0.5">Amount</Label>
                       <div className="relative">
-                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-white/30 italic">Rs</span>
+                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-muted-foreground/60 italic">Rs</span>
                          <Input 
                           type="number"
                           placeholder="0.00"
@@ -238,41 +244,41 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                           disabled={!!split.voucher_no}
                           onChange={(e) => updateSplitRow(split.id, 'amount', e.target.value)}
                           className={cn(
-                            "h-12 pl-10 pr-4 rounded-sm bg-black/40 border-white/10 text-white font-black text-right focus:border-orange-500/50",
+                            "h-10 pl-8 pr-3 rounded-lg bg-background border-border text-foreground font-bold text-xs text-right focus-visible:ring-orange-500",
                             split.voucher_no && "opacity-60 cursor-not-allowed"
                           )}
                         />
                       </div>
                     </div>
 
-                    {/* Conditional Logic for Payment Details */}
+                    {/* Conditional Payment Method */}
                     {isBank && (
-                      <div className="col-span-12 lg:col-span-4 flex flex-col gap-2 animate-in fade-in zoom-in-95">
-                        <Label className="text-[8px] font-black uppercase text-orange-500 tracking-widest">Payment Method</Label>
-                        <div className="h-12 flex bg-black/20 px-4 rounded-xl border border-orange-500/20 items-center justify-center">
-                          <span className="text-[9px] font-black text-orange-400 uppercase tracking-[0.2em] text-center">Online (Direct Transfer)</span>
+                      <div className="col-span-12 lg:col-span-4 flex flex-col gap-1.5 animate-in fade-in zoom-in-95">
+                        <Label className="text-[9px] font-black uppercase text-orange-500 tracking-wider">Method</Label>
+                        <div className="h-10 flex bg-orange-500/5 dark:bg-orange-500/10 px-3 rounded-lg border border-orange-500/20 items-center justify-center">
+                          <span className="text-[8px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest text-center">Online (Direct Transfer)</span>
                         </div>
                       </div>
                     )}
 
                     {isChequeInHand && (
                       <>
-                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-2 animate-in fade-in zoom-in-95">
-                          <Label className="text-[8px] font-black uppercase text-orange-500 tracking-widest">Cheque Number</Label>
+                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-1.5 animate-in fade-in zoom-in-95">
+                          <Label className="text-[9px] font-black uppercase text-orange-500 tracking-wider">Cheque No.</Label>
                           <Input 
                             placeholder="CHQ-XXXXXX"
                             value={split.cheque_no || ""}
                             onChange={(e) => updateSplitRow(split.id, 'cheque_no', e.target.value)}
-                            className="h-12 rounded-sm bg-black/50 border-white/10 text-white font-bold italic"
+                            className="h-10 rounded-lg bg-background border-border text-foreground text-xs font-bold font-mono"
                           />
                         </div>
-                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-2 animate-in fade-in zoom-in-95">
-                          <Label className="text-[8px] font-black uppercase text-orange-500 tracking-widest">Cheque Date</Label>
+                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-1.5 animate-in fade-in zoom-in-95">
+                          <Label className="text-[9px] font-black uppercase text-orange-500 tracking-wider">Cheque Date</Label>
                           <Input 
                             type="date"
                             value={split.cheque_date || ""}
                             onChange={(e) => updateSplitRow(split.id, 'cheque_date', e.target.value)}
-                            className="h-12 rounded-sm bg-black/50 border-white/10 text-white font-bold"
+                            className="h-10 rounded-lg bg-background border-border text-foreground text-xs font-bold"
                           />
                         </div>
                       </>
@@ -283,9 +289,10 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                       <Button
                         variant="ghost"
                         onClick={() => removeSplitRow(split.id)}
-                        className="h-12 w-12 rounded-sm bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all active:scale-95"
+                        disabled={!!split.voucher_no}
+                        className="h-10 w-10 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-white border border-destructive/20 transition-all active:scale-95 disabled:opacity-50"
                       >
-                        <Trash2 size={20} />
+                        <Trash2 size={16} />
                       </Button>
                     </div>
 
@@ -297,33 +304,27 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
           <Button
             variant="outline"
             onClick={addSplitRow}
-            className="w-full h-16 rounded-[2rem] border-dashed border-2 border-white/10 bg-white/5 text-zinc-500 hover:text-orange-500 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-3 group"
+            className="w-full h-12 rounded-xl border-dashed border-2 border-border bg-muted/20 text-muted-foreground hover:text-orange-500 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-2 group"
           >
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-              <Plus size={18} />
-            </div>
-            <span className="font-black uppercase tracking-[0.3em] text-[10px]">Add Payment Method</span>
+            <Plus size={14} className="group-hover:scale-110 transition-transform" />
+            <span className="font-extrabold uppercase tracking-wider text-[9px]">Add Payment Method</span>
           </Button>
         </div>
 
         {/* Global Footer */}
-        <DialogFooter className="p-8 bg-[#161925] border-t border-white/5 gap-4">
+        <DialogFooter className="p-6 bg-muted/30 border-t border-border flex flex-row gap-3">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
-            className="h-14 flex-1 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border-white/10 bg-transparent text-zinc-400 hover:bg-white/5"
+            className="h-11 flex-1 rounded-xl font-bold uppercase text-[9px] tracking-wider border-border bg-transparent text-muted-foreground hover:bg-muted"
           >
             Cancel
           </Button>
           <Button 
             onClick={onCommit}
-            className={cn(
-              "h-14 flex-[2] rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] shadow-2xl relative overflow-hidden group",
-              ACCENT_GRADIENT
-            )}
+            className="h-11 flex-[2] rounded-xl font-extrabold uppercase text-[9px] tracking-wider bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md shadow-orange-500/10 active:scale-[0.98] transition-all"
           >
-            <span className="relative z-10 italic">Save & Finalize Invoice</span>
-            <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent to-white/10 opacity-40 group-hover:animate-shine" />
+            Save & Finalize Invoice
           </Button>
         </DialogFooter>
 

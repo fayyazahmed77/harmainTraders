@@ -32,7 +32,7 @@ class AccountController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode']),
+            new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode', 'searchSuggestions']),
             new Middleware('permission:manage accounts', only: ['create', 'store', 'edit', 'update', 'destroy', 'toggleStatus', 'resetGuestToken']),
         ];
     }
@@ -151,7 +151,7 @@ class AccountController extends Controller implements HasMiddleware
         // ✅ Basic rules common to all
         $rules = [
             'code' => 'required|string|max:50',
-            'title' => 'required|string|max:255',
+            'title' => 'required|string|max:255|unique:accounts,title',
             'type' => 'required|integer|exists:account_types,id',
             'purchase' => 'nullable|boolean',
             'cashbank' => 'nullable|boolean',
@@ -206,7 +206,9 @@ class AccountController extends Controller implements HasMiddleware
             }
         }
 
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [
+            'title.unique' => 'Account name already exists.',
+        ]);
 
         // ✅ Convert checkbox booleans
         $validated['purchase'] = $request->boolean('purchase');
@@ -298,7 +300,7 @@ class AccountController extends Controller implements HasMiddleware
         // ✅ Validate incoming data
         $validated = $request->validate([
             'code' => 'required|string|max:50',
-            'title' => 'required|string|max:255',
+            'title' => 'required|string|max:255|unique:accounts,title,' . $account->id,
             'type' => 'required|string',
             'purchase' => 'nullable|boolean',
             'cashbank' => 'nullable|boolean',
@@ -333,6 +335,8 @@ class AccountController extends Controller implements HasMiddleware
             'cnic' => 'nullable|string|max:20',
             'status' => 'boolean',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ], [
+            'title.unique' => 'Account name already exists.',
         ]);
 
         // ✅ Convert checkbox booleans
@@ -366,7 +370,7 @@ class AccountController extends Controller implements HasMiddleware
         $typeLower = strtolower($type);
 
         if ($typeLower === 'customers') {
-            $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
+            $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total') - \App\Models\Sales::where('customer_id', $account->id)->sum('extra_discount');
             $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
             $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where(function($q){ $q->whereNull('cheque_status')->orWhere('cheque_status', 'not like', '%ancel%')->orWhere('cheque_status', 'not like', '%eturn%'); })->sum('amount'); // Not rigorously filtering bounces? Wait, let's keep it simple as it was before.
 			
@@ -448,43 +452,8 @@ class AccountController extends Controller implements HasMiddleware
     }
     public function getBalance($id)
     {
-        $account = Account::with('accountType')->findOrFail($id);
-
-        $type = trim($account->accountType->name ?? '');
-        $typeLower = strtolower($type);
-
-        $total = 0;
-
-        if ($typeLower === 'customers') {
-            $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
-            $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-
-            $total = $account->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
-        } elseif ($typeLower === 'supplier') {
-            $totalPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->sum('net_total');
-            $totalReturns = \App\Models\PurchaseReturn::where('supplier_id', $account->id)->sum('net_total');
-            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-
-            $total = $account->opening_balance + $totalPurchases + $totalReceipts - $totalReturns - $totalPayments;
-        } elseif (in_array($typeLower, ['bank', 'cash', 'cheque in hand'])) {
-            $total = $account->current_balance;
-        } else {
-            // Mixed or untyped account fallback
-            $salesUnpaid = \App\Models\Sales::where('customer_id', $id)->sum('remaining_amount');
-            $salesReturnsUnpaid = \App\Models\SalesReturn::where('customer_id', $id)->sum('remaining_amount');
-
-            $purchasesUnpaid = \App\Models\Purchase::where('supplier_id', $id)->sum('remaining_amount');
-            $purchaseReturnsUnpaid = \App\Models\PurchaseReturn::where('supplier_id', $id)->sum('remaining_amount');
-
-            $total = $account->opening_balance
-                + ($salesUnpaid - $salesReturnsUnpaid)
-                + ($purchasesUnpaid - $purchaseReturnsUnpaid);
-        }
-
-        return response()->json(['balance' => $total]);
+        $account = Account::findOrFail($id);
+        return response()->json(['balance' => (float)$account->current_balance]);
     }
 
     public function getNextCode(Request $request)
@@ -521,5 +490,41 @@ class AccountController extends Controller implements HasMiddleware
         $account->save();
 
         return redirect()->route('account.index')->with('success', 'Account status updated successfully');
+    }
+
+    public function searchSuggestions(Request $request)
+    {
+        $query = $request->query('query', '');
+        // Trim and normalize spaces
+        $query = preg_replace('/\s+/', ' ', trim($query));
+        $excludeId = $request->query('exclude_id');
+
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        $accounts = Account::with(['accountType', 'city'])
+            ->where('title', 'like', '%' . $query . '%')
+            ->when($excludeId, function ($q) use ($excludeId) {
+                return $q->where('id', '!=', $excludeId);
+            })
+            ->orderByRaw("CASE 
+                WHEN title LIKE ? THEN 1 
+                ELSE 2 
+            END", [$query . '%'])
+            ->limit(8)
+            ->get();
+
+        $results = $accounts->map(function ($acc) {
+            return [
+                'id' => $acc->id,
+                'title' => $acc->title,
+                'code' => $acc->code,
+                'account_type' => $acc->accountType ? $acc->accountType->name : null,
+                'city' => $acc->city ? $acc->city->name : null,
+            ];
+        });
+
+        return response()->json($results);
     }
 }

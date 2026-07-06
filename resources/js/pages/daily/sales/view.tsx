@@ -377,43 +377,46 @@ export default function View({ sale }: Props) {
                                                 <th className="px-3 py-3">Product Specification</th>
                                                 <th className="px-3 py-3 text-center">Carton</th>
                                                 <th className="px-3 py-3 text-center">Pcs</th>
-                                                <th className="px-3 py-3 text-center">Total Pcs</th>
                                                 <th className="px-4 py-3 text-right">Rate</th>
                                                 <th className="px-4 py-3 text-right">Discount</th>
+                                                <th className="px-4 py-3 text-right">After Disc</th>
                                                 <th className="px-6 py-3 text-right">Subtotal</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
-                                            {sale.items.map((it, idx) => (
-                                                <tr
-                                                    key={it.id}
-                                                    className="group transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 border-l-2 border-transparent text-xs"
-                                                >
-                                                    <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
-                                                    <td className="px-3 py-3.5">
-                                                        <div className="min-w-0">
-                                                            <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[320px]">{it.item?.title}</p>
-                                                            <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
-                                                    <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
-                                                    <td className="px-3 py-3.5 text-center">
-                                                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-850 rounded font-mono font-bold text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                                                            {it.total_pcs}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
-                                                        {formatCurrency(it.trade_price).replace('PKR', '').trim()}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-rose-500">
-                                                        {it.discount > 0 ? `-${formatCurrency(it.discount).replace('PKR', '').trim()}` : "0.00"}
-                                                    </td>
-                                                    <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                                                        {formatCurrency(it.subtotal - it.discount).replace('PKR', '').trim()}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {sale.items.map((it, idx) => {
+                                                const subtotalGross = Number(it.subtotal || 0);
+                                                const discPercent = subtotalGross > 0 ? (Number(it.discount || 0) / subtotalGross) * 100 : 0;
+                                                const afterDiscRate = Number(it.trade_price || 0) * (1 - discPercent / 100);
+                                                return (
+                                                    <tr
+                                                        key={it.id}
+                                                        className="group transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 border-l-2 border-transparent text-xs"
+                                                    >
+                                                        <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
+                                                        <td className="px-3 py-3.5">
+                                                            <div className="min-w-0">
+                                                                <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[320px]">{it.item?.title}</p>
+                                                                <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
+                                                            {formatCurrency(it.trade_price).replace('PKR', '').trim()}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">
+                                                            {it.discount > 0 ? `-${formatCurrency(it.discount).replace('PKR', '').trim()}` : "0.00"}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                            {formatCurrency(afterDiscRate).replace('PKR', '').trim()}
+                                                        </td>
+                                                        <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                                                            {formatCurrency(it.subtotal - it.discount).replace('PKR', '').trim()}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                         <tfoot className="bg-zinc-50/50 dark:bg-zinc-950/20 font-black text-xs border-t border-zinc-200 dark:border-zinc-800">
                                             <tr>
@@ -425,13 +428,11 @@ export default function View({ sale }: Props) {
                                                 <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
                                                     {sale.items.reduce((acc, it) => acc + Number(it.qty_pcs || 0), 0)}
                                                 </td>
-                                                <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
-                                                    {sale.items.reduce((acc, it) => acc + Number(it.total_pcs || 0), 0)}
-                                                </td>
                                                 <td className="px-4 py-3.5"></td>
                                                 <td className="px-4 py-3.5 text-right text-rose-500 font-mono">
                                                     -{formatCurrency(sale.items.reduce((acc, it) => acc + Number(it.discount || 0), 0)).replace('PKR', '').trim()}
                                                 </td>
+                                                <td className="px-4 py-3.5"></td>
                                                 <td className="px-6 py-3.5 text-right text-orange-500 font-mono">
                                                     {formatCurrency(sale.items.reduce((acc, it) => acc + (Number(it.subtotal || 0) - Number(it.discount || 0)), 0)).replace('PKR', '').trim()}
                                                 </td>

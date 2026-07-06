@@ -124,6 +124,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/account')->group(function () {
         Route::get('/', [AccountController::class, 'index'])->name('account.index');
         Route::get('/create', [AccountController::class, 'create'])->name('account.create');
+        Route::get('/search-suggestions', [AccountController::class, 'searchSuggestions'])->name('account.search-suggestions');
         Route::post('/', [AccountController::class, 'store'])->name('account.store');
         Route::get('/{account}/show', [AccountController::class, 'show'])->name('account.show');
         Route::get('/{account}/edit', [AccountController::class, 'edit'])->name('account.edit');
@@ -260,6 +261,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/items')->group(function () {
         Route::get('/', [ItemsController::class, 'index'])->name('items.index');
         Route::get('/create', [ItemsController::class, 'create'])->name('items.create');
+        Route::get('/search-suggestions', [ItemsController::class, 'searchSuggestions'])->name('items.search-suggestions');
         Route::post('/', [ItemsController::class, 'store'])->name('items.store');
         Route::get('/next-code', [ItemsController::class, 'getNextCode'])->name('items.next-code');
         Route::get('/{items}/edit', [ItemsController::class, 'edit'])->name('items.edit');

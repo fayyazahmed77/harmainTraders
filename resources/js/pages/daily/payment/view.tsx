@@ -55,10 +55,14 @@ interface Payment {
     email: string;
     website: string;
   };
+  current_balance: number;
+  orientation: string;
 }
 
 interface Props {
   payment?: any;
+  groupPayments?: any[];
+  isCombined?: boolean;
   mode?: string;
 }
 
@@ -140,6 +144,8 @@ const defaultPayment: Payment = {
     email: 'info@harmaintraders.com',
     website: 'aishtycoons.agency',
   },
+  current_balance: 0,
+  orientation: 'DR',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -221,21 +227,20 @@ function InfoRow({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // MAIN VOUCHER CARD
 // ─────────────────────────────────────────────────────────────────────────────
-const VoucherCard = ({ p }: { p: Payment }) => {
+const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment; mappedGroupPayments: Payment[]; combinedVoucherNo: string }) => {
   const statusConfig = getStatusConfig(p.status, p.cheque_status, p.method);
   const StatusIcon = statusConfig.icon;
 
   // Financial calculations
-  const invoiceTotal = p.allocations.reduce((s, a) => s + a.invoice_total, 0);
-  const totalApplied = p.allocations.reduce((s, a) => s + a.amount_applied, 0);
-  const outstandingBefore = invoiceTotal - (totalApplied - p.total_amount); // before this payment
-  const remainingBalance = invoiceTotal - totalApplied;
-  const paidPct = invoiceTotal > 0 ? Math.min(100, Math.round((totalApplied / invoiceTotal) * 100)) : 0;
-  const isFullyPaid = remainingBalance <= 0.01;
-  const isOverpaid = remainingBalance < -0.01;
+  const totalAmount = mappedGroupPayments.reduce((s, gp) => s + gp.total_amount, 0);
+  const totalDiscount = mappedGroupPayments.reduce((s, gp) => s + gp.discount, 0);
+  const totalActualPaid = mappedGroupPayments.reduce((s, gp) => s + gp.amount, 0);
+
+  const currentBalance = p.current_balance;
+  const previousBalance = currentBalance + totalAmount;
+  const orientation = p.orientation;
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-[#e2e8f0] shadow-xl shadow-slate-200/60 overflow-hidden print:shadow-none print:border-none print:rounded-none relative select-none">
@@ -243,9 +248,9 @@ const VoucherCard = ({ p }: { p: Payment }) => {
       {/* ── Watermark ── */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
         <div className={`text-[80px] font-black tracking-[0.25em] transform -rotate-[28deg] uppercase ${
-          isFullyPaid ? 'text-emerald-500/[0.04]' : p.status === 'bounced' || p.cheque_status?.toLowerCase() === 'bounced' ? 'text-red-500/[0.04]' : 'text-slate-400/[0.04]'
+          currentBalance <= 0 ? 'text-emerald-500/[0.04]' : p.status === 'bounced' || p.cheque_status?.toLowerCase() === 'bounced' ? 'text-red-500/[0.04]' : 'text-slate-400/[0.04]'
         }`}>
-          {isFullyPaid ? 'PAID' : p.status === 'bounced' ? 'BOUNCED' : 'PENDING'}
+          {currentBalance <= 0 ? 'PAID' : p.status === 'bounced' ? 'BOUNCED' : 'PENDING'}
         </div>
       </div>
 
@@ -296,11 +301,13 @@ const VoucherCard = ({ p }: { p: Payment }) => {
               </div>
               <div className="inline-flex items-center justify-end gap-1.5 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
                 <CreditCard size={11} className="text-blue-200" />
-                <span className="text-[11px] font-bold text-white">{p.method}</span>
+                <span className="text-[11px] font-bold text-white">
+                  {mappedGroupPayments.length > 1 ? 'Multi' : p.method}
+                </span>
               </div>
               <div>
                 <div className="text-[10px] text-blue-300 uppercase tracking-wider">Voucher No</div>
-                <div className="text-[16px] font-black text-[#fbbf24] tracking-wide font-mono">{p.voucher_number}</div>
+                <div className="text-[16px] font-black text-[#fbbf24] tracking-wide font-mono">{combinedVoucherNo}</div>
               </div>
               <div>
                 <div className="text-[10px] text-blue-300 uppercase tracking-wider">Date</div>
@@ -314,65 +321,65 @@ const VoucherCard = ({ p }: { p: Payment }) => {
             SUMMARY CARDS
         ══════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-4 border-b border-[#e2e8f0]">
-          {/* Card 1: Payment Amount */}
+          {/* Card 1: Voucher Total */}
           <div className="px-6 py-5 border-r border-[#e2e8f0]">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
                 <Banknote size={14} className="text-emerald-600" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Payment Amount</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Voucher Total</span>
             </div>
             <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className="text-[22px] font-black text-emerald-600 leading-tight">{formatPKR(p.total_amount)}</div>
-            {p.discount > 0 && (
-              <div className="text-[10px] text-[#94a3b8] mt-0.5">Disc: PKR {formatPKR(p.discount)}</div>
+            <div className="text-[22px] font-black text-emerald-600 leading-tight">{formatPKR(totalAmount)}</div>
+            {totalDiscount > 0 && (
+              <div className="text-[10px] text-[#94a3b8] mt-0.5">Disc: PKR {formatPKR(totalDiscount)}</div>
             )}
           </div>
 
-          {/* Card 2: Invoice Total */}
+          {/* Card 2: Previous Balance */}
           <div className="px-6 py-5 border-r border-[#e2e8f0]">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
-                <FileText size={14} className="text-orange-500" />
+                <TrendingUp size={14} className="text-orange-500" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Invoice Total</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Previous Balance</span>
             </div>
             <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className="text-[22px] font-black text-orange-500 leading-tight">{formatPKR(invoiceTotal)}</div>
-            <div className="text-[10px] text-[#94a3b8] mt-0.5">{p.allocations.length} invoice{p.allocations.length !== 1 ? 's' : ''}</div>
+            <div className="text-[22px] font-black text-orange-500 leading-tight">{formatPKR(Math.abs(previousBalance))}</div>
+            <div className="text-[10px] text-[#94a3b8] mt-0.5 font-bold uppercase tracking-wider">
+              {previousBalance < 0 ? 'Paid in Advance' : orientation}
+            </div>
           </div>
 
-          {/* Card 3: Remaining Balance */}
+          {/* Card 3: Amount Paid / Received */}
           <div className="px-6 py-5 border-r border-[#e2e8f0]">
             <div className="flex items-center gap-2 mb-2">
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isFullyPaid ? 'bg-emerald-50' : isOverpaid ? 'bg-blue-50' : 'bg-amber-50'}`}>
-                <TrendingUp size={14} className={isFullyPaid ? 'text-emerald-600' : isOverpaid ? 'text-blue-600' : 'text-amber-500'} />
+              <div className="w-7 h-7 rounded-lg bg-[#eff6ff] flex items-center justify-center">
+                <CheckCircle2 size={14} className="text-[#3b82f6]" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Remaining</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">
+                {p.type === 'RECEIPT' ? 'Amount Received' : 'Amount Paid'}
+              </span>
             </div>
             <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className={`text-[22px] font-black leading-tight ${isFullyPaid ? 'text-emerald-600' : isOverpaid ? 'text-blue-600' : 'text-amber-600'}`}>
-              {formatPKR(Math.abs(remainingBalance))}
-            </div>
-            <div className={`text-[10px] mt-0.5 font-bold uppercase tracking-wider ${isFullyPaid ? 'text-emerald-500' : isOverpaid ? 'text-blue-500' : 'text-amber-500'}`}>
-              {isFullyPaid ? 'Fully Paid' : isOverpaid ? 'Credit Balance' : 'Outstanding'}
-            </div>
+            <div className="text-[22px] font-black text-[#1e3a8a] leading-tight">{formatPKR(totalActualPaid)}</div>
+            <div className="text-[10px] text-[#94a3b8] mt-0.5 font-bold uppercase tracking-wider">Cleared</div>
           </div>
 
-          {/* Card 4: Payment Method */}
+          {/* Card 4: Net Balance */}
           <div className="px-6 py-5">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
-                <CreditCard size={14} className="text-violet-600" />
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${currentBalance <= 0 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                <CreditCard size={14} className={currentBalance <= 0 ? 'text-emerald-600' : 'text-amber-500'} />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Payment Method</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Net Balance</span>
             </div>
-            <div className="text-[15px] font-black text-[#1e3a8a] leading-tight">{p.method}</div>
-            {p.cheque_number && (
-              <div className="text-[11px] text-[#64748b] font-mono mt-0.5">{p.cheque_number}</div>
-            )}
-            <div className={`mt-1 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md inline-block border ${statusConfig.color}`}>
-              {statusConfig.label}
+            <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
+            <div className={`text-[22px] font-black leading-tight ${currentBalance <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {formatPKR(Math.abs(currentBalance))}
+            </div>
+            <div className={`text-[10px] mt-0.5 font-bold uppercase tracking-wider ${currentBalance <= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+              {currentBalance < 0 ? 'Paid in Advance' : orientation}
             </div>
           </div>
         </div>
@@ -435,20 +442,20 @@ const VoucherCard = ({ p }: { p: Payment }) => {
             <div>
               <SectionHeading>Payment Information</SectionHeading>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <InfoRow label="Voucher No" value={p.voucher_number} copyable mono highlight />
+                <InfoRow label="Voucher No" value={combinedVoucherNo} copyable mono highlight />
                 <InfoRow label="Payment Date" value={formatDate(p.voucher_date)} />
-                <InfoRow label="Payment Method" value={p.method} />
-                <InfoRow label="Bank / Cash Account" value={p.account} />
-                {p.cheque_number && (
+                <InfoRow label="Payment Method" value={mappedGroupPayments.length > 1 ? 'Multi' : p.method} />
+                <InfoRow label="Bank / Cash Account" value={mappedGroupPayments.length > 1 ? 'Multi' : p.account} />
+                {mappedGroupPayments.length === 1 && p.cheque_number && (
                   <InfoRow label="Cheque Number" value={p.cheque_number} copyable mono />
                 )}
-                {p.cheque_date && (
+                {mappedGroupPayments.length === 1 && p.cheque_date && (
                   <InfoRow label="Cheque Date" value={formatDate(p.cheque_date)} />
                 )}
-                {p.clear_date && (
+                {mappedGroupPayments.length === 1 && p.clear_date && (
                   <InfoRow label="Clear Date" value={formatDate(p.clear_date)} />
                 )}
-                {p.cheque_status && (
+                {mappedGroupPayments.length === 1 && p.cheque_status && (
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[#94a3b8]">Clearance Status</span>
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border w-fit ${statusConfig.color}`}>
@@ -479,100 +486,61 @@ const VoucherCard = ({ p }: { p: Payment }) => {
               </div>
               <div className="text-right">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-[#3b82f6] mb-0.5">PKR</div>
-                <div className="text-[32px] font-black text-[#1e3a8a] leading-none">{formatPKR(p.total_amount)}</div>
+                <div className="text-[32px] font-black text-[#1e3a8a] leading-none">{formatPKR(totalAmount)}</div>
               </div>
             </div>
-            {p.discount > 0 && (
+            {totalDiscount > 0 && (
               <div className="border-t border-[#bfdbfe]/60 pt-3 mt-3 flex justify-between items-center">
                 <span className="text-[11px] text-[#64748b] font-medium">
-                  Cash Received: <span className="text-[#1e3a8a] font-black">PKR {formatPKR(p.amount)}</span>
+                  Cash Received: <span className="text-[#1e3a8a] font-black">PKR {formatPKR(totalActualPaid)}</span>
                 </span>
                 <span className="text-[11px] text-[#64748b] font-medium">
-                  Discount Adjusted: <span className="text-rose-600 font-black">PKR {formatPKR(p.discount)}</span>
+                  Discount Adjusted: <span className="text-rose-600 font-black">PKR {formatPKR(totalDiscount)}</span>
                 </span>
               </div>
             )}
           </div>
 
-          {/* ── SECTION C: Payment Allocation Table ── */}
+          {/* ── SECTION C: Payment Details Table ── */}
           <div>
-            <SectionHeading>Payment Allocation</SectionHeading>
+            <SectionHeading>Payment Details</SectionHeading>
             <div className="rounded-xl border border-[#e2e8f0] overflow-hidden">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
                     <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 w-10">#</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Invoice Reference</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Invoice Date</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 text-right">Invoice Total</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 text-right">Amount Applied</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 text-right">Remaining</th>
-                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 text-center">Status</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Account</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Method</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Remarks</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Cheque #</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3">Cheque Date</th>
+                    <th className="text-[9px] font-bold uppercase tracking-widest text-[#94a3b8] px-4 py-3 text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {p.allocations.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-10 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <ReceiptText size={24} className="text-[#cbd5e1]" />
-                          <span className="text-[12px] text-[#94a3b8] italic font-normal">No invoices allocated — Advance Payment</span>
-                        </div>
-                      </td>
+                  {mappedGroupPayments.map((gp, idx) => (
+                    <tr
+                      key={gp.id || idx}
+                      className={`border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafbfc]'}`}
+                    >
+                      <td className="text-[11px] text-[#94a3b8] font-mono px-4 py-3">{String(idx + 1).padStart(2, '0')}</td>
+                      <td className="px-4 py-3 font-bold text-[#1e3a8a] text-[12px]">{gp.account || 'Cash'}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#475569]">{gp.method || 'Cash'}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#64748b]">{gp.remarks || '—'}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#64748b] font-mono">{gp.cheque_number || '—'}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#64748b]">{formatDate(gp.cheque_date)}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#1e3a8a] font-bold text-right font-mono">{formatPKR(gp.total_amount)}</td>
                     </tr>
-                  ) : (
-                    p.allocations.map((alloc, idx) => {
-                      const remaining = alloc.invoice_total - alloc.amount_applied;
-                      const isPaid = remaining <= 0.01;
-                      return (
-                        <tr
-                          key={idx}
-                          className={`border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafbfc]'}`}
-                        >
-                          <td className="text-[11px] text-[#94a3b8] font-mono px-4 py-3">{String(idx + 1).padStart(2, '0')}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <div className="text-[12px] font-bold text-[#1e3a8a]">{alloc.invoice_ref}</div>
-                              <CopyButton value={alloc.invoice_ref} />
-                            </div>
-                            <div className="text-[10px] text-[#94a3b8] mt-0.5 font-medium">{alloc.ref}</div>
-                          </td>
-                          <td className="px-4 py-3 text-[12px] text-[#64748b] font-medium">{formatDate(alloc.date)}</td>
-                          <td className="px-4 py-3 text-[12px] text-[#475569] text-right font-mono">{formatPKR(alloc.invoice_total)}</td>
-                          <td className="px-4 py-3 text-[12px] text-[#1e3a8a] font-bold text-right font-mono">{formatPKR(alloc.amount_applied)}</td>
-                          <td className={`px-4 py-3 text-[12px] font-bold text-right font-mono ${isPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {formatPKR(Math.max(0, remaining))}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wide ${
-                              isPaid
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                              <span className={`w-1 h-1 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                              {isPaid ? 'Settled' : 'Partial'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-[#f0f9ff] border-t-2 border-[#bfdbfe]">
-                    <td colSpan={3} className="text-[11px] font-bold uppercase tracking-wider text-[#3b82f6] px-4 py-3">
-                      Totals
+                    <td colSpan={6} className="text-[11px] font-bold uppercase tracking-wider text-[#3b82f6] px-4 py-3">
+                      Total
                     </td>
                     <td className="px-4 py-3 text-[12px] font-black text-[#1e3a8a] text-right font-mono">
-                      {formatPKR(invoiceTotal)}
+                      {formatPKR(totalAmount)}
                     </td>
-                    <td className="px-4 py-3 text-[12px] font-black text-emerald-600 text-right font-mono">
-                      {formatPKR(totalApplied)}
-                    </td>
-                    <td className={`px-4 py-3 text-[12px] font-black text-right font-mono ${isFullyPaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {formatPKR(Math.max(0, remainingBalance))}
-                    </td>
-                    <td />
                   </tr>
                 </tfoot>
               </table>
@@ -589,65 +557,43 @@ const VoucherCard = ({ p }: { p: Payment }) => {
               </div>
               <div className="divide-y divide-[#f1f5f9]">
                 {[
-                  { label: 'Invoice Total', val: invoiceTotal, color: 'text-[#1e3a8a]' },
-                  { label: 'Previously Outstanding', val: Math.max(0, invoiceTotal - p.total_amount), color: 'text-amber-600' },
-                  { label: 'Payment Received', val: p.total_amount, color: 'text-emerald-600' },
+                  { label: 'Voucher Total', val: totalAmount, color: 'text-[#1e3a8a]' },
+                  { label: 'Previous Balance', val: previousBalance, color: 'text-amber-600', isBal: true },
+                  ...(totalDiscount > 0 ? [{ label: 'Discount Adjusted', val: totalDiscount, color: 'text-rose-600' }] : []),
+                  { label: p.type === 'RECEIPT' ? 'Amount Received' : 'Amount Paid', val: totalActualPaid, color: 'text-emerald-600' },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center px-5 py-2.5">
                     <span className="text-[12px] text-[#64748b] font-medium">{row.label}</span>
-                    <span className={`text-[13px] font-bold font-mono ${row.color}`}>PKR {formatPKR(row.val)}</span>
+                    <span className={`text-[13px] font-bold font-mono ${row.color}`}>
+                      PKR {formatPKR(Math.abs(row.val))} {row.isBal ? (row.val < 0 ? 'CR' : orientation) : ''}
+                    </span>
                   </div>
                 ))}
-                <div className={`flex justify-between items-center px-5 py-3 ${isFullyPaid ? 'bg-emerald-50' : isOverpaid ? 'bg-blue-50' : 'bg-amber-50'}`}>
-                  <span className="text-[12px] font-black uppercase tracking-wider text-[#1e293b]">Remaining Balance</span>
+                <div className={`flex justify-between items-center px-5 py-3 ${currentBalance <= 0 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                  <span className="text-[12px] font-black uppercase tracking-wider text-[#1e293b]">Net Balance</span>
                   <div className="text-right">
-                    <div className={`text-[20px] font-black font-mono ${isFullyPaid ? 'text-emerald-600' : isOverpaid ? 'text-blue-600' : 'text-amber-600'}`}>
-                      PKR {formatPKR(Math.abs(remainingBalance))}
+                    <div className={`text-[20px] font-black font-mono ${currentBalance <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      PKR {formatPKR(Math.abs(currentBalance))}
                     </div>
-                    <div className={`text-[9px] font-black uppercase tracking-widest ${isFullyPaid ? 'text-emerald-500' : isOverpaid ? 'text-blue-500' : 'text-amber-500'}`}>
-                      {isFullyPaid ? '✓ Fully Paid' : isOverpaid ? 'Credit Balance' : 'Outstanding'}
+                    <div className={`text-[9px] font-black uppercase tracking-widest ${currentBalance <= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                      {currentBalance < 0 ? 'Paid in Advance' : orientation}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Breakdown with Progress */}
-            <div className="bg-[#f8fafc] rounded-xl border border-[#e2e8f0] overflow-hidden">
-              <div className="px-5 py-3 bg-[#f0f9ff] border-b border-[#bfdbfe]">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#3b82f6]">Payment Breakdown</span>
+            {/* Breakdown */}
+            <div className="bg-[#f8fafc] rounded-xl border border-[#e2e8f0] overflow-hidden flex flex-col justify-between p-5">
+              <div className="space-y-3">
+                <div className="text-[10px] font-black uppercase tracking-widest text-[#3b82f6]">Branding & ERP Compliance</div>
+                <div className="text-[12px] text-[#475569] leading-relaxed">
+                  This voucher lists the details of liquidity transactions posted under the ERP reference <span className="font-mono font-bold text-[#1e3a8a]">{combinedVoucherNo}</span>. 
+                  All cheque clearing and bank transfers follow secure reconciliation protocols.
+                </div>
               </div>
-              <div className="px-5 py-4 flex flex-col gap-3">
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-[#64748b] font-medium">Invoice Total</span>
-                  <span className="font-bold font-mono text-[#1e3a8a]">{formatPKR(invoiceTotal)}</span>
-                </div>
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-[#64748b] font-medium">Current Payment</span>
-                  <span className="font-bold font-mono text-emerald-600">{formatPKR(p.total_amount)}</span>
-                </div>
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-[#64748b] font-medium">Net Outstanding</span>
-                  <span className="font-bold font-mono text-amber-600">{formatPKR(Math.max(0, remainingBalance))}</span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-2">
-                  <div className="flex justify-between text-[10px] mb-1.5">
-                    <span className="font-bold text-emerald-600">Paid {paidPct}%</span>
-                    <span className="font-bold text-amber-500">Outstanding {100 - paidPct}%</span>
-                  </div>
-                  <div className="h-2.5 bg-[#e2e8f0] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700"
-                      style={{ width: `${paidPct}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] mt-1 text-[#94a3b8] font-mono">
-                    <span>PKR 0</span>
-                    <span>PKR {formatPKR(invoiceTotal)}</span>
-                  </div>
-                </div>
+              <div className="text-[10px] text-[#94a3b8] italic">
+                Verified and compiled under standard ledger auditing schemas.
               </div>
             </div>
           </div>
@@ -826,6 +772,10 @@ function mapPayment(raw: any): Payment {
   const companyEmail = firmObj ? firmObj.email : (raw.company?.email ?? defaultPayment.company.email);
   const companyWebsite = firmObj ? firmObj.website : (raw.company?.website ?? defaultPayment.company.website);
 
+  const currentBalance = raw.account ? Number(raw.account.current_balance ?? 0) : 0;
+  const isPurchase = raw.account ? Boolean(raw.account.purchase) : false;
+  const orientation = isPurchase ? 'CR' : 'DR';
+
   return {
     id:                  raw.id             ?? defaultPayment.id,
     voucher_number:      raw.voucher_no     ?? raw.voucher_number ?? defaultPayment.voucher_number,
@@ -865,18 +815,25 @@ function mapPayment(raw: any): Payment {
       email:   companyEmail || 'info@harmaintraders.com',
       website: companyWebsite || 'aishtycoons.agency',
     },
+    current_balance:     currentBalance,
+    orientation:         orientation,
   };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PaymentView({ payment, mode }: Props) {
+export default function PaymentView({ payment, groupPayments, mode }: Props) {
   const [printMode, setPrintMode] = useState<'a4' | 'thermal' | null>(null);
   const isPrint = mode === 'print';
   const pageProps = usePage().props as any;
+  
   const rawPayment = payment || pageProps.payment;
+  const rawGroupPayments = groupPayments || pageProps.groupPayments || [rawPayment];
+
   const p = mapPayment(rawPayment);
+  const mappedGroupPayments: Payment[] = rawGroupPayments.map((gp: any) => mapPayment(gp));
+  const combinedVoucherNo = Array.from(new Set(mappedGroupPayments.map((gp: Payment) => gp.voucher_number))).sort().join(', ');
 
   const handlePrintA4 = () => {
     const url = rawPayment?.id ? route('payments.pdf', rawPayment.id) : null;
@@ -927,7 +884,7 @@ export default function PaymentView({ payment, mode }: Props) {
     return (
       <div className="min-h-screen bg-white p-8">
         <style dangerouslySetInnerHTML={{ __html: printStyles }} />
-        <VoucherCard p={p} />
+        <VoucherCard p={p} mappedGroupPayments={mappedGroupPayments} combinedVoucherNo={combinedVoucherNo} />
         <script dangerouslySetInnerHTML={{ __html: 'window.print()' }} />
       </div>
     );
@@ -939,7 +896,7 @@ export default function PaymentView({ payment, mode }: Props) {
       <SidebarInset>
         <SiteHeader breadcrumbs={[
           { title: 'Payments', href: '/payment' },
-          { title: p.voucher_number, href: `/payment/${p.id}` },
+          { title: combinedVoucherNo, href: `/payment/${p.id}` },
         ]} />
 
         <style dangerouslySetInnerHTML={{ __html: printStyles }} />
@@ -963,7 +920,7 @@ export default function PaymentView({ payment, mode }: Props) {
               <div className="flex items-center gap-1.5 text-[11px] text-[#64748b] font-medium">
                 <Link href="/payment" className="text-[#1e3a8a] hover:underline font-semibold">Payments</Link>
                 <ChevronRight size={11} className="text-[#94a3b8]" />
-                <span className="font-mono text-[#1e3a8a] font-bold">{p.voucher_number}</span>
+                <span className="font-mono text-[#1e3a8a] font-bold">{combinedVoucherNo}</span>
               </div>
 
               {/* Right: Action Buttons */}
@@ -995,7 +952,7 @@ export default function PaymentView({ payment, mode }: Props) {
 
           {/* ── VOUCHER ── */}
           <div className="max-w-5xl mx-auto px-6 py-8 print:p-0 print:max-w-none">
-            <VoucherCard p={p} />
+            <VoucherCard p={p} mappedGroupPayments={mappedGroupPayments} combinedVoucherNo={combinedVoucherNo} />
           </div>
 
         </div>

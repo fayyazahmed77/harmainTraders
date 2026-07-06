@@ -56,10 +56,51 @@ class PaymentController extends Controller implements HasMiddleware
             $query->where('payment_method', $request->payment_method);
         }
 
-        $payments = $query->orderBy('date', 'desc')
+        $allPayments = $query->orderBy('date', 'desc')
             ->orderBy('id', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+            ->get();
+
+        $grouped = collect();
+        $groups = [];
+
+        foreach ($allPayments as $p) {
+            if ($p->group_id) {
+                if (isset($groups[$p->group_id])) {
+                    $rep = $groups[$p->group_id];
+                    $rep->amount += $p->amount;
+                    $rep->net_amount += $p->net_amount;
+                    $rep->discount += $p->discount;
+                    
+                    // Comma separate voucher nos
+                    $vNos = explode(', ', $rep->voucher_no);
+                    if (!in_array($p->voucher_no, $vNos)) {
+                        $vNos[] = $p->voucher_no;
+                        sort($vNos);
+                        $rep->voucher_no = implode(', ', $vNos);
+                    }
+                    $rep->payment_method = 'Multi';
+                } else {
+                    $rep = clone $p;
+                    $groups[$p->group_id] = $rep;
+                    $grouped->push($rep);
+                }
+            } else {
+                $grouped->push($p);
+            }
+        }
+
+        $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage() ?: 1;
+        $perPage = 10;
+        $currentPageItems = $grouped->slice(($currentPage - 1) * $perPage, $perPage)->all();
+
+        $payments = new \Illuminate\Pagination\LengthAwarePaginator(
+            array_values($currentPageItems),
+            $grouped->count(),
+            $perPage,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath()]
+        );
+        $payments->withQueryString();
 
         // Calculate Summary (Based on current filters)
         // Remove pagination/ordering for summary stats if needed, or re-apply filters to a fresh query
@@ -191,8 +232,23 @@ class PaymentController extends Controller implements HasMiddleware
     // Show payment details
     public function show($id)
     {
-        $payment = Payment::with(['account', 'paymentAccount', 'allocations', 'cheque', 'messageLine', 'firm'])->findOrFail($id);
-        return Inertia::render('daily/payment/view', ['payment' => $payment]);
+        $payment = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine', 'firm'])->findOrFail($id);
+        
+        if ($payment->group_id) {
+            $groupPayments = Payment::with(['account', 'paymentAccount', 'allocations.bill', 'cheque', 'messageLine', 'firm'])
+                ->where('group_id', $payment->group_id)
+                ->get();
+            $isCombined = true;
+        } else {
+            $groupPayments = collect([$payment]);
+            $isCombined = false;
+        }
+
+        return Inertia::render('daily/payment/view', [
+            'payment' => $payment,
+            'groupPayments' => $groupPayments,
+            'isCombined' => $isCombined
+        ]);
     }
 
     // Edit payment
@@ -797,7 +853,7 @@ class PaymentController extends Controller implements HasMiddleware
             $advancePaid = 0;
 
             if ($type === 'customers') {
-                $totalSalesVal = (float) $account->sales()->sum('net_total');
+                $totalSalesVal = (float) $account->sales()->sum('net_total') - (float) $account->sales()->sum('extra_discount');
                 $totalReturnsVal = (float) $account->salesReturns()->sum('net_total');
                 $totalSalesOrPurchases = $totalSalesVal - $totalReturnsVal + (float) $account->opening_balance;
 
@@ -1028,7 +1084,7 @@ class PaymentController extends Controller implements HasMiddleware
                 // Skip if amount and discount are both 0 and not the only split
                 if ($isMulti && $split['amount'] <= 0 && $currentSplitDiscount <= 0) continue;
 
-                $voucherNo = $isMulti ? $baseVoucherNo . '-' . chr(65 + $index) : $baseVoucherNo;
+                $voucherNo = $baseVoucherNo;
 
                 // Handle Cheque for this split
                 $chequeId = null;

@@ -251,7 +251,7 @@
 
             <div class="total-row clearfix">
                 <span class="total-label">Gross Amount :-</span>
-                <span class="total-value">{{ number_format($sale->net_total + $sale->discount_total, 2) }}</span>
+                <span class="total-value">{{ number_format($sale->net_total - ($sale->courier_charges ?? 0), 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -271,16 +271,22 @@
             </div>
             @endif
 
+            @php
+            $current_balance = (float) ($sale->customer->current_balance ?? 0);
+            $invoice_net = $sale->net_total - $sale->extra_discount;
+            $prev_balance = $current_balance - $invoice_net + $sale->paid_amount;
+            @endphp
+
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
-                <span class="total-value">{{ number_format($sale->customer->opening_balance ?? 0, 2) }}</span>
+                <span class="total-value">{{ number_format($prev_balance, 2) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format($sale->net_total + ($sale->customer->opening_balance ?? 0) - $sale->extra_discount, 2) }}</span>
+                <span class="total-value">{{ number_format(($sale->net_total + $prev_balance) - $sale->extra_discount, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -292,7 +298,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Receivable :</span>
-                <span class="total-value">{{ number_format(($sale->net_total + ($sale->customer->opening_balance ?? 0) - $sale->extra_discount) - $sale->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format(($sale->net_total + $prev_balance - $sale->extra_discount) - $sale->paid_amount, 2) }}</span>
             </div>
         </div>
 

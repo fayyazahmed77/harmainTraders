@@ -195,15 +195,6 @@
         $f_email = $payment->firm ? $payment->firm->email : 'info@harmaintraders.com';
         $f_website = $payment->firm ? $payment->firm->website : 'aishtycoons.agency';
 
-        // Allocations
-        $displayAllocations = isset($isCombined) && $isCombined
-            ? $groupPayments->flatMap->allocations
-            : $payment->allocations;
-
-        $mergedAllocations = $displayAllocations->groupBy(function($a) {
-            return $a->bill_type . $a->bill_id;
-        });
-
         $totalAmount = isset($isCombined) && $isCombined
             ? $groupPayments->sum('net_amount')
             : $payment->net_amount;
@@ -216,16 +207,9 @@
             ? $groupPayments->sum('amount')
             : $payment->amount;
 
-        // Invoice Total Sum
-        $invoiceTotalSum = 0;
-        foreach($mergedAllocations as $group) {
-            $first = $group->first();
-            $invoiceTotalSum += $first->bill ? ($first->bill->net_total ?? $first->bill->total ?? $group->sum('amount')) : $group->sum('amount');
-        }
-
         // Balances
         $current_balance = (float) $payment->account->current_balance;
-        $previous_balance = $current_balance - $invoiceTotalSum + $totalAmount;
+        $previous_balance = $current_balance + $totalAmount;
         $net_balance = $current_balance;
         $orientation = $payment->account->purchase == 1 ? 'CR' : 'DR';
     @endphp
@@ -248,7 +232,7 @@
         <!-- Voucher Meta Info -->
         <div class="info-section">
             <div class="info-row">
-                <span class="info-label">Voucher No:</span>
+                <span class="info-label">Voucher #:</span>
                 <span class="info-value">{{ $payment->voucher_no }}</span>
             </div>
             <div class="info-row">
@@ -256,45 +240,13 @@
                 <span class="info-value">{{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}</span>
             </div>
             <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span class="info-value">{{ \Carbon\Carbon::parse($payment->created_at)->setTimezone('Asia/Karachi')->format('h:i A') }}</span>
+            </div>
+            <div class="info-row">
                 <span class="info-label">{{ $payment->type === 'RECEIPT' ? 'Received From:' : 'Paid To:' }}</span>
                 <span class="info-value">{{ $payment->account->title }}</span>
             </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Method/Account Details -->
-        <div class="info-section">
-            @if(isset($isCombined) && $isCombined)
-                <div class="bold" style="font-size: 8px; margin-bottom: 2px; text-transform: uppercase;">Liquidity Distribution:</div>
-                @foreach($groupPayments as $gp)
-                    <div class="info-row">
-                        <span class="info-label" style="width: 80px;">{{ $gp->paymentAccount->title ?? 'Cash' }} ({{ $gp->payment_method ?: 'Cash' }}):</span>
-                        <span class="info-value">{{ number_format($gp->amount, 2) }}</span>
-                    </div>
-                @endforeach
-            @else
-                <div class="info-row">
-                    <span class="info-label">Method:</span>
-                    <span class="info-value">{{ $payment->payment_method ?: 'Cash' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Paid Via:</span>
-                    <span class="info-value">{{ $payment->paymentAccount ? $payment->paymentAccount->title : 'Cash Account' }}</span>
-                </div>
-                @if($payment->cheque_no)
-                    <div class="info-row">
-                        <span class="info-label">Cheque No:</span>
-                        <span class="info-value">{{ $payment->cheque_no }}</span>
-                    </div>
-                @endif
-                @if($payment->cheque_date)
-                    <div class="info-row">
-                        <span class="info-label">Cheque Date:</span>
-                        <span class="info-value">{{ \Carbon\Carbon::parse($payment->cheque_date)->format('d M Y') }}</span>
-                    </div>
-                @endif
-            @endif
         </div>
 
         <div class="divider"></div>
@@ -331,35 +283,42 @@
             </div>
         </div>
 
-        <!-- Allocations Section -->
-        @if($displayAllocations->count() > 0)
-            <div class="divider"></div>
-            <div class="bold" style="font-size: 8px; text-transform: uppercase; margin-bottom: 2px;">Invoice Allocations:</div>
-            <table class="alloc-table">
-                <thead>
+        <!-- Payment Details Table Section -->
+        <div class="divider"></div>
+        <div class="bold" style="font-size: 8px; text-transform: uppercase; margin-bottom: 2px;">Payment Details:</div>
+        <table class="alloc-table">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th>Method</th>
+                    <th>Chq # / Date</th>
+                    <th class="text-right" style="padding-right: 1mm;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php
+                    $displayPayments = isset($isCombined) && $isCombined
+                        ? $groupPayments
+                        : collect([$payment]);
+                @endphp
+                @foreach($displayPayments as $p)
+                    @php
+                        $acctTitle = $p->paymentAccount ? $p->paymentAccount->title : 'Cash';
+                        $methodTitle = $p->payment_method ?: 'Cash';
+                        $chqInfo = $p->cheque_no ? $p->cheque_no : '';
+                        if ($p->cheque_date) {
+                            $chqInfo .= ($chqInfo ? ' · ' : '') . \Carbon\Carbon::parse($p->cheque_date)->format('d/m/y');
+                        }
+                    @endphp
                     <tr>
-                        <th>Invoice Ref</th>
-                        <th>Inv Date</th>
-                        <th class="text-right" style="padding-right: 1mm;">Applied</th>
+                        <td>{{ $acctTitle }}</td>
+                        <td>{{ $methodTitle }}</td>
+                        <td>{{ $chqInfo ?: '-' }}</td>
+                        <td class="text-right" style="padding-right: 1mm; font-weight: bold;">{{ number_format($p->net_amount, 0) }}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach($mergedAllocations as $group)
-                        @php
-                            $first = $group->first();
-                            $refLabel = $first->bill->invoice ?? ($first->bill->invoice_no ?? class_basename($first->bill_type) . ' #' . $first->bill_id);
-                            $invoiceDate = $first->bill ? \Carbon\Carbon::parse($first->bill->date)->format('d M Y') : '-';
-                            $amountApplied = $group->sum('amount');
-                        @endphp
-                        <tr>
-                            <td>{{ $refLabel }}</td>
-                            <td>{{ $invoiceDate }}</td>
-                            <td class="text-right" style="padding-right: 1mm; font-weight: bold;">{{ number_format($amountApplied, 0) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @endif
+                @endforeach
+            </tbody>
+        </table>
 
         <!-- Remarks & Communication -->
         @php

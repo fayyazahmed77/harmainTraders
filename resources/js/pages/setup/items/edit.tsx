@@ -33,6 +33,7 @@ import ReactSelect from "react-select"
 import { useAppearance } from "@/hooks/use-appearance"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import axios from "axios"
+import { route } from "ziggy-js"
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Items", href: "/items" },
@@ -114,6 +115,27 @@ const TechLabel = ({ children, icon: Icon, label, required, error }: { children:
     {error && <p className="text-[10px] text-rose-500 mt-1 font-bold">{error}</p>}
   </div>
 );
+
+const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
+  if (!highlight.trim()) {
+    return <span>{text}</span>;
+  }
+  const regex = new RegExp(`(${highlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, index) => 
+        regex.test(part) ? (
+          <mark key={index} className="bg-orange-500/20 text-orange-600 dark:text-orange-400 font-black rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+};
 
 const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
   const colors = {
@@ -219,7 +241,7 @@ export default function Page({ item, categories, companies, pagination }: Props)
   const [openingOpen, setOpeningOpen] = useState(false)
 
   // Inertia form initialised with keys matching your migration
-  const { data, setData, put, processing, errors, reset, isDirty } = useForm<ItemForm>({
+  const { data, setData, put, processing, errors, reset, isDirty, setError, clearErrors } = useForm<ItemForm>({
     date: item.date ?? "",
     code: item.code ?? "",
     title: item.title ?? "",
@@ -275,6 +297,94 @@ export default function Page({ item, categories, companies, pagination }: Props)
   // small helper typed setter - using type bypass to resolve deep recursion in large forms
   const onInputChange = (key: keyof ItemForm, value: any) =>
     (setData as any)(key, value)
+
+  // ---------- Autocomplete & Duplicate Checking state ----------
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [exactDuplicateExists, setExactDuplicateExists] = useState(false);
+  const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
+  const [availabilityStatus, setAvailabilityStatus] = useState<"none" | "loading" | "available" | "duplicate">("none");
+
+  // Debounced search for item title uniqueness (excluding current item ID)
+  useEffect(() => {
+    const normalizedTitle = data.title.replace(/\s+/g, ' ').trim().toUpperCase();
+
+    if (normalizedTitle.length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      setIsSearching(false);
+      setExactDuplicateExists(false);
+      setAvailabilityStatus("none");
+      if (errors.title === "Item name already exists.") {
+        clearErrors("title");
+      }
+      return;
+    }
+
+    setIsSearching(true);
+    setAvailabilityStatus("loading");
+
+    const handler = setTimeout(() => {
+      axios.get(route('items.search-suggestions'), {
+        params: {
+          query: normalizedTitle,
+          exclude_id: item.id
+        }
+      })
+      .then((response) => {
+        const results = response.data;
+        setSuggestions(results);
+        
+        // Exact match check case-insensitive and normalized
+        const exactMatch = results.some((s: any) => 
+          s.title.replace(/\s+/g, ' ').trim().toUpperCase() === normalizedTitle
+        );
+
+        if (exactMatch) {
+          setExactDuplicateExists(true);
+          setAvailabilityStatus("duplicate");
+          setError("title", "Item name already exists.");
+        } else {
+          setExactDuplicateExists(false);
+          setAvailabilityStatus("available");
+          if (errors.title === "Item name already exists.") {
+            clearErrors("title");
+          }
+        }
+        setIsSearching(false);
+      })
+      .catch((error) => {
+        console.error("Error checking item title uniqueness:", error);
+        setIsSearching(false);
+        setAvailabilityStatus("none");
+      });
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [data.title]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < suggestions.length) {
+        e.preventDefault();
+        router.visit(route('items.edit', suggestions[focusedSuggestionIndex].id));
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+      setFocusedSuggestionIndex(-1);
+    }
+  };
 
   const setPrimaryExisting = (id: number) => {
     (setData as any)("primary_image_id", id);
@@ -428,8 +538,8 @@ export default function Page({ item, categories, companies, pagination }: Props)
             <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* TOP CONTROL DECK */}
-              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative overflow-hidden`}>
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT}`} />
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative overflow-visible`}>
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} rounded-l-md`} />
 
                 <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
                   <div className="text-[10px] uppercase font-black tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Status</div>
@@ -499,15 +609,82 @@ export default function Page({ item, categories, companies, pagination }: Props)
 
                   <div className="md:col-span-4">
                     <TechLabel label="Primary Title" icon={Type} required error={errors.title}>
-                      <Input
-                        value={data.title}
-                        onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
-                        placeholder="Full Item Description"
-                        className={cn(
-                          `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
-                          errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                      <div className="relative">
+                        <Input
+                          value={data.title}
+                          onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
+                          onFocus={() => setShowDropdown(true)}
+                          onBlur={() => {
+                            setTimeout(() => setShowDropdown(false), 200);
+                          }}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Full Item Description"
+                          className={cn(
+                            `h-10 pr-24 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400 uppercase`,
+                            errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                          )}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                          {availabilityStatus === "loading" && (
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
+                              <span className="h-2.5 w-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                              Checking...
+                            </span>
+                          )}
+                          {availabilityStatus === "available" && (
+                            <span className="text-[10px] text-emerald-500 font-black flex items-center gap-1 animate-in fade-in zoom-in-95">
+                              🟢 Available
+                            </span>
+                          )}
+                          {availabilityStatus === "duplicate" && (
+                            <span className="text-[10px] text-rose-500 font-black flex items-center gap-1 animate-in fade-in zoom-in-95">
+                              🔴 Exists
+                            </span>
+                          )}
+                        </div>
+
+                        {showDropdown && suggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white/95 dark:bg-zinc-950/95 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg z-50 divide-y divide-zinc-100 dark:divide-zinc-900 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                            {suggestions.map((suggestion, index) => (
+                              <div
+                                key={suggestion.id}
+                                onMouseDown={() => {
+                                  router.visit(route('items.edit', suggestion.id));
+                                }}
+                                className={cn(
+                                  "p-3 flex justify-between items-start gap-4 cursor-pointer transition-colors text-left",
+                                  index === focusedSuggestionIndex 
+                                    ? "bg-orange-500/10 dark:bg-orange-500/5 border-l-2 border-orange-500" 
+                                    : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                                )}
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-tight">
+                                    <HighlightText text={suggestion.title} highlight={data.title} />
+                                  </div>
+                                  <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                                    {suggestion.category || "No Category"}
+                                    {suggestion.company && (
+                                      <>
+                                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                                        <span>{suggestion.company}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[10px] font-mono font-black text-zinc-400 dark:text-zinc-600 tracking-wider">
+                                    {suggestion.code}
+                                  </div>
+                                  <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 hover:underline">
+                                    Open
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
-                      />
+                      </div>
                     </TechLabel>
                   </div>
 
@@ -939,10 +1116,19 @@ export default function Page({ item, categories, companies, pagination }: Props)
                   Commit Identity Record
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" type="button" onClick={() => { reset(); setOpeningDate(initialDate); }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
+                  <Button variant="outline" type="button" onClick={() => { 
+                    reset(); 
+                    setOpeningDate(initialDate); 
+                    setSuggestions([]);
+                    setShowDropdown(false);
+                    setIsSearching(false);
+                    setExactDuplicateExists(false);
+                    setFocusedSuggestionIndex(-1);
+                    setAvailabilityStatus("none");
+                  }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
                     {processing ? "Saving..." : "Update Item"}
                   </Button>
                 </div>

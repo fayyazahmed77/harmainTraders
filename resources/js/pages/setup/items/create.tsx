@@ -34,6 +34,7 @@ import ReactSelect from "react-select"
 import { useAppearance } from "@/hooks/use-appearance"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import axios from "axios"
+import { route } from "ziggy-js"
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Items", href: "/items" },
@@ -104,8 +105,8 @@ const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-80
 
 const TechLabel = ({ children, icon: Icon, label, required, error }: { children: React.ReactNode, icon?: any, label: string, required?: boolean, error?: string }) => (
   <div className="space-y-1">
-    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
-      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-700 mb-0.5">
+      {Icon && <Icon size={10} className="text-zinc-700 dark:text-zinc-500" />}
       {label}
       {required && <span className="text-rose-500 ml-0.5">*</span>}
     </div>
@@ -113,6 +114,27 @@ const TechLabel = ({ children, icon: Icon, label, required, error }: { children:
     {error && <p className="text-[10px] text-rose-500 mt-1 font-bold">{error}</p>}
   </div>
 );
+
+const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
+  if (!highlight.trim()) {
+    return <span>{text}</span>;
+  }
+  const regex = new RegExp(`(${highlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <span>
+      {parts.map((part, index) => 
+        regex.test(part) ? (
+          <mark key={index} className="bg-orange-500/20 text-orange-600 dark:text-orange-400 font-black rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+};
 
 const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | 'red' | 'orange' | 'blue' }) => {
   const colors = {
@@ -203,9 +225,9 @@ export default function Page({ categories, companies }: { categories: any, compa
   // date picker state
   const [openingDate, setOpeningDate] = useState<Date | undefined>(new Date());
   const [openingOpen, setOpeningOpen] = useState(false)
-
+ 
   // Inertia form initialised with keys matching your migration
-  const { data, setData, post, processing, errors, reset, isDirty } = useForm<ItemForm>({
+  const { data, setData, post, processing, errors, reset, isDirty, setError, clearErrors } = useForm<ItemForm>({
     date: "",
     code: "",
     title: "",
@@ -258,6 +280,93 @@ export default function Page({ categories, companies }: { categories: any, compa
   // small helper typed setter - using type bypass to resolve deep recursion in large forms
   const onInputChange = (key: keyof ItemForm, value: any) =>
     (setData as any)(key, value)
+
+  // ---------- Autocomplete & Duplicate Checking state ----------
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [exactDuplicateExists, setExactDuplicateExists] = useState(false);
+  const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
+  const [availabilityStatus, setAvailabilityStatus] = useState<"none" | "loading" | "available" | "duplicate">("none");
+
+  // Debounced search for item title uniqueness
+  useEffect(() => {
+    const normalizedTitle = data.title.replace(/\s+/g, ' ').trim().toUpperCase();
+
+    if (normalizedTitle.length < 2) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      setIsSearching(false);
+      setExactDuplicateExists(false);
+      setAvailabilityStatus("none");
+      if (errors.title === "Item name already exists.") {
+        clearErrors("title");
+      }
+      return;
+    }
+
+    setIsSearching(true);
+    setAvailabilityStatus("loading");
+
+    const handler = setTimeout(() => {
+      axios.get(route('items.search-suggestions'), {
+        params: {
+          query: normalizedTitle
+        }
+      })
+      .then((response) => {
+        const results = response.data;
+        setSuggestions(results);
+        
+        // Exact match check case-insensitive and normalized
+        const exactMatch = results.some((s: any) => 
+          s.title.replace(/\s+/g, ' ').trim().toUpperCase() === normalizedTitle
+        );
+
+        if (exactMatch) {
+          setExactDuplicateExists(true);
+          setAvailabilityStatus("duplicate");
+          setError("title", "Item name already exists.");
+        } else {
+          setExactDuplicateExists(false);
+          setAvailabilityStatus("available");
+          if (errors.title === "Item name already exists.") {
+            clearErrors("title");
+          }
+        }
+        setIsSearching(false);
+      })
+      .catch((error) => {
+        console.error("Error checking item title uniqueness:", error);
+        setIsSearching(false);
+        setAvailabilityStatus("none");
+      });
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [data.title]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < suggestions.length) {
+        e.preventDefault();
+        router.visit(route('items.edit', suggestions[focusedSuggestionIndex].id));
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+      setFocusedSuggestionIndex(-1);
+    }
+  };
 
   // UseEffect to calculating Retail and Trade Price difference
   useEffect(() => {
@@ -320,6 +429,12 @@ export default function Page({ categories, companies }: { categories: any, compa
         reset()
         setOpeningDate(undefined)
         setPreviews([])
+        setSuggestions([])
+        setShowDropdown(false)
+        setIsSearching(false)
+        setExactDuplicateExists(false)
+        setFocusedSuggestionIndex(-1)
+        setAvailabilityStatus("none")
       },
       onError: (errs) => {
         console.error("Validation Errors:", errs)
@@ -380,11 +495,11 @@ export default function Page({ categories, companies }: { categories: any, compa
             <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* TOP CONTROL DECK */}
-              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative overflow-hidden`}>
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT}`} />
+              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative overflow-visible`}>
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} rounded-l-md`} />
 
                 <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
-                  <div className="text-[10px] uppercase font-black tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Status</div>
+                  <div className="text-[10px] uppercase font-black tracking-widest text-zinc-700 dark:text-zinc-500 mb-2">Status</div>
                   <div className="flex flex-col gap-2">
                     {data.is_active && <SignalBadge text="ACTIVE" type="green" />}
                     {data.is_import && <SignalBadge text="IMPORT" type="blue" />}
@@ -404,7 +519,7 @@ export default function Page({ categories, companies }: { categories: any, compa
                           <Button
                             type="button"
                             variant="outline"
-                            className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 ${!openingDate && !data.date && "text-zinc-400"}`}
+                            className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 ${!openingDate && !data.date && "text-zinc-700"}`}
                           >
                             {openingDate
                               ? openingDate.toLocaleDateString("en-GB", {
@@ -415,7 +530,7 @@ export default function Page({ categories, companies }: { categories: any, compa
                               : data.date
                                 ? data.date
                                 : "Select date"}
-                            <CalendarIcon size={14} className="text-zinc-400" />
+                            <CalendarIcon size={14} className="text-zinc-700" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -451,15 +566,82 @@ export default function Page({ categories, companies }: { categories: any, compa
 
                   <div className="md:col-span-4">
                     <TechLabel label="Primary Title" icon={Type} required error={errors.title}>
-                      <Input
-                        value={data.title}
-                        onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
-                        placeholder="Full Item Description"
-                        className={cn(
-                          `h-10 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400`,
-                          errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                      <div className="relative">
+                        <Input
+                          value={data.title}
+                          onChange={(e) => onInputChange("title", e.target.value.toUpperCase())}
+                          onFocus={() => setShowDropdown(true)}
+                          onBlur={() => {
+                            setTimeout(() => setShowDropdown(false), 200);
+                          }}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Full Item Description"
+                          className={cn(
+                            `h-10 pr-24 border-zinc-200 dark:border-zinc-700 font-bold text-sm bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-400 uppercase`,
+                            errors.title && "border-rose-500 focus-visible:ring-rose-500 shadow-[0_0_0_1px_rgba(244,63,94,1)]"
+                          )}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                          {availabilityStatus === "loading" && (
+                            <span className="text-[10px] text-zinc-700 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
+                              <span className="h-2.5 w-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                              Checking...
+                            </span>
+                          )}
+                          {availabilityStatus === "available" && (
+                            <span className="text-[10px] text-emerald-500 font-black flex items-center gap-1 animate-in fade-in zoom-in-95">
+                              🟢 Available
+                            </span>
+                          )}
+                          {availabilityStatus === "duplicate" && (
+                            <span className="text-[10px] text-rose-500 font-black flex items-center gap-1 animate-in fade-in zoom-in-95">
+                              🔴 Exists
+                            </span>
+                          )}
+                        </div>
+
+                        {showDropdown && suggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white/95 dark:bg-zinc-950/95 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg z-50 divide-y divide-zinc-100 dark:divide-zinc-900 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                            {suggestions.map((suggestion, index) => (
+                              <div
+                                key={suggestion.id}
+                                onMouseDown={() => {
+                                  router.visit(route('items.edit', suggestion.id));
+                                }}
+                                className={cn(
+                                  "p-3 flex justify-between items-start gap-4 cursor-pointer transition-colors text-left",
+                                  index === focusedSuggestionIndex 
+                                    ? "bg-orange-500/10 dark:bg-orange-500/5 border-l-2 border-orange-500" 
+                                    : "hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                                )}
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-tight">
+                                    <HighlightText text={suggestion.title} highlight={data.title} />
+                                  </div>
+                                  <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-700 uppercase tracking-wider flex items-center gap-1">
+                                    {suggestion.category || "No Category"}
+                                    {suggestion.company && (
+                                      <>
+                                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                                        <span>{suggestion.company}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[10px] font-mono font-black text-zinc-700 dark:text-zinc-600 tracking-wider">
+                                    {suggestion.code}
+                                  </div>
+                                  <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 hover:underline">
+                                    Open
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
-                      />
+                      </div>
                     </TechLabel>
                   </div>
 
@@ -534,7 +716,7 @@ export default function Page({ categories, companies }: { categories: any, compa
 
                   {/* Advanced Pricing Tiers */}
                   <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4 space-y-3">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP1 - TP6)</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-zinc-700">Advanced Pricing Tiers (TP1 - TP6)</div>
                     <div className="grid grid-cols-2 gap-3">
                       <TechLabel label="Loose (T.P.1) %" icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
@@ -722,7 +904,7 @@ export default function Page({ categories, companies }: { categories: any, compa
                         <div className="grid grid-cols-2 gap-2 relative">
                           <Input type="number" value={data.stock_1} onChange={(e) => onInputChange("stock_1", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Full" />
                           <Input type="number" value={data.stock_2} onChange={(e) => onInputChange("stock_2", e.target.value)} className="h-9 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" placeholder="Pcs" />
-                          <div className="absolute -bottom-4 right-0 text-[9px] font-bold text-zinc-400">
+                          <div className="absolute -bottom-4 right-0 text-[9px] font-bold text-zinc-700">
                              Total: {(Number(data.stock_1 || 0) * Number(data.packing_qty || 1)) + Number(data.stock_2 || 0)} Units
                           </div>
                         </div>
@@ -764,28 +946,28 @@ export default function Page({ categories, companies }: { categories: any, compa
                   <TechLabel label="GST Configuration" icon={Percent}>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <div className="text-[9px] uppercase font-bold text-zinc-400 mb-1">Percentage</div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-700 mb-1">Percentage</div>
                         <Input value={data.gst_percent} onChange={(e) => onInputChange("gst_percent", e.target.value)} placeholder="%" className="h-10 text-sm font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </div>
                       <div>
-                        <div className="text-[9px] uppercase font-bold text-zinc-400 mb-1">Amount</div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-700 mb-1">Amount</div>
                         <Input value={data.gst_amount} onChange={(e) => onInputChange("gst_amount", e.target.value)} placeholder="Amt" className="h-10 text-sm font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </div>
                     </div>
                   </TechLabel>
-
+ 
                   <TechLabel label="Advance Tax Profile" icon={BadgePercent}>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <div className="text-[9px] uppercase font-bold text-zinc-400 mb-1">Filer %</div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-700 mb-1">Filer %</div>
                         <Input value={data.adv_tax_filer} onChange={(e) => onInputChange("adv_tax_filer", e.target.value)} placeholder="%" className="h-10 text-sm font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </div>
                       <div>
-                        <div className="text-[9px] uppercase font-bold text-zinc-400 mb-1">Non-Filer %</div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-700 mb-1">Non-Filer %</div>
                         <Input value={data.adv_tax_non_filer} onChange={(e) => onInputChange("adv_tax_non_filer", e.target.value)} placeholder="%" className="h-10 text-sm font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </div>
                       <div>
-                        <div className="text-[9px] uppercase font-bold text-zinc-400 mb-1">Manufacturer %</div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-700 mb-1">Manufacturer %</div>
                         <Input value={data.adv_tax_manufacturer} onChange={(e) => onInputChange("adv_tax_manufacturer", e.target.value)} placeholder="%" className="h-10 text-sm font-mono bg-zinc-50 dark:bg-zinc-800" />
                       </div>
                     </div>
@@ -806,7 +988,7 @@ export default function Page({ categories, companies }: { categories: any, compa
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                   <label className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center aspect-square cursor-pointer hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-orange-500/5 transition-all group">
                     <input type="file" multiple onChange={handleImageChange} className="hidden" accept="image/*" />
-                    <Upload size={24} className="text-zinc-400 group-hover:text-orange-500 mb-2" />
+                    <Upload size={24} className="text-zinc-700 group-hover:text-orange-500 mb-2" />
                     <span className="text-[10px] font-black uppercase tracking-tighter text-zinc-500 group-hover:text-orange-600">Upload Images</span>
                   </label>
 
@@ -853,10 +1035,19 @@ export default function Page({ categories, companies }: { categories: any, compa
                   Commit Identity Record
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" type="button" onClick={() => { reset(); setOpeningDate(undefined); }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
+                  <Button variant="outline" type="button" onClick={() => { 
+                    reset(); 
+                    setOpeningDate(undefined); 
+                    setSuggestions([]);
+                    setShowDropdown(false);
+                    setIsSearching(false);
+                    setExactDuplicateExists(false);
+                    setFocusedSuggestionIndex(-1);
+                    setAvailabilityStatus("none");
+                  }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
                     {processing ? "Saving..." : "Create Item"}
                   </Button>
                 </div>

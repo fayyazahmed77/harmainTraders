@@ -17,7 +17,7 @@ class ItemsController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view stock', only: ['index', 'show', 'getNextCode']),
+            new Middleware('permission:view stock', only: ['index', 'show', 'getNextCode', 'searchSuggestions']),
             new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive']),
         ];
     }
@@ -136,7 +136,7 @@ class ItemsController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'date' => 'nullable|date',
             'code' => 'nullable|string|max:255',
-            'title' => 'required|string|max:255',
+            'title' => 'required|string|max:255|unique:items,title',
             'short_name' => 'nullable|string|max:255',
             'company' => 'required|exists:accounts,id',
 
@@ -196,6 +196,8 @@ class ItemsController extends Controller implements HasMiddleware
             'images' => 'nullable|array',
             'images.*' => 'image|mimes:jpeg,png,jpg,gif,webp|max:5120',
             'primary_new_index' => 'nullable|numeric',
+        ], [
+            'title.unique' => 'Item name already exists.',
         ]);
 
         // ✅ Create item
@@ -268,7 +270,7 @@ class ItemsController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'date' => 'nullable|date',
             'code' => 'nullable|string|max:255',
-            'title' => 'required|string|max:255',
+            'title' => 'required|string|max:255|unique:items,title,' . $id,
             'short_name' => 'nullable|string|max:255',
             'company' => 'required|exists:accounts,id',
 
@@ -331,6 +333,8 @@ class ItemsController extends Controller implements HasMiddleware
             'deleted_images.*' => 'numeric',
             'primary_image_id' => 'nullable|numeric',
             'primary_new_index' => 'nullable|numeric',
+        ], [
+            'title.unique' => 'Item name already exists.',
         ]);
         $item->update($validated);
 
@@ -536,6 +540,43 @@ class ItemsController extends Controller implements HasMiddleware
         $item->save();
 
         return redirect()->route('items.index')->with('success', 'Item status updated successfully');
+    }
+
+    public function searchSuggestions(Request $request)
+    {
+        $query = $request->query('query', '');
+        // Trim and normalize spaces
+        $query = preg_replace('/\s+/', ' ', trim($query));
+        $excludeId = $request->query('exclude_id');
+
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        $items = Items::with(['category', 'companyAccount'])
+            ->where('title', 'like', '%' . $query . '%')
+            ->when($excludeId, function ($q) use ($excludeId) {
+                return $q->where('id', '!=', $excludeId);
+            })
+            ->orderByRaw("CASE 
+                WHEN title LIKE ? THEN 1 
+                ELSE 2 
+            END", [$query . '%'])
+            ->limit(8)
+            ->get();
+
+        $results = $items->map(function ($item) {
+            $cat = $item->getRelation('category');
+            return [
+                'id' => $item->id,
+                'title' => $item->title,
+                'code' => $item->code,
+                'category' => $cat ? $cat->name : null,
+                'company' => $item->companyAccount ? $item->companyAccount->title : null,
+            ];
+        });
+
+        return response()->json($results);
     }
 }
 
