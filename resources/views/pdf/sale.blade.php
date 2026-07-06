@@ -463,7 +463,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                 <table class="details-table" align="right">
                     <tr>
                         <td class="detail-label-cell">Invoice Time :</td>
-                        <td class="detail-value-cell">{{ $sale->created_at ? \Carbon\Carbon::parse($sale->created_at)->format('h:i A') : \Carbon\Carbon::now()->format('h:i A') }}</td>
+                        <td class="detail-value-cell">{{ $sale->created_at ? \Carbon\Carbon::parse($sale->created_at)->setTimezone('Asia/Karachi')->format('h:i A') : \Carbon\Carbon::now()->setTimezone('Asia/Karachi')->format('h:i A') }}</td>
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Invoice Date :</td>

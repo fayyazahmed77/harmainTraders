@@ -83,6 +83,7 @@ export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending 
    ✔️ Main Interface
 --------------------------------- */
 interface Sales {
+    extra_discount: number;
     id: number;
     date: string;
     created_at?: string;
@@ -224,11 +225,65 @@ export default function DataTable({ data }: DataTableProps) {
             )
         },
         { accessorKey: "no_of_items", header: "Items" },
-        { accessorKey: "gross_total", header: "Gross Total" },
-        { accessorKey: "discount_total", header: "Discount" },
-        { accessorKey: "net_total", header: "Net Total" },
-        { accessorKey: "paid_amount", header: "Paid" },
-        { accessorKey: "remaining_amount", header: "Remaining" },
+        { 
+            accessorKey: "gross_total", 
+            header: "Gross Total",
+            cell: ({ row }) => <span className="font-mono">{Number(row.original.gross_total || 0).toLocaleString()}</span>
+        },
+        { 
+            accessorKey: "discount_total", 
+            header: "Discount",
+            cell: ({ row }) => {
+                const discTotal = Number(row.original.discount_total || 0);
+                const extraDisc = Number(row.original.extra_discount || 0);
+                return (
+                    <div>
+                        <div className="font-mono text-sm">{discTotal.toLocaleString()}</div>
+                        {extraDisc > 0 && (
+                            <div className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded border border-rose-100 dark:border-rose-900/30 w-fit font-mono mt-0.5">
+                                Extra: -{extraDisc.toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+        },
+        { 
+            accessorKey: "net_total", 
+            header: "Net Total",
+            cell: ({ row }) => {
+                const net = Number(row.original.net_total || 0);
+                const extraDisc = Number(row.original.extra_discount || 0);
+                const finalNet = net - extraDisc;
+                return (
+                    <div className="font-mono text-sm font-semibold">
+                        {finalNet.toLocaleString()}
+                        {extraDisc > 0 && (
+                            <div className="text-[9px] text-muted-foreground line-through opacity-70">
+                                {net.toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+        },
+        { 
+            accessorKey: "paid_amount", 
+            header: "Paid",
+            cell: ({ row }) => <span className="font-mono text-emerald-600 font-semibold">{Number(row.original.paid_amount || 0).toLocaleString()}</span>
+        },
+        { 
+            accessorKey: "remaining_amount", 
+            header: "Remaining",
+            cell: ({ row }) => {
+                const rem = Number(row.original.remaining_amount || 0);
+                return (
+                    <span className={`font-mono font-semibold ${rem > 0 ? 'text-rose-600' : 'text-zinc-500'}`}>
+                        {rem.toLocaleString()}
+                    </span>
+                );
+            }
+        },
 
         /* ------------------------------
            ✔️ Status Column (Color + Icon)

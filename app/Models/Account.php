@@ -145,7 +145,7 @@ class Account extends Model
         $type = strtolower($this->accountType->name ?? '');
         
         if ($type === 'customers') {
-            $totalSales = $this->sales()->sum('net_total');
+            $totalSales = (float)$this->sales()->sum('net_total') - (float)$this->sales()->sum('extra_discount');
             $totalReturns = $this->salesReturns()->sum('net_total');
             $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
                 ->where(function($q) {
@@ -175,7 +175,7 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
             
-            return (float)$this->opening_balance + $totalPurchases - $totalReceipts - $totalReturns - $totalPayments;
+            return (float)$this->opening_balance + $totalPurchases + $totalReceipts - $totalReturns - $totalPayments;
         } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {

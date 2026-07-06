@@ -627,7 +627,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const saveInvoice = (forceSave = false) => {
     const payload = {
       date: date ? formatLocalDate(date) : formatLocalDate(new Date()), // Format as YYYY-MM-DD
-      invoice: invoiceNo,
+      // invoice is generated server-side; we do NOT send it from the client
       code: code,
       type: cashCredit,
       customer_id: accountType?.value,
@@ -649,7 +649,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       tax_total: totals.taxTotal,
       courier_charges: totals.courier,
       net_total: totals.net,
-      total_receivable: totals.receivable,
+      total_receivable: totals.finalAmount,
       paid_amount: splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
       remaining_amount: totals.net - splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
 
@@ -955,11 +955,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </TechLabel>
 
                 <TechLabel label="Bill No" icon={Hash} className="space-y-1.5 shrink-0">
-                  <Input
-                    value={invoiceNo}
-                    onChange={(e) => setInvoiceNo(e.target.value)}
-                    className={`w-28 h-9 text-xs font-black text-center border-orange-200 bg-orange-50/20 text-orange-600 ${PREMIUM_ROUNDING_MD}`}
-                  />
+                  <div
+                    className={`flex items-center justify-center w-28 h-9 text-xs font-black text-center border border-orange-200 bg-orange-50/40 text-orange-600 ${PREMIUM_ROUNDING_MD} select-none cursor-default`}
+                    title="Invoice number is auto-generated"
+                  >
+                    {invoiceNo}
+                  </div>
                 </TechLabel>
 
                 <TechLabel label="Salesman" className="space-y-1.5 shrink-0">

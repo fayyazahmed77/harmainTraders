@@ -138,7 +138,7 @@ class StockReportBuilder
             ->select(
                 'item_id', 
                 DB::raw('SUM(total_pcs) as total'),
-                DB::raw('SUM(subtotal) / SUM(total_pcs) as avg_rate'),
+                DB::raw('AVG(trade_price) as avg_rate'),
                 DB::raw('(SELECT trade_price FROM purchase_items pi2 WHERE pi2.item_id = purchase_items.item_id ORDER BY id DESC LIMIT 1) as last_rate')
             )
             ->whereDate('purchases.date', '<=', $toDate)
@@ -175,7 +175,7 @@ class StockReportBuilder
             DB::raw('COALESCE(p.total, 0) + COALESCE(sr.total, 0) as in_qty'),
             DB::raw('COALESCE(s.total, 0) + COALESCE(pr.total, 0) as out_qty'),
             DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
-            DB::raw('COALESCE(p.avg_rate * items.packing_qty, items.trade_price) as avg_rate'),
+            DB::raw('COALESCE(p.avg_rate, items.trade_price) as avg_rate'),
             DB::raw('COALESCE(p.last_rate, items.trade_price) as last_rate')
         )
         ->leftJoinSub($purchaseQty, 'p', 'items.id', '=', 'p.item_id')

@@ -13,17 +13,20 @@ interface FundsPieChartProps {
 }
 
 const FundsPieChart: React.FC<FundsPieChartProps> = ({ fundsData }) => {
-    const total = fundsData.reduce((sum, item) => sum + item.value, 0);
+    // Filter out negative values to prevent overdrafts/deficits from displaying
+    const filteredFundsData = fundsData.filter(item => item.value >= 0);
+    const total = filteredFundsData.reduce((sum, item) => sum + item.value, 0);
 
     const formatRs = (val: number): string => {
-        if (val >= 10000000) {
-            return (val / 10000000).toFixed(2) + 'Cr';
-        } else if (val >= 100000) {
-            return (val / 100000).toFixed(1) + 'L';
-        } else if (val >= 1000) {
-            return (val / 1000).toFixed(1) + 'K';
+        const roundedVal = Math.round(val);
+        if (roundedVal >= 10000000) {
+            return (roundedVal / 10000000).toFixed(2) + 'Cr';
+        } else if (roundedVal >= 100000) {
+            return (roundedVal / 100000).toFixed(1) + 'L';
+        } else if (roundedVal >= 1000) {
+            return (roundedVal / 1000).toFixed(1) + 'K';
         }
-        return val.toString();
+        return roundedVal.toLocaleString('en-PK');
     };
 
     const formatCurrency = (val: number): string => {
@@ -46,7 +49,7 @@ const FundsPieChart: React.FC<FundsPieChartProps> = ({ fundsData }) => {
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={fundsData}
+                                data={filteredFundsData}
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={40}
@@ -55,7 +58,7 @@ const FundsPieChart: React.FC<FundsPieChartProps> = ({ fundsData }) => {
                                 dataKey="value"
                                 stroke="none"
                             >
-                                {fundsData.map((entry, index) => (
+                                {filteredFundsData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                 ))}
                             </Pie>
@@ -75,7 +78,7 @@ const FundsPieChart: React.FC<FundsPieChartProps> = ({ fundsData }) => {
 
                 {/* Custom Legend */}
                 <div className="mt-4 space-y-2">
-                    {fundsData.map((item, index) => (
+                    {filteredFundsData.map((item, index) => (
                         <div key={index} className="flex items-center justify-between group">
                             <div className="flex items-center gap-2">
                                 <div 

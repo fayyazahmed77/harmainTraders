@@ -770,10 +770,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 overflow-hidden flex flex-col h-screen">
         <SiteHeader breadcrumbs={[{ title: "Payment Ledger", href: "/payment/create" }]} />
 
-        <main className="flex-1 overflow-auto md:overflow-hidden p-3 md:p-6 flex flex-col md:flex-row gap-6 scroll-smooth">
+        <main className="flex-1 overflow-auto md:overflow-hidden p-3 md:py-4 md:px-6 flex flex-col md:flex-row gap-5 scroll-smooth">
 
           {/* ── WORKSPACE ── */}
-          <div className="flex-1 flex flex-col gap-4 md:gap-6 md:overflow-hidden">
+          <div className="flex-1 flex flex-col gap-4 md:gap-4 md:overflow-hidden">
 
             {/* Success State handled via SuccessDialog component at bottom */}
 
@@ -823,7 +823,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
             {/* Control Header (Desktop Only) */}
             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-              <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-6 items-end relative overflow-hidden`}>
+              <Card className={`p-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-4 items-end relative overflow-hidden`}>
                 <div className={`absolute top-0 left-0 w-1.5 h-full ${t.gradient}`} />
 
                 <div className="col-span-3">
@@ -933,9 +933,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
             {/* Ledger Manifest (The Workhorse) */}
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1 min-h-0 flex flex-col md:overflow-hidden">
-              <Card className={`flex-1 flex flex-col border border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none overflow-hidden ${PREMIUM_ROUNDING}`}>
+              <Card className={`flex-1 flex flex-col border border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none overflow-hidden ${PREMIUM_ROUNDING} py-0`}>
                 {/* Table Header/Toolbar */}
-                <div className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 px-4 h-12 flex items-center justify-between flex-shrink-0">
+                <div className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800 px-4 h-12 flex items-center justify-between flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <Scale size={14} className="text-zinc-400" />
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Registry Manifest</span>
@@ -952,26 +952,52 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <table className="w-full border-separate border-spacing-0">
                     <thead className="sticky top-0 z-10">
                       <tr className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-                        <th className="p-4 text-left border-b border-zinc-100 dark:border-zinc-800 w-10">
+                        <th className="px-4 py-1 text-left border-b border-zinc-100 dark:border-zinc-800 w-10">
                           <Checkbox checked={unpaidBills.length > 0 && selectedBillIds.size === unpaidBills.length} onCheckedChange={toggleAll} className="border-zinc-300 dark:border-zinc-700" />
                         </th>
-                        <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Invoice No</th>
-                        <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Type</th>
-                        <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Date</th>
-                        <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Discount</th>
-                        <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Returns</th>
-                        <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Remaining</th>
-                        <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 w-40">Allocation</th>
+                        <th className="px-4 py-1 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Invoice No</th>
+                        <th className="px-4 py-1 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Type</th>
+                        <th className="px-4 py-1 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Date</th>
+                        <th className="px-4 py-1 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Discount</th>
+                        <th className="px-4 py-1 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Returns</th>
+                        <th className="px-4 py-1 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Remaining</th>
+                        <th className="px-4 py-1 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 w-40">Allocation</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
                       {unpaidBills.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="py-24 text-center">
-                            <div className="flex flex-col items-center gap-3 opacity-20">
-                              <Package size={48} className="text-zinc-400" />
-                              <div className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Workspace Vacant</div>
-                            </div>
+                            {!selectedAccountId ? (
+                              <div className="flex flex-col items-center gap-4 max-w-md mx-auto p-6">
+                                <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 shadow-inner">
+                                  <UserIcon size={18} />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-xs font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400">No Party Selected</div>
+                                  <p className="text-[11px] text-zinc-400 font-bold max-w-[280px] mx-auto leading-relaxed">Select a ledger party to view active invoices and configure payment allocations.</p>
+                                </div>
+                                <Button 
+                                  onClick={() => setDesktopAccOpen(true)}
+                                  variant="outline" 
+                                  size="sm" 
+                                  className={`mt-1 text-[10px] font-black uppercase tracking-wider bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all ${PREMIUM_ROUNDING_MD}`}
+                                >
+                                  <Search size={12} className="mr-1.5 opacity-60" />
+                                  Select Ledger Party
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-4 max-w-md mx-auto p-6 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="w-12 h-12 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shadow-inner">
+                                  <CheckCircle2 size={18} />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">No Active Invoices</div>
+                                  <p className="text-[11px] text-zinc-400 font-bold max-w-[285px] mx-auto leading-relaxed">This party has no outstanding invoices. Any payout posted will be registered as an advance / on-account credit.</p>
+                                </div>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ) : (
@@ -1028,7 +1054,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 </div>
 
                 {/* Table Footer / Summary Bar */}
-                <div className="bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-4 flex-shrink-0">
+                <div className="bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-4 flex-shrink-0">
                   <div className="flex gap-4">
                     <div className="space-y-0.5">
                       <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Selected Entries</div>
@@ -1055,11 +1081,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Effective Payout</div>
-                        <div className={`text-xl font-mono font-black ${t.text} tracking-tighter`}>
+                        <div className={`text-lg font-mono font-black ${t.text} tracking-tighter`}>
                           Rs {totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </div>
-                      <div className={`w-10 h-10 ${t.gradient} ${PREMIUM_ROUNDING_MD} flex items-center justify-center text-white shadow-lg ${t.gradientShadow}`}>
+                      <div className={`w-8 h-8 ${t.gradient} ${PREMIUM_ROUNDING_MD} flex items-center justify-center text-white shadow-lg ${t.gradientShadow}`}>
                         <Calculator size={20} className="opacity-80" />
                       </div>
                     </div>
@@ -1070,13 +1096,13 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           </div>
 
           {/* ── FINANCIAL HUD (Right Sidebar) ── */}
-          <div className="w-full md:w-[380px] space-y-4 md:space-y-6 flex flex-col md:overflow-hidden">
+          <div className="w-full md:w-[380px] space-y-4 md:space-y-4 flex flex-col md:overflow-hidden">
 
             {/* Account Insight Card */}
             {selectedAccountId && (
               <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex-shrink-0">
                 <Card className={`${CARD_BASE} p-5 ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                  <div className="flex items-center gap-2 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
                     <div className={`w-2 h-2 rounded-full bg-blue-500`} />
                     <h4 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest leading-none pt-0.5">Financial Auditor</h4>
                   </div>
@@ -1118,11 +1144,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             )}
 
             {/* Executive Summary Card */}
-            <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-shrink-0">
-              <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none`}>
+            <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1 min-h-0 flex flex-col">
+              <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none flex-1 flex flex-col min-h-0`}>
                 <div className={`absolute top-0 right-0 w-32 h-32 ${t.blob} rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none`} />
 
-                <div className="flex justify-between items-center mb-6 border-b border-zinc-100 dark:border-zinc-800 pb-4 relative z-10">
+                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-1 relative z-10 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${t.gradient}`} />
                     <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">PAYMENT</h3>
@@ -1136,7 +1162,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
                 </div>
 
-                <div className="space-y-6 relative z-10">
+                <div className="flex-1 min-h-0 flex flex-col relative z-10">
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-4 my-3 custom-scrollbar">
                   <div className="flex justify-between items-end gap-4">
                     <div className="flex-1">
                       {isMultiPayment ? (
@@ -1286,18 +1313,18 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       </Select>
                     </TechLabel>
                   </div>
-
-                  <div className="pt-4">
-                    <Button className={`w-full h-14 ${t.gradient} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg ${t.gradientShadow} transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
-                      onClick={handleSave} disabled={loading}>
-                      <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={loading ? { opacity: 0.5 } : {}}>
-                        {loading ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                        {loading ? "PROCESSING..." : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")}
-                      </motion.div>
-                    </Button>
-                    
-                  </div>
                 </div>
+
+                <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex-shrink-0">
+                  <Button className={`w-full h-14 ${t.gradient} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg ${t.gradientShadow} transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
+                    onClick={handleSave} disabled={loading}>
+                    <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={loading ? { opacity: 0.5 } : {}}>
+                      {loading ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      {loading ? "PROCESSING..." : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")}
+                    </motion.div>
+                  </Button>
+                </div>
+              </div>
               </Card>
             </motion.div>
           </div>

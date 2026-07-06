@@ -17,6 +17,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 export type SaleStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled";
 interface Sales {
     id: number;
+    extra_discount: number;
     date: string;
     invoice: string;
     code: string;

@@ -357,7 +357,7 @@ if (file_exists($logo_path)) {
                 <table class="details-table" align="right">
                     <tr>
                         <td class="detail-label-cell">Invoice Time :</td>
-                        <td class="detail-value-cell">{{ $purchase->created_at ? \Carbon\Carbon::parse($purchase->created_at)->format('h:i A') : \Carbon\Carbon::now()->format('h:i A') }}</td>
+                        <td class="detail-value-cell">{{ $purchase->created_at ? \Carbon\Carbon::parse($purchase->created_at)->setTimezone('Asia/Karachi')->format('h:i A') : \Carbon\Carbon::now()->setTimezone('Asia/Karachi')->format('h:i A') }}</td>
                     </tr>
                     <tr>
                         <td class="detail-label-cell">Invoice Date :</td>

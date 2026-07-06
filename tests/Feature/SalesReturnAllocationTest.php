@@ -9,7 +9,17 @@ use App\Models\Saleman;
 use App\Models\AccountType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-
+/**
+ * @var \Tests\TestCase $this
+ * @property \App\Models\User $user
+ * @property \App\Models\AccountType $customerType
+ * @property \App\Models\AccountType $cashType
+ * @property \App\Models\Account $customer
+ * @property \App\Models\Account $cashAccount
+ * @property \App\Models\Saleman $salesman
+ * @property \App\Models\Items $item
+ * @property \App\Models\Sales $sale
+ */
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
@@ -61,6 +71,18 @@ beforeEach(function () {
         'remaining_amount' => 1000,
         'courier_charges' => 0.00,
         'status' => 'Completed',
+    ]);
+
+    \App\Models\SalesItem::create([
+        'sale_id' => $this->sale->id,
+        'item_id' => $this->item->id,
+        'qty_carton' => 0,
+        'qty_pcs' => 100,
+        'total_pcs' => 100,
+        'trade_price' => 10,
+        'discount' => 0,
+        'gst_amount' => 0,
+        'subtotal' => 1000,
     ]);
 });
 

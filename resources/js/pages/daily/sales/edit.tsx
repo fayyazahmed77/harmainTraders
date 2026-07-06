@@ -630,7 +630,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       tax_total: totals.taxTotal,
       courier_charges: totals.courier,
       net_total: totals.net,
-      total_receivable: totals.receivable,
+      total_receivable: totals.finalAmount,
       paid_amount: newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0),
       remaining_amount: totals.net - newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0),
 

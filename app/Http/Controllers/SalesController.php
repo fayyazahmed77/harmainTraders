@@ -123,8 +123,9 @@ class SalesController extends Controller implements HasMiddleware
                 return $item;
             });
 
-        // B5 Fix: Suggest invoice number based on MAX id to avoid created_at ordering issues.
-        // The actual invoice number is locked and generated at save time (in store()).
+        // Invoice number is generated server-side at save time inside a DB transaction.
+        // This preview is shown as a read-only badge on the frontend — the actual number
+        // is locked and assigned in store() to prevent race conditions.
         $lastSale = Sales::orderByDesc('id')->first();
         $nextInvoiceNo = 'SLS-000001';
 
@@ -162,7 +163,7 @@ class SalesController extends Controller implements HasMiddleware
     {
         $request->validate([
             'date'            => 'required|date',
-            'invoice'         => 'required|string', // Assuming auto-generated or passed
+            // 'invoice' is generated server-side — not validated from client input
             'code'            => 'nullable|string',
             'type'            => 'nullable|string',
             'customer_id'     => 'required|integer', // Assuming passed
@@ -199,9 +200,7 @@ class SalesController extends Controller implements HasMiddleware
 
         try {
 
-            // Create sale
             // B9 Fix: Server-side financial verification — never trust frontend totals.
-            // Recalculate gross_total from item subtotals and net_total from all components.
             $calcGross = collect($request->items)->sum(fn($i) => (float)($i['subtotal'] ?? 0));
             $calcNet   = $calcGross
                 - (float)($request->discount_total ?? 0)
@@ -210,7 +209,7 @@ class SalesController extends Controller implements HasMiddleware
 
             if (abs((float)$request->gross_total - $calcGross) > 1) {
                 DB::rollBack();
-                \Illuminate\Support\Facades\Log::warning('B9 gross_total mismatch attempt', [
+                \Illuminate\Support\Facades\Log::warning('B9 gross_total mismatch', [
                     'client_gross' => $request->gross_total, 'server_gross' => $calcGross,
                     'customer_id'  => $request->customer_id, 'ip' => request()->ip(),
                 ]);
@@ -218,23 +217,17 @@ class SalesController extends Controller implements HasMiddleware
             }
             if (abs((float)$request->net_total - $calcNet) > 2) {
                 DB::rollBack();
-                \Illuminate\Support\Facades\Log::warning('B9 net_total mismatch attempt', [
+                \Illuminate\Support\Facades\Log::warning('B9 net_total mismatch', [
                     'client_net' => $request->net_total, 'server_net' => $calcNet,
                     'customer_id' => $request->customer_id, 'ip' => request()->ip(),
                 ]);
                 return redirect()->back()->withErrors(['net_total' => 'Net total mismatch. Please refresh and recalculate.'])->withInput();
             }
 
-            $netTotal = $request->net_total;
-            $extraDiscount = $request->extra_discount ?? 0;
-            $paidAmount = $request->paid_amount ?? 0;
-            $remainingAmount = ($netTotal - $extraDiscount) - $paidAmount;
-
             // --- Multi-Method Split Payments & Allocation Logic ---
             $isMulti = (bool) $request->input('is_multi', false);
             $splitsData = $isMulti ? $request->input('splits', []) : [];
 
-            // Calculate total paid from all splits
             $totalPaidAmount = 0;
             if ($isMulti) {
                 foreach ($splitsData as $split) {
@@ -242,7 +235,6 @@ class SalesController extends Controller implements HasMiddleware
                 }
             } else {
                 $totalPaidAmount = (float) ($request->paid_amount ?? 0);
-                // Normalize single payment to split format for unified processing
                 if ($request->is_pay_now && $totalPaidAmount > 0 && $request->payment_account_id) {
                     $splitsData = [[
                         'payment_account_id' => $request->payment_account_id,
@@ -255,14 +247,18 @@ class SalesController extends Controller implements HasMiddleware
                 }
             }
 
-            // Calculate how much goes to THIS bill vs Surplus (Previous Balance)
-            $actualPaidOnThisBill = min($totalPaidAmount, $request->net_total);
-            $surplusAmount = max(0, $totalPaidAmount - $request->net_total);
-            $remainingAmount = max(0, $request->net_total - $actualPaidOnThisBill);
+            $netPayable = max(0, (float)$request->net_total - (float)($request->extra_discount ?? 0));
+            $actualPaidOnThisBill = min($totalPaidAmount, $netPayable);
+            $surplusAmount        = max(0, $totalPaidAmount - $netPayable);
+            $remainingAmount      = max(0, $netPayable - $actualPaidOnThisBill);
+
+            // --- INVOICE NUMBER: ID-based generation (guaranteed unique, zero race conditions) ---
+            // Insert with a unique placeholder to get the auto-increment ID, then
+            // immediately derive the final invoice number from it. No locks needed.
 
             $sale = Sales::create([
                 'date'            => $request->date,
-                'invoice'         => $request->invoice ?? 'INV-' . time(),
+                'invoice'         => uniqid('SLS-TMP-', true), // unique temp; replaced below
                 'code'            => $request->code,
                 'type'            => $request->type ?? 'CREDIT',
                 'customer_id'     => $request->customer_id ?? 0,
@@ -280,6 +276,10 @@ class SalesController extends Controller implements HasMiddleware
                 'paid_amount'     => $actualPaidOnThisBill,
                 'remaining_amount' => $remainingAmount,
             ]);
+
+            // Auto-increment ID is now known — set final unique invoice number.
+            $sale->invoice = 'SLS-' . str_pad($sale->id, 6, '0', STR_PAD_LEFT);
+            $sale->save();
 
             // --- Wallet & Commission Logic ---
             if ($sale->salesman_id) {
@@ -609,13 +609,14 @@ class SalesController extends Controller implements HasMiddleware
             // Calculate updated totals
             $netTotal = (float) $request->net_total;
             $extraDiscount = (float) ($request->extra_discount ?? 0);
+            $netPayable = max(0, $netTotal - $extraDiscount);
             $existingPaid = (float) $sale->paid_amount;
             
             // Increment paid amount with NEW payments made during this edit
             $newTotalPaid = $existingPaid + $totalNewPaid;
             
-            $actualPaidOnThisBill = min($newTotalPaid, $netTotal);
-            $remainingAmount = max(0, $netTotal - $actualPaidOnThisBill);
+            $actualPaidOnThisBill = min($newTotalPaid, $netPayable);
+            $remainingAmount = max(0, $netPayable - $actualPaidOnThisBill);
 
             $sale->update([
                 'date'            => $request->date,
@@ -829,7 +830,7 @@ class SalesController extends Controller implements HasMiddleware
     //view
     public function view($id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->find($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine', 'firm')->find($id);
 
 
         // Get all returns for this sale

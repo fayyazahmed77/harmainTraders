@@ -61,7 +61,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $sales->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $sales->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, (net_total - extra_discount) as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchases = Purchase::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate]);
@@ -293,7 +293,7 @@ class ReportBuilder
         // Calculate sum of all transactions between fromDate and toDate
         // This is a simplified version that ignores the ID tie-breaking for now
 
-        $sales = Sales::where('customer_id', $accountId)->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
+        $sales = Sales::where('customer_id', $accountId)->whereBetween('date', [$fromDate, $toDate])->sum(DB::raw('net_total - extra_discount'));
         $purchases = Purchase::where('supplier_id', $accountId)->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
 
         $account = Account::find($accountId);
@@ -325,7 +325,7 @@ class ReportBuilder
         if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
             $salesQuery->where('salesman_id', $params['salemanId']);
         }
-        $sales = $salesQuery->sum('net_total');
+        $sales = $salesQuery->sum(DB::raw('net_total - extra_discount'));
 
         $purchasesQuery = Purchase::where('supplier_id', $accountId)->where('date', '<', $date);
         if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
@@ -1060,7 +1060,7 @@ class ReportBuilder
                 if (isset($filters['salemanId']) && $filters['salemanId'] !== 'ALL') {
                     $salesQuery->where('salesman_id', $filters['salemanId']);
                 }
-                $salesQuery->select('date', 'net_total as debit', DB::raw('0 as credit'));
+                $salesQuery->select('date', DB::raw('(net_total - extra_discount) as debit'), DB::raw('0 as credit'));
 
                 $purchasesQuery = DB::table('purchases')
                     ->where('supplier_id', $account->id)
@@ -1205,7 +1205,7 @@ class ReportBuilder
                 'customer_id' => $sale->customer_id,
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,
-                'bill_amt' => (float)$sale->net_total,
+                'bill_amt' => (float)$sale->net_total - (float)$sale->extra_discount,
                 'paid' => (float)$sale->paid_amount,
                 'remaining' => (float)$sale->remaining_amount,
                 'credit_days' => $agingDays,
@@ -1392,6 +1392,15 @@ class ReportBuilder
             ->whereBetween('sales.date', [$fromDate, $toDate])
             ->selectRaw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, 0)) as total_cogs')
             ->value('total_cogs') ?? 0;
+
+        $returnCogs = (float)DB::table('sales_return_items')
+            ->join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+            ->leftJoinSub($purchaseCostsSub, 'pc', 'sales_return_items.item_id', '=', 'pc.item_id')
+            ->whereBetween('sales_returns.date', [$fromDate, $toDate])
+            ->selectRaw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, 0)) as total_cogs')
+            ->value('total_cogs') ?? 0;
+
+        $cogs = max(0, $cogs - $returnCogs);
 
         $grossProfit = $netSales - $cogs;
 
@@ -1719,7 +1728,7 @@ class ReportBuilder
             'party_id' => $bill->{$partyRel . '_id'},
             'due_date' => $dueDate->format('Y-m-d'),
             'days' => $days,
-            'bill_amt' => (float)$bill->net_total,
+            'bill_amt' => (float)$bill->net_total - (float)($bill->extra_discount ?? 0),
             'paid' => (float)$bill->paid_amount,
             'remaining' => (float)$bill->remaining_amount,
             'credit_days' => $agingDays,

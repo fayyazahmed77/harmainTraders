@@ -894,4 +894,34 @@ class PurchaseController extends Controller implements HasMiddleware
 
         return response()->json($lastPurchase);
     }
+
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+        try {
+            $purchase = Purchase::with('items')->findOrFail($id);
+
+            // Revert Stock (Decrease stock by purchased and free units)
+            foreach ($purchase->items as $pi) {
+                $item = Items::find($pi->item_id);
+                if ($item) {
+                    $packing = $item->packing ?? 1;
+                    $freeUnits = (($pi->free_carton ?? 0) * $packing) + (($pi->free_pcs ?? 0));
+                    $totalToDeduct = $pi->total_pcs + $freeUnits;
+
+                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - $totalToDeduct));
+                }
+            }
+
+            // Delete Purchase items & Purchase
+            PurchaseItem::where('purchase_id', $id)->delete();
+            $purchase->delete();
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Purchase invoice deleted and stock reverted successfully!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error deleting purchase: ' . $e->getMessage());
+        }
+    }
 }

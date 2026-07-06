@@ -1,6 +1,7 @@
 // purchase_return/create.tsx
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
+import { toast } from "sonner";
 import { SuccessDialog } from "./components/SuccessDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,8 @@ interface RowData {
     bonus_full: number;
     bonus_pcs: number;
     has_bonus_available?: boolean;
+    already_returned_pcs?: number;
+    returnable_pcs?: number;
     // Intelligence Fields
     purchase_date?: string;
     purchase_invoice?: string;
@@ -494,12 +497,19 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         const taxableAmountForCalc = baseAmountForCalc - discVal;
                         const taxPercent = taxableAmountForCalc > 0 ? (taxVal / taxableAmountForCalc * 100) : 0;
 
+                        const alreadyReturnedPcs = toNum(pi.already_returned_pcs);
+                        const returnablePcs = pi.returnable_pcs !== undefined
+                            ? toNum(pi.returnable_pcs)
+                            : (s_full * packing + s_pcs) - alreadyReturnedPcs;
+                        const returnFull = Math.floor(returnablePcs / packing);
+                        const returnPcs = returnablePcs % packing;
+
                         return {
                             id: Math.random(),
                             item_id: pi.item_id,
                             item_title: it?.title ?? "",
-                            full: s_full,
-                            pcs: s_pcs,
+                            full: returnFull,
+                            pcs: returnPcs,
                             sold_full: s_full,
                             sold_pcs: s_pcs,
                             rate: rate,
@@ -510,6 +520,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                             bonus_full: 0,
                             bonus_pcs: 0,
                             has_bonus_available: true,
+                            already_returned_pcs: alreadyReturnedPcs,
+                            returnable_pcs: returnablePcs,
                             purchase_date: inv.date,
                             purchase_invoice: inv.invoice,
                             current_stock: toNum(it?.stock_1),
@@ -584,6 +596,10 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         const newRows = itemsToAdd.map(pi => {
             const it = pi.item;
             const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
+            const bAlready = toNum(pi.already_returned_pcs);
+            const bReturnable = pi.returnable_pcs !== undefined
+                ? toNum(pi.returnable_pcs)
+                : (toNum(pi.qty_carton) * packing + toNum(pi.qty_pcs)) - bAlready;
             return {
                 id: Math.random(),
                 item_id: pi.item_id,
@@ -600,6 +616,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 bonus_full: 0,
                 bonus_pcs: 0,
                 has_bonus_available: true,
+                already_returned_pcs: bAlready,
+                returnable_pcs: bReturnable,
                 purchase_date: pi.date,
                 purchase_invoice: pi.invoice_no,
                 current_stock: toNum(it?.stock_1),
@@ -644,29 +662,67 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const initializeWorkspace = () => setRows([getEmptyRow()]);
     const purgeWorkspace = () => setRows([getEmptyRow()]);
 
-    const updateRow = (id: number, field: keyof RowData, value: any) => {
-        setRows(prev => prev.map(r => {
-            if (r.id !== id) return r;
-            const updated = { ...r, [field]: value };
-            
-            // Quantity Validation Guardrails
-            if (field === 'full' || field === 'pcs') {
-                const packing = toNum(r.packing || 1);
-                const maxTotalPcs = toNum(r.sold_full) * packing + toNum(r.sold_pcs);
-                const currentTotalPcs = toNum(updated.full) * packing + toNum(updated.pcs);
+    const updateRowQty = (id: number, field: keyof RowData, value: any) => {
+        const row = rows.find(r => r.id === id);
+        if (!row) return;
 
-                if (maxTotalPcs > 0 && currentTotalPcs > maxTotalPcs) {
-                    // If it exceeds, we cap it for safety
-                    if (field === 'full') {
-                        updated.full = Math.floor(maxTotalPcs / packing);
-                        updated.pcs = maxTotalPcs % packing;
-                    } else {
-                        updated.pcs = maxTotalPcs - (toNum(updated.full) * packing);
-                    }
+        const packing = toNum(row.packing || 1);
+        let clampedValue = value;
+        let shouldWarn = false;
+        let warnMsg = '';
+
+        if (field === 'full' || field === 'pcs') {
+            const maxTotalPcs = row.returnable_pcs !== undefined
+                ? toNum(row.returnable_pcs)
+                : toNum(row.sold_full) * packing + toNum(row.sold_pcs);
+            const newFull = field === 'full' ? toNum(value) : toNum(row.full);
+            const newPcs  = field === 'pcs'  ? toNum(value) : toNum(row.pcs);
+            const currentTotalPcs = newFull * packing + newPcs;
+
+            if (maxTotalPcs > 0 && currentTotalPcs > maxTotalPcs) {
+                shouldWarn = true;
+                warnMsg = `Cannot exceed returnable qty (${maxTotalPcs} pcs) for ${row.item_title}.`;
+                if (field === 'full') {
+                    clampedValue = Math.floor(maxTotalPcs / packing);
+                } else {
+                    clampedValue = Math.max(0, maxTotalPcs - (toNum(row.full) * packing));
                 }
             }
-            return updated;
-        }));
+        }
+
+        if (field === 'bonus_full' || field === 'bonus_pcs') {
+            const maxBonus = row.returnable_pcs !== undefined
+                ? toNum(row.returnable_pcs)
+                : toNum(row.sold_full) * packing + toNum(row.sold_pcs);
+            const newBFull = field === 'bonus_full' ? toNum(value) : toNum(row.bonus_full);
+            const newBPcs  = field === 'bonus_pcs'  ? toNum(value) : toNum(row.bonus_pcs);
+            const currentBonus = newBFull * packing + newBPcs;
+
+            if (maxBonus > 0 && currentBonus > maxBonus) {
+                shouldWarn = true;
+                warnMsg = `Bonus qty cannot exceed returnable qty (${maxBonus} pcs) for ${row.item_title}.`;
+                if (field === 'bonus_full') {
+                    clampedValue = Math.floor(maxBonus / packing);
+                } else {
+                    clampedValue = Math.max(0, maxBonus - (toNum(row.bonus_full) * packing));
+                }
+            }
+        }
+
+        if (shouldWarn) {
+            toast.warning(warnMsg, { duration: 3000 });
+        }
+
+        setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: clampedValue } : r));
+    };
+
+    // Alias for non-qty field updates (rate, disc, etc.)
+    const updateRow = (id: number, field: keyof RowData, value: any) => {
+        if (['full', 'pcs', 'bonus_full', 'bonus_pcs'].includes(field as string)) {
+            updateRowQty(id, field, value);
+        } else {
+            setRows(prev => prev.map(r => r.id !== id ? r : { ...r, [field]: value }));
+        }
     };
 
     // ── Filtering logic ────────────────────────
@@ -1259,10 +1315,18 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                         <div className={`w-8 h-8 border-4 border-orange-500 border-t-transparent animate-spin ${PREMIUM_ROUNDING}`} />
                                         <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest animate-pulse">Scanning Registry...</div>
                                     </div>
-                                ) : filteredInvoices.map((inv, idx) => (
+                                ) : filteredInvoices.map((inv, idx) => {
+                                    const isFullyReturned = inv.status === 'Returned';
+                                    const isPartialReturn = inv.status === 'Partial Return';
+                                    return (
                                     <motion.button key={inv.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
-                                        className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-zinc-800 hover:border-orange-500 transition-all active:scale-[0.99] ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0`}
-                                        onClick={() => handleSelectInvoice(inv)}>
+                                        disabled={isFullyReturned}
+                                        className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group border transition-all active:scale-[0.99] ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0 ${
+                                            isFullyReturned
+                                                ? 'bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
+                                                : 'bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-zinc-800 hover:border-orange-500 cursor-pointer'
+                                        }`}
+                                        onClick={() => !isFullyReturned && handleSelectInvoice(inv)}>
                                         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                                             <div className="flex justify-between md:block items-center">
                                                 <div className="space-y-1">
@@ -1270,7 +1334,11 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                     <div className="text-lg font-black text-zinc-900 dark:text-white group-hover:text-orange-500 transition-colors tracking-tighter">{inv.invoice}</div>
                                                 </div>
                                                 <div className="md:hidden">
-                                                    <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'orange'} />
+                                                    {isFullyReturned
+                                                        ? <SignalBadge text="Full Return" type="red" />
+                                                        : isPartialReturn
+                                                            ? <SignalBadge text="Partial Return" type="orange" />
+                                                            : <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'blue'} />}
                                                 </div>
                                             </div>
                                             <div className="w-full md:w-px h-px md:h-8 bg-zinc-200 dark:bg-zinc-800" />
@@ -1280,7 +1348,11 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                     <div className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300">{fmtDate(inv.date)}</div>
                                                 </div>
                                                 <div className="hidden md:block">
-                                                    <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'orange'} />
+                                                    {isFullyReturned
+                                                        ? <SignalBadge text="Full Return" type="red" />
+                                                        : isPartialReturn
+                                                            ? <SignalBadge text="Partial Return" type="orange" />
+                                                            : <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'blue'} />}
                                                 </div>
                                             </div>
                                         </div>
@@ -1297,7 +1369,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                             <ChevronRight size={18} className="text-zinc-300 dark:text-zinc-700 group-hover:text-orange-500 transition-colors hidden md:block" />
                                         </div>
                                     </motion.button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </Card>
                     </DialogContent>
@@ -1332,25 +1405,39 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                             <div className="max-h-[450px] overflow-auto p-4 custom-scrollbar relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {filteredSupplierItems.map((pi, idx) => {
                                     const isLocked = activeAssignPurchaseId !== null && pi.purchase_id !== activeAssignPurchaseId;
+                                    const returnablePcs = pi.returnable_pcs !== undefined ? toNum(pi.returnable_pcs) : null;
+                                    const isFullyReturned = returnablePcs !== null && returnablePcs <= 0;
+                                    const isDisabled = isLocked || isFullyReturned;
                                     const isSelected = selectedAssignIds.includes(pi.id);
                                     return (
                                     <motion.div key={pi.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}
-                                        title={isLocked ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` : undefined}
+                                        title={
+                                            isFullyReturned ? 'This item has been fully returned already.' :
+                                            isLocked ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` : undefined
+                                        }
                                         className={`flex items-center gap-4 p-3 border ${
                                             isSelected ? 'border-orange-500 bg-orange-500/5' :
-                                            isLocked ? 'border-zinc-100 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30 opacity-40 cursor-not-allowed' :
+                                            isDisabled ? 'border-zinc-100 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30 opacity-40 cursor-not-allowed' :
                                             'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 cursor-pointer'
                                         } ${PREMIUM_ROUNDING_MD} transition-all group`}
-                                        onClick={() => !isLocked && toggleAssignSelection(pi)}>
+                                        onClick={() => !isDisabled && toggleAssignSelection(pi)}>
                                         <Checkbox
                                             checked={isSelected}
-                                            disabled={isLocked}
-                                            onCheckedChange={() => !isLocked && toggleAssignSelection(pi)}
+                                            disabled={isDisabled}
+                                            onCheckedChange={() => !isDisabled && toggleAssignSelection(pi)}
                                             className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500 disabled:opacity-30" />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="text-[11px] font-black text-zinc-900 dark:text-white uppercase truncate tracking-tighter">{pi.item?.title}</div>
-                                                <div className="text-[9px] font-mono font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">{pi.invoice_no}</div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {isFullyReturned && (
+                                                        <span className="text-[8px] font-black uppercase bg-rose-500/10 text-rose-600 border border-rose-500/20 px-1.5 py-0.5 rounded">Full Return</span>
+                                                    )}
+                                                    {!isFullyReturned && returnablePcs !== null && pi.already_returned_pcs > 0 && (
+                                                        <span className="text-[8px] font-black uppercase bg-orange-500/10 text-orange-600 border border-orange-500/20 px-1.5 py-0.5 rounded">{returnablePcs} Left</span>
+                                                    )}
+                                                    <div className="text-[9px] font-mono font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">{pi.invoice_no}</div>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-3 text-[11px] font-mono font-bold text-zinc-600">
                                                 <span>Rate: Rs {toNum(pi.last_trade_price ?? pi.item?.trade_price).toLocaleString()}</span>

@@ -20,7 +20,7 @@ class SupplierOrderController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view purchases', only: ['index', 'getItems', 'list', 'show', 'print']),
+            new Middleware('permission:view purchases', only: ['index', 'getItems', 'getAllItems', 'list', 'show', 'print']),
             new Middleware('permission:create purchases', only: ['store']),
         ];
     }
@@ -100,7 +100,8 @@ class SupplierOrderController extends Controller implements HasMiddleware
             ]);
 
         if ($mode === 'reorder') {
-            $query->whereRaw('FLOOR(((COALESCE(p.total_purchased, 0) - COALESCE(pr.total_purchase_returned, 0)) - (COALESCE(s.total_sold, 0) - COALESCE(sr.total_sales_returned, 0))) / COALESCE(items.packing_qty, 1)) <= items.reorder_level');
+            // Use stored stock_1/stock_2 values (same as Items List page) to filter
+            $query->whereRaw('(COALESCE(items.stock_1, 0) * COALESCE(items.packing_qty, 1)) + COALESCE(items.stock_2, 0) <= items.reorder_level * COALESCE(items.packing_qty, 1)');
         } else {
             // Sales Wise: Show all items with sales in the last 15 days, regardless of stock level
             // This ensures you never miss a fast-moving item even if it's above reorder level.
@@ -117,8 +118,11 @@ class SupplierOrderController extends Controller implements HasMiddleware
 
             $totalPcs = (int) $item->calculated_total_pcs;
             $packing = (int) ($item->packing_qty ?: 1);
-            $stock1 = floor($totalPcs / $packing);
-            $stock2 = $totalPcs % $packing;
+
+            // Use stored stock_1 / stock_2 directly — same source as the Items List page.
+            // This guarantees both pages always show identical stock values.
+            $stock1 = (int) ($item->stock_1 ?? 0);
+            $stock2 = (int) ($item->stock_2 ?? 0);
 
             $salesTotal = (int) $item->sales_15_days;
             $salesFull = floor($salesTotal / $packing);
@@ -222,6 +226,54 @@ class SupplierOrderController extends Controller implements HasMiddleware
             'message' => 'Order created successfully!',
             'order_id' => $orderId
         ]);
+    }
+
+    public function getAllItems()
+    {
+        // Calculate stock and intelligence for all items in the database
+        $purchased = DB::table('purchase_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchased'))->groupBy('item_id');
+        $sold = DB::table('sales_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sold'))->groupBy('item_id');
+        $purchaseReturned = DB::table('purchase_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchase_returned'))->groupBy('item_id');
+        $salesReturned = DB::table('sales_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sales_returned'))->groupBy('item_id');
+
+        $query = Items::with(['lastPurchaseItem.purchase.supplier'])
+            ->leftJoinSub($purchased, 'p', 'items.id', '=', 'p.item_id')
+            ->leftJoinSub($sold, 's', 'items.id', '=', 's.item_id')
+            ->leftJoinSub($purchaseReturned, 'pr', 'items.id', '=', 'pr.item_id')
+            ->leftJoinSub($salesReturned, 'sr', 'items.id', '=', 'sr.item_id')
+            ->select('items.*')
+            ->addSelect([
+                'calculated_total_pcs' => DB::raw('(COALESCE(p.total_purchased, 0) - COALESCE(pr.total_purchase_returned, 0)) - (COALESCE(s.total_sold, 0) - COALESCE(sr.total_sales_returned, 0))')
+            ]);
+
+        $items = $query->get();
+
+        $mapped = $items->map(function ($item) {
+            $lastPurchaseItem = $item->lastPurchaseItem;
+            $avgPurchaseRate = DB::table('purchase_items')->where('item_id', $item->id)->avg('trade_price');
+
+            $packing = (int) ($item->packing_qty ?: 1);
+            $stock1 = (int) ($item->stock_1 ?? 0);
+            $stock2 = (int) ($item->stock_2 ?? 0);
+
+            return [
+                'id' => $item->id,
+                'code' => $item->code,
+                'title' => $item->title,
+                'packing_qty' => $packing,
+                'stock_1' => $stock1, 
+                'stock_2' => $stock2, 
+                'reorder_level' => $item->reorder_level,
+                'last_purchase_rate' => (float) ($lastPurchaseItem?->trade_price ?? $item->trade_price),
+                'av_purchase_rate' => (float) ($avgPurchaseRate ? round($avgPurchaseRate, 2) : $item->trade_price),
+                'last_supplier' => $lastPurchaseItem?->purchase?->supplier?->title ?? null,
+                'last_purchase_date' => $lastPurchaseItem?->purchase?->date ?? null,
+                'last_qty_carton' => (int) ($lastPurchaseItem?->qty_carton ?? 0),
+                'last_qty_pcs' => (int) ($lastPurchaseItem?->qty_pcs ?? 0),
+            ];
+        });
+
+        return response()->json(['items' => $mapped]);
     }
 
     public function list()

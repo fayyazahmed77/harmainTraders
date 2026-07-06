@@ -91,6 +91,51 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'items.*.subtotal'        => 'required|numeric',
         ]);
 
+        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)->first();
+        if (!$purchase) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The selected original purchase invoice does not exist.'
+            ]);
+        }
+
+        // Validate item quantities and ensure they don't return more than purchased
+        foreach ($request->items as $it) {
+            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantities cannot be negative.'
+                ]);
+            }
+            
+            // Fetch original purchase item
+            $purchaseItem = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
+                ->where('item_id', $it['item_id'])
+                ->first();
+            if (!$purchaseItem) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Item was not purchased on the original purchase invoice.'
+                ]);
+            }
+
+            // Calculate already returned pieces for this item on this purchase
+            $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+                ->where('purchase_returns.original_invoice', $purchase->invoice)
+                ->where('purchase_return_items.item_id', $it['item_id'])
+                ->sum('purchase_return_items.total_pcs');
+            
+            $item = Items::find($it['item_id']);
+            $packing = $item->packing_qty ?: 1;
+            $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+            $totalToReturn = $it['total_pcs'] + $bonusUnits;
+
+            $maxReturnableQty = $purchaseItem->total_pcs - $alreadyReturnedPcs;
+
+            if ($totalToReturn > $maxReturnableQty) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantity for item ' . $item->title . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
+                ]);
+            }
+        }
+
         DB::beginTransaction();
 
         try {
@@ -127,17 +172,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 // DECREASE Stock for Purchase Returns (We are giving items back)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = (float)($item->packing_full ?? 1);
+                    $packing = (float)($item->packing_qty ?? 1);
                     $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalReturnPcs;
-                    $item->save();
+                    $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
                 }
             }
 
-            // ─────────────────────────────────────────────────────────────────────────────
-            // Update Purchase Status & Financials
-            // ─────────────────────────────────────────────────────────────────────────────
-            $this->updatePurchaseStatusAndBalance($request->original_invoice);
+            $allocationService = new \App\Services\FIFOAllocationService();
+            $allocationService->allocatePurchaseReturn($return, $return->net_total - $return->paid_amount);
 
             if ($request->paid_amount > 0) {
                 $count = Payment::where('type', 'RECEIPT')->count() + 1;
@@ -157,6 +199,9 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ]);
             }
 
+            // Log activity
+            \App\Services\ActivityLogger::log('created', 'Purchase Return', "Created purchase return {$return->invoice} for supplier ID {$request->supplier_id}");
+
             DB::commit();
             return redirect()->back()->with('success', 'Purchase Return saved successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
@@ -174,8 +219,8 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         
         $purchase = Purchase::where('invoice', $invoiceNo)->first();
         if ($purchase) {
-            // Calculate Total Returns for this invoice
-            $totalReturns = PurchaseReturn::where('original_invoice', $invoiceNo)->sum('net_total');
+            // Calculate Total Returns for this invoice from allocations
+            $totalReturns = \App\Models\PurchaseReturnAllocation::where('purchase_id', $purchase->id)->sum('amount');
             
             // Calculate Total Payments for this invoice
             $totalPayments = PaymentAllocation::where('bill_id', $purchase->id)
@@ -183,15 +228,17 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ->sum('amount');
 
             // Remaining = Net - (Payments + Returns)
-            $purchase->remaining_amount = $purchase->net_total - ($totalPayments + $totalReturns);
+            $purchase->remaining_amount = max(0, $purchase->net_total - ($totalPayments + $totalReturns));
             
             // Status Logic
-            if ($totalReturns >= $purchase->net_total) {
-                $purchase->status = 'Returned';
+            if ($purchase->remaining_amount <= 0.005) {
+                $purchase->status = ($totalReturns >= $purchase->net_total) ? 'Returned' : 'Paid';
             } elseif ($totalReturns > 0) {
                 $purchase->status = 'Partial Return';
+            } elseif ($totalPayments > 0) {
+                $purchase->status = 'Partial';
             } else {
-                $purchase->status = 'Active';
+                $purchase->status = 'Completed';
             }
             
             $purchase->save();
@@ -236,17 +283,26 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 return response()->json(['error' => 'Invoice not found'], 404);
             }
 
-            $items = $purchase->items->map(function ($pi) {
+            $items = $purchase->items->map(function ($pi) use ($purchase) {
+                $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+                    ->where('purchase_returns.original_invoice', $purchase->invoice)
+                    ->where('purchase_return_items.item_id', $pi->item_id)
+                    ->sum('purchase_return_items.total_pcs');
+
                 return [
-                    'item_id'     => $pi->item_id,
-                    'item'        => $pi->item,
-                    'qty_carton'  => $pi->qty_carton,
-                    'qty_pcs'     => $pi->qty_pcs,
-                    'total_pcs'   => $pi->total_pcs,
-                    'trade_price' => $pi->trade_price,
-                    'discount'    => $pi->discount,
-                    'gst_amount'  => $pi->gst_amount,
-                    'subtotal'    => $pi->subtotal,
+                    'item_id'              => $pi->item_id,
+                    'item'                 => $pi->item,
+                    'qty_carton'           => $pi->qty_carton,
+                    'qty_pcs'              => $pi->qty_pcs,
+                    'total_pcs'            => $pi->total_pcs,
+                    'already_returned_pcs' => (int) $alreadyReturnedPcs,
+                    'returnable_pcs'       => max(0, $pi->total_pcs - (int) $alreadyReturnedPcs),
+                    'trade_price'          => $pi->trade_price,
+                    'discount'             => $pi->discount,
+                    'gst_amount'           => $pi->gst_amount,
+                    'subtotal'             => $pi->subtotal,
+                    'bonus_carton'         => $pi->bonus_qty_carton,
+                    'bonus_pcs'            => $pi->bonus_qty_pcs,
                 ];
             });
 
@@ -275,6 +331,11 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ->with(['item', 'purchase:id,invoice,date'])
                 ->get()
                 ->map(function ($pi) {
+                    $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+                        ->where('purchase_returns.original_invoice', $pi->purchase->invoice)
+                        ->where('purchase_return_items.item_id', $pi->item_id)
+                        ->sum('purchase_return_items.total_pcs');
+
                     return [
                         'id'               => $pi->id,
                         'purchase_id'      => $pi->purchase_id,
@@ -285,9 +346,13 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                         'qty_carton'       => $pi->qty_carton,
                         'qty_pcs'          => $pi->qty_pcs,
                         'total_pcs'        => $pi->total_pcs,
+                        'already_returned_pcs' => (int) $alreadyReturnedPcs,
+                        'returnable_pcs'       => max(0, $pi->total_pcs - (int) $alreadyReturnedPcs),
                         'last_trade_price' => $pi->trade_price,
                         'gst_amount'       => $pi->gst_amount,
                         'discount'         => $pi->discount,
+                        'bonus_carton'     => $pi->bonus_qty_carton,
+                        'bonus_pcs'        => $pi->bonus_qty_pcs,
                     ];
                 });
 
@@ -337,8 +402,53 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
             'net_total'       => 'required|numeric',
-            'items'           => 'required|array',
         ]);
+
+        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)->first();
+        if (!$purchase) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'original_invoice' => 'The selected original purchase invoice does not exist.'
+            ]);
+        }
+
+        // Validate item quantities and ensure they don't return more than purchased
+        foreach ($request->items as $it) {
+            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantities cannot be negative.'
+                ]);
+            }
+            
+            // Fetch original purchase item
+            $purchaseItem = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
+                ->where('item_id', $it['item_id'])
+                ->first();
+            if (!$purchaseItem) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Item was not purchased on the original purchase invoice.'
+                ]);
+            }
+
+            // Calculate already returned pieces (excluding this return instance)
+            $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+                ->where('purchase_returns.original_invoice', $purchase->invoice)
+                ->where('purchase_returns.id', '!=', $id) // Exclude current return
+                ->where('purchase_return_items.item_id', $it['item_id'])
+                ->sum('purchase_return_items.total_pcs');
+            
+            $item = Items::find($it['item_id']);
+            $packing = $item->packing_qty ?: 1;
+            $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
+            $totalToReturn = $it['total_pcs'] + $bonusUnits;
+
+            $maxReturnableQty = $purchaseItem->total_pcs - $alreadyReturnedPcs;
+
+            if ($totalToReturn > $maxReturnableQty) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantity for item ' . $item->title . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
+                ]);
+            }
+        }
 
         DB::beginTransaction();
 
@@ -352,15 +462,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $packing = (float)($item->packing_full ?? 1);
+                    $packing = (float)($item->packing_qty ?? 1);
                     $totalRevertPcs = (float)($oldItem->total_pcs) + ((float)($oldItem->bonus_qty_carton ?? 0) * $packing) + (float)($oldItem->bonus_qty_pcs ?? 0);
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $totalRevertPcs;
-                    $item->save();
+                    $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
                 }
             }
 
-            // 2. Revert Original Invoice Balance & Status
-            $this->updatePurchaseStatusAndBalance($oldOriginalInvoice);
+            $allocationService = new \App\Services\FIFOAllocationService();
+            $allocationService->rollbackPurchaseReturn($return);
 
             // 3. Update Return Record
             $return->update([
@@ -398,15 +507,13 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 // Update Stock (Decrease for Purchase Return)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = (float)($item->packing_full ?? 1);
+                    $packing = (float)($item->packing_qty ?? 1);
                     $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
-                    $item->stock_1 = ($item->stock_1 ?? 0) - $totalReturnPcs;
-                    $item->save();
+                    $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
                 }
             }
 
-            // 5. Update New Original Invoice Balance & Status
-            $this->updatePurchaseStatusAndBalance($request->original_invoice);
+            $allocationService->allocatePurchaseReturn($return, $return->net_total - $request->paid_amount);
 
             // 6. Sync Refund Payment
             $refundPayment = Payment::where('remarks', 'like', "%Refund for Purchase Return Invoice: {$return->invoice}%")
@@ -442,6 +549,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $refundPayment->update(['cheque_status' => 'Canceled']);
             }
 
+            \App\Services\ActivityLogger::log('updated', 'Purchase Return', "Updated purchase return {$return->invoice}");
             DB::commit();
             return redirect()->back()->with('success', 'Purchase Return updated successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
@@ -465,15 +573,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             foreach ($returnItems as $ri) {
                 $item = Items::find($ri->item_id);
                 if ($item) {
-                    $packing = (float)($item->packing_full ?? 1);
+                    $packing = (float)($item->packing_qty ?? 1);
                     $totalRevertPcs = (float)($ri->total_pcs) + ((float)($ri->bonus_qty_carton ?? 0) * $packing) + (float)($ri->bonus_qty_pcs ?? 0);
-                    $item->stock_1 = ($item->stock_1 ?? 0) + $totalRevertPcs;
-                    $item->save();
+                    $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
                 }
             }
 
-            // 3. Revert Original Invoice Balance & Status
-            $this->updatePurchaseStatusAndBalance($originalInvoice);
+            $allocationService = new \App\Services\FIFOAllocationService();
+            $allocationService->rollbackPurchaseReturn($return);
 
             // 4. Sync Refund Payment (Cancel it)
             $refundPayment = Payment::where('remarks', 'like', "%Refund for Purchase Return Invoice: {$return->invoice}%")
@@ -488,6 +595,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             PurchaseReturnItem::where('purchase_return_id', $id)->delete();
             $return->delete();
 
+            \App\Services\ActivityLogger::log('deleted', 'Purchase Return', "Deleted purchase return {$return->invoice}");
             DB::commit();
             return redirect()->back()->with('success', 'Purchase Return deleted and stock/balances reverted successfully!');
         } catch (\Exception $e) {

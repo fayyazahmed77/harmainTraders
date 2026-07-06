@@ -365,6 +365,7 @@ Route::middleware(['auth'])->group(function () {
     });
     //--------------------------------------------Payments-----------------------------------------------
     Route::prefix('/payments')->group(function () {
+        Route::get('/unpaid-invoices', [PaymentController::class, 'unpaidInvoices'])->name('payments.unpaid-invoices');
         Route::get('/', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('/create', [PaymentController::class, 'create'])->name('payments.create');
         Route::post('/', [PaymentController::class, 'store'])->name('payments.store');
@@ -504,6 +505,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payment/available-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCheques'])->name('payment.available-cheques');
     Route::get('/payment/available-customer-cheques', [App\Http\Controllers\PaymentController::class, 'getAvailableCustomerCheques'])->name('payment.available-customer-cheques');
     Route::get('/payment/bill-items', [App\Http\Controllers\PaymentController::class, 'getBillItems'])->name('payment.bill-items');
+    Route::get('/payment/available-credits/{customerId}', [App\Http\Controllers\PaymentController::class, 'getAvailableCredits'])->name('payment.available-credits');
+    Route::post('/payment/refund-credit', [App\Http\Controllers\PaymentController::class, 'refundCredit'])->name('payment.refund-credit');
 
     // ============================================================================
     // INVESTOR PANEL ROUTES
@@ -570,6 +573,7 @@ Route::middleware(['auth'])->group(function () {
         // Supplier Orders
         Route::get('/supplier-order', [SupplierOrderController::class, 'index'])->name('admin.supplier-order.index');
         Route::post('/api/supplier-order/items', [SupplierOrderController::class, 'getItems']);
+        Route::get('/api/supplier-order/all-items', [SupplierOrderController::class, 'getAllItems']);
         Route::post('/api/supplier-order/store', [SupplierOrderController::class, 'store']);
         Route::get('/supplier-order/list', [SupplierOrderController::class, 'list'])->name('admin.supplier-order.list');
         Route::get('/supplier-order/{id}/show', [SupplierOrderController::class, 'show'])->name('admin.supplier-order.show');

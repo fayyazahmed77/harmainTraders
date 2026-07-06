@@ -87,6 +87,14 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
     return new Date().toISOString().split('T')[0];
   };
 
+  // Fix 4: Format purchase date as "4 July 2026"
+  const formatPurchaseDate = (dateStr: string | null): string => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr + 'T00:00:00'); // prevent timezone shift
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const [salesStartDate, setSalesStartDate] = useState(getFifteenDaysAgo());
 
   const salesDaysCount = useMemo(() => {
@@ -108,6 +116,61 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [filterMode, setFilterMode] = useState<'reorder' | 'sales'>('reorder');
+
+  const [isItemManualDialogOpen, setIsItemManualDialogOpen] = useState(false);
+  const [allItemsList, setAllItemsList] = useState<OrderItem[]>([]);
+  const [itemSearchQuery, setItemSearchQuery] = useState("");
+  const [isLoadingAllItems, setIsLoadingAllItems] = useState(false);
+
+  // Fetch all items when the dialog opens
+  useEffect(() => {
+    if (isItemManualDialogOpen) {
+      setIsLoadingAllItems(true);
+      axios.get('/admin/api/supplier-order/all-items')
+        .then(response => {
+          setAllItemsList(response.data.items);
+        })
+        .catch(err => {
+          console.error("Failed to load all items", err);
+        })
+        .finally(() => {
+          setIsLoadingAllItems(false);
+        });
+    }
+  }, [isItemManualDialogOpen]);
+
+  // F2 keybind
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setIsItemManualDialogOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const selectItemManually = (item: any) => {
+    if (orderItems.some(oi => oi.id === item.id)) {
+      return;
+    }
+    const reorderLevel = Number(item.reorder_level || 0);
+    const stockFull = Number(item.stock_1 || 0);
+    const shortageFull = Math.max(0, reorderLevel - stockFull);
+    
+    const newOrderItem: OrderItem = {
+      ...item,
+      input_full: shortageFull,
+      input_pcs: 0,
+      input_b_full: 0,
+      input_b_pcs: 0,
+      disc_percent: 0,
+    };
+    
+    setOrderItems(prev => [...prev, newOrderItem]);
+    setSelectedRowId(item.id);
+  };
 
   // Time effect
   useEffect(() => {
@@ -146,14 +209,22 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
         sales_start_date: salesStartDate
       });
       
-      const newItems = response.data.items.map((item: any) => ({
-        ...item,
-        input_full: Math.max(0, Number(item.reorder_level || 0) - Number(item.stock_1 || 0)),
-        input_pcs: 0,
-        input_b_full: 0,
-        input_b_pcs: 0,
-        disc_percent: 0,
-      }));
+      const newItems = response.data.items.map((item: any) => {
+        // Fix 5: Negative stock is treated as additional deficit.
+        // e.g. reorder_level=10, stock_1=-20 → 10 - (-20) = 30
+        // e.g. reorder_level=10, stock_1=0  → 10 - 0 = 10
+        const reorderLevel = Number(item.reorder_level || 0);
+        const stockFull   = Number(item.stock_1 || 0);
+        const inputFull   = Math.max(0, reorderLevel - stockFull);
+        return {
+          ...item,
+          input_full: inputFull,
+          input_pcs: 0,
+          input_b_full: 0,
+          input_b_pcs: 0,
+          disc_percent: 0,
+        };
+      });
       setOrderItems(newItems);
       if (newItems.length > 0) {
         const stillExists = newItems.some((item: any) => item.id === selectedRowId);
@@ -215,7 +286,10 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
 
   const handleMakeReorderLevel = () => {
     setOrderItems(prev => prev.map(item => {
-      const shortageFull = Math.max(0, Number(item.reorder_level || 0) - Number(item.stock_1 || 0));
+      // Fix 5 (same formula as loadItems): negative stock = additional deficit
+      const reorderLevel = Number(item.reorder_level || 0);
+      const stockFull   = Number(item.stock_1 || 0);
+      const shortageFull = Math.max(0, reorderLevel - stockFull);
       return {
         ...item,
         input_full: shortageFull,
@@ -573,6 +647,15 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </Button>
+                <Button 
+                  onClick={() => setIsItemManualDialogOpen(true)}
+                  variant="outline"
+                  size="sm" 
+                  className="h-8 border-orange-500/50 hover:bg-orange-500/10 text-orange-500 text-[10px] font-black uppercase tracking-widest gap-2"
+                >
+                  <ListPlus size={14} />
+                  Select Item (F2)
+                </Button>
               </div>
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
@@ -615,7 +698,8 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Pur. Date</span>
-                    <span className="text-xs font-mono text-zinc-500 font-bold">{selectedItem.last_purchase_date || 'N/A'}</span>
+                    {/* Fix 4: Format as "4 July 2026" */}
+                    <span className="text-xs font-mono text-zinc-500 font-bold">{formatPurchaseDate(selectedItem.last_purchase_date)}</span>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Qty</span>
@@ -633,8 +717,16 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Available Qty</span>
-                    <span className="text-xs font-mono text-emerald-400 font-bold">
-                      {selectedItem.stock_1} <span className="text-[9px] text-emerald-500/50 font-sans">Full</span>, {selectedItem.stock_2} <span className="text-[9px] text-emerald-500/50 font-sans">Pcs</span>
+                    {/* Fix 2: Conditional color + NEG badge for negative stock */}
+                    <span className={`text-xs font-mono font-bold flex items-center gap-1 flex-wrap ${
+                      selectedItem.stock_1 < 0 ? 'text-red-400' : selectedItem.stock_1 === 0 ? 'text-zinc-400' : 'text-emerald-400'
+                    }`}>
+                      {selectedItem.stock_1 < 0 && (
+                        <span className="text-[8px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded font-black tracking-widest">NEG</span>
+                      )}
+                      {selectedItem.stock_1} <span className="text-[9px] font-sans opacity-60">Full</span>,{' '}
+                      <span className={selectedItem.stock_2 < 0 ? 'text-red-400' : 'inherit'}>{selectedItem.stock_2}</span>{' '}
+                      <span className="text-[9px] font-sans opacity-60">Pcs</span>
                     </span>
                   </div>
                   <div className="flex flex-col gap-1 border-l border-zinc-800 pl-4">
@@ -648,7 +740,17 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                   </div>
                   <div className="flex flex-col gap-1 border-l border-zinc-100 dark:border-zinc-800 pl-4">
                     <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Last Supplier</span>
-                    <span className="text-xs text-zinc-900 dark:text-zinc-300 font-bold truncate max-w-[120px]">{selectedItem.last_supplier || 'N/A'}</span>
+                    {/* Fix 1: Remove truncate — use break-words + title tooltip for full name */}
+                    {selectedItem.last_supplier ? (
+                      <span
+                        className="text-xs text-zinc-900 dark:text-zinc-300 font-bold break-words max-w-[150px] leading-tight"
+                        title={selectedItem.last_supplier}
+                      >
+                        {selectedItem.last_supplier}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-500 italic font-normal">N/A</span>
+                    )}
                   </div>
                  
                 </div>
@@ -698,6 +800,125 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                     Print Order
                   </Button>
                 </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Manual Item Selection Dialog */}
+          <Dialog open={isItemManualDialogOpen} onOpenChange={setIsItemManualDialogOpen}>
+            <DialogContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 sm:max-w-6xl max-h-[85vh] flex flex-col p-6">
+              <DialogHeader className="pb-4 border-b border-zinc-200 dark:border-zinc-800">
+                <DialogTitle className="text-sm font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                  <ListPlus className="text-orange-500" size={16} />
+                  Select Items Manually
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="py-4 flex flex-col gap-4 flex-1 min-h-0">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <Input 
+                    placeholder="Search by product name or code..." 
+                    value={itemSearchQuery}
+                    onChange={e => setItemSearchQuery(e.target.value)}
+                    className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 pl-10 text-sm h-11 focus-visible:ring-orange-500/50 text-zinc-900 dark:text-zinc-100 font-medium"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Table Container */}
+                <div className="flex-1 overflow-auto border border-zinc-200 dark:border-zinc-800 rounded-lg custom-scrollbar min-h-0 bg-zinc-50/30 dark:bg-zinc-950/20">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-white dark:bg-zinc-900 z-10 border-b border-zinc-200 dark:border-zinc-800 shadow-sm">
+                      <tr>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Item Name</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[15%]">Last Pur. Rate</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[20%]">Available Qty</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[15%]">Re-Order Lvl</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-center text-zinc-400 dark:text-zinc-500 w-[15%]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+                      {isLoadingAllItems ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-12 text-center text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                            <span className="animate-pulse">Loading items catalog...</span>
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const filtered = allItemsList.filter(item => {
+                          const title = (item.title || "").toLowerCase();
+                          const code = (item.code || "").toLowerCase();
+                          const q = itemSearchQuery.toLowerCase();
+                          return title.includes(q) || code.includes(q);
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={5} className="px-4 py-12 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                                No items match your search
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map(item => {
+                          const isAlreadyAdded = orderItems.some(oi => oi.id === item.id);
+                          return (
+                            <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                              <td className="px-4 py-2.5">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-200">{item.title}</span>
+                                  <span className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">{item.code} • Pk: {item.packing_qty}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                                Rs {Number(item.last_purchase_rate || 0).toFixed(2)}
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-xs font-mono">
+                                <span className={`font-bold ${item.stock_1 < 0 ? 'text-red-500' : item.stock_1 === 0 ? 'text-zinc-500' : 'text-emerald-500'}`}>
+                                  {item.stock_1 < 0 ? 'NEG ' : ''}{item.stock_1}F, {item.stock_2}P
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-center text-xs font-mono font-bold text-rose-500 dark:text-rose-400">
+                                {item.reorder_level} F
+                              </td>
+                              <td className="px-4 py-2.5 text-center">
+                                {isAlreadyAdded ? (
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                                    Added
+                                  </span>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => selectItemManually(item)}
+                                    className="h-7 bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3"
+                                  >
+                                    Select
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  Tip: F2 key toggles this dialog
+                </span>
+                <Button 
+                  onClick={() => setIsItemManualDialogOpen(false)}
+                  className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-black uppercase tracking-widest h-9"
+                >
+                  Close
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

@@ -70,6 +70,8 @@ interface RowData {
     bonus_full: number;
     bonus_pcs: number;
     has_bonus_available?: boolean;
+    already_returned_pcs?: number;
+    returnable_pcs?: number;
     // Intelligence Fields
     sales_date?: string;
     sales_invoice?: string;
@@ -415,6 +417,53 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     });
 
     const [rows, setRows] = useState<RowData[]>([getEmptyRow()]);
+
+    const updateRowQty = (rowId: number, field: 'full' | 'pcs' | 'bonus_full' | 'bonus_pcs', val: number) => {
+        const row = rows.find(r => r.id === rowId);
+        if (!row) return;
+
+        const packing = toNum(row.packing) || 1;
+        const soldTotal = (toNum(row.sold_full) * packing) + toNum(row.sold_pcs);
+        const returnablePcs = row.returnable_pcs !== undefined ? toNum(row.returnable_pcs) : soldTotal;
+        
+        let proposedFull = field === 'full' ? val : toNum(row.full);
+        let proposedPcs = field === 'pcs' ? val : toNum(row.pcs);
+        let proposedBonusFull = field === 'bonus_full' ? val : toNum(row.bonus_full);
+        let proposedBonusPcs = field === 'bonus_pcs' ? val : toNum(row.bonus_pcs);
+        
+        const proposedMainPcs = (proposedFull * packing) + proposedPcs;
+        const proposedBonusPcsTotal = (proposedBonusFull * packing) + proposedBonusPcs;
+        const proposedTotal = proposedMainPcs + proposedBonusPcsTotal;
+        
+        if (proposedTotal > returnablePcs) {
+            toast.warning(`Total quantity (incl. bonus) exceeds returnable limit of ${returnablePcs} Pcs for ${row.item_title}`);
+            const otherFieldsPcs = returnablePcs - (
+                (field === 'full' || field === 'pcs') ? proposedBonusPcsTotal : proposedMainPcs
+            );
+            const allowedPcs = Math.max(0, otherFieldsPcs);
+            
+            if (field === 'full') {
+                proposedFull = Math.floor(allowedPcs / packing);
+                proposedPcs = Math.min(proposedPcs, allowedPcs - (proposedFull * packing));
+            } else if (field === 'pcs') {
+                proposedPcs = Math.max(0, allowedPcs - (proposedFull * packing));
+            } else if (field === 'bonus_full') {
+                proposedBonusFull = Math.floor(allowedPcs / packing);
+                proposedBonusPcs = Math.min(proposedBonusPcs, allowedPcs - (proposedBonusFull * packing));
+            } else if (field === 'bonus_pcs') {
+                proposedBonusPcs = Math.max(0, allowedPcs - (proposedBonusFull * packing));
+            }
+        }
+
+        setRows(prev => prev.map(r => r.id === rowId ? {
+            ...r,
+            full: proposedFull,
+            pcs: proposedPcs,
+            bonus_full: proposedBonusFull,
+            bonus_pcs: proposedBonusPcs
+        } : r));
+    };
+
     const [selectedRowItemId, setSelectedRowItemId] = useState<number | null>(null);
     const [rowSearchMap, setRowSearchMap] = useState<Record<number, string>>({});
     const [rowPopoverOpen, setRowPopoverOpen] = useState<Record<number, boolean>>({});
@@ -489,12 +538,14 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
                         const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
 
+                        const returnablePcs = toNum(si.returnable_pcs ?? si.total_pcs);
+
                         return {
                             id: Math.random(),
                             item_id: si.item_id,
                             item_title: si.item?.title ?? "",
-                            full: s_full, // Auto-load qty
-                            pcs: s_pcs,   // Auto-load qty
+                            full: Math.min(s_full, Math.floor(returnablePcs / packing)),
+                            pcs: Math.min(s_pcs, returnablePcs % packing),
                             sold_full: s_full,
                             sold_pcs: s_pcs,
                             rate: rate,
@@ -507,6 +558,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             bonus_full: 0,
                             bonus_pcs: 0,
                             has_bonus_available: toNum(si.bonus_carton) > 0 || toNum(si.bonus_pcs) > 0,
+                            already_returned_pcs: toNum(si.already_returned_pcs),
+                            returnable_pcs: returnablePcs,
                             sales_date: inv.date,
                             sales_invoice: inv.invoice,
                             current_stock: toNum(si.item?.stock_1),
@@ -561,6 +614,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             bonus_full: 0,
             bonus_pcs: 0,
             has_bonus_available: toNum(found.bonus_carton) > 0 || toNum(found.bonus_pcs) > 0,
+            already_returned_pcs: toNum(found.already_returned_pcs),
+            returnable_pcs: toNum(found.returnable_pcs ?? found.total_pcs),
             salesman: salemans.find(s => s.id === (selectedAccount?.saleman_id || found.salesman_id))?.name || "N/A",
         } : r));
         setFocusedRowId(rowId);
@@ -606,6 +661,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                 bonus_full: 0,
                 bonus_pcs: 0,
                 has_bonus_available: toNum(ci.bonus_carton) > 0 || toNum(ci.bonus_pcs) > 0,
+                already_returned_pcs: toNum(ci.already_returned_pcs),
+                returnable_pcs: toNum(ci.returnable_pcs ?? ci.total_pcs),
                 salesman: salemans.find(s => s.id === (selectedAccount?.saleman_id || ci.salesman_id))?.name || "N/A",
             };
         });
@@ -905,7 +962,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
                                                     <div className="space-y-0.5">
                                                         <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Outstanding</div>
-                                                        <div className="text-orange-600 dark:text-orange-500 font-black">Rs {toNum(selectedInvoice.remaining_amount).toLocaleString()}</div>
+                                                        <div className="text-orange-600 dark:text-orange-500 font-black">Rs {toNum(selectedInvoice.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                                     </div>
                                                 </div>
                                             )}
@@ -960,7 +1017,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                             {/* Manifest Qty (Sold) */}
                                             <div className={`${hasAnyBonus ? 'col-span-1' : 'col-span-2'}`}>
-                                                <div className="text-center font-mono text-[10px] font-bold text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800 tracking-tight">
+                                                <div className="text-center font-mono text-[12px] font-bold text-red-400 bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800 tracking-tight">
                                                     {row.sold_full}<span className="text-[8px] opacity-50">F</span> | {row.sold_pcs}<span className="text-[8px] opacity-50">P</span>
                                                 </div>
                                             </div>
@@ -971,13 +1028,13 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     <div className="col-span-1">
                                                         <Input type="number" value={row.bonus_full || ""}
                                                             onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                            onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_full: toNum(e.target.value) } : r))}
+                                                            onChange={e => updateRowQty(row.id, 'bonus_full', toNum(e.target.value))}
                                                             className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
                                                     </div>
                                                     <div className="col-span-1">
                                                         <Input type="number" value={row.bonus_pcs || ""}
                                                             onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                            onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_pcs: toNum(e.target.value) } : r))}
+                                                            onChange={e => updateRowQty(row.id, 'bonus_pcs', toNum(e.target.value))}
                                                             className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
                                                     </div>
                                                 </>
@@ -986,13 +1043,13 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             <div className="col-span-1">
                                                 <Input type="number" value={row.full || ""}
                                                     onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
+                                                    onChange={e => updateRowQty(row.id, 'full', toNum(e.target.value))}
                                                     className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="FULL" />
                                             </div>
                                             <div className="col-span-1">
                                                 <Input type="number" value={row.pcs || ""}
                                                     onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
+                                                    onChange={e => updateRowQty(row.id, 'pcs', toNum(e.target.value))}
                                                     className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="PCS" />
                                             </div>
 
@@ -1024,7 +1081,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                             {/* Total Position */}
                                             <div className="col-span-1 text-right">
-                                                <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                                <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                             </div>
 
                                             {/* Action Column */}
@@ -1123,10 +1180,10 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             <div className="flex items-center gap-1">
                                                 <Input type="number" placeholder="F" value={row.full || ""}
                                                     onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
+                                                    onChange={e => updateRowQty(row.id, 'full', toNum(e.target.value))} className="h-9 text-xs font-black text-center" />
                                                 <Input type="number" placeholder="P" value={row.pcs || ""}
                                                     onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                    onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center" />
+                                                    onChange={e => updateRowQty(row.id, 'pcs', toNum(e.target.value))} className="h-9 text-xs font-black text-center" />
                                             </div>
                                         </div>
 
@@ -1136,10 +1193,10 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 <div className="flex items-center gap-1">
                                                     <Input type="number" placeholder="F" value={row.bonus_full || ""}
                                                         onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_full: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
+                                                        onChange={e => updateRowQty(row.id, 'bonus_full', toNum(e.target.value))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
                                                     <Input type="number" placeholder="P" value={row.bonus_pcs || ""}
                                                         onFocus={() => { setFocusedRowId(row.id); setSelectedRowItemId(row.item_id); }}
-                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, bonus_pcs: toNum(e.target.value) } : r))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
+                                                        onChange={e => updateRowQty(row.id, 'bonus_pcs', toNum(e.target.value))} className="h-9 text-xs font-black text-center border-emerald-500/30" />
                                                 </div>
                                             </div>
                                         )}
@@ -1171,7 +1228,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                     <div className="flex justify-between items-center pt-1 border-t border-zinc-50 dark:border-zinc-800/50">
                                         <div className="text-[9px] font-black uppercase text-zinc-400">Position Net</div>
-                                        <div className="text-sm font-black text-zinc-800 dark:text-zinc-100 italic">Rs {row.amount.toLocaleString()}</div>
+                                        <div className="text-sm font-black text-zinc-800 dark:text-zinc-100 italic">Rs {row.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                     </div>
                                 </Card>
                             ))}
@@ -1190,11 +1247,11 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-0.5">
                                             <div className="text-[9px] uppercase font-bold text-zinc-500">Position Net</div>
-                                            <div className="text-lg font-black italic">Rs {totals.gross.toLocaleString()}</div>
+                                            <div className="text-lg font-black italic">Rs {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                         </div>
                                         <div className="text-right space-y-0.5">
                                             <div className="text-[9px] uppercase font-bold text-zinc-500 text-orange-600 dark:text-orange-400">Net Refund</div>
-                                            <div className="text-lg font-black text-orange-600 dark:text-orange-400 italic">Rs {totals.net.toLocaleString()}</div>
+                                            <div className="text-lg font-black text-orange-600 dark:text-orange-400 italic">Rs {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
@@ -1204,7 +1261,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         </div>
                                         <div className="text-right space-y-1">
                                             <div className="text-[9px] font-black uppercase text-zinc-400">Tax Impact</div>
-                                            <div className="text-xs font-bold text-rose-500">Rs {totals.tax.toLocaleString()}</div>
+                                            <div className="text-xs font-bold text-rose-500">Rs {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                         </div>
                                     </div>
                                 </Card>
@@ -1251,7 +1308,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             </div>
                                             <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
                                                 <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
-                                                {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </div>
                                         </div>
 
@@ -1264,7 +1321,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     Tax Impact
                                                 </div>
                                                 <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    + {totals.tax.toLocaleString()}
+                                                    + {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                 </div>
                                             </div>
                                             <div className="space-y-0.5 text-right">
@@ -1273,7 +1330,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     Disc. Total
                                                 </div>
                                                 <div className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
-                                                    - {totals.disc.toLocaleString()}
+                                                    - {totals.disc.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                                 </div>
                                             </div>
                                         </div>
@@ -1285,7 +1342,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             </div>
                                             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
                                                 <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono font-normal">Rs</span>
-                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </div>
                                         </div>
                                     </div>
@@ -1303,7 +1360,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                                 <div className="flex flex-col items-end">
                                                     <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
-                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - refundAmount).toLocaleString()}</div>
+                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                                 </div>
                                             </>
                                         ) : (
@@ -1317,7 +1374,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 </div>
                                                 <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
                                                     <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Update</span>
-                                                    <span className="text-sm font-mono font-black text-orange-500">Rs {totals.net.toLocaleString()}</span>
+                                                    <span className="text-sm font-mono font-black text-orange-500">Rs {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                                                 </div>
                                             </div>
                                         )}
@@ -1424,7 +1481,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             <div className="text-[10px] text-zinc-500 uppercase font-black tracking-wider mb-0.5">Net Disbursement</div>
                             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
                                 <span className="text-sm font-bold mr-1">Rs</span>
-                                {totals.net.toLocaleString()}
+                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </div>
                         </div>
                         <Button onClick={handleSave} className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95" disabled={isSaving}>
@@ -1439,7 +1496,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         </div>
                         <div className="flex flex-col items-center border-l border-zinc-100 dark:border-zinc-800">
                             <span className="text-[9px] uppercase text-zinc-400 font-bold">Tax Impact</span>
-                            <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {totals.tax.toLocaleString()}</span>
+                            <span className="text-xs font-black text-zinc-700 dark:text-zinc-300">Rs {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                         </div>
                     </div>
                 </div>
@@ -1472,13 +1529,26 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             )}
                             <div className="max-h-[450px] overflow-auto p-4 custom-scrollbar relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {customerItems.filter(ci => !assignSearch || ci.item?.title.toLowerCase().includes(assignSearch.toLowerCase()) || ci.invoice_no?.toLowerCase().includes(assignSearch.toLowerCase())).map((ci, idx) => {
-                                    const isLocked = activeAssignSaleId !== null && ci.sale_id !== activeAssignSaleId;
+                                    const returnablePcs = toNum(ci.returnable_pcs ?? ci.total_pcs);
+                                    const alreadyReturnedPcs = toNum(ci.already_returned_pcs ?? 0);
+                                    const isFullyReturnedItem = returnablePcs <= 0;
+
+                                    const isLocked = (activeAssignSaleId !== null && ci.sale_id !== activeAssignSaleId) || isFullyReturnedItem;
                                     const isSelected = selectedAssignIds.includes(ci.id);
+                                    const isPartiallyReturnedItem = alreadyReturnedPcs > 0 && returnablePcs > 0;
+
                                     return (
                                     <motion.div key={ci.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}
-                                        title={isLocked ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` : undefined}
+                                        title={
+                                            isFullyReturnedItem 
+                                                ? "This item has already been fully returned on this invoice." 
+                                                : isLocked 
+                                                    ? `Only items from invoice ${activeAssignInvoiceNo} can be selected together.` 
+                                                    : undefined
+                                        }
                                         className={`flex items-center gap-4 p-3 border ${
                                             isSelected ? 'border-orange-500 bg-orange-500/5' :
+                                            isFullyReturnedItem ? 'border-rose-200/50 bg-rose-50/10 dark:bg-rose-950/5 opacity-50 cursor-not-allowed' :
                                             isLocked ? 'border-zinc-100 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30 opacity-40 cursor-not-allowed' :
                                             'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 cursor-pointer'
                                         } ${PREMIUM_ROUNDING_MD} transition-all group`}
@@ -1490,8 +1560,18 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             className="border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-500 disabled:opacity-30" />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start mb-1">
-                                                <div className="text-[11px] font-black text-zinc-900 dark:text-white uppercase truncate tracking-tighter">{ci.item?.title}</div>
-                                                <div className="text-[9px] font-mono font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">{ci.invoice_no}</div>
+                                                <div className={`text-11px font-black uppercase truncate tracking-tighter ${
+                                                    isFullyReturnedItem ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white'
+                                                }`}>{ci.item?.title}</div>
+                                                <div className="flex items-center gap-1.5">
+                                                    {isFullyReturnedItem && (
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-1 rounded">Returned</span>
+                                                    )}
+                                                    {isPartiallyReturnedItem && (
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-orange-500 bg-orange-500/10 px-1 rounded">{returnablePcs} Pcs Left</span>
+                                                    )}
+                                                    <div className="text-[9px] font-mono font-black text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">{ci.invoice_no}</div>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-3 text-[11px] font-mono font-bold text-zinc-600">
                                                 <span>Sold: Rs {toNum(ci.last_trade_price).toLocaleString()}</span>
@@ -1524,7 +1604,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     </DialogContent>
                 </Dialog>
 
-                {/* ── SOURCE DOCUMENT SELECTION ── */}
+                {/* ── SOURCE DOCUMENT SELECTION A── */}
                 <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
                     <DialogContent className={`max-w-[95vw] md:max-w-4xl w-full md:w-[900px] border-none bg-transparent shadow-none p-0`}>
                         <DialogTitle className="hidden">Source Document Registry</DialogTitle>
@@ -1549,18 +1629,31 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         <div className={`w-8 h-8 border-4 border-orange-500 border-t-transparent animate-spin ${PREMIUM_ROUNDING}`} />
                                         <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest animate-pulse">Scanning Cloud Repository...</div>
                                     </div>
-                                ) : filteredInvoices.map((inv, idx) => (
+                                ) : filteredInvoices.map((inv, idx) => {
+                                    const isFullyReturned = inv.status === 'Returned';
+                                    const isPartialReturn = inv.status === 'Partial Return';
+                                    return (
                                     <motion.button key={inv.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
-                                        className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-zinc-800 hover:border-orange-500 transition-all active:scale-[0.99] ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0`}
-                                        onClick={() => handleSelectInvoice(inv)}>
+                                        disabled={isFullyReturned}
+                                        className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group border transition-all ${
+                                            isFullyReturned 
+                                                ? 'bg-zinc-100/50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800 opacity-60 cursor-not-allowed'
+                                                : 'bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-zinc-800 hover:border-orange-500 active:scale-[0.99]'
+                                        } ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0`}
+                                        onClick={() => !isFullyReturned && handleSelectInvoice(inv)}>
                                         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                                             <div className="flex justify-between md:block items-center">
                                                 <div className="space-y-1">
                                                     <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none">ID#</div>
-                                                    <div className="text-lg font-black text-zinc-900 dark:text-white group-hover:text-orange-500 transition-colors tracking-tighter">{inv.invoice}</div>
+                                                    <div className={`text-lg font-black group-hover:text-orange-500 transition-colors tracking-tighter ${
+                                                        isFullyReturned ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white'
+                                                    }`}>{inv.invoice}</div>
                                                 </div>
                                                 <div className="md:hidden">
-                                                    <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'orange'} />
+                                                    <SignalBadge 
+                                                        text={isFullyReturned ? 'Full Return' : isPartialReturn ? 'Partial Return' : inv.status} 
+                                                        type={isFullyReturned ? 'red' : isPartialReturn ? 'orange' : inv.status === 'Completed' ? 'green' : 'blue'} 
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="w-full md:w-px h-px md:h-8 bg-zinc-200 dark:bg-zinc-800" />
@@ -1570,7 +1663,10 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                     <div className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300">{fmtDate(inv.date)}</div>
                                                 </div>
                                                 <div className="hidden md:block">
-                                                    <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'orange'} />
+                                                    <SignalBadge 
+                                                        text={isFullyReturned ? 'Full Return' : isPartialReturn ? 'Partial Return' : inv.status} 
+                                                        type={isFullyReturned ? 'red' : isPartialReturn ? 'orange' : inv.status === 'Completed' ? 'green' : 'blue'} 
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -1578,16 +1674,17 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         <div className="flex items-center justify-between md:justify-end gap-0 md:gap-8 md:pr-4 bg-orange-500/5 md:bg-transparent -mx-4 -mb-4 md:mx-0 md:mb-0 p-4 md:p-0 border-t md:border-t-0 border-orange-500/10 md:border-transparent">
                                             <div className="space-y-1 text-left md:text-right">
                                                 <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none">Net Value</div>
-                                                <div className="text-sm md:text-base font-black text-zinc-900 dark:text-white leading-none">Rs {toNum(inv.net_total).toLocaleString()}</div>
+                                                <div className={`text-sm md:text-base font-black leading-none ${isFullyReturned ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white'}`}>Rs {toNum(inv.net_total).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                             </div>
                                             <div className="space-y-1 text-right min-w-[100px] md:min-w-[120px]">
                                                 <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest leading-none">Outstanding</div>
-                                                <div className="text-lg md:text-xl font-black text-orange-600 dark:text-orange-500 leading-none tracking-tighter">Rs {toNum(inv.remaining_amount).toLocaleString()}</div>
+                                                <div className="text-lg md:text-xl font-black text-orange-600 dark:text-orange-500 leading-none tracking-tighter">Rs {toNum(inv.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                             </div>
                                             <ChevronRight size={18} className="text-zinc-300 dark:text-zinc-700 group-hover:text-orange-500 transition-colors hidden md:block" />
                                         </div>
                                     </motion.button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </Card>
                     </DialogContent>

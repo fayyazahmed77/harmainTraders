@@ -370,8 +370,7 @@
                     &nbsp;&nbsp;|&nbsp;&nbsp;
                     Date: <strong>{{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}</strong>
                     &nbsp;&nbsp;
-                    @php $statusLower = strtolower($payment->status ?? 'pending'); @endphp
-                    <span class="status-badge">PAID</span>
+                    Time: <strong>{{ \Carbon\Carbon::parse($payment->created_at)->setTimezone('Asia/Karachi')->format('h:i A') }}</strong>
                 </div>
             </div>
         </div>

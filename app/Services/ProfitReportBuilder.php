@@ -60,11 +60,30 @@ class ProfitReportBuilder
             ->leftJoinSub($purchaseCosts, 'pc', 'items.id', '=', 'pc.item_id')
             ->whereBetween('sales.date', [$fromDate, $toDate]);
 
+        $returnQuery = DB::table('sales_return_items')
+            ->join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+            ->join('items', 'sales_return_items.item_id', '=', 'items.id')
+            ->join('accounts', 'sales_returns.customer_id', '=', 'accounts.id')
+            ->leftJoinSub($purchaseCosts, 'pc', 'items.id', '=', 'pc.item_id')
+            ->whereBetween('sales_returns.date', [$fromDate, $toDate]);
+
         // Apply filters
-        if (!empty($filters['customer_id'])) $query->where('sales.customer_id', $filters['customer_id']);
-        if (!empty($filters['firm_id'])) $query->where('sales.firm_id', $filters['firm_id']);
-        if (!empty($filters['item_id'])) $query->where('sales_items.item_id', $filters['item_id']);
-        if (!empty($filters['salesman_id'])) $query->where('sales.salesman_id', $filters['salesman_id']);
+        if (!empty($filters['customer_id'])) {
+            $query->where('sales.customer_id', $filters['customer_id']);
+            $returnQuery->where('sales_returns.customer_id', $filters['customer_id']);
+        }
+        if (!empty($filters['firm_id'])) {
+            $query->where('sales.firm_id', $filters['firm_id']);
+            $returnQuery->where('sales_returns.firm_id', $filters['firm_id']);
+        }
+        if (!empty($filters['item_id'])) {
+            $query->where('sales_items.item_id', $filters['item_id']);
+            $returnQuery->where('sales_return_items.item_id', $filters['item_id']);
+        }
+        if (!empty($filters['salesman_id'])) {
+            $query->where('sales.salesman_id', $filters['salesman_id']);
+            $returnQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
+        }
 
         $results = $query->select(
             'sales.invoice',
@@ -75,17 +94,29 @@ class ProfitReportBuilder
             'sales_items.trade_price as sale_rate',
             'sales_items.subtotal as revenue',
             DB::raw('COALESCE(pc.avg_cost, 0) as purchase_rate')
-        )
-        ->orderBy('sales.date', 'desc')
-        ->orderBy('sales.invoice', 'desc')
-        ->get();
+        )->get();
 
-        return $results->map(function($row) {
+        $returnResults = $returnQuery->select(
+            DB::raw('CONCAT(sales_returns.invoice, " (Return)") as invoice'),
+            'sales_returns.date',
+            'accounts.title as customer_name',
+            'items.title as product_name',
+            DB::raw('-sales_return_items.total_pcs as qty'),
+            'sales_return_items.trade_price as sale_rate',
+            DB::raw('-sales_return_items.subtotal as revenue'),
+            DB::raw('COALESCE(pc.avg_cost, 0) as purchase_rate')
+        )->get();
+
+        $combined = $results->concat($returnResults)->sortByDesc(function($row) {
+            return $row->date . ' ' . $row->invoice;
+        });
+
+        return $combined->map(function($row) {
             $row->cogs = $row->purchase_rate > 0 ? (float)($row->qty * $row->purchase_rate) : 0;
-            $row->profit = $row->purchase_rate > 0 ? ($row->revenue - $row->cogs) : 0;
-            $row->margin = ($row->revenue > 0 && $row->purchase_rate > 0) ? round(($row->profit / $row->revenue) * 100, 2) : 0;
+            $row->profit = $row->revenue - $row->cogs;
+            $row->margin = (abs($row->revenue) > 0 && $row->purchase_rate > 0) ? round(($row->profit / abs($row->revenue)) * 100, 2) : 0;
             return (array)$row;
-        })->toArray();
+        })->values()->toArray();
     }
 
     public function partyWiseProfit($fromDate = null, $toDate = null, $filters = [])
@@ -94,10 +125,24 @@ class ProfitReportBuilder
         $toDate = $toDate ?? date('Y-m-d');
 
         $salesQuery = $this->getSalesItemsQuery($fromDate, $toDate);
-        if (!empty($filters['customer_id'])) $salesQuery->where('sales.customer_id', $filters['customer_id']);
-        if (!empty($filters['item_id'])) $salesQuery->where('sales_items.item_id', $filters['item_id']);
-        if (!empty($filters['salesman_id'])) $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
-        if (!empty($filters['firm_id'])) $salesQuery->where('sales.firm_id', $filters['firm_id']);
+        $returnsQuery = $this->getReturnItemsQuery($fromDate, $toDate);
+
+        if (!empty($filters['customer_id'])) {
+            $salesQuery->where('sales.customer_id', $filters['customer_id']);
+            $returnsQuery->where('sales_returns.customer_id', $filters['customer_id']);
+        }
+        if (!empty($filters['item_id'])) {
+            $salesQuery->where('sales_items.item_id', $filters['item_id']);
+            $returnsQuery->where('sales_return_items.item_id', $filters['item_id']);
+        }
+        if (!empty($filters['salesman_id'])) {
+            $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
+            $returnsQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
+        }
+        if (!empty($filters['firm_id'])) {
+            $salesQuery->where('sales.firm_id', $filters['firm_id']);
+            $returnsQuery->where('sales_returns.firm_id', $filters['firm_id']);
+        }
 
         $salesData = $salesQuery->join('accounts', 'sales.customer_id', '=', 'accounts.id')
             ->select(
@@ -107,12 +152,39 @@ class ProfitReportBuilder
                 DB::raw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as cogs')
             )
             ->groupBy('accounts.id', 'accounts.title')
-            ->get();
+            ->get()
+            ->keyBy('id');
 
-        return $salesData->map(function($item) {
-            $item->profit = $item->revenue - $item->cogs;
-            $item->margin = $item->revenue > 0 ? round(($item->profit / $item->revenue) * 100, 2) : 0;
-            return (array)$item;
+        $returnsData = $returnsQuery->join('accounts', 'sales_returns.customer_id', '=', 'accounts.id')
+            ->select(
+                'accounts.id',
+                'accounts.title as name',
+                DB::raw('SUM(sales_return_items.subtotal) as return_revenue'),
+                DB::raw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as return_cogs')
+            )
+            ->groupBy('accounts.id', 'accounts.title')
+            ->get()
+            ->keyBy('id');
+
+        $allPartyIds = collect(array_keys($salesData->toArray()))->merge(array_keys($returnsData->toArray()))->unique();
+
+        return $allPartyIds->map(function($partyId) use ($salesData, $returnsData) {
+            $saleRow = $salesData->get($partyId);
+            $returnRow = $returnsData->get($partyId);
+
+            $revenue = ($saleRow ? (float)$saleRow->revenue : 0) - ($returnRow ? (float)$returnRow->return_revenue : 0);
+            $cogs = ($saleRow ? (float)$saleRow->cogs : 0) - ($returnRow ? (float)$returnRow->return_cogs : 0);
+            $profit = $revenue - $cogs;
+            $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
+
+            return [
+                'id' => $partyId,
+                'name' => $saleRow ? $saleRow->name : ($returnRow ? $returnRow->name : 'N/A'),
+                'revenue' => $revenue,
+                'cogs' => $cogs,
+                'profit' => $profit,
+                'margin' => $margin
+            ];
         })->sortByDesc('profit')->values()->toArray();
     }
 
@@ -122,10 +194,24 @@ class ProfitReportBuilder
         $toDate = $toDate ?? date('Y-m-d');
 
         $salesQuery = $this->getSalesItemsQuery($fromDate, $toDate);
-        if (!empty($filters['salesman_id'])) $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
-        if (!empty($filters['item_id'])) $salesQuery->where('sales_items.item_id', $filters['item_id']);
-        if (!empty($filters['customer_id'])) $salesQuery->where('sales.customer_id', $filters['customer_id']);
-        if (!empty($filters['firm_id'])) $salesQuery->where('sales.firm_id', $filters['firm_id']);
+        $returnsQuery = $this->getReturnItemsQuery($fromDate, $toDate);
+
+        if (!empty($filters['salesman_id'])) {
+            $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
+            $returnsQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
+        }
+        if (!empty($filters['item_id'])) {
+            $salesQuery->where('sales_items.item_id', $filters['item_id']);
+            $returnsQuery->where('sales_return_items.item_id', $filters['item_id']);
+        }
+        if (!empty($filters['customer_id'])) {
+            $salesQuery->where('sales.customer_id', $filters['customer_id']);
+            $returnsQuery->where('sales_returns.customer_id', $filters['customer_id']);
+        }
+        if (!empty($filters['firm_id'])) {
+            $salesQuery->where('sales.firm_id', $filters['firm_id']);
+            $returnsQuery->where('sales_returns.firm_id', $filters['firm_id']);
+        }
 
         $salesData = $salesQuery->leftJoin('salemen', 'sales.salesman_id', '=', 'salemen.id')
             ->select(
@@ -135,22 +221,63 @@ class ProfitReportBuilder
                 DB::raw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as cogs')
             )
             ->groupBy('salemen.id', 'salemen.name')
-            ->get();
+            ->get()
+            ->keyBy('id');
 
-        return $salesData->map(function($item) {
-            $item->profit = $item->revenue - $item->cogs;
-            $item->margin = $item->revenue > 0 ? round(($item->profit / $item->revenue) * 100, 2) : 0;
-            return (array)$item;
+        $returnsData = $returnsQuery->leftJoin('salemen', 'sales_returns.salesman_id', '=', 'salemen.id')
+            ->select(
+                'salemen.id',
+                DB::raw('COALESCE(salemen.name, "Unassigned") as name'),
+                DB::raw('SUM(sales_return_items.subtotal) as return_revenue'),
+                DB::raw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as return_cogs')
+            )
+            ->groupBy('salemen.id', 'salemen.name')
+            ->get()
+            ->keyBy('id');
+
+        $allSalesmanIds = collect(array_keys($salesData->toArray()))->merge(array_keys($returnsData->toArray()))->unique();
+
+        return $allSalesmanIds->map(function($smId) use ($salesData, $returnsData) {
+            $saleRow = $salesData->get($smId);
+            $returnRow = $returnsData->get($smId);
+
+            $revenue = ($saleRow ? (float)$saleRow->revenue : 0) - ($returnRow ? (float)$returnRow->return_revenue : 0);
+            $cogs = ($saleRow ? (float)$saleRow->cogs : 0) - ($returnRow ? (float)$returnRow->return_cogs : 0);
+            $profit = $revenue - $cogs;
+            $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
+
+            return [
+                'id' => $smId,
+                'name' => $saleRow ? $saleRow->name : ($returnRow ? $returnRow->name : 'Unassigned'),
+                'revenue' => $revenue,
+                'cogs' => $cogs,
+                'profit' => $profit,
+                'margin' => $margin
+            ];
         })->sortByDesc('profit')->values()->toArray();
     }
 
     public function companyWiseProfit($fromDate = null, $toDate = null, $filters = [])
     {
         $salesQuery = $this->getSalesItemsQuery($fromDate, $toDate);
-        if (!empty($filters['firm_id'])) $salesQuery->where('sales.firm_id', $filters['firm_id']);
-        if (!empty($filters['item_id'])) $salesQuery->where('sales_items.item_id', $filters['item_id']);
-        if (!empty($filters['customer_id'])) $salesQuery->where('sales.customer_id', $filters['customer_id']);
-        if (!empty($filters['salesman_id'])) $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
+        $returnsQuery = $this->getReturnItemsQuery($fromDate, $toDate);
+
+        if (!empty($filters['firm_id'])) {
+            $salesQuery->where('sales.firm_id', $filters['firm_id']);
+            $returnsQuery->where('sales_returns.firm_id', $filters['firm_id']);
+        }
+        if (!empty($filters['item_id'])) {
+            $salesQuery->where('sales_items.item_id', $filters['item_id']);
+            $returnsQuery->where('sales_return_items.item_id', $filters['item_id']);
+        }
+        if (!empty($filters['customer_id'])) {
+            $salesQuery->where('sales.customer_id', $filters['customer_id']);
+            $returnsQuery->where('sales_returns.customer_id', $filters['customer_id']);
+        }
+        if (!empty($filters['salesman_id'])) {
+            $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
+            $returnsQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
+        }
 
         $salesData = $salesQuery
             ->leftJoin('accounts as companies', 'items.company', '=', 'companies.id')
@@ -160,12 +287,38 @@ class ProfitReportBuilder
                 DB::raw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as cogs')
             )
             ->groupBy('name')
-            ->get();
+            ->get()
+            ->keyBy('name');
 
-        return $salesData->map(function($item) {
-            $item->profit = $item->revenue - $item->cogs;
-            $item->margin = $item->revenue > 0 ? round(($item->profit / $item->revenue) * 100, 2) : 0;
-            return (array)$item;
+        $returnsData = $returnsQuery
+            ->leftJoin('accounts as companies', 'items.company', '=', 'companies.id')
+            ->select(
+                DB::raw('COALESCE(companies.title, items.company, "Unassigned") as name'),
+                DB::raw('SUM(sales_return_items.subtotal) as return_revenue'),
+                DB::raw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as return_cogs')
+            )
+            ->groupBy('name')
+            ->get()
+            ->keyBy('name');
+
+        $allCompanies = collect(array_keys($salesData->toArray()))->merge(array_keys($returnsData->toArray()))->unique();
+
+        return $allCompanies->map(function($name) use ($salesData, $returnsData) {
+            $saleRow = $salesData->get($name);
+            $returnRow = $returnsData->get($name);
+
+            $revenue = ($saleRow ? (float)$saleRow->revenue : 0) - ($returnRow ? (float)$returnRow->return_revenue : 0);
+            $cogs = ($saleRow ? (float)$saleRow->cogs : 0) - ($returnRow ? (float)$returnRow->return_cogs : 0);
+            $profit = $revenue - $cogs;
+            $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
+
+            return [
+                'name' => $name,
+                'revenue' => $revenue,
+                'cogs' => $cogs,
+                'profit' => $profit,
+                'margin' => $margin
+            ];
         })->sortByDesc('profit')->values()->toArray();
     }
 
@@ -181,18 +334,42 @@ class ProfitReportBuilder
                 DB::raw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as cogs')
             )
             ->groupBy('sales.date')
-            ->get();
+            ->get()
+            ->keyBy('date');
 
-        return $salesData->map(function($item) {
-            $item->profit = $item->revenue - $item->cogs;
-            $item->margin = $item->revenue > 0 ? round(($item->profit / $item->revenue) * 100, 2) : 0;
-            
-            // Format the date as '01 APR 2026 Wednesday'
-            $dateObj = \Carbon\Carbon::parse($item->date);
-            $item->date_display = strtoupper($dateObj->format('d M Y')) . ' ' . $dateObj->format('l');
+        $returnsData = $this->getReturnItemsQuery($fromDate, $toDate)
+            ->select(
+                'sales_returns.date',
+                DB::raw('SUM(sales_return_items.subtotal) as return_revenue'),
+                DB::raw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as return_cogs')
+            )
+            ->groupBy('sales_returns.date')
+            ->get()
+            ->keyBy('date');
 
-            return (array)$item;
-        })->sortBy('date')->values()->toArray();
+        $allDates = collect(array_keys($salesData->toArray()))->merge(array_keys($returnsData->toArray()))->unique()->sort();
+
+        return $allDates->map(function($date) use ($salesData, $returnsData) {
+            $saleRow = $salesData->get($date);
+            $returnRow = $returnsData->get($date);
+
+            $revenue = ($saleRow ? (float)$saleRow->revenue : 0) - ($returnRow ? (float)$returnRow->return_revenue : 0);
+            $cogs = ($saleRow ? (float)$saleRow->cogs : 0) - ($returnRow ? (float)$returnRow->return_cogs : 0);
+            $profit = $revenue - $cogs;
+            $margin = $revenue > 0 ? round(($profit / $revenue) * 100, 2) : 0;
+
+            $dateObj = \Carbon\Carbon::parse($date);
+            $date_display = strtoupper($dateObj->format('d M Y')) . ' ' . $dateObj->format('l');
+
+            return [
+                'date' => $date,
+                'date_display' => $date_display,
+                'revenue' => $revenue,
+                'cogs' => $cogs,
+                'profit' => $profit,
+                'margin' => $margin
+            ];
+        })->values()->toArray();
     }
 
     public function monthWiseProfit($fromDate = null, $toDate = null)
@@ -207,7 +384,18 @@ class ProfitReportBuilder
                 DB::raw('SUM(sales_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as cogs')
             )
             ->groupBy('month')
-            ->get();
+            ->get()
+            ->keyBy('month');
+
+        $returnsData = $this->getReturnItemsQuery($fromDate, $toDate)
+            ->select(
+                DB::raw('DATE_FORMAT(sales_returns.date, "%Y-%m") as month'),
+                DB::raw('SUM(sales_return_items.subtotal) as return_revenue'),
+                DB::raw('SUM(sales_return_items.total_pcs * COALESCE(pc.avg_cost, items.trade_price)) as return_cogs')
+            )
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
 
         $expensesData = DB::table('payments')
             ->join('accounts', 'payments.account_id', '=', 'accounts.id')
@@ -222,21 +410,20 @@ class ProfitReportBuilder
             ->get()
             ->keyBy('month');
 
-        $salesData = clone $salesData;
-        $salesKeyed = $salesData->keyBy('month');
-
-        $allMonths = collect(array_keys($salesKeyed->toArray()))
+        $allMonths = collect(array_keys($salesData->toArray()))
+            ->merge(array_keys($returnsData->toArray()))
             ->merge(array_keys($expensesData->toArray()))
             ->unique()
             ->sort()
             ->values();
 
-        return $allMonths->map(function($month) use ($salesKeyed, $expensesData) {
-            $saleRow = $salesKeyed->get($month);
+        return $allMonths->map(function($month) use ($salesData, $returnsData, $expensesData) {
+            $saleRow = $salesData->get($month);
+            $returnRow = $returnsData->get($month);
             $expenseRow = $expensesData->get($month);
 
-            $revenue = $saleRow ? (float)$saleRow->revenue : 0;
-            $cogs = $saleRow ? (float)$saleRow->cogs : 0;
+            $revenue = ($saleRow ? (float)$saleRow->revenue : 0) - ($returnRow ? (float)$returnRow->return_revenue : 0);
+            $cogs = ($saleRow ? (float)$saleRow->cogs : 0) - ($returnRow ? (float)$returnRow->return_cogs : 0);
             $expense = $expenseRow ? (float)$expenseRow->expense : 0;
 
             $profit = $revenue - $cogs;

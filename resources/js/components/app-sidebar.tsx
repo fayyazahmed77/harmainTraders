@@ -146,6 +146,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           permissions: ['create sales'],
         },
         {
+          title: "Unpaid Bills",
+          url: "/payments/unpaid-invoices",
+          permissions: ['view payments'],
+        },
+        {
           title: "Payment List",
           url: "/payments",
           permissions: ['view payments'],
@@ -280,7 +285,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           permissions: ['view purchases'],
         },
         {
-          title: "Create Supplier Order",
+          title: "Create Order",
           url: "/admin/supplier-order",
           permissions: ['create purchases'],
         },

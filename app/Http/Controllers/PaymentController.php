@@ -460,9 +460,14 @@ class PaymentController extends Controller implements HasMiddleware
                 }
             }
 
-            // Soft-cancels the payment (sets cheque_status = 'Cancelled') and deletes its allocations
-            $payment->update(['cheque_status' => 'Cancelled']);
-            PaymentAllocation::where('payment_id', $payment->id)->delete();
+            if ($payment->customer_credit_id) {
+                $creditService = new \App\Services\CustomerCreditService();
+                $creditService->cancelRefund($payment->id);
+            } else {
+                // Soft-cancels the payment (sets cheque_status = 'Cancelled') and deletes its allocations
+                $payment->update(['cheque_status' => 'Cancelled']);
+                PaymentAllocation::where('payment_id', $payment->id)->delete();
+            }
 
             DB::commit();
             return back()->with('success', 'Payment deleted and allocations reversed.');
@@ -502,6 +507,137 @@ class PaymentController extends Controller implements HasMiddleware
         }
 
         return $pdf->stream($payment->voucher_no . '.pdf');
+    }
+
+    public function unpaidInvoices(Request $request)
+    {
+        $sales = Sales::with(['customer'])
+            ->where('remaining_amount', '>', 0)
+            ->orderBy('date', 'desc')
+            ->get()
+            ->map(function ($sale) {
+                return [
+                    'id' => $sale->id,
+                    'invoice_no' => $sale->invoice,
+                    'date' => $sale->date,
+                    'type' => 'Sale',
+                    'party_name' => $sale->customer->title ?? 'N/A',
+                    'account_id' => $sale->customer_id,
+                    'gross_total' => (float) $sale->gross_total,
+                    'discount_total' => (float) $sale->discount_total,
+                    'net_total' => (float) $sale->net_total,
+                    'paid_amount' => (float) $sale->paid_amount,
+                    'remaining_amount' => (float) $sale->remaining_amount,
+                    'status' => $sale->status,
+                ];
+            });
+
+        $purchases = Purchase::with(['supplier'])
+            ->where('remaining_amount', '>', 0)
+            ->orderBy('date', 'desc')
+            ->get()
+            ->map(function ($purchase) {
+                return [
+                    'id' => $purchase->id,
+                    'invoice_no' => $purchase->invoice,
+                    'date' => $purchase->date,
+                    'type' => 'Purchase',
+                    'party_name' => $purchase->supplier->title ?? 'N/A',
+                    'account_id' => $purchase->supplier_id,
+                    'gross_total' => (float) $purchase->gross_total,
+                    'discount_total' => (float) $purchase->discount_total,
+                    'net_total' => (float) $purchase->net_total,
+                    'paid_amount' => (float) $purchase->paid_amount,
+                    'remaining_amount' => (float) $purchase->remaining_amount,
+                    'status' => $purchase->status,
+                ];
+            });
+
+        $invoices = collect($sales)->merge($purchases)->sortByDesc('date')->values()->all();
+
+        $accounts = Account::with('accountType')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Customers', 'Supplier']);
+            })
+            ->select('id', 'title', 'type')
+            ->get();
+
+        // ───────────────────────────────────────────
+        // SALES SUMMARY (Matching Index)
+        // ───────────────────────────────────────────
+        $salesQuery = Sales::query();
+        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+            $salesQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+        $salesData = clone $salesQuery;
+
+        $salesReturnQuery = \App\Models\SalesReturn::query();
+        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+            $salesReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+
+        $salesSummary = [
+            'total_sales' => $salesData->sum('net_total'),
+            'total_paid' => $salesData->sum('paid_amount'),
+            'total_unpaid' => $salesData->sum('remaining_amount'),
+            'total_returns' => $salesReturnQuery->sum('net_total'),
+        ];
+
+        // ───────────────────────────────────────────
+        // PURCHASE SUMMARY (Matching Index)
+        // ───────────────────────────────────────────
+        $purchaseQuery = Purchase::query();
+        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+            $purchaseQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+        $purchaseData = clone $purchaseQuery;
+
+        $purchaseReturnQuery = \App\Models\PurchaseReturn::query();
+        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+            $purchaseReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+
+        $purchaseSummary = [
+            'total_purchase' => $purchaseData->sum('net_total'),
+            'total_paid' => $purchaseData->sum('paid_amount'),
+            'total_unpaid' => $purchaseData->sum('remaining_amount'),
+            'total_returns' => $purchaseReturnQuery->sum('net_total'),
+        ];
+
+        // ───────────────────────────────────────────
+        // ANALYTICS (Matching Index)
+        // ───────────────────────────────────────────
+        $analytics = [];
+        $startDate = $request->start_date ? \Carbon\Carbon::parse($request->start_date) : now()->subDays(6);
+        $endDate = $request->end_date ? \Carbon\Carbon::parse($request->end_date) : now();
+
+        $diff = $startDate->diffInDays($endDate);
+        if ($diff > 30) $startDate = (clone $endDate)->subDays(30);
+
+        $salesTotals = Sales::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+        $purchasesTotals = Purchase::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+        $receiptsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'RECEIPT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+        $paymentsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'PAYMENT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+
+        for ($date = clone $startDate; $date->lte($endDate); $date->addDay()) {
+            $currentDate = $date->toDateString();
+            $analytics[] = [
+                'date' => $date->format('M d'),
+                'sales' => $salesTotals[$currentDate] ?? 0,
+                'purchases' => $purchasesTotals[$currentDate] ?? 0,
+                'receipts' => $receiptsTotals[$currentDate] ?? 0,
+                'payments' => $paymentsTotals[$currentDate] ?? 0,
+            ];
+        }
+
+        return Inertia::render("daily/payment/unpaid-bills", [
+            'invoices' => $invoices,
+            'accounts' => $accounts,
+            'sales_summary' => $salesSummary,
+            'purchase_summary' => $purchaseSummary,
+            'analytics' => $analytics,
+            'filters' => $request->all(['start_date', 'end_date', 'account_id', 'type']),
+        ]);
     }
 
     // Create page
@@ -1027,6 +1163,50 @@ class PaymentController extends Controller implements HasMiddleware
             DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Payment Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return back()->withErrors(['error' => 'Failed to save payment: ' . $e->getMessage()]);
+        }
+    }
+
+    public function getAvailableCredits($customerId)
+    {
+        try {
+            $credits = \App\Models\CustomerCredit::where('customer_id', $customerId)
+                ->where('available_balance', '>', 0)
+                ->where('status', '!=', 'Canceled')
+                ->get();
+            return response()->json($credits);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function refundCredit(Request $request)
+    {
+        $request->validate([
+            'customer_credit_id' => 'required|integer|exists:customer_credits,id',
+            'amount' => 'required|numeric|min:0.01',
+            'date' => 'required|date',
+            'payment_method' => 'required|string',
+            'payment_account_id' => 'nullable|integer|exists:accounts,id',
+            'remarks' => 'nullable|string',
+        ]);
+
+        try {
+            $service = new \App\Services\CustomerCreditService();
+            $payment = $service->processCreditRefund(
+                $request->customer_credit_id,
+                (float)$request->amount,
+                $request->date,
+                $request->payment_method,
+                $request->payment_account_id,
+                $request->remarks ?? ''
+            );
+
+            // Log activity
+            \App\Services\ActivityLogger::log('created', 'Payment Refund', "Refunded credit note ID {$request->customer_credit_id} with voucher {$payment->voucher_no}");
+
+            return redirect()->back()->with('success', 'Customer credit refunded successfully via voucher: ' . $payment->voucher_no);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Refund failed: ' . $e->getMessage());
         }
     }
 }

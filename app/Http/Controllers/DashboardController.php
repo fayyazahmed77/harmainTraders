@@ -187,27 +187,45 @@ class DashboardController extends Controller
         $getFunds = function($ids) {
             if ($ids->isEmpty()) return 0;
             
-            $opening = Account::whereIn('id', $ids)->sum('opening_balance');
+            $accounts = Account::whereIn('id', $ids)->get(['id', 'opening_balance']);
             
-            $totalIn = Payment::whereIn('payment_account_id', $ids)
+            $totalInByAccount = Payment::whereIn('payment_account_id', $ids)
                 ->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
                       ->orWhere('cheque_status', '')
                       ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
-                })->sum('amount');
+                })
+                ->groupBy('payment_account_id')
+                ->selectRaw('payment_account_id, SUM(amount) as total')
+                ->pluck('total', 'payment_account_id');
 
-            $totalOut = Payment::whereIn('payment_account_id', $ids)
+            $totalOutByAccount = Payment::whereIn('payment_account_id', $ids)
                 ->where('type', 'PAYMENT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
                       ->orWhere('cheque_status', '')
                       ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
-                })->sum('amount');
+                })
+                ->groupBy('payment_account_id')
+                ->selectRaw('payment_account_id, SUM(amount) as total')
+                ->pluck('total', 'payment_account_id');
 
-            return (float)$opening + $totalIn - $totalOut;
+            $sum = 0;
+            foreach ($accounts as $account) {
+                $opening = (float)$account->opening_balance;
+                $in = (float)($totalInByAccount[$account->id] ?? 0);
+                $out = (float)($totalOutByAccount[$account->id] ?? 0);
+                $balance = $opening + $in - $out;
+                
+                if ($balance > 0) {
+                    $sum += $balance;
+                }
+            }
+
+            return $sum;
         };
 
         $fundsData = [
