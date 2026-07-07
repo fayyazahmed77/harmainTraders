@@ -121,10 +121,10 @@ export function useShiftTimer(shift: Shift | null, userId: number | undefined) {
         const [startH, startM, startS] = shift.start_time.split(':');
         const [endH, endM, endS] = shift.end_time.split(':');
 
-        let shiftStart = new Date(nowTime);
+        const shiftStart = new Date(nowTime);
         shiftStart.setHours(parseInt(startH, 10), parseInt(startM, 10), parseInt(startS, 10) || 0, 0);
 
-        let shiftEnd = new Date(nowTime);
+        const shiftEnd = new Date(nowTime);
         shiftEnd.setHours(parseInt(endH, 10), parseInt(endM, 10), parseInt(endS, 10) || 0, 0);
 
         // Handle overnight shifts

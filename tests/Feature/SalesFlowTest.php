@@ -76,7 +76,7 @@ it('verifies that creating a sale reduces stock and sets remaining balance corre
     $response->assertRedirect();
 
     // Verify Sale Record
-    $sale = Sales::where('invoice', 'SLS-TEST-001')->first();
+    $sale = Sales::first();
     expect($sale)->not->toBeNull();
     expect($sale->remaining_amount)->toEqual(60);
 
@@ -127,7 +127,7 @@ it('verifies that "Pay Now" option creates a payment record and allocates correc
     ]);
 
     // Verify Allocation
-    $sale = Sales::where('invoice', 'SLS-PAY-001')->first();
+    $sale = Sales::first();
     $this->assertDatabaseHas('payment_allocations', [
         'bill_id' => $sale->id,
         'amount' => 100

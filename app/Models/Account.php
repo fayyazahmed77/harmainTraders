@@ -146,7 +146,7 @@ class Account extends Model
         
         if ($type === 'customers') {
             $totalSales = (float)$this->sales()->sum('net_total') - (float)$this->sales()->sum('extra_discount');
-            $totalReturns = $this->salesReturns()->sum('net_total');
+            $totalReturns = (float)$this->salesReturns()->sum('net_total') - (float)$this->salesReturns()->sum('extra_discount');
             $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
@@ -165,7 +165,7 @@ class Account extends Model
             return (float)$this->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
         } elseif ($type === 'supplier') {
             $totalPurchases = $this->purchases()->sum('net_total');
-            $totalReturns = $this->purchaseReturns()->sum('net_total');
+            $totalReturns = (float)$this->purchaseReturns()->sum('net_total') - (float)$this->purchaseReturns()->sum('extra_discount');
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');

@@ -449,9 +449,18 @@ if (file_exists($logo_path)) {
                             <td class="label">Total Rs. :-</td>
                             <td class="value">{{ number_format($purchase->net_total, 2) }}</td>
                         </tr>
+                        <!-- Extra Discount -->
+                        @if(($purchase->extra_discount ?? 0) > 0)
+                        <tr>
+                            <td class="label">Extra Discount :-</td>
+                            <td class="value">{{ number_format($purchase->extra_discount, 2) }}</td>
+                        </tr>
+                        @endif
                         <!-- Previous Balance -->
                         @php
-                        $prev_balance = $purchase->supplier->opening_balance ?? 0;
+                        $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
+                        $purchase_net = $purchase->net_total;
+                        $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>

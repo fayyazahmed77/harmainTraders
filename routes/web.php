@@ -394,6 +394,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [JournalVoucherController::class, 'index'])->name('journal-vouchers.index');
         Route::get('/create', [JournalVoucherController::class, 'create'])->name('journal-vouchers.create');
         Route::post('/', [JournalVoucherController::class, 'store'])->name('journal-vouchers.store');
+        Route::get('/{id}/edit', [JournalVoucherController::class, 'edit'])->name('journal-vouchers.edit');
+        Route::put('/{id}', [JournalVoucherController::class, 'update'])->name('journal-vouchers.update');
+        Route::get('/{id}', [JournalVoucherController::class, 'show'])->name('journal-vouchers.show');
+        Route::get('/{id}/pdf', [JournalVoucherController::class, 'pdf'])->name('journal-vouchers.pdf');
         Route::delete('/{id}', [JournalVoucherController::class, 'destroy'])->name('journal-vouchers.destroy');
     });
 

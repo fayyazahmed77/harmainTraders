@@ -16,8 +16,9 @@ class JournalVoucherController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view jv', only: ['index']),
+            new Middleware('permission:view jv', only: ['index', 'show', 'pdf']),
             new Middleware('permission:create jv', only: ['create', 'store']),
+            new Middleware('permission:manage jv', only: ['edit', 'update']),
             new Middleware('permission:delete jv', only: ['destroy']),
         ];
     }
@@ -280,5 +281,235 @@ class JournalVoucherController extends Controller implements HasMiddleware
             \Illuminate\Support\Facades\Log::error('JV Delete Error: ' . $e->getMessage());
             return back()->withErrors(['error' => 'Failed to delete Journal Voucher: ' . $e->getMessage()]);
         }
+    }
+
+    public function show($id)
+    {
+        $receipt = Payment::with(['account', 'allocations.bill', 'firm'])->findOrFail($id);
+        if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
+            abort(403, 'Not a primary Credit side Journal Voucher');
+        }
+
+        $payment = Payment::with(['account', 'allocations.bill'])
+            ->where('group_id', $receipt->group_id)
+            ->where('type', 'PAYMENT')
+            ->where('payment_method', 'Journal')
+            ->firstOrFail();
+
+        $cleanVoucherNo = str_replace(['-A', '-B'], '', $receipt->voucher_no);
+
+        return Inertia::render('journal-voucher/Show', [
+            'receipt' => $receipt,
+            'payment' => $payment,
+            'voucher_no' => $cleanVoucherNo,
+        ]);
+    }
+
+    public function edit($id)
+    {
+        $receipt = Payment::with(['allocations'])->findOrFail($id);
+        if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
+            abort(403, 'Not a primary Credit side Journal Voucher');
+        }
+
+        $payment = Payment::with(['allocations'])
+            ->where('group_id', $receipt->group_id)
+            ->where('type', 'PAYMENT')
+            ->where('payment_method', 'Journal')
+            ->firstOrFail();
+
+        $accounts = Account::with('accountType')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Customers', 'Supplier']);
+            })
+            ->get();
+
+        return Inertia::render('journal-voucher/Edit', [
+            'receipt' => $receipt,
+            'payment' => $payment,
+            'accounts' => $accounts,
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $receipt = Payment::findOrFail($id);
+        if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
+            abort(403, 'Not a primary Credit side Journal Voucher');
+        }
+
+        $payment = Payment::where('group_id', $receipt->group_id)
+            ->where('type', 'PAYMENT')
+            ->where('payment_method', 'Journal')
+            ->firstOrFail();
+
+        $request->validate([
+            'date' => 'required|date',
+            'credit_account_id' => 'required|exists:accounts,id',
+            'debit_account_id' => 'required|exists:accounts,id|different:credit_account_id',
+            'amount' => 'required|numeric|min:0.01',
+            'remarks' => 'nullable|string',
+            'source_allocations' => 'nullable|array',
+            'destination_allocations' => 'nullable|array',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // 1. Revert existing allocations for BOTH receipt and payment
+            $receiptAllocations = \App\Models\PaymentAllocation::where('payment_id', $receipt->id)->get();
+            foreach ($receiptAllocations as $alloc) {
+                $bill = $alloc->bill_type === 'App\Models\Sales' 
+                    ? \App\Models\Sales::find($alloc->bill_id) 
+                    : \App\Models\Purchase::find($alloc->bill_id);
+                if ($bill) {
+                    $bill->paid_amount = max(0, $bill->paid_amount - $alloc->amount);
+                    $sumOfReturns = $alloc->bill_type === 'App\Models\Sales' 
+                        ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
+                        : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                    if ($alloc->bill_type === 'App\Models\Sales') {
+                        $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : ($bill->paid_amount > 0 ? 'Partial' : 'Unpaid');
+                    } else {
+                        $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : '';
+                    }
+                    $bill->save();
+                }
+            }
+            \App\Models\PaymentAllocation::where('payment_id', $receipt->id)->delete();
+
+            $paymentAllocations = \App\Models\PaymentAllocation::where('payment_id', $payment->id)->get();
+            foreach ($paymentAllocations as $alloc) {
+                $bill = $alloc->bill_type === 'App\Models\Sales' 
+                    ? \App\Models\Sales::find($alloc->bill_id) 
+                    : \App\Models\Purchase::find($alloc->bill_id);
+                if ($bill) {
+                    $bill->paid_amount = max(0, $bill->paid_amount - $alloc->amount);
+                    $sumOfReturns = $alloc->bill_type === 'App\Models\Sales' 
+                        ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
+                        : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                    if ($alloc->bill_type === 'App\Models\Sales') {
+                        $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : ($bill->paid_amount > 0 ? 'Partial' : 'Unpaid');
+                    } else {
+                        $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : '';
+                    }
+                    $bill->save();
+                }
+            }
+            \App\Models\PaymentAllocation::where('payment_id', $payment->id)->delete();
+
+            // 2. Update both Payments
+            $receipt->update([
+                'date' => $request->date,
+                'account_id' => $request->credit_account_id,
+                'amount' => $request->amount,
+                'net_amount' => $request->amount,
+                'remarks' => $request->remarks,
+            ]);
+
+            $payment->update([
+                'date' => $request->date,
+                'account_id' => $request->debit_account_id,
+                'amount' => $request->amount,
+                'net_amount' => $request->amount,
+                'remarks' => $request->remarks,
+            ]);
+
+            // 3. Process new allocations
+            if ($request->has('source_allocations') && is_array($request->source_allocations)) {
+                foreach ($request->source_allocations as $alloc) {
+                    if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
+                        \App\Models\PaymentAllocation::create([
+                            'payment_id' => $receipt->id,
+                            'bill_id' => $alloc['bill_id'],
+                            'bill_type' => $alloc['type'],
+                            'amount' => $alloc['amount']
+                        ]);
+                        
+                        $bill = $alloc['type'] === 'App\Models\Sales' 
+                            ? \App\Models\Sales::find($alloc['bill_id']) 
+                            : \App\Models\Purchase::find($alloc['bill_id']);
+                            
+                        if ($bill) {
+                            $bill->paid_amount += $alloc['amount'];
+                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
+                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
+                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                            if ($alloc['type'] === 'App\Models\Sales') {
+                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
+                            } else {
+                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
+                            }
+                            $bill->save();
+                        }
+                    }
+                }
+            }
+
+            if ($request->has('destination_allocations') && is_array($request->destination_allocations)) {
+                foreach ($request->destination_allocations as $alloc) {
+                    if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
+                        \App\Models\PaymentAllocation::create([
+                            'payment_id' => $payment->id,
+                            'bill_id' => $alloc['bill_id'],
+                            'bill_type' => $alloc['type'],
+                            'amount' => $alloc['amount']
+                        ]);
+                        
+                        $bill = $alloc['type'] === 'App\Models\Sales' 
+                            ? \App\Models\Sales::find($alloc['bill_id']) 
+                            : \App\Models\Purchase::find($alloc['bill_id']);
+                            
+                        if ($bill) {
+                            $bill->paid_amount += $alloc['amount'];
+                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
+                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
+                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                            if ($alloc['type'] === 'App\Models\Sales') {
+                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
+                            } else {
+                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
+                            }
+                            $bill->save();
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('journal-vouchers.index')->with('success', 'Journal Voucher updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('JV Update Error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to update: ' . $e->getMessage()]);
+        }
+    }
+
+    public function pdf($id)
+    {
+        $receipt = Payment::with(['account', 'allocations.bill', 'firm'])->findOrFail($id);
+        if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
+            abort(403, 'Not a primary Credit side Journal Voucher');
+        }
+
+        $payment = Payment::with(['account', 'allocations.bill'])
+            ->where('group_id', $receipt->group_id)
+            ->where('type', 'PAYMENT')
+            ->where('payment_method', 'Journal')
+            ->firstOrFail();
+
+        $cleanVoucherNo = str_replace(['-A', '-B'], '', $receipt->voucher_no);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.journal-voucher', [
+            'receipt' => $receipt,
+            'payment' => $payment,
+            'voucher_no' => $cleanVoucherNo,
+        ]);
+
+        $pdf->setPaper('A4', 'portrait');
+
+        return $pdf->stream($cleanVoucherNo . '.pdf');
     }
 }

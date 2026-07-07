@@ -68,33 +68,50 @@ class GuestController extends Controller
         
         $itemsWithPrice = $items->map(function ($item) use ($customerCategory) {
             $tradePrice = (float) $item->trade_price;
-            $percentage = 0;
             
-            switch ($customerCategory) {
-                case '2': $percentage = (float) $item->pt2; break;
-                case '3': $percentage = (float) $item->pt3; break;
-                case '4': $percentage = (float) $item->pt4; break;
-                case '5': $percentage = (float) $item->pt5; break;
-                case '6': $percentage = (float) $item->pt6; break;
-                case '7': $percentage = (float) $item->pt7; break;
-                default: $percentage = 0; break;
-            }
-            
-            $guestPrice = $tradePrice;
+            $getPriceForTier = function($tier) use ($item, $tradePrice) {
+                if ($tier === '1') {
+                    return $tradePrice;
+                }
+                
+                $percentage = 0;
+                switch ($tier) {
+                    case '2': $percentage = (float) $item->pt2; break;
+                    case '3': $percentage = (float) $item->pt3; break;
+                    case '4': $percentage = (float) $item->pt4; break;
+                    case '5': $percentage = (float) $item->pt5; break;
+                    case '6': $percentage = (float) $item->pt6; break;
+                    case '7': $percentage = (float) $item->pt7; break;
+                }
+                
+                if ($percentage > 0) {
+                    return $tradePrice * (1 + ($percentage / 100));
+                }
+                
+                return (float) $item->retail ?: $tradePrice;
+            };
+
             if ($customerCategory === '1') {
                 $packingSize = (float) $item->packing_size ?: 1;
+                $pricePiece = $getPriceForTier('2');
                 $priceCarton = $tradePrice * $packingSize;
-                $priceLooseCarton = $tradePrice * (1 + ((float) $item->pt2 / 100));
-                $pricePiece = $priceLooseCarton;
+                $priceLooseCarton = $pricePiece * $packingSize;
+                $guestPrice = $tradePrice;
             } else {
-                if ($percentage > 0) {
-                    $guestPrice = $percentage;
-                } elseif ($item->retail > 0) {
-                    $guestPrice = (float) $item->retail;
+                $currentTier = in_array($customerCategory, ['2', '3', '4', '5', '6', '7']) ? $customerCategory : '7';
+                $nextTier = (string) min(7, (int)$currentTier + 1);
+                
+                $pricePiece = $getPriceForTier($currentTier);
+                $pricePieceLoose = $getPriceForTier($nextTier);
+                
+                if ($pricePieceLoose == $pricePiece) {
+                    $pricePieceLoose = $pricePiece * 1.05;
                 }
-                $priceCarton = $guestPrice;
-                $priceLooseCarton = $guestPrice;
-                $pricePiece = round($guestPrice / ($item->packing_qty ?: 1));
+                
+                $packing = $item->packing_qty ?: 1;
+                $priceCarton = $pricePiece * $packing;
+                $priceLooseCarton = $pricePieceLoose * $packing;
+                $guestPrice = $pricePiece;
             }
 
             return [
@@ -169,17 +186,6 @@ class GuestController extends Controller
                     case '7': $percentage = (float) $item->pt7; break;
                 }
                 
-                $price = $tradePrice;
-                if ($customerCategory === '1') {
-                    $price = $tradePrice;
-                } else {
-                    if ($percentage > 0) {
-                        $price = $percentage;
-                    } elseif ($item->retail > 0) {
-                        $price = (float) $item->retail;
-                    }
-                }
-
                 $packing = $item->packing_qty ?: 1;
                 $packingSize = (float) $item->packing_size ?: 1;
                 
@@ -190,16 +196,51 @@ class GuestController extends Controller
                 }
                 
                 if ($totalPcs <= 0) continue;
-                
+
+                $getPriceForTier = function($tier) use ($item, $tradePrice) {
+                    if ($tier === '1') {
+                        return $tradePrice;
+                    }
+                    
+                    $percentage = 0;
+                    switch ($tier) {
+                        case '2': $percentage = (float) $item->pt2; break;
+                        case '3': $percentage = (float) $item->pt3; break;
+                        case '4': $percentage = (float) $item->pt4; break;
+                        case '5': $percentage = (float) $item->pt5; break;
+                        case '6': $percentage = (float) $item->pt6; break;
+                        case '7': $percentage = (float) $item->pt7; break;
+                    }
+                    
+                    if ($percentage > 0) {
+                        return $tradePrice * (1 + ($percentage / 100));
+                    }
+                    
+                    return (float) $item->retail ?: $tradePrice;
+                };
+
                 if ($customerCategory === '1') {
+                    $pricePiece = $getPriceForTier('2');
                     $priceCarton = $tradePrice * $packingSize;
-                    $priceLooseCarton = $tradePrice * (1 + ((float) $item->pt2 / 100));
-                    $pricePiece = $priceLooseCarton;
                     $fullCartonsFromPcs = floor($it['qty_pcs'] / $packingSize);
                     $remainingPcs = $it['qty_pcs'] % $packingSize;
                     $subtotal = ($it['qty_carton'] * $priceCarton) + ($fullCartonsFromPcs * $priceCarton) + ($remainingPcs * $pricePiece);
+                    $price = $tradePrice;
                 } else {
-                    $subtotal = ($it['qty_carton'] * $price) + ($it['qty_pcs'] * ($price / $packing));
+                    $currentTier = in_array($customerCategory, ['2', '3', '4', '5', '6', '7']) ? $customerCategory : '7';
+                    $nextTier = (string) min(7, (int)$currentTier + 1);
+                    
+                    $pricePiece = $getPriceForTier($currentTier);
+                    $pricePieceLoose = $getPriceForTier($nextTier);
+                    
+                    if ($pricePieceLoose == $pricePiece) {
+                        $pricePieceLoose = $pricePiece * 1.05;
+                    }
+                    
+                    $priceCarton = $pricePiece * $packing;
+                    
+                    $subtotal = ($it['qty_carton'] * $priceCarton) + ($it['qty_pcs'] * $pricePieceLoose);
+                    $price = $pricePiece;
                 }
                 $grossTotal += $subtotal;
                 

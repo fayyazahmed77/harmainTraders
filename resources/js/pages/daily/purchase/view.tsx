@@ -8,22 +8,21 @@ import {
     PrinterIcon,
     DownloadIcon,
     Calendar,
-    Hash,
-    User,
-    CreditCard,
-    Box,
-    TrendingUp,
     ShieldCheck,
-    Info,
     Receipt,
     Tag,
-    ChevronRight
+    Info,
+    CheckCircle,
+    CircleDollarSign,
+    History,
+    Truck,
+    Package,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface PurchaseItem {
     id: number;
@@ -39,6 +38,7 @@ interface PurchaseItem {
         id: number;
         title: string;
         code?: string;
+        packing_qty?: number;
     };
 }
 
@@ -46,22 +46,21 @@ interface Purchase {
     id: number;
     date: string;
     invoice: string;
-    code: string;
-    supplier?: { id: number; title: string };
+    code?: string;
+    supplier?: { id: number; title: string; current_balance?: number };
     salesman?: { id: number; name: string };
     no_of_items: number;
     gross_total: number;
     discount_total: number;
-    tax_total: number;
+    extra_discount?: number;
+    tax_total?: number;
+    courier_charges?: number;
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
-    message_line_id?: number | null;
-    message_line?: {
-        id: number;
-        messageline: string;
-    } | null;
+    message_line?: { id: number; messageline: string } | null;
     items: PurchaseItem[];
+    created_at?: string;
 }
 
 interface Props {
@@ -75,317 +74,286 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function View({ purchase }: Props) {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-PK", {
-            style: "currency",
-            currency: "PKR",
-            minimumFractionDigits: 2,
-        }).format(amount);
+    const fmt = (amount: number) =>
+        new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", minimumFractionDigits: 2 })
+            .format(amount).replace("PKR", "").trim();
+
+    const fmtDate = (d: string | null | undefined) => {
+        if (!d) return "N/A";
+        const dt = new Date(d + "T00:00:00");
+        return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
     };
 
-    const totalPcs = purchase.items.reduce((acc, curr) => acc + Number(curr.total_pcs), 0);
+    const netTotal = Number(purchase.net_total || 0);
+    const extraDiscount = Number(purchase.extra_discount || 0);
+    const invoiceTotal = Math.max(0, netTotal - extraDiscount);
+    const paid = Number(purchase.paid_amount || 0);
+    const supplierBal = Number(purchase.supplier?.current_balance || 0);
+    const prevBal = supplierBal - invoiceTotal + paid;
+    const netBal = invoiceTotal + prevBal - paid;
+    const remaining = Math.max(0, invoiceTotal - paid);
+    const totalPcs = purchase.items.reduce((a, c) => a + Number(c.total_pcs), 0);
+
+    const badge = remaining === 0
+        ? { label: "Fully Paid", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-300" }
+        : paid > 0
+            ? { label: "Partial Paid", cls: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300" }
+            : { label: "Unpaid", cls: "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-300" };
 
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
-            <SidebarInset className="bg-background">
+            <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/20">
                 <SiteHeader breadcrumbs={breadcrumbs} />
+                <div className="mx-auto w-full max-w-[1600px] p-6 lg:p-8 space-y-8">
 
-                <div className="mx-auto w-full max-w-[1600px] p-6 lg:p-8 space-y-6">
-
-                    {/* PROFESSIONAL ACTION HEADER (COMPACT) */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border pb-6">
-                        <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-4"
-                        >
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => window.history.back()}
-                                className="h-10 w-10 rounded-xl shadow-sm border-border bg-card hover:bg-muted/50"
-                            >
+                    {/* HEADER */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-200 dark:border-zinc-800 pb-6">
+                        <div className="flex items-center gap-4">
+                            <Button variant="outline" size="icon" onClick={() => window.history.back()}
+                                className="h-10 w-10 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                                 <ArrowLeftIcon className="h-4 w-4" />
                             </Button>
                             <div>
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <h1 className="text-2xl font-black tracking-tighter text-foreground">
-                                        {purchase.invoice}
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+                                        Purchase Bill <span className="font-mono text-primary">{purchase.invoice}</span>
                                     </h1>
-                                    <div className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest rounded-full border border-primary/20">
-                                        PURCHASE_BILL
-                                    </div>
+                                    <Badge className="px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-300">
+                                        <CheckCircle className="h-3 w-3" /> Verified
+                                    </Badge>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-1.5">
-                                        <ShieldCheck className="h-2.5 w-2.5 text-emerald-500" /> VERIFIED
-                                    </p>
-                                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">INDEX: {purchase.id}</span>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-zinc-500 font-medium">
+                                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                                        <ShieldCheck className="h-3.5 w-3.5" /> Transaction Verified
+                                    </span>
+                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                                    <span>Date: <span className="font-bold text-zinc-700 dark:text-zinc-300">{fmtDate(purchase.date)}</span></span>
+                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                                    <span>Created: <span className="font-bold text-zinc-700 dark:text-zinc-300">{purchase.created_at ? new Date(purchase.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : fmtDate(purchase.date)}</span></span>
+                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                                    <span>Supplier: <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase">{purchase.supplier?.title || "N/A"}</span></span>
+                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                                    <span>Agent: <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase">{purchase.salesman?.name || "Direct"}</span></span>
                                 </div>
                             </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="flex items-center gap-2"
-                        >
-                            <Button
-                                variant="outline"
-                                onClick={() => window.open(`/purchase/${purchase.id}/pdf`, "_blank")}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-border bg-card hover:bg-muted/50 transition-all shadow-sm"
-                            >
-                                <PrinterIcon className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                                PRINT
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=small`, "_blank")}
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center gap-2">
+                                <PrinterIcon className="h-4 w-4 text-orange-500" /> Print Small
                             </Button>
-                            <Button
-                                onClick={() => window.location.href = `/purchase/${purchase.id}/download`}
-                                className="h-10 px-6 text-xs font-bold bg-[#FF8904] text-white hover:bg-[#e67a03] rounded-xl shadow-lg shadow-orange-500/10 border-none transition-all group"
-                            >
-                                <DownloadIcon className="h-3.5 w-3.5 mr-2 group-hover:-translate-y-0.5 transition-transform" />
-                                SAVE AS PDF
+                            <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=big`, "_blank")}
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center gap-2">
+                                <PrinterIcon className="h-4 w-4 text-blue-500" /> Print Large
                             </Button>
-                        </motion.div>
+                            <Button variant="outline" onClick={() => (window.location.href = `/purchase/${purchase.id}/download`)}
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm flex items-center gap-2">
+                                <DownloadIcon className="h-4 w-4 text-emerald-500" /> Download PDF
+                            </Button>
+                        </div>
                     </div>
 
-                    {/* PRECISION COMPACT GRID */}
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    {/* MAIN GRID */}
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
-                        {/* SIDEBAR WING: ADMINISTRATION (4 COLS) */}
-                        <div className="xl:col-span-4 space-y-4">
-
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="grid grid-cols-1 gap-4"
-                            >
-                                {/* DATE & SUPPLIER TILE (COMBINED REFINED) */}
-                                <Card className="p-0 border-border bg-card shadow-sm overflow-hidden divide-y divide-border text-foreground">
-                                    <div className="p-4 flex items-center justify-between group hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
-                                                <Calendar className="h-4 w-4 text-orange-500" />
-                                            </div>
+                        {/* LEFT: Table (8 cols) */}
+                        <div className="xl:col-span-8 min-w-0 space-y-8">
+                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
+                                <CardHeader className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                            <Receipt className="h-5 w-5 text-primary" />
                                             <div>
-                                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Purchase Date</span>
-                                                <p className="text-sm font-black tracking-tight leading-none mt-0.5">{purchase.date}</p>
+                                                <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">Purchase Items Manifest</CardTitle>
+                                                <CardDescription className="text-[10px] text-zinc-500 font-mono">Detailed manifest of products and transaction row totals</CardDescription>
                                             </div>
                                         </div>
-                                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
+                                        <Badge variant="outline" className="text-[10px] font-mono border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-none">PID_{purchase.id}</Badge>
                                     </div>
-                                    <div className="p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                                        <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                                            <User className="h-4 w-4 text-blue-500" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Supplier / Vendor</span>
-                                            <p className="text-sm font-black tracking-tight leading-none mt-0.5 uppercase">{purchase.supplier?.title || "SUPPLIER"}</p>
-                                            <div className="flex items-center gap-1.5 mt-1 opacity-60">
-                                                <div className="h-1 w-1 rounded-full bg-emerald-500"></div>
-                                                <span className="text-[8px] font-bold uppercase tracking-tighter">Rep: {purchase.salesman?.name || "Direct"}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-
-                                {/* STATS ROW: VOLUMES */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Card className="p-4 bg-muted/20 border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Total Items</span>
-                                        <div className="flex items-center justify-between">
-                                            <Box className="h-4 w-4 text-muted-foreground" />
-                                            <p className="text-lg font-black text-foreground">{purchase.no_of_items}</p>
-                                        </div>
-                                    </Card>
-                                    <Card className="p-4 bg-card border-border shadow-sm flex flex-col justify-between">
-                                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-2">Total Pieces</span>
-                                        <div className="flex items-center justify-between text-primary">
-                                            <TrendingUp className="h-4 w-4" />
-                                            <p className="text-lg font-black tabular-nums">{totalPcs}</p>
-                                        </div>
-                                    </Card>
-
-                                    {/* MESSAGE LINE SECTION */}
-                                    {purchase.message_line && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 5 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="col-span-2 p-4 rounded-[0.5rem] border border-sky-100 bg-sky-50/30 flex items-center gap-3 shadow-sm group hover:bg-sky-50/50 transition-all"
-                                        >
-                                            <div className="h-8 w-8 rounded-lg bg-sky-500/10 flex items-center justify-center border border-sky-500/20 group-hover:scale-110 transition-transform">
-                                                <Info className="h-4 w-4 text-sky-600" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <span className="text-[8px] font-black text-sky-600/60 uppercase tracking-widest block mb-0.5">Note / Remarks</span>
-                                                <p className="text-sm font-black text-sky-900 leading-tight break-words px-1 border-l-2 border-sky-200 ml-1 italic group-hover:translate-x-1 transition-transform">
-                                                    {purchase.message_line.messageline}
-                                                </p>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </div>
-                            </motion.div>
-
-                            {/* COMPACT PAYMENT INDICATOR - HUD (Horizontal-ish) */}
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.98 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.1 }}
-                                className="p-5 rounded-[0.5rem] bg-slate-900 dark:bg-card text-white dark:text-foreground shadow-xl relative overflow-hidden group"
-                            >
-                                <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-125 transition-transform duration-1000">
-                                    <CreditCard className="h-20 w-20" />
-                                </div>
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-2.5 mb-5 opacity-80">
-                                        <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
-                                            <CreditCard className="h-3.5 w-3.5" />
-                                        </div>
-                                        <span className="text-[9px] font-black uppercase tracking-widest">Payment Details</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
-                                        <div>
-                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Paid</span>
-                                            <p className="text-sm font-black font-mono">
-                                                {formatCurrency(purchase.paid_amount).replace('PKR', '').trim()} <span className="text-[8px] opacity-40">PKR</span>
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest block mb-1">Balance Due</span>
-                                            <p className="text-sm font-black text-[#FF8904] font-mono">
-                                                {formatCurrency(purchase.remaining_amount).replace('PKR', '').trim()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        {/* DATA WING: TABLE & FINANCIALS (8 COLS) */}
-                        <div className="xl:col-span-8 space-y-6">
-
-                            <Card className="p-0 rounded-[0.5rem] border-border shadow-md shadow-muted/10 overflow-hidden bg-card transition-all">
-                                {/* COMPACT TABLE HEADER */}
-                                <div className="px-6 py-4 border-b border-border bg-muted/10 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                                            <Receipt className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Item Details</h3>
-                                    </div>
-                                    <div className="hidden sm:flex items-center gap-3 bg-background px-2 py-1 rounded-lg border border-border">
-                                        <span className="text-[8px] font-black text-primary px-2 py-0.5 bg-primary/10 rounded">VERIFIED</span>
-                                        <span className="text-[8px] font-bold font-mono text-muted-foreground">ID_{purchase.id}</span>
-                                    </div>
-                                </div>
-
+                                </CardHeader>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full">
+                                    <table className="w-full text-left border-collapse table-auto">
                                         <thead>
-                                            <tr className="bg-muted/20 text-[9px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">
-                                                <th className="px-6 py-3 text-left">Product Name</th>
+                                            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                                <th className="px-6 py-3">#</th>
+                                                <th className="px-3 py-3">Product Specification</th>
                                                 <th className="px-3 py-3 text-center">Carton</th>
                                                 <th className="px-3 py-3 text-center">Pcs</th>
-                                                <th className="px-3 py-3 text-center">Total Pcs</th>
-                                                <th className="px-6 py-3 text-right">Rate</th>
+                                                <th className="px-4 py-3 text-right">Rate</th>
+                                                <th className="px-4 py-3 text-right">Discount</th>
+                                                <th className="px-4 py-3 text-right">After Disc</th>
                                                 <th className="px-6 py-3 text-right">Subtotal</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-border/30">
-                                            {purchase.items.map((it, idx) => (
-                                                <motion.tr
-                                                    key={it.id}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ delay: 0.1 + idx * 0.03 }}
-                                                    className="group hover:bg-muted/30 transition-all cursor-default"
-                                                >
-                                                    <td className="px-6 py-3.5">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 shrink-0 rounded-lg bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-inner group-hover:-rotate-3">
-                                                                <Tag className="h-4 w-4" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs font-black text-foreground tracking-tight leading-tight uppercase group-hover:translate-x-1 transition-transform">{it.item?.title}</p>
-                                                                <p className="text-[8px] font-bold text-muted-foreground font-mono mt-0.5 tracking-widest opacity-60">#{it.item?.code || "UN_MKD"}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-3 text-center text-[10px] font-black text-muted-foreground font-mono opacity-50">{it.qty_carton}</td>
-                                                    <td className="px-3 py-3 text-center text-[10px] font-black text-muted-foreground font-mono opacity-50">{it.qty_pcs}</td>
-                                                    <td className="px-3 py-3 text-center">
-                                                        <span className="px-2 py-0.5 bg-muted rounded text-[10px] font-black text-foreground border border-border group-hover:border-primary/30">
-                                                            {it.total_pcs}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-3 text-right text-[10px] font-black text-muted-foreground font-mono">
-                                                        {formatCurrency(it.trade_price).replace('PKR', '').trim()}
-                                                    </td>
-                                                    <td className="px-6 py-3 text-right">
-                                                        <div className="text-[13px] font-black text-foreground font-mono tracking-tighter">
-                                                            {formatCurrency(it.subtotal).replace('PKR', '').trim()}
-                                                            <span className="text-[8px] font-bold opacity-30 ml-1">PKR</span>
-                                                        </div>
-                                                        {it.discount > 0 && (
-                                                            <p className="text-[8px] font-bold text-rose-500 mt-0.5 flex items-center justify-end gap-1">
-                                                                -{formatCurrency(it.discount)} Disc
-                                                            </p>
-                                                        )}
-                                                    </td>
-                                                </motion.tr>
-                                            ))}
+                                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
+                                            {purchase.items.map((it, idx) => {
+                                                const sg = Number(it.subtotal || 0);
+                                                const dp = sg > 0 ? (Number(it.discount || 0) / sg) * 100 : 0;
+                                                const adr = Number(it.trade_price || 0) * (1 - dp / 100);
+                                                return (
+                                                    <tr key={it.id} className="group transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 border-l-2 border-transparent text-xs">
+                                                        <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
+                                                        <td className="px-3 py-3.5">
+                                                            <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[300px]">{it.item?.title}</p>
+                                                            <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
+                                                        </td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">{fmt(it.trade_price)}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">{it.discount > 0 ? `-${fmt(it.discount)}` : "0.00"}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
+                                                        <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
+                                        <tfoot className="bg-zinc-50/50 dark:bg-zinc-950/20 font-black text-xs border-t border-zinc-200 dark:border-zinc-800">
+                                            <tr>
+                                                <td className="px-6 py-3.5 text-zinc-500">Total</td>
+                                                <td></td>
+                                                <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{purchase.items.reduce((a, i) => a + Number(i.qty_carton || 0), 0)}</td>
+                                                <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{purchase.items.reduce((a, i) => a + Number(i.qty_pcs || 0), 0)}</td>
+                                                <td></td>
+                                                <td className="px-4 py-3.5 text-right text-rose-500 font-mono">-{fmt(purchase.items.reduce((a, i) => a + Number(i.discount || 0), 0))}</td>
+                                                <td></td>
+                                                <td className="px-6 py-3.5 text-right text-orange-500 font-mono">{fmt(purchase.items.reduce((a, i) => a + (Number(i.subtotal || 0) - Number(i.discount || 0)), 0))}</td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             </Card>
 
-                            {/* COMPACT FINANCIAL HUD (FOOTER) */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
-                                className="grid grid-cols-1 md:grid-cols-3 gap-4"
-                            >
-                                <Card className="p-5 bg-card border-border flex flex-col justify-between group hover:border-primary/20 transition-all shadow-sm">
-                                    <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-3">Total Amount</p>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-xl font-black tracking-tight font-mono">{formatCurrency(purchase.gross_total).replace('PKR', '').trim()}</span>
-                                        <span className="text-[8px] font-bold opacity-30 uppercase">PKR</span>
-                                    </div>
+                            {purchase.message_line?.messageline && (
+                                <Card className="bg-orange-500/[0.02] border border-orange-500/10 shadow-sm rounded-xl p-5">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 block mb-2 flex items-center gap-1.5">
+                                        <Info className="h-4 w-4" /> Message Line / Special Notice
+                                    </span>
+                                    <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 italic uppercase">"{purchase.message_line.messageline}"</p>
                                 </Card>
+                            )}
+                        </div>
 
-                                <Card className="p-5 bg-rose-500/[0.03] border-rose-500/10 flex flex-col justify-between group hover:bg-rose-500/[0.08] transition-all">
-                                    <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-3">Total Discount</p>
-                                    <div className="flex items-baseline gap-2 text-rose-600">
-                                        <span className="text-xl font-black tracking-tight font-mono">-{formatCurrency(purchase.discount_total).replace('PKR', '').trim()}</span>
-                                        <span className="text-[8px] font-black opacity-40 uppercase italic ml-1 leading-none">DISC</span>
-                                    </div>
-                                </Card>
+                        {/* RIGHT: Sidebar (4 cols) */}
+                        <div className="xl:col-span-4 min-w-0 space-y-8">
 
-                                <Card className="p-5 bg-[#FF8904] text-white shadow-xl shadow-orange-500/10 flex flex-col justify-center relative overflow-hidden group border-none">
-                                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-125 transition-transform duration-700">
-                                        <TrendingUp className="h-12 w-12" />
+                           
+
+                            {/* Financial Ledger */}
+                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
+                                <CardHeader className="px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200 flex items-center gap-2">
+                                            <CircleDollarSign className="h-4 w-4 text-emerald-500" />
+                                            Financial Payable Ledger
+                                        </CardTitle>
+                                        <Badge className={cn("px-2.5 py-0.5 rounded-full shadow-none font-bold text-[9px] uppercase tracking-wider border", badge.cls)}>
+                                            {badge.label}
+                                        </Badge>
                                     </div>
-                                    <div className="relative z-10">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-80 mb-6">Final Amount</p>
-                                        <div className="flex items-baseline justify-end gap-2 translate-y-1">
-                                            <span className="text-3xl font-black tracking-tighter font-mono tabular-nums leading-none">
-                                                {formatCurrency(purchase.net_total).replace('PKR', '').trim()}
-                                            </span>
-                                            <span className="text-[10px] font-black opacity-60">PKR</span>
+                                </CardHeader>
+                                <CardContent className="p-5 space-y-3.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+                                    <div className="flex justify-between items-center">
+                                        <span>Gross Subtotal</span>
+                                        <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(purchase.gross_total)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-rose-500">
+                                        <span>Standard Item Discount</span>
+                                        <span className="font-mono">-{fmt(purchase.discount_total)}</span>
+                                    </div>
+                                    {extraDiscount > 0 && (
+                                        <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-bold">
+                                            <span>Extra Discount (current bill)</span>
+                                            <span className="font-mono">-{fmt(extraDiscount)}</span>
+                                        </div>
+                                    )}
+                                    {(purchase.courier_charges ?? 0) > 0 && (
+                                        <div className="flex justify-between items-center text-purple-600 dark:text-purple-400">
+                                            <span>Courier / Freight Charges</span>
+                                            <span className="font-mono">+{fmt(purchase.courier_charges ?? 0)}</span>
+                                        </div>
+                                    )}
+                                    {(purchase.tax_total ?? 0) > 0 && (
+                                        <div className="flex justify-between items-center text-blue-500">
+                                            <span>Purchase Tax (GST)</span>
+                                            <span className="font-mono">+{fmt(purchase.tax_total ?? 0)}</span>
+                                        </div>
+                                    )}
+                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
+                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-bold">
+                                        <span>Current Invoice Total</span>
+                                        <span className="font-mono">{fmt(invoiceTotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-zinc-500">
+                                        <span>Supplier Previous Balance</span>
+                                        <span className={cn("font-mono font-bold", prevBal > 0 ? "text-rose-500" : prevBal < 0 ? "text-emerald-500" : "text-zinc-500")}>
+                                            {prevBal < 0 ? "-" : ""}{fmt(Math.abs(prevBal))}
+                                        </span>
+                                    </div>
+                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
+                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                        <span>Net Balance Payable</span>
+                                        <span className="font-mono text-orange-500">{fmt(invoiceTotal + prevBal)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                                        <span>Amount Paid</span>
+                                        <span className="font-mono font-bold">{fmt(purchase.paid_amount)}</span>
+                                    </div>
+                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
+                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                        <span>Net Balance Outstanding</span>
+                                        <span className={cn("font-mono", netBal > 0 ? "text-rose-600" : "text-emerald-600")}>{fmt(netBal)}</span>
+                                    </div>
+                                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60 mt-2 space-y-1.5 text-[10px] text-zinc-400 font-medium">
+                                        <div className="flex justify-between">
+                                            <span>Payment Terms</span>
+                                            <span className="font-bold text-zinc-600 dark:text-zinc-400 uppercase">CREDIT</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Terminal ID</span>
+                                            <span className="font-mono">PUR_T_{purchase.id}</span>
                                         </div>
                                     </div>
-                                </Card>
-                            </motion.div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Audit Timeline */}
+                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 block mb-4 flex items-center gap-1.5">
+                                    <History className="h-4 w-4 text-purple-500" /> Audit Transaction Timeline
+                                </span>
+                                <div className="relative pl-6 border-l-2 border-zinc-100 dark:border-zinc-800 space-y-5 ml-1">
+                                    {[
+                                        {
+                                            label: "Purchase Bill Drafted & Created",
+                                            sub: purchase.created_at ? `${new Date(purchase.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} ${new Date(purchase.created_at).toLocaleTimeString()}` : fmtDate(purchase.date),
+                                            active: true,
+                                        },
+                                        { label: "Stock Replenishment Logged", sub: "Automated inventory update completed", active: true },
+                                        {
+                                            label: "Payment Settlement Processed",
+                                            sub: purchase.paid_amount > 0 ? `Paid: Rs ${purchase.paid_amount.toLocaleString()}` : "Credit Term Account — Pending",
+                                            active: purchase.paid_amount > 0,
+                                        },
+                                        { label: "Audit Status Confirmed", sub: "Verified by system administrator", active: true },
+                                    ].map((item, i) => (
+                                        <div key={i} className="relative">
+                                            <div className={cn("absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 bg-white dark:bg-zinc-900 flex items-center justify-center", item.active ? "border-emerald-500" : "border-zinc-300 dark:border-zinc-700")}>
+                                                <div className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700")} />
+                                            </div>
+                                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{item.label}</p>
+                                            <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">{item.sub}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
 
                         </div>
                     </div>
 
-                    {/* COMPACT FOOTER SYSTEM */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border pt-6 mt-4 opacity-30 select-none pointer-events-none mb-6">
-                        <p className="text-[8px] font-black uppercase tracking-[0.3em]">TX_ENGINE_V2.7 // OPS.LOG_INDEX:4492-AXL</p>
-                        <p className="text-[8px] font-bold font-mono tracking-widest mt-2 sm:mt-0 uppercase">REG_VERIFIED: 2026-01-24</p>
+                    <div className="hidden print:flex flex-col items-center justify-center border-t border-zinc-200 pt-6 mt-12 text-center text-xs text-zinc-400 font-mono">
+                        <p className="font-bold uppercase tracking-wider">Harnain Traders Wholesale & Supply Chain</p>
+                        <p className="mt-1">Generated dynamically on {new Date().toLocaleString()}</p>
                     </div>
 
                 </div>

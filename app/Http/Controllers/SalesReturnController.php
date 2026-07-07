@@ -82,6 +82,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'discount_total'  => 'required|numeric',
                 'tax_total'       => 'required|numeric',
                 'net_total'       => 'required|numeric',
+                'extra_discount'  => 'nullable|numeric|min:0',
                 'paid_amount'     => 'required|numeric',
                 'remaining_amount' => 'required|numeric',
                 'payment_account_id' => 'nullable|integer|exists:accounts,id',
@@ -188,18 +189,30 @@ class SalesReturnController extends Controller implements HasMiddleware
             // Generate sequential invoice number inside the transaction to prevent duplicates
             $finalInvoice = $request->invoice ?? $this->generateNextReturnInvoice();
 
+            $customer = Account::findOrFail($request->customer_id);
+            $previousBalance = (float)$customer->current_balance;
+
+            $extraDiscount = (float)($request->extra_discount ?? 0);
+            if ($extraDiscount > $request->net_total) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'extra_discount' => 'Extra discount cannot exceed return total.'
+                ]);
+            }
+
             $return = SalesReturn::create([
                 'date'            => $request->date,
                 'invoice'         => $finalInvoice,
                 'original_invoice' => $request->original_invoice,
                 'sale_id'         => $sale->id,
                 'customer_id'     => $request->customer_id,
+                'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?? 0,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
                 'tax_total'       => $request->tax_total,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $extraDiscount,
                 'paid_amount'     => $request->paid_amount,
                 'remaining_amount' => $request->remaining_amount,
                 'remarks'         => $request->remarks,
@@ -232,7 +245,7 @@ class SalesReturnController extends Controller implements HasMiddleware
 
             // Allocate return value using the FIFO Allocation engine
             $allocationService = new \App\Services\FIFOAllocationService();
-            $allocationService->allocate($return, (float)$return->net_total);
+            $allocationService->allocate($return, (float)($return->net_total - $return->extra_discount));
 
             // Log activity
             \App\Services\ActivityLogger::log('created', 'Sales Return', "Created sales return {$finalInvoice} for customer ID {$request->customer_id}");
@@ -409,6 +422,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'discount_total'  => 'required|numeric',
                 'tax_total'       => 'required|numeric',
                 'net_total'       => 'required|numeric',
+                'extra_discount'  => 'nullable|numeric|min:0',
                 'items'           => 'required|array',
                 'sale_id'         => 'nullable|integer|exists:sales,id',
             ]);
@@ -521,6 +535,16 @@ class SalesReturnController extends Controller implements HasMiddleware
                 }
             }
 
+            $customer = Account::findOrFail($request->customer_id);
+            $previousBalance = (float)$customer->current_balance + (float)($return->net_total - $return->extra_discount);
+
+            $extraDiscount = (float)($request->extra_discount ?? 0);
+            if ($extraDiscount > $request->net_total) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'extra_discount' => 'Extra discount cannot exceed return total.'
+                ]);
+            }
+
             // 2. Update Return Record
             $return->update([
                 'date'            => $request->date,
@@ -528,12 +552,14 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'original_invoice' => $request->original_invoice,
                 'sale_id'         => $newSale->id,
                 'customer_id'     => $request->customer_id,
+                'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?? 0,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
                 'tax_total'       => $request->tax_total,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $extraDiscount,
                 'remarks'         => $request->remarks,
             ]);
 
@@ -565,7 +591,7 @@ class SalesReturnController extends Controller implements HasMiddleware
             }
 
             // 4. Run FIFO allocation again
-            $allocationService->allocate($return, (float)$return->net_total);
+            $allocationService->allocate($return, (float)($return->net_total - $return->extra_discount));
 
             // Log activity
             \App\Services\ActivityLogger::log('updated', 'Sales Return', "Updated sales return {$return->invoice}");

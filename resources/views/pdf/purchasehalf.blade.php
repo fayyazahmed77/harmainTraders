@@ -185,8 +185,12 @@
                 <span class="info-value">{{ $purchase->supplier->address1 ?? 'N/A' }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Date/Time:</span>
-                <span class="info-value">{{ \Carbon\Carbon::parse($purchase->date)->format('l F d Y h:i A') }}</span>
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ strtoupper(\Carbon\Carbon::parse($purchase->date)->format('d M Y')) }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span class="info-value">{{ $purchase->created_at ? \Carbon\Carbon::parse($purchase->created_at)->setTimezone('Asia/Karachi')->format('h:i A') : \Carbon\Carbon::now()->setTimezone('Asia/Karachi')->format('h:i A') }}</span>
             </div>
         </div>
 
@@ -238,21 +242,34 @@
             </div>
             @endif
 
+            @if(($purchase->extra_discount ?? 0) > 0)
+            <div class="total-row clearfix">
+                <span class="total-label">Extra Discount :-</span>
+                <span class="total-value">{{ number_format($purchase->extra_discount, 2) }}</span>
+            </div>
+            @endif
+
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Rs. :-</span>
                 <span class="total-value">{{ number_format($purchase->net_total, 2) }}</span>
             </div>
 
+            @php
+            $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
+            $purchase_net = $purchase->net_total;
+            $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
+            @endphp
+
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
-                <span class="total-value">{{ number_format($purchase->supplier->opening_balance ?? 0, 2) }}</span>
+                <span class="total-value">{{ number_format($prev_balance, 2) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format($purchase->net_total + ($purchase->supplier->opening_balance ?? 0), 2) }}</span>
+                <span class="total-value">{{ number_format($purchase_net + $prev_balance, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -264,7 +281,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Net Payable :</span>
-                <span class="total-value">{{ number_format(($purchase->net_total + ($purchase->supplier->opening_balance ?? 0)) - $purchase->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format(($purchase_net + $prev_balance) - $purchase->paid_amount, 2) }}</span>
             </div>
         </div>
 

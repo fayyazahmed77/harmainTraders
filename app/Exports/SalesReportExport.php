@@ -49,6 +49,30 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
     public function columnWidths(): array
     {
         switch ($this->type) {
+            case 'details_wise':
+                return [
+                    'A' => 8,
+                    'B' => 15,
+                    'C' => 15,
+                    'D' => 12,
+                    'E' => 12,
+                    'F' => 18,
+                    'G' => 15,
+                    'H' => 18,
+                ];
+            case 'detail':
+                return [
+                    'A' => 8,
+                    'B' => 12,
+                    'C' => 15,
+                    'D' => 30,
+                    'E' => 35,
+                    'F' => 12,
+                    'G' => 12,
+                    'H' => 15,
+                    'I' => 15,
+                    'J' => 18,
+                ];
             case 'company':
                 return [
                     'A' => 10,
@@ -81,6 +105,18 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
     public function columnFormats(): array
     {
         switch ($this->type) {
+            case 'details_wise':
+                return [
+                    'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                ];
+            case 'detail':
+                return [
+                    'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'J' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                ];
             case 'company':
                 return [
                     'C' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
@@ -96,13 +132,10 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
                 ];
             case 'salesman':
                 return [
-                    'A' => 10,
-                    'B' => 40,
-                    'C' => 20,
-                    'D' => 20,
-                    'E' => 20,
-                    'F' => 20,
-                    'G' => 15,
+                    'C' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'D' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'E' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                 ];
             default:
                 return [

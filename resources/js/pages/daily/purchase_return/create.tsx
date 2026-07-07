@@ -306,6 +306,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState("");
     const [supplierBalance, setSupplierBalance] = useState<number | null>(null);
+    const [extraDiscount, setExtraDiscount] = useState<number>(0);
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -442,6 +443,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         setRows([getEmptyRow()]);
         setInvoices([]);
         setSupplierBalance(null);
+        setExtraDiscount(0);
 
         if (acc) {
             setSalesman(acc.saleman_id ?? null);
@@ -781,6 +783,16 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         return accounts.filter(a => a.title.toLowerCase().includes(q));
     }, [accounts, accountSearch]);
 
+    const handleExtraDiscountChange = (val: number) => {
+        if (val < 0) return;
+        if (val > totals.net) {
+            toast.warning("Extra discount cannot exceed return total.");
+            setExtraDiscount(totals.net);
+            return;
+        }
+        setExtraDiscount(val);
+    };
+
     // ── Save ──────────────────────────────────
     const handleSave = () => {
         const rowCount = rows.filter(r => r.item_id !== null).length;
@@ -796,13 +808,15 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
             supplier_id: selectedAccount.id,
-            saleman_id: salesman,
+            previous_balance: toNum(supplierBalance),
+            salesman_id: salesman,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
             net_total: totals.net,
+            extra_discount: extraDiscount,
             paid_amount: refundAmount,
-            remaining_amount: totals.net - refundAmount,
+            remaining_amount: totals.net - extraDiscount - refundAmount,
             items: validRows.map(r => {
                 const packing = toNum(r.packing || 1);
                 const rate = toNum(r.rate);
@@ -829,7 +843,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 
                 setSuccessData({
                     supplierName: selectedAccount?.title || "Supplier",
-                    totalAmount: totals.net,
+                    totalAmount: totals.net - extraDiscount,
                     itemCount: validRows.length,
                     totalFull: validRows.reduce((acc, r) => acc + toNum(r.full), 0),
                     totalPcs: validRows.reduce((acc, r) => acc + toNum(r.pcs), 0),
@@ -1191,33 +1205,12 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     </h3>
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-end">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Gross Total</span>
-                                            <span className="text-lg font-black font-mono tracking-tighter text-zinc-900 dark:text-white">
-                                                {totals.gross.toLocaleString()}
-                                            </span>
-                                        </div>
-                                        {supplierBalance !== null && (
-                                            <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                                <span className="text-[10px] uppercase font-bold text-zinc-400">Supplier Ledger Bal</span>
-                                                <span className={`text-sm font-black font-mono tracking-tighter ${toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                                                    Rs {toNum(supplierBalance).toLocaleString()}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Total Full</span>
-                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-zinc-100">
-                                                {totals.total_full}
+                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Return Subtotal</span>
+                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-white">
+                                                {totals.net.toLocaleString()}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Total Pieces</span>
-                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-zinc-100">
-                                                {totals.total_pcs}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-end">
                                             <span className="text-[10px] uppercase font-bold text-zinc-400">Discount Delta</span>
                                             <span className="text-sm font-black font-mono tracking-tighter text-rose-600">
                                                 -{totals.disc.toLocaleString()}
@@ -1227,13 +1220,43 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 </div>
 
                                 <div className="space-y-4">
+                                    <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                        <div className="relative">
+                                            <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                                className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                        </div>
+                                    </TechLabel>
+
                                     <div className="bg-zinc-900 dark:bg-black p-5 rounded-xl border border-zinc-800 shadow-inner group/net">
-                                        <div className="text-[9px] uppercase font-black text-zinc-500 tracking-[0.2em] mb-1 group-hover/net:text-orange-500 transition-colors">Net Settlement</div>
+                                        <div className="text-[9px] uppercase font-black text-zinc-500 tracking-[0.2em] mb-1 group-hover/net:text-orange-500 transition-colors">Net Return Amount</div>
                                         <div className="text-4xl font-black text-white font-mono tracking-tighter flex items-baseline gap-1">
                                             <span className="text-lg opacity-30 font-sans">Rs</span>
-                                            {totals.net.toLocaleString()}
+                                            {(totals.net - extraDiscount).toLocaleString()}
                                         </div>
                                     </div>
+
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-0.5">
+                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                Previous Balance
+                                            </div>
+                                            <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                Rs {supplierBalance !== null ? toNum(supplierBalance).toLocaleString() : "0"}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-0.5 text-right">
+                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                New Balance
+                                            </div>
+                                            <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                Rs {(toNum(supplierBalance) - (totals.net - extraDiscount) + refundAmount).toLocaleString()}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
                                     <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
                                         <div className="relative group/refund">

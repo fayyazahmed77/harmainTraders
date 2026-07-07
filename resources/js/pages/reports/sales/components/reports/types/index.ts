@@ -1,5 +1,6 @@
 export { default as BillReport } from './BillReport';
 export { default as DetailsReport } from './DetailsReport';
+export { default as DateWiseReport } from './DateWiseReport';
 export { default as MonthReport } from './MonthReport';
 export { default as AreaItemPartyReport } from './AreaItemPartyReport';
 export { default as AreaPartyReport } from './AreaPartyReport';

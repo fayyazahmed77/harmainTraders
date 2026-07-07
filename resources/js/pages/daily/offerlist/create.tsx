@@ -125,12 +125,21 @@ interface Firm {
     id: number;
     name: string;
     logo?: string;
+    defult?: number | boolean;
+    status?: number | boolean;
 }
 
 export default function OfferListing({ items, categories, accounts, messageLines, firms }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[]; firms: Firm[] }) {
     const [date] = useState(new Date().toLocaleDateString('en-GB'));
     const [selectedAccount, setSelectedAccount] = useState<string>("");
-    const [selectedFirm, setSelectedFirm] = useState<string>("");
+    
+    const defaultFirm = useMemo(() => {
+        return firms.find(f => f.defult === 1 || f.defult === true);
+    }, [firms]);
+
+    const [selectedFirm, setSelectedFirm] = useState<string>(() => {
+        return defaultFirm ? defaultFirm.id.toString() : "";
+    });
     const [customerCategory, setCustomerCategory] = useState<string | null>(null);
     const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -552,12 +561,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                 </SelectTrigger>
                                                 <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                     <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                    <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
-                                                    <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
-                                                    <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
-                                                    <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
-                                                    <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
-                                                    <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -572,12 +581,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                 </SelectTrigger>
                                                 <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                     <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                    <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
-                                                    <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
-                                                    <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
-                                                    <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
-                                                    <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
-                                                    <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -594,12 +603,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                             </SelectTrigger>
                                             <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                 <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                <SelectItem value="2" className="text-xs font-bold">Tier 2</SelectItem>
-                                                <SelectItem value="3" className="text-xs font-bold">Tier 3</SelectItem>
-                                                <SelectItem value="4" className="text-xs font-bold">Tier 4</SelectItem>
-                                                <SelectItem value="5" className="text-xs font-bold">Tier 5</SelectItem>
-                                                <SelectItem value="6" className="text-xs font-bold">Tier 6</SelectItem>
-                                                <SelectItem value="7" className="text-xs font-bold">Tier 7</SelectItem>
+                                                <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
+                                                <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
+                                                <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
+                                                <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
+                                                <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
+                                                <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

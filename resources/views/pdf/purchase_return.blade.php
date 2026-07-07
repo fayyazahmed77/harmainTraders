@@ -420,12 +420,34 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td class="value">{{ number_format($purchaseReturn->net_total, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="label">Extra Discount :-</td>
+                        <td class="value">- {{ number_format($purchaseReturn->extra_discount, 2) }}</td>
+                    </tr>
+                    <tr style="font-size: 12px;">
+                        <td class="label">NET RETURN AMOUNT :-</td>
+                        <td class="value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Previous Balance :-</td>
+                        <td class="value">{{ number_format($purchaseReturn->previous_balance, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
+                    </tr>
+                    <tr style="font-size: 12px;">
+                        <td class="label">TOTAL BALANCE :-</td>
+                        <td class="value">{{ number_format($purchaseReturn->previous_balance - ($purchaseReturn->net_total - $purchaseReturn->extra_discount), 2) }}</td>
+                    </tr>
+                    <tr>
                         <td class="label">Cash Received :-</td>
                         <td class="value">{{ number_format($purchaseReturn->paid_amount, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="label">Account Adjustment :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->remaining_amount, 2) }}</td>
+                        <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
+                    </tr>
+                    <tr style="font-size: 12px; font-weight: bold;">
+                        <td class="label">NET OUTSTANDING :</td>
+                        <td class="value">{{ number_format($purchaseReturn->previous_balance - ($purchaseReturn->net_total - $purchaseReturn->extra_discount) + $purchaseReturn->paid_amount, 2) }}</td>
                     </tr>
                 </table>
             </div>

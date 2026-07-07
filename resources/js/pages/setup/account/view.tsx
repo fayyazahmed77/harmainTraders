@@ -142,18 +142,44 @@ export default function AccountView({ account, financial_summary }: Props) {
                             Customer Activity
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3">
+                        {/* Gross sales line */}
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Total Sales</span>
+                            <span className="text-muted-foreground">Total Sales (Net)</span>
                             <span className="font-bold">{formatCurrency(financial_summary.total_sales)}</span>
                         </div>
+
+                        {/* Discount line */}
+                        {Number(financial_summary.total_extra_discount) > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Total Discount</span>
+                                <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_extra_discount)}</span>
+                            </div>
+                        )}
+
+                        {/* Returns line */}
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Returns</span>
+                            <span className="font-bold text-orange-600">-{formatCurrency(financial_summary.total_returns)}</span>
+                        </div>
+
+                        {/* Net effective after returns + discount */}
+                        {(Number(financial_summary.total_extra_discount) > 0 || Number(financial_summary.total_returns) > 0) && (
+                            <div className="flex items-center justify-between text-sm border-t pt-2">
+                                <span className="text-muted-foreground font-medium">Net Effective</span>
+                                <span className="font-bold text-blue-600">
+                                    {formatCurrency(
+                                        Number(financial_summary.total_sales) - Number(financial_summary.total_returns)
+                                    )}
+                                </span>
+                            </div>
+                        )}
+
+                        <Separator />
+
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Amount Received</span>
                             <span className="font-bold text-green-600">{formatCurrency(financial_summary.total_receipts)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Returns</span>
-                            <span className="font-bold text-orange-600">{formatCurrency(financial_summary.total_returns)}</span>
                         </div>
                         <Separator />
                         <div className="flex items-center justify-between text-sm">
@@ -345,14 +371,58 @@ export default function AccountView({ account, financial_summary }: Props) {
                                             {formatCurrency(account.opening_balance)}
                                         </div>
                                     </div>
-                                    {financial_summary?.current_balance !== undefined && (
-                                        <div className="pt-2">
-                                            <div className="text-xs text-muted-foreground uppercase mb-1">{typeLower === 'cheque in hand' ? 'Available Amount of Check' : 'Current Balance'}</div>
-                                            <div className={cn("text-2xl font-bold", financial_summary.current_balance < 0 ? "text-red-500" : "text-green-600")}>
-                                                {formatCurrency(financial_summary.current_balance)}
+                                    {financial_summary?.current_balance !== undefined && (() => {
+                                        const balance = financial_summary.current_balance || 0;
+                                        const isCustomer = typeLower.includes('customer');
+                                        const isSupplier = typeLower.includes('supplier');
+                                        
+                                        let indicator = "";
+                                        let indicatorColor = "";
+                                        let isRed = false;
+                                        
+                                        if (balance !== 0) {
+                                            if (isCustomer) {
+                                                indicator = balance > 0 ? "DR" : "CR";
+                                                indicatorColor = balance > 0 ? "bg-emerald-500" : "bg-rose-500";
+                                                isRed = balance < 0;
+                                            } else if (isSupplier) {
+                                                indicator = balance > 0 ? "CR" : "DR";
+                                                indicatorColor = balance > 0 ? "bg-rose-500" : "bg-emerald-500";
+                                                isRed = balance > 0;
+                                            } else {
+                                                indicator = balance > 0 ? "BAL" : "OD";
+                                                indicatorColor = balance > 0 ? "bg-zinc-500" : "bg-zinc-700";
+                                                isRed = balance < 0;
+                                            }
+                                        }
+
+                                        const textColor = balance === 0
+                                            ? "text-zinc-400"
+                                            : isRed
+                                                ? "text-red-500"
+                                                : "text-green-600";
+
+                                        return (
+                                            <div className="pt-2">
+                                                <div className="text-xs text-muted-foreground uppercase mb-1">
+                                                    {typeLower === 'cheque in hand' ? 'Available Amount of Check' : 'Current Balance'}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={cn("text-2xl font-bold", textColor)}>
+                                                        {formatCurrency(Math.abs(balance))}
+                                                    </span>
+                                                    {indicator && (
+                                                        <span className={cn(
+                                                            "px-1 py-0.5 rounded text-[8px] font-black text-white uppercase",
+                                                            indicatorColor
+                                                        )}>
+                                                            {indicator}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-primary/10">
                                         <div>
                                             <div className="text-[10px] text-muted-foreground uppercase mb-1">Credit Limit</div>

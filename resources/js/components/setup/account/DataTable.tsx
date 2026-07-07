@@ -211,23 +211,33 @@ export function DataTable({ data }: DataTableProps) {
                 
                 let indicator = "";
                 let indicatorColor = "";
+                let isRed = false;
                 
                 if (balance !== 0) {
                     if (isCustomer) {
                         indicator = balance > 0 ? "DR" : "CR";
                         indicatorColor = balance > 0 ? "bg-emerald-500" : "bg-rose-500";
+                        isRed = balance < 0;
                     } else if (isSupplier) {
                         indicator = balance > 0 ? "CR" : "DR";
                         indicatorColor = balance > 0 ? "bg-rose-500" : "bg-emerald-500";
+                        isRed = balance > 0;
                     } else {
                         indicator = balance > 0 ? "BAL" : "OD";
                         indicatorColor = balance > 0 ? "bg-zinc-500" : "bg-zinc-700";
+                        isRed = balance < 0;
                     }
                 }
 
+                const textColor = balance === 0
+                    ? "text-zinc-400"
+                    : isRed
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-emerald-600 dark:text-emerald-400";
+
                 return (
                     <div className="flex items-center gap-2 py-1">
-                        <span className={`text-sm font-black tracking-tight ${balance > 0 ? "text-emerald-600 dark:text-emerald-400" : balance < 0 ? "text-rose-600 dark:text-rose-400" : "text-zinc-400"}`}>
+                        <span className={`text-sm font-black tracking-tight ${textColor}`}>
                             {Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                         {indicator && (

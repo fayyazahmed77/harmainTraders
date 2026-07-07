@@ -96,6 +96,8 @@ interface SalesReturn {
     payment_account_id?: number | null;
     items: any[];
     sale_id?: number | null;
+    previous_balance?: number | string;
+    extra_discount?: number | string;
 }
 
 interface Props {
@@ -161,6 +163,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     const [calOpen, setCalOpen] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState(returnData.invoice);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => accounts.find(a => a.id === returnData.customer_id) ?? null);
+    const [previousBalance, setPreviousBalance] = useState<number>(toNum(returnData.previous_balance));
+    const [extraDiscount, setExtraDiscount] = useState<number>(toNum(returnData.extra_discount));
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(toNum(returnData.paid_amount));
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);
@@ -302,11 +306,18 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         setOriginalInvoiceNo("");
         setRows([getEmptyRow()]);
         setInvoices([]);
+        setPreviousBalance(0);
+        setExtraDiscount(0);
 
         if (acc) {
             fetch(`/sales-return/customer/${accId}/purchased-items`)
                 .then(r => r.json())
                 .then(data => { if (Array.isArray(data)) setCustomerItems(data); })
+                .catch(console.error);
+
+            fetch(`/account/${accId}/balance`)
+                .then(r => r.json())
+                .then(data => setPreviousBalance(toNum(data.balance)))
                 .catch(console.error);
         }
         setMobileAccOpen(false);
@@ -504,6 +515,16 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         return accounts.filter(a => a.title.toLowerCase().includes(q));
     }, [accounts, accountSearch]);
 
+    const handleExtraDiscountChange = (val: number) => {
+        if (val < 0) return;
+        if (val > totals.net) {
+            toast.warning("Extra discount cannot exceed return total.");
+            setExtraDiscount(totals.net);
+            return;
+        }
+        setExtraDiscount(val);
+    };
+
     // ── Save/Update ────────────────────────────
     const handleSave = () => {
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
@@ -518,14 +539,16 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
             customer_id: selectedAccount.id,
+            previous_balance: previousBalance,
             salesman_id: selectedAccount.saleman_id ?? null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
             tax_total: totals.tax,
             net_total: totals.net,
+            extra_discount: extraDiscount,
             paid_amount: refundAmount,
-            remaining_amount: totals.net - refundAmount,
+            remaining_amount: totals.net - extraDiscount - refundAmount,
             payment_account_id: selectedPaymentAccountId,
             sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
@@ -742,30 +765,76 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="space-y-0.5">
-                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Gross Impact</div>
+                                        <div className="space-y-0.5 group">
+                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-between">
+                                                Return Subtotal
+                                                <Info size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
                                             <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
                                                 <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
-                                                {totals.gross.toLocaleString()}
+                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </div>
                                         </div>
+
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Tax Rev.</div>
-                                                <div className="text-xs font-bold text-zinc-800 dark:text-zinc-300">+ {totals.tax.toLocaleString()}</div>
+                                            <div className="space-y-0.5">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <BadgePercent size={10} />
+                                                    Tax Rev
+                                                </div>
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                    + {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Disc Rec.</div>
-                                                <div className="text-xs font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
+                                            <div className="space-y-0.5 text-right">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5">
+                                                    <ArrowDownToLine size={10} className="text-rose-500" />
+                                                    Disc Rec
+                                                </div>
+                                                <div className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
+                                                    - {totals.disc.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className={`bg-orange-600/10 border border-orange-500/20 p-4 space-y-0.5 ${PREMIUM_ROUNDING_MD}`}>
-                                            <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest">Net Credit Change</div>
+                                        <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                            <div className="relative">
+                                                <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                                    className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                            </div>
+                                        </TechLabel>
+
+                                        <div className={`bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 p-4 space-y-1 relative ${PREMIUM_ROUNDING_MD}`}>
+                                            <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest flex justify-between">
+                                                Net Return Amount
+                                                <Calculator size={10} className="opacity-50" />
+                                            </div>
                                             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono">Rs</span>
-                                                {totals.net.toLocaleString()}
+                                                <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono font-normal">Rs</span>
+                                                {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-0.5">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                    Previous Balance
+                                                </div>
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                    Rs {previousBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-0.5 text-right">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                    New Balance
+                                                </div>
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                    Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -780,35 +849,10 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                                     </div>
                                                 </TechLabel>
 
-                                                {refundAmount > 0 && (
-                                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-                                                        <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                                                            <RotateCcw size={12} /> Refund Disbursement Account
-                                                        </div>
-                                                        <div className="max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
-                                                            <div className="grid grid-cols-1 gap-2">
-                                                                {paymentAccounts?.map(acc => (
-                                                                    <button
-                                                                        key={acc.id}
-                                                                        onClick={() => setSelectedPaymentAccountId(acc.id.toString())}
-                                                                        className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                                                                            selectedPaymentAccountId === acc.id.toString() 
-                                                                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' 
-                                                                            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
-                                                                        }`}
-                                                                    >
-                                                                        <span className="text-[11px] font-black uppercase tracking-tight">{acc.title}</span>
-                                                                        <div className={`w-3 h-3 rounded-full border-2 ${
-                                                                            selectedPaymentAccountId === acc.id.toString()
-                                                                            ? 'bg-emerald-500 border-emerald-500'
-                                                                            : 'border-zinc-300 dark:border-zinc-700'
-                                                                        }`} />
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </motion.div>
-                                                )}
+                                                <div className="flex flex-col items-end">
+                                                    <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
+                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - extraDiscount - refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                                                </div>
                                             </>
                                         ) : (
                                             <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl space-y-2">
@@ -821,7 +865,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                                 </div>
                                                 <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
                                                     <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Adjustment</span>
-                                                    <span className="text-sm font-mono font-black text-emerald-600">Rs {totals.net.toLocaleString()}</span>
+                                                    <span className="text-sm font-mono font-black text-emerald-600">Rs {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                                                 </div>
                                             </div>
                                         )}

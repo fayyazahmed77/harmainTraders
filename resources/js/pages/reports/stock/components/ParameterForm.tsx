@@ -122,65 +122,7 @@ const SearchableSelect = ({ value, onValueChange, options, placeholder, emptyMes
     );
 };
 
-const ProcessingDialog = ({ open, reportName }: { open: boolean; reportName: string }) => (
-    <Dialog open={open}>
-        <DialogContent className="sm:max-w-[400px] p-0 border-none bg-transparent shadow-none outline-none overflow-hidden select-none">
-            <div className="relative p-12 bg-surface-1/90 backdrop-blur-3xl border border-white/5 rounded-sm flex flex-col items-center justify-center text-center space-y-8 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-                {/* Ambient Background Glow */}
-                <div className="absolute inset-0 bg-emerald-600/5 animate-pulse rounded-sm" />
-                
-                <DialogHeader className="sr-only">
-                    <DialogTitle>Compiling Stock Matrix</DialogTitle>
-                    <DialogDescription>
-                        Intelligence Aggregation in Progress for {reportName}
-                    </DialogDescription>
-                </DialogHeader>
 
-                {/* Industrial Gear Iconography */}
-                <div className="relative">
-                    <div className="absolute inset-0 bg-emerald-600/20 blur-[40px] animate-pulse rounded-full" />
-                    <div className="h-24 w-24 bg-emerald-600/10 border border-emerald-600/20 rounded-full flex items-center justify-center relative shadow-inner">
-                        <Settings className="h-12 w-12 text-emerald-600 animate-[spin_4s_linear_infinite]" />
-                        <Loader2 className="h-16 w-16 text-emerald-600/20 animate-spin absolute" />
-                    </div>
-                </div>
-
-                <div className="space-y-3 relative">
-                    <h3 className="text-md font-black text-text-primary uppercase tracking-[0.4em] italic leading-tight">
-                        Compiling <span className="text-emerald-600">Stock Matrix</span>
-                    </h3>
-                    <div className="flex flex-col space-y-1">
-                        <p className="text-[9px] font-black text-text-muted uppercase tracking-[0.2em] opacity-40">Intelligence Aggregation in Progress</p>
-                        <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest italic">{reportName}</p>
-                    </div>
-                </div>
-
-                {/* Precise Progress Bar */}
-                <div className="w-full max-w-[280px] space-y-3">
-                    <div className="h-1.5 w-full bg-surface-0/60 rounded-full overflow-hidden border border-white/5 shadow-inner">
-                        <motion.div 
-                            className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]"
-                            initial={{ width: "0%" }}
-                            animate={{ width: "100%" }}
-                            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                        />
-                    </div>
-                    <div className="flex justify-between px-1">
-                        <span className="text-[8px] font-black text-emerald-600/40 uppercase tracking-widest animate-pulse">Syncing...</span>
-                        <span className="text-[8px] font-black text-emerald-600/40 uppercase tracking-widest animate-pulse">Verifying...</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    <p className="text-[9px] font-black text-text-muted/40 uppercase tracking-[0.5em]">
-                        Aggregation Engine Active
-                    </p>
-                </div>
-            </div>
-        </DialogContent>
-    </Dialog>
-);
 
 export function ParameterForm({ 
     params, 
@@ -258,9 +200,9 @@ export function ParameterForm({
                             <Building2 className="h-4 w-4 text-text-muted group-hover:text-emerald-600" />
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
-                             <span className="text-[9px] font-black uppercase tracking-[0.1em] text-text-muted leading-none mb-1">Supplier Selection</span>
+                             <span className="text-[9px] font-black uppercase tracking-[0.1em] text-text-muted leading-none mb-1">Supplier/Customer Selection</span>
                              <span className="text-[11px] font-bold text-text-primary truncate group-hover:text-emerald-600 italic">
-                                {params.companyId === 'ALL' ? 'All Active Suppliers' : (selectedCompany?.title || 'Selected Supplier')}
+                                {params.companyId === 'ALL' ? 'All Active Parties' : (selectedCompany?.title || 'Selected Party')}
                              </span>
                         </div>
                         <ChevronRight className="h-3 w-3 text-text-muted/30 mr-1 group-hover:translate-x-0.5 transition-all" />
@@ -520,10 +462,6 @@ export function ParameterForm({
                 onSelect={(id) => updateParam('itemId', id)}
             />
 
-            <ProcessingDialog 
-                open={loading} 
-                reportName={selectedReport.title} 
-            />
         </div>
     );
 }

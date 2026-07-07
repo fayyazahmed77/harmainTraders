@@ -24,13 +24,12 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                 <TableHeader>
                     <TableRow className="bg-surface-1/50 border-b-2 border-text-primary hover:bg-surface-1/50">
                         <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic whitespace-nowrap">Date</TableHead>
-                        <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic whitespace-nowrap">Voucher #</TableHead>
                         <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic min-w-[200px]">Account</TableHead>
+                        <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic min-w-[200px]">Item</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Rate</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Purchase</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Sale</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Balance</TableHead>
-                        <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">COGS Rt</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Amount</TableHead>
                         <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Profit/Loss</TableHead>
                     </TableRow>
@@ -41,9 +40,6 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase tabular-nums">
                                 {formatSafeDate(row.date).toUpperCase()}
                             </TableCell>
-                            <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase italic tabular-nums">
-                                {row.voucher_no}
-                            </TableCell>
                             <TableCell className="py-4 px-4">
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black text-text-primary uppercase italic tracking-tighter">
@@ -53,6 +49,11 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                                         {row.type.replace('_', ' ')}
                                     </span>
                                 </div>
+                            </TableCell>
+                            <TableCell className="py-4 px-4">
+                                <span className="text-[11px] font-black text-text-primary uppercase italic tracking-tighter">
+                                    {row.item_name}
+                                </span>
                             </TableCell>
                             <TableCell className="py-4 px-4 text-right font-bold text-text-muted text-[11px] tabular-nums">
                                 {formatCurrency(Number(row.rate))}
@@ -65,9 +66,6 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                             </TableCell>
                             <TableCell className="py-4 px-4 text-right font-black text-emerald-600 text-[11px] tabular-nums">
                                 {Number(row.balance).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="py-4 px-4 text-right font-bold text-text-muted/40 text-[10px] tabular-nums italic">
-                                {formatCurrency(Number(row.cogs_rate))}
                             </TableCell>
                             <TableCell className="py-4 px-4 text-right font-black text-indigo-600 text-[11px] tabular-nums">
                                 {formatCurrency(Number(row.amount))}

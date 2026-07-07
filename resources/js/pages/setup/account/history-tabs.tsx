@@ -101,20 +101,36 @@ export const SalesHistoryTab = ({ accountId }: { accountId: number }) => {
                             <TableHead>Date</TableHead>
                             <TableHead>Invoice #</TableHead>
                             <TableHead>Gross</TableHead>
+                            <TableHead className="text-amber-700">Discount</TableHead>
                             <TableHead>Net Total</TableHead>
+                            <TableHead className="text-orange-700">Return</TableHead>
                             <TableHead>Paid</TableHead>
                             <TableHead>Remaining</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {data.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground italic">No sales found.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground italic">No sales found.</TableCell></TableRow>
                         ) : data.map((item: any) => (
                             <TableRow key={item.id} className="cursor-pointer hover:bg-muted/30 transition-colors">
                                 <TableCell className="font-medium">{formatDate(item.date)}</TableCell>
                                 <TableCell className="text-primary font-semibold">{item.invoice}</TableCell>
-                                <TableCell>{formatCurrency(item.gross_total)}</TableCell>
+                                <TableCell className="text-muted-foreground">{formatCurrency(item.gross_total)}</TableCell>
+                                <TableCell>
+                                    {Number(item.extra_discount) > 0 ? (
+                                        <span className="font-semibold text-amber-600">-{formatCurrency(item.extra_discount)}</span>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                </TableCell>
                                 <TableCell className="font-bold">{formatCurrency(item.net_total)}</TableCell>
+                                <TableCell>
+                                    {Number(item.return_total) > 0 ? (
+                                        <span className="font-semibold text-orange-600">-{formatCurrency(item.return_total)}</span>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-green-600">{formatCurrency(item.paid_amount)}</TableCell>
                                 <TableCell>
                                     {Number(item.remaining_amount) > 0 ? (

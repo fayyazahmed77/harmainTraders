@@ -296,6 +296,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     const [calOpen, setCalOpen] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState(nextInvoiceNo);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [previousBalance, setPreviousBalance] = useState<number>(0);
+    const [extraDiscount, setExtraDiscount] = useState<number>(0);
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(0);
     const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState<string | null>(null);
@@ -490,11 +492,18 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         setOriginalInvoiceNo("");
         setRows([getEmptyRow()]);
         setInvoices([]);
+        setPreviousBalance(0);
+        setExtraDiscount(0);
 
         if (acc) {
             fetch(`/sales-return/customer/${accId}/purchased-items`)
                 .then(r => r.json())
                 .then(data => { if (Array.isArray(data)) setCustomerItems(data); })
+                .catch(console.error);
+
+            fetch(`/account/${accId}/balance`)
+                .then(r => r.json())
+                .then(data => setPreviousBalance(toNum(data.balance)))
                 .catch(console.error);
         }
         setMobileAccOpen(false);
@@ -756,6 +765,16 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         return accounts.filter(a => a.title.toLowerCase().includes(q));
     }, [accounts, accountSearch]);
 
+    const handleExtraDiscountChange = (val: number) => {
+        if (val < 0) return;
+        if (val > totals.net) {
+            toast.warning("Extra discount cannot exceed return total.");
+            setExtraDiscount(totals.net);
+            return;
+        }
+        setExtraDiscount(val);
+    };
+
     // ── Save ──────────────────────────────────
     const handleSave = () => {
         const rowCount = rows.filter(r => r.item_id !== null).length;
@@ -770,15 +789,17 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
             customer_id: selectedAccount.id,
+            previous_balance: previousBalance,
             salesman_id: selectedAccount.saleman_id ?? null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
             tax_total: totals.tax,
             net_total: totals.net,
+            extra_discount: extraDiscount,
             paid_amount: refundAmount,
             payment_account_id: selectedPaymentAccountId,
-            remaining_amount: totals.net - refundAmount,
+            remaining_amount: totals.net - extraDiscount - refundAmount,
             sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
                 const base = (r.full * r.packing + r.pcs) * r.rate;
@@ -1303,12 +1324,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                     <div className="space-y-4">
                                         <div className="space-y-0.5 group">
                                             <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-between">
-                                                Gross Position
+                                                Return Subtotal
                                                 <Info size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                             <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
                                                 <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
-                                                {totals.gross.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </div>
                                         </div>
 
@@ -1318,7 +1339,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             <div className="space-y-0.5">
                                                 <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
                                                     <BadgePercent size={10} />
-                                                    Tax Impact
+                                                    Tax Rev
                                                 </div>
                                                 <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
                                                     + {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -1327,7 +1348,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             <div className="space-y-0.5 text-right">
                                                 <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5">
                                                     <ArrowDownToLine size={10} className="text-rose-500" />
-                                                    Disc. Total
+                                                    Disc Rec
                                                 </div>
                                                 <div className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
                                                     - {totals.disc.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -1335,14 +1356,42 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             </div>
                                         </div>
 
+                                        <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                            <div className="relative">
+                                                <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                                    className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                            </div>
+                                        </TechLabel>
+
                                         <div className={`bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 p-4 space-y-1 relative ${PREMIUM_ROUNDING_MD}`}>
                                             <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest flex justify-between">
-                                                Net Disbursement
+                                                Net Return Amount
                                                 <Calculator size={10} className="opacity-50" />
                                             </div>
                                             <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
                                                 <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono font-normal">Rs</span>
-                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-0.5">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                    Previous Balance
+                                                </div>
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                    Rs {previousBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-0.5 text-right">
+                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                    New Balance
+                                                </div>
+                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                    Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1360,7 +1409,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
                                                 <div className="flex flex-col items-end">
                                                     <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
-                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - extraDiscount - refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                                 </div>
                                             </>
                                         ) : (
@@ -1374,7 +1423,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 </div>
                                                 <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
                                                     <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Update</span>
-                                                    <span className="text-sm font-mono font-black text-orange-500">Rs {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                                    <span className="text-sm font-mono font-black text-orange-500">Rs {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                                                 </div>
                                             </div>
                                         )}

@@ -148,7 +148,7 @@ class SalesReportsController extends Controller implements HasMiddleware
             'area_item_party' => 'Area Wise Item Party Summary',
             'area_party' => 'Area Wise Party Summary',
             'bill' => 'Bill Wise',
-            'details_wise' => 'Details Wise',
+            'details_wise' => 'Date Wise',
             'detail' => 'Detail',
             'invoice_details' => 'Invoice Details',
             'item_party' => 'Item Party Wise Summary',

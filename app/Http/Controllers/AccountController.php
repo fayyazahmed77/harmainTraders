@@ -370,10 +370,11 @@ class AccountController extends Controller implements HasMiddleware
         $typeLower = strtolower($type);
 
         if ($typeLower === 'customers') {
-            $totalSales = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total') - \App\Models\Sales::where('customer_id', $account->id)->sum('extra_discount');
+            $totalSalesGross = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
+            $totalExtraDiscount = \App\Models\Sales::where('customer_id', $account->id)->sum('extra_discount');
+            $totalSales = $totalSalesGross - $totalExtraDiscount;
             $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where(function($q){ $q->whereNull('cheque_status')->orWhere('cheque_status', 'not like', '%ancel%')->orWhere('cheque_status', 'not like', '%eturn%'); })->sum('amount'); // Not rigorously filtering bounces? Wait, let's keep it simple as it was before.
-			
+
             // Revert changes and just use original logic + add missing sums:
             $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
             $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
@@ -385,6 +386,7 @@ class AccountController extends Controller implements HasMiddleware
 
             $summary = [
                 'total_sales' => $totalSales,
+                'total_extra_discount' => $totalExtraDiscount,
                 'total_returns' => $totalReturns,
                 'total_receipts' => $totalReceipts,
                 'total_payments' => $totalPayments,

@@ -53,8 +53,8 @@ class PurchaseReturnReportBuilder
             'purchase_returns.date',
             'accounts.title as account_name',
             'purchase_returns.gross_total as gross',
-            'purchase_returns.discount_total as discount',
-            'purchase_returns.net_total as amount'
+            DB::raw('(purchase_returns.discount_total + purchase_returns.extra_discount) as discount'),
+            DB::raw('(purchase_returns.net_total - purchase_returns.extra_discount) as amount')
         )
         ->orderBy('date', 'desc')
         ->get();
@@ -69,7 +69,7 @@ class PurchaseReturnReportBuilder
         $results = $query->select(
             'date',
             DB::raw('COUNT(*) as total_bills'),
-            DB::raw('SUM(net_total) as total_amount')
+            DB::raw('SUM(net_total - extra_discount) as total_amount')
         )
         ->groupBy('date')
         ->orderBy('date', 'asc')

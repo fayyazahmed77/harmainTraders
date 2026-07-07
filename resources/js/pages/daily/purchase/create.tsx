@@ -654,7 +654,7 @@ export default function Purchase({
                     totalPcs: totals.totalPcs,
                     gross: totals.gross,
                     discount: totals.discTotal,
-                    net: totals.net,
+                    net: Math.max(0, totals.net - extraDiscount),
                     purchaseId: (page.props as any).flash?.id, // Assuming ID is flashed or in props
                     nextInvoiceNo: newProps.nextInvoiceNo
                 });

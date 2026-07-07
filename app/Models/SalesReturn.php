@@ -18,15 +18,22 @@ class SalesReturn extends Model
         'original_invoice',
         'sale_id',
         'customer_id',
+        'previous_balance',
         'salesman_id',
         'no_of_items',
         'gross_total',
         'discount_total',
         'tax_total',
         'net_total',
+        'extra_discount',
         'paid_amount',
         'remaining_amount',
         'remarks',
+    ];
+
+    protected $casts = [
+        'previous_balance' => 'decimal:2',
+        'extra_discount' => 'decimal:2',
     ];
 
     public function items()

@@ -195,8 +195,12 @@
                 <span class="info-value">{{ $sale->customer->address1 ?? 'N/A' }}</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Date/Time:</span>
-                <span class="info-value">{{ \Carbon\Carbon::parse($sale->date)->format('l F d Y h:i A') }}</span>
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ strtoupper(\Carbon\Carbon::parse($sale->date)->format('d M Y')) }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span class="info-value">{{ $sale->created_at ? \Carbon\Carbon::parse($sale->created_at)->setTimezone('Asia/Karachi')->format('h:i A') : \Carbon\Carbon::now()->setTimezone('Asia/Karachi')->format('h:i A') }}</span>
             </div>
         </div>
 

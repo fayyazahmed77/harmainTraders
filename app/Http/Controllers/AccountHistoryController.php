@@ -27,9 +27,22 @@ class AccountHistoryController extends Controller implements HasMiddleware
             ->latest('date')
             ->latest('id')
             ->paginate(10);
-            
+
+        // Attach return total per sale
+        $saleIds = collect($sales->items())->pluck('id');
+        $returnTotals = \App\Models\SalesReturn::whereIn('sale_id', $saleIds)
+            ->selectRaw('sale_id, SUM(net_total) as total_returned')
+            ->groupBy('sale_id')
+            ->pluck('total_returned', 'sale_id');
+
+        $items = collect($sales->items())->map(function ($sale) use ($returnTotals) {
+            $data = $sale->toArray();
+            $data['return_total'] = (float) ($returnTotals[$sale->id] ?? 0);
+            return $data;
+        });
+
         return response()->json([
-            'data' => $sales->items(),
+            'data' => $items,
             'current_page' => $sales->currentPage(),
             'last_page' => $sales->lastPage(),
             'total' => $sales->total(),

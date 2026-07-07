@@ -101,7 +101,7 @@ export default function Catalog({ items, categories, account, token }: CatalogPr
             const remainingPcs = qtyPcs % packingSize;
             return (qtyCarton * priceCarton) + (fullCartonsFromPcs * priceCarton) + (remainingPcs * pricePiece);
         } else {
-            return Math.round((qtyCarton * priceCarton) + (qtyPcs * (priceCarton / packing)));
+            return Math.round((qtyCarton * priceCarton) + (qtyPcs * pricePiece));
         }
     };
 

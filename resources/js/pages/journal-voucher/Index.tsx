@@ -3,7 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutDashboard, ShieldCheck, Trash2 } from "lucide-react";
+import { Plus, LayoutDashboard, ShieldCheck, Trash2, Eye, Edit3, Printer } from "lucide-react";
 import { Link, router, usePage } from '@inertiajs/react';
 import { motion } from "framer-motion";
 import { route } from 'ziggy-js';
@@ -133,15 +133,41 @@ export default function JournalVoucherIndex({ jvs, filters }: Props) {
                                                 <TableCell className="py-3 text-[10px] font-medium text-text-muted italic max-w-[200px] truncate">
                                                     {jv.remarks || '-'}
                                                 </TableCell>
-                                                <TableCell className="py-3 text-right">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg"
-                                                        onClick={() => handleDelete(jv.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                <TableCell className="py-3 text-right whitespace-nowrap">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg"
+                                                            onClick={() => router.visit(route('journal-vouchers.show', jv.id))}
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0 text-slate-500 hover:text-slate-600 hover:bg-slate-500/10 rounded-lg"
+                                                            onClick={() => router.visit(route('journal-vouchers.edit', jv.id))}
+                                                        >
+                                                            <Edit3 className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0 text-teal-500 hover:text-teal-600 hover:bg-teal-500/10 rounded-lg"
+                                                            onClick={() => window.open(route('journal-vouchers.pdf', jv.id), '_blank')}
+                                                        >
+                                                            <Printer className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg"
+                                                            onClick={() => handleDelete(jv.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))

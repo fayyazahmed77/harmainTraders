@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import { SuccessDialog } from "./components/SuccessDialog";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,8 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
     const [remarks, setRemarks] = useState(returnData.remarks || "");
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-    const [supplierBalance, setSupplierBalance] = useState<number | null>(null);
+    const [previousBalance, setPreviousBalance] = useState<number>(toNum((returnData as any).previous_balance));
+    const [extraDiscount, setExtraDiscount] = useState<number>(toNum((returnData as any).extra_discount));
     const [refundAmount, setRefundAmount] = useState(toNum((returnData as any).paid_amount || 0));
 
     // ── Invoice Dialog state ───────────────────
@@ -203,9 +205,9 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
 
     useEffect(() => {
         if (selectedAccount) {
-            fetch(`/account/balance/${selectedAccount.id}`)
+            fetch(`/account/${selectedAccount.id}/balance`)
                 .then(r => r.json())
-                .then(data => setSupplierBalance(toNum(data.balance)))
+                .then(data => setPreviousBalance(toNum(data.balance)))
                 .catch(console.error);
 
             fetch(`/purchase-return/supplier/${selectedAccount.id}/purchased-items`)
@@ -223,6 +225,8 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
         setOriginalInvoiceNo("");
         setRows([getEmptyRow()]);
         setInvoices([]);
+        setPreviousBalance(0);
+        setExtraDiscount(0);
         setDesktopAccOpen(false);
     };
 
@@ -378,6 +382,16 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
         }));
     };
 
+    const handleExtraDiscountChange = (val: number) => {
+        if (val < 0) return;
+        if (val > totals.net) {
+            toast.warning("Extra discount cannot exceed return total.");
+            setExtraDiscount(totals.net);
+            return;
+        }
+        setExtraDiscount(val);
+    };
+
     const handleSave = () => {
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0 || r.bonus_full > 0 || r.bonus_pcs > 0));
 
@@ -390,11 +404,13 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
             supplier_id: selectedAccount.id,
+            previous_balance: previousBalance,
             salesman_id: selectedAccount.saleman_id ?? null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
             net_total: totals.net,
+            extra_discount: extraDiscount,
             remarks: remarks,
             items: validRows.map(r => {
                 const packing = toNum(r.packing || 1);
@@ -414,7 +430,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                 };
             }),
             paid_amount: refundAmount,
-            remaining_amount: totals.net - refundAmount,
+            remaining_amount: totals.net - extraDiscount - refundAmount,
         };
 
         router.put(`/purchase-return/${returnData.id}`, payload, {
@@ -423,7 +439,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                 const id = (page.props as any).id || (page.props as any).flash?.id || returnData.id;
                 setSuccessData({
                     supplierName: selectedAccount?.title || "Supplier",
-                    totalAmount: totals.net,
+                    totalAmount: totals.net - extraDiscount,
                     itemCount: validRows.length,
                     totalFull: validRows.reduce((acc, r) => acc + toNum(r.full), 0),
                     totalPcs: validRows.reduce((acc, r) => acc + toNum(r.pcs), 0),
@@ -491,13 +507,13 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                                             </div>
                                         </PopoverContent>
                                     </Popover>
-                                    {supplierBalance !== null && (
+                                    {previousBalance !== null && (
                                         <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none">
                                             <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[8px] font-black px-2 py-0.5 rounded shadow-xl flex items-center gap-1.5">
                                                 <div className="w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
                                                 <span className="text-zinc-500">BAL:</span>
-                                                <span className={toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                                    Rs {toNum(supplierBalance).toLocaleString()}
+                                                <span className={toNum(previousBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                                                    Rs {toNum(previousBalance).toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -586,18 +602,10 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                         <Card className={`p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl ${PREMIUM_ROUNDING_MD} space-y-6`}>
                             <h3 className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Financial Summary</h3>
                             <div className="space-y-4">
-                                <div>
-                                    <div className="text-[10px] font-black text-zinc-400 uppercase">Gross Impact</div>
-                                    <div className="text-2xl font-black tracking-tighter">Rs {totals.gross.toLocaleString()}</div>
+                                <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                    <div className="text-[10px] font-black text-zinc-500 uppercase">Return Subtotal</div>
+                                    <div className="text-sm font-bold">Rs {totals.net.toLocaleString()}</div>
                                 </div>
-                                {supplierBalance !== null && (
-                                    <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                                        <div className="text-[10px] font-black text-zinc-500 uppercase">Supplier Ledger Bal</div>
-                                        <div className={`text-sm font-bold ${toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                                            Rs {toNum(supplierBalance).toLocaleString()}
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
                                     <div className="text-[10px] font-black text-zinc-500 uppercase">Total Boxes</div>
                                     <div className="text-sm font-bold">{totals.total_full}</div>
@@ -606,14 +614,46 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                                     <div className="text-[10px] font-black text-zinc-500 uppercase">Total Pieces</div>
                                     <div className="text-sm font-bold">{totals.total_pcs}</div>
                                 </div>
-                                <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                                    <div className="text-[10px] font-black text-rose-500 uppercase">Discount</div>
+                                <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3 border-b pb-2">
+                                    <div className="text-[10px] font-black text-rose-500 uppercase">Discount Delta</div>
                                     <div className="text-sm font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
                                 </div>
+
+                                <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                    <div className="relative">
+                                        <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                            className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                    </div>
+                                </TechLabel>
+
                                 <div className="bg-orange-600 text-white p-4 rounded-xl space-y-1">
-                                    <div className="text-[9px] font-black uppercase opacity-60">Net Debit Entry</div>
-                                    <div className="text-2xl font-black tracking-tighter">Rs {totals.net.toLocaleString()}</div>
+                                    <div className="text-[9px] font-black uppercase opacity-60">Net Return Amount</div>
+                                    <div className="text-2xl font-black tracking-tighter">Rs {(totals.net - extraDiscount).toLocaleString()}</div>
                                 </div>
+
+                                <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-0.5">
+                                        <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                            Previous Balance
+                                        </div>
+                                        <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                            Rs {previousBalance.toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-0.5 text-right">
+                                        <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                            New Balance
+                                        </div>
+                                        <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                            Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
                                 <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
                                     <div className="relative">
                                         <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}

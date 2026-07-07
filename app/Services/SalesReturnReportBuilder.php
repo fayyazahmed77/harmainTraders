@@ -155,8 +155,8 @@ class SalesReturnReportBuilder
             'sales_returns.date',
             'accounts.title as customer_name',
             'sales_returns.gross_total as gross',
-            'sales_returns.discount_total as discount',
-            'sales_returns.net_total as amount'
+            DB::raw('(sales_returns.discount_total + sales_returns.extra_discount) as discount'),
+            DB::raw('(sales_returns.net_total - sales_returns.extra_discount) as amount')
         )
         ->orderBy('sales_returns.date', 'desc')
         ->get();

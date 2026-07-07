@@ -109,7 +109,7 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                     </div>
                                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
                                         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">Loose Carton</span>
-                                        <span className="text-xl font-black text-zinc-700 dark:text-zinc-200">{formatCurrency(buyItem.price_loose_carton)}</span>
+                                        <span className="text-xl font-black text-zinc-700 dark:text-zinc-200">{formatCurrency(buyItem.price_piece || buyItem.price_loose_carton)}</span>
                                         <span className="text-[9px] font-bold text-zinc-500 uppercase mt-1">Rate per Pack</span>
                                     </div>
                                 </div>
@@ -192,7 +192,7 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                         ({formatCurrency(
                                             (customerCategory === 1 || customerCategory === '1')
                                                 ? (cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + Math.floor((cart[buyItem.id]?.qty_pcs || 0) / Math.max(1, buyItem.packing_size || 1)) * buyItem.price_carton + ((cart[buyItem.id]?.qty_pcs || 0) % Math.max(1, buyItem.packing_size || 1)) * (buyItem.price_piece || 0)
-                                                : Math.round((cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + (cart[buyItem.id]?.qty_pcs || 0) * (buyItem.price_carton / Math.max(1, buyItem.packing_qty || 1)))
+                                                : Math.round((cart[buyItem.id]?.qty_carton || 0) * buyItem.price_carton + (cart[buyItem.id]?.qty_pcs || 0) * (buyItem.price_piece || 0))
                                         )})
                                     </span>
                                 )}

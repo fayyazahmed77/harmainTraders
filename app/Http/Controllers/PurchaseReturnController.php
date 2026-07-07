@@ -77,6 +77,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
             'net_total'       => 'required|numeric',
+            'extra_discount'  => 'nullable|numeric|min:0',
             'paid_amount'     => 'required|numeric', // Refund Amount
             'remaining_amount' => 'required|numeric',
 
@@ -139,17 +140,29 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         DB::beginTransaction();
 
         try {
+            $supplier = Account::findOrFail($request->supplier_id);
+            $previousBalance = (float)$supplier->current_balance;
+
+            $extraDiscount = (float)($request->extra_discount ?? 0);
+            if ($extraDiscount > $request->net_total) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'extra_discount' => 'Extra discount cannot exceed return total.'
+                ]);
+            }
+
             $return = PurchaseReturn::create([
                 'date'            => $request->date,
                 'invoice'         => $request->invoice ?? 'PRET-' . time(),
                 'original_invoice' => $request->original_invoice,
                 'supplier_id'     => $request->supplier_id,
+                'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?: null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
                 'tax_total'       => 0,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $extraDiscount,
                 'paid_amount'     => $request->paid_amount,
                 'remaining_amount' => $request->remaining_amount,
                 'remarks'         => $request->remarks,
@@ -179,7 +192,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             }
 
             $allocationService = new \App\Services\FIFOAllocationService();
-            $allocationService->allocatePurchaseReturn($return, $return->net_total - $return->paid_amount);
+            $allocationService->allocatePurchaseReturn($return, (float)($return->net_total - $return->extra_discount) - (float)$return->paid_amount);
 
             if ($request->paid_amount > 0) {
                 $count = Payment::where('type', 'RECEIPT')->count() + 1;
@@ -402,6 +415,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
             'net_total'       => 'required|numeric',
+            'extra_discount'  => 'nullable|numeric|min:0',
         ]);
 
         $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)->first();
@@ -471,18 +485,30 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $allocationService = new \App\Services\FIFOAllocationService();
             $allocationService->rollbackPurchaseReturn($return);
 
+            $supplier = Account::findOrFail($request->supplier_id);
+            $previousBalance = (float)$supplier->current_balance + (float)($return->net_total - $return->extra_discount);
+
+            $extraDiscount = (float)($request->extra_discount ?? 0);
+            if ($extraDiscount > $request->net_total) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'extra_discount' => 'Extra discount cannot exceed return total.'
+                ]);
+            }
+
             // 3. Update Return Record
             $return->update([
                 'date'            => $request->date,
                 'invoice'         => $request->invoice,
                 'original_invoice' => $request->original_invoice,
                 'supplier_id'     => $request->supplier_id,
+                'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?: null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
                 'tax_total'       => 0,
                 'net_total'       => $request->net_total,
+                'extra_discount'  => $extraDiscount,
                 'remarks'         => $request->remarks,
             ]);
 
@@ -513,7 +539,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 }
             }
 
-            $allocationService->allocatePurchaseReturn($return, $return->net_total - $request->paid_amount);
+            $allocationService->allocatePurchaseReturn($return, (float)($return->net_total - $return->extra_discount) - (float)$request->paid_amount);
 
             // 6. Sync Refund Payment
             $refundPayment = Payment::where('remarks', 'like', "%Refund for Purchase Return Invoice: {$return->invoice}%")

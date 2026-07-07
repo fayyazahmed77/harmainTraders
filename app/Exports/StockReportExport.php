@@ -43,7 +43,9 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
         if (isset($this->params['withAmount']) && $this->params['withAmount']) {
             $colspan = 8;
         }
-        if (in_array($this->type, ['available_stock', 'detail', 'price_list', 're_order_level'])) {
+        if ($this->type === 'detail') {
+            $colspan = 9;
+        } elseif (in_array($this->type, ['available_stock', 'price_list', 're_order_level'])) {
             $colspan = 10;
         }
 
@@ -65,15 +67,14 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
             case 'detail':
                 return [
                     'A' => 12, // Date
-                    'B' => 12, // Voucher
-                    'C' => 40, // Account
+                    'B' => 30, // Account
+                    'C' => 30, // Item
                     'D' => 12, // Rate
                     'E' => 10, // In
                     'F' => 10, // Out
                     'G' => 12, // Balance
-                    'H' => 12, // COGS
-                    'I' => 15, // Amount
-                    'J' => 15, // Profit/Loss
+                    'H' => 15, // Amount
+                    'I' => 15, // Profit/Loss
                 ];
             case 're_order_level':
                 return [
@@ -111,7 +112,6 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
                 'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                 'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                 'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-                'J' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             ];
         }
         $formats = [

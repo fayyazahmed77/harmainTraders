@@ -274,13 +274,37 @@
             </div>
 
             <div class="total-row clearfix">
+                <span class="total-label">Extra Discount :-</span>
+                <span class="total-value">- {{ number_format($purchaseReturn->extra_discount, 2) }}</span>
+            </div>
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Net Return Amount :-</span>
+                <span class="total-value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 2) }}</span>
+            </div>
+
+            <div class="total-row clearfix">
+                <span class="total-label">Previous Balance :-</span>
+                <span class="total-value">{{ number_format($purchaseReturn->previous_balance, 2) }}</span>
+            </div>
+
+            <div class="dashed-bottom" style="margin: 2px 0;"></div>
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Total Balance :-</span>
+                <span class="total-value">{{ number_format($purchaseReturn->previous_balance - ($purchaseReturn->net_total - $purchaseReturn->extra_discount), 2) }}</span>
+            </div>
+
+            <div class="total-row clearfix">
                 <span class="total-label">Cash Received :-</span>
                 <span class="total-value">{{ number_format($purchaseReturn->paid_amount, 2) }}</span>
             </div>
 
-            <div class="total-row clearfix">
-                <span class="total-label">Account Adjustment :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->remaining_amount, 2) }}</span>
+            <div class="dashed-bottom" style="margin: 2px 0;"></div>
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Net Outstanding :</span>
+                <span class="total-value">{{ number_format($purchaseReturn->previous_balance - ($purchaseReturn->net_total - $purchaseReturn->extra_discount) + $purchaseReturn->paid_amount, 2) }}</span>
             </div>
         </div>
 

@@ -46,7 +46,7 @@ class SalesReportBuilder
         // Routing to specific methods
         switch ($reportId) {
             case 'bill': $data = $this->billWise($fromDate, $toDate, $filters); break;
-            case 'details_wise':
+            case 'details_wise': $data = $this->dateWise($fromDate, $toDate, $filters); break;
             case 'detail': $data = $this->details($fromDate, $toDate, $filters); break;
             case 'area_party': $data = $this->areaWisePartySummary($fromDate, $toDate, $filters); break;
             case 'area_item_party': $data = $this->areaWiseItemPartySummary($fromDate, $toDate, $filters); break;
@@ -193,6 +193,58 @@ class SalesReportBuilder
         ->distinct()
         ->orderBy('sales.date', 'desc')
         ->orderBy('sales.id', 'desc')
+        ->get();
+
+        return $this->transformToArray($results);
+    }
+
+    public function dateWise($fromDate, $toDate, $filters = [])
+    {
+        $itemsSummary = DB::table('sales_items')
+            ->select('sale_id',
+                DB::raw('SUM(qty_carton) as qty_full'),
+                DB::raw('SUM(qty_pcs) as qty_pcs'),
+                DB::raw('SUM(discount) as items_discount'),
+                DB::raw('SUM(subtotal) as items_amount')
+            )
+            ->groupBy('sale_id');
+
+        if ($filters['item_id']) {
+            $itemsSummary->where('item_id', $filters['item_id']);
+        }
+        if ($filters['category_id']) {
+            $itemsSummary->join('items', 'sales_items.item_id', '=', 'items.id')
+                         ->where('items.category', $filters['category_id']);
+        }
+        if ($filters['company_id']) {
+            if (!$filters['category_id']) {
+                $itemsSummary->join('items', 'sales_items.item_id', '=', 'items.id');
+            }
+            $itemsSummary->where('items.company', $filters['company_id']);
+        }
+
+        $query = DB::table('sales')
+            ->joinSub($itemsSummary, 'items_sum', 'sales.id', '=', 'items_sum.sale_id')
+            ->join('accounts', 'sales.customer_id', '=', 'accounts.id')
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+
+        if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
+        if ($filters['salesman_id']) $query->where('sales.salesman_id', $filters['salesman_id']);
+        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        if ($filters['firm_id']) $query->where('sales.firm_id', $filters['firm_id']);
+
+        $results = $query->select(
+            'sales.date',
+            DB::raw('COUNT(DISTINCT sales.id) as bill_count'),
+            DB::raw('SUM(items_sum.qty_full) as qty_full'),
+            DB::raw('SUM(items_sum.qty_pcs) as qty_pcs'),
+            DB::raw('SUM(items_sum.items_amount) as gross'),
+            DB::raw('SUM(items_sum.items_discount) as discount'),
+            DB::raw('SUM(items_sum.items_amount - items_sum.items_discount) as amount')
+        )
+        ->groupBy('sales.date')
+        ->orderBy('sales.date', 'desc')
         ->get();
 
         return $this->transformToArray($results);

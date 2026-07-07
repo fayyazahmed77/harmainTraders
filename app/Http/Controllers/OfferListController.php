@@ -49,7 +49,7 @@ class OfferListController extends Controller implements HasMiddleware
             ->where('status', 'active')
             ->get();
 
-        $firms = Firm::where('status', 'active')->get();
+        $firms = Firm::where('status', 1)->get();
 
         return Inertia::render("daily/offerlist/create", [
             'items' => $items,

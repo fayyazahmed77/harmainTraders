@@ -219,25 +219,19 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                 <div className="flex items-center gap-6">
                     <Scale className="h-5 w-5 text-indigo-400" />
                     <div>
-                        <h5 className="text-[8px] font-display font-black text-text-muted uppercase tracking-[0.3em]">Net Portfolio Position</h5>
-                        <p className="text-sm font-display font-black text-text-primary tracking-widest uppercase">Financial Intelligence Consolidation</p>
+                        <h5 className="text-[8px] font-display font-black text-text-muted uppercase tracking-[0.3em]">Total Outstanding Position</h5>
+                        <p className="text-sm font-display font-black text-text-primary tracking-widest uppercase">Supplier Outstanding Consolidation</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-12">
-                    {[
-                        { label: 'Receivables', val: stats.receivable, color: 'text-emerald-500' },
-                        { label: 'Payables', val: stats.payable, color: 'text-amber-500' },
-                        { label: 'Liquidity Position', val: stats.net, color: stats.net >= 0 ? 'text-indigo-500' : 'text-rose-500', bold: true }
-                    ].map((s, idx) => (
-                        <div key={idx} className="flex flex-col items-end">
-                            <span className="text-[8px] font-display font-black text-text-muted uppercase tracking-widest mb-1">{s.label}</span>
-                            <p className={cn("text-base font-mono-jet font-black tracking-tighter", s.color)}>
-                                <span className="text-[10px] font-medium opacity-30 mr-1.5 font-sans">PKR</span>
-                                {s.val.toLocaleString()}
-                            </p>
-                        </div>
-                    ))}
+                    <div className="flex flex-col items-end">
+                        <span className="text-[8px] font-display font-black text-text-muted uppercase tracking-widest mb-1">Total Payables</span>
+                        <p className="text-base font-mono-jet font-black tracking-tighter text-amber-500">
+                            <span className="text-[10px] font-medium opacity-30 mr-1.5 font-sans">PKR</span>
+                            {stats.payable.toLocaleString()}
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

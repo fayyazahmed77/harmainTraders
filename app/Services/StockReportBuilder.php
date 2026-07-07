@@ -227,6 +227,7 @@ class StockReportBuilder
                 'purchases.date',
                 DB::raw('CAST(purchases.id AS CHAR) as voucher_no'),
                 'accounts.title as account_name',
+                'items.title as item_name',
                 'purchase_items.trade_price as rate',
                 'purchase_items.total_pcs as in_qty',
                 DB::raw('0 as out_qty'),
@@ -243,6 +244,7 @@ class StockReportBuilder
                 'sales.date',
                 DB::raw('CAST(sales.id AS CHAR) as voucher_no'),
                 'accounts.title as account_name',
+                'items.title as item_name',
                 'sales_items.trade_price as rate',
                 DB::raw('0 as in_qty'),
                 'sales_items.total_pcs as out_qty',
@@ -259,6 +261,7 @@ class StockReportBuilder
                 'sales_returns.date',
                 DB::raw('CAST(sales_returns.id AS CHAR) as voucher_no'),
                 'accounts.title as account_name',
+                'items.title as item_name',
                 'sales_return_items.trade_price as rate',
                 'sales_return_items.total_pcs as in_qty',
                 DB::raw('0 as out_qty'),
@@ -275,6 +278,7 @@ class StockReportBuilder
                 'purchase_returns.date',
                 DB::raw('CAST(purchase_returns.id AS CHAR) as voucher_no'),
                 'accounts.title as account_name',
+                'items.title as item_name',
                 'purchase_return_items.trade_price as rate',
                 DB::raw('0 as in_qty'),
                 'purchase_return_items.total_pcs as out_qty',
@@ -288,6 +292,54 @@ class StockReportBuilder
             $sales->where('sales_items.item_id', $filters['item_id']);
             $saleReturns->where('sales_return_items.item_id', $filters['item_id']);
             $purchaseReturns->where('purchase_return_items.item_id', $filters['item_id']);
+        }
+
+        if ($filters['company_id']) {
+            // Look up account type to apply filter to the correct queries only
+            $accountType = DB::table('accounts')->where('id', $filters['company_id'])->value('type');
+            
+            if ($accountType == 3) {
+                // Customer: filter sales and sale returns only
+                $sales->where('sales.customer_id', $filters['company_id']);
+                $saleReturns->where('sales_returns.customer_id', $filters['company_id']);
+                // Exclude all purchases (no matching supplier)
+                $purchases->whereRaw('1=0');
+                $purchaseReturns->whereRaw('1=0');
+            } elseif ($accountType == 6) {
+                // Supplier: filter purchases and purchase returns only
+                $purchases->where('purchases.supplier_id', $filters['company_id']);
+                $purchaseReturns->where('purchase_returns.supplier_id', $filters['company_id']);
+                // Exclude all sales (no matching customer)
+                $sales->whereRaw('1=0');
+                $saleReturns->whereRaw('1=0');
+            } else {
+                // Unknown type: try both sides
+                $purchases->where('purchases.supplier_id', $filters['company_id']);
+                $sales->where('sales.customer_id', $filters['company_id']);
+                $saleReturns->where('sales_returns.customer_id', $filters['company_id']);
+                $purchaseReturns->where('purchase_returns.supplier_id', $filters['company_id']);
+            }
+        }
+
+        if ($filters['category_id']) {
+            $purchases->where('items.category', $filters['category_id']);
+            $sales->where('items.category', $filters['category_id']);
+            $saleReturns->where('items.category', $filters['category_id']);
+            $purchaseReturns->where('items.category', $filters['category_id']);
+        }
+
+        if ($filters['item_type']) {
+            $purchases->where('items.type', $filters['item_type']);
+            $sales->where('items.type', $filters['item_type']);
+            $saleReturns->where('items.type', $filters['item_type']);
+            $purchaseReturns->where('items.type', $filters['item_type']);
+        }
+
+        if ($filters['firm_id']) {
+            $purchases->where('purchases.firm_id', $filters['firm_id']);
+            $sales->where('sales.firm_id', $filters['firm_id']);
+            $saleReturns->where('sales_returns.firm_id', $filters['firm_id']);
+            $purchaseReturns->where('purchase_returns.firm_id', $filters['firm_id']);
         }
 
         $union = $purchases->unionAll($sales)
@@ -317,6 +369,7 @@ class StockReportBuilder
     {
         $query = DB::table('items')
             ->select(
+                'items.id',
                 'items.code',
                 'items.title as item_name',
                 'items.trade_price as trade_price',
@@ -330,12 +383,20 @@ class StockReportBuilder
             )
             ->where('items.is_active', true);
 
+        if (isset($filters['item_id']) && $filters['item_id'] !== 'ALL') {
+            $query->where('items.id', $filters['item_id']);
+        }
+
         if (isset($filters['company_id']) && $filters['company_id'] !== 'ALL') {
             $query->where('items.company', $filters['company_id']);
         }
 
         if (isset($filters['category_id']) && $filters['category_id'] !== 'ALL') {
             $query->where('items.category', $filters['category_id']);
+        }
+
+        if (isset($filters['item_type']) && $filters['item_type'] !== 'ALL') {
+            $query->where('items.type', $filters['item_type']);
         }
 
         return $query->orderBy('items.title')->get()->map(fn($row) => (array)$row)->toArray();

@@ -5,41 +5,38 @@
     <thead>
         <tr>
             <th style="width: 30px;">S.#</th>
-            <th style="width: 60px;">Inv #</th>
-            <th style="width: 70px;">Date</th>
-            <th>Customer</th>
-            <th>Product Description</th>
-            <th style="width: 50px;" class="text-right">Qty F</th>
-            <th style="width: 50px;" class="text-right">Qty P</th>
-            <th style="width: 65px;" class="text-right">Rate</th>
-            <th style="width: 65px;" class="text-right">Discount</th>
-            <th style="width: 80px;" class="text-right">Subtotal</th>
+            <th style="width: 100px;">Date</th>
+            <th style="width: 70px;" class="text-right">Bill Count</th>
+            <th style="width: 70px;" class="text-right">Qty F</th>
+            <th style="width: 70px;" class="text-right">Qty P</th>
+            <th style="width: 90px;" class="text-right">Gross</th>
+            <th style="width: 90px;" class="text-right">Discount</th>
+            <th style="width: 100px;" class="text-right">Net Amount</th>
         </tr>
     </thead>
     <tbody>
         @foreach($data as $index => $row)
         <tr>
             <td>{{ $index + 1 }}</td>
-            <td>{{ $row['invoice'] }}</td>
-            <td>{{ strtoupper(date('d M y', strtotime($row['date']))) }}</td>
-            <td style="text-transform: uppercase; font-size: 8px;">{{ $row['customer_name'] }}</td>
-            <td style="text-transform: uppercase;">{{ $row['product_name'] }}</td>
-            <td class="text-right">{{ $row['qty_full'] }}</td>
-            <td class="text-right">{{ $row['qty_pcs'] }}</td>
-            <td class="text-right">{{ number_format($row['tp'], 2) }}</td>
+            <td>{{ strtoupper(date('d M Y', strtotime($row['date']))) }}</td>
+            <td class="text-right">{{ number_format($row['bill_count'], 0) }}</td>
+            <td class="text-right">{{ number_format($row['qty_full'], 0) }}</td>
+            <td class="text-right">{{ number_format($row['qty_pcs'], 0) }}</td>
+            <td class="text-right">{{ number_format($row['gross'], 2) }}</td>
             <td class="text-right">{{ number_format($row['discount'], 2) }}</td>
-            <td class="text-right font-bold">{{ number_format($row['amount'] - $row['discount'], 2) }}</td>
+            <td class="text-right font-bold">{{ number_format($row['amount'], 2) }}</td>
         </tr>
         @endforeach
     </tbody>
     <tfoot>
         <tr style="background-color: #f8fafc; font-weight: 900;">
-            <td colspan="5" class="text-right uppercase">Totals</td>
+            <td colspan="2" class="text-right uppercase">Totals</td>
+            <td class="text-right">{{ collect($data)->sum('bill_count') }}</td>
             <td class="text-right">{{ collect($data)->sum('qty_full') }}</td>
             <td class="text-right">{{ collect($data)->sum('qty_pcs') }}</td>
-            <td></td>
+            <td class="text-right">{{ number_format(collect($data)->sum('gross'), 2) }}</td>
             <td class="text-right">{{ number_format(collect($data)->sum('discount'), 2) }}</td>
-            <td class="text-right">{{ number_format(collect($data)->sum('amount') - collect($data)->sum('discount'), 2) }}</td>
+            <td class="text-right">{{ number_format(collect($data)->sum('amount'), 2) }}</td>
         </tr>
     </tfoot>
 </table>

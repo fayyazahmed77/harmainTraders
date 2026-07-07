@@ -131,7 +131,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $salesReturns->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $salesReturns->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, (net_total - extra_discount) as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchaseReturns = PurchaseReturn::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate]);
@@ -146,7 +146,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $purchaseReturns->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, net_total as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $purchaseReturns->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, (net_total - extra_discount) as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $query = $sales->unionAll($purchases)
             ->unionAll($payments)
@@ -349,13 +349,13 @@ class ReportBuilder
         if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
             $salesReturnsQuery->where('salesman_id', $params['salemanId']);
         }
-        $salesReturns = $salesReturnsQuery->sum('net_total');
+        $salesReturns = $salesReturnsQuery->sum(DB::raw('net_total - extra_discount'));
 
         $purchaseReturnsQuery = PurchaseReturn::where('supplier_id', $accountId)->where('date', '<', $date);
         if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
             $purchaseReturnsQuery->where('salesman_id', $params['salemanId']);
         }
-        $purchaseReturns = $purchaseReturnsQuery->sum('net_total');
+        $purchaseReturns = $purchaseReturnsQuery->sum(DB::raw('net_total - extra_discount'));
 
         if ($isAsset) {
             $pQuery->where(function($q) {
@@ -1631,7 +1631,7 @@ class ReportBuilder
         $targetParty = $accountId !== 'ALL' ? Account::find($accountId) : null;
 
         // 1. Fetch Sales (Receivables)
-        $includeSales = ($accountId === 'ALL') || ($targetParty && $targetParty->sale == 1);
+        $includeSales = false; // Filter out customer/sales data, only show supplier data
         if ($includeSales) {
             $salesQuery = Sales::with(['customer' => function($q) {
                 $q->select('id', 'title', 'aging_days', 'credit_limit');

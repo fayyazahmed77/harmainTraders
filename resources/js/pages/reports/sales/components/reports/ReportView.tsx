@@ -87,7 +87,6 @@ const getSortOptions = (reportId: string) => {
                 { value: 'paid_asc', label: 'Recovery: Low to High' },
             ];
         case 'detail':
-        case 'details_wise':
         case 'invoice_details':
             return [
                 { value: 'default', label: 'Default (Newest First)' },
@@ -101,6 +100,16 @@ const getSortOptions = (reportId: string) => {
                 { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
                 { value: 'amount_desc', label: 'Subtotal: High to Low' },
                 { value: 'amount_asc', label: 'Subtotal: Low to High' },
+            ];
+        case 'details_wise':
+            return [
+                { value: 'default', label: 'Default (Newest First)' },
+                { value: 'date_desc', label: 'Date: Newest First' },
+                { value: 'date_asc', label: 'Date: Oldest First' },
+                { value: 'qty_desc', label: 'Quantity Cartons: High to Low' },
+                { value: 'qty_asc', label: 'Quantity Cartons: Low to High' },
+                { value: 'amount_desc', label: 'Net Amount: High to Low' },
+                { value: 'amount_asc', label: 'Net Amount: Low to High' },
             ];
         case 'month':
         case 'item_party':
@@ -561,7 +570,7 @@ export function ReportView({
                                     const components: { [key: string]: React.FC<any> } = {
                                         bill: Reports.BillReport,
                                         detail: Reports.DetailsReport,
-                                        details_wise: Reports.DetailsReport,
+                                        details_wise: Reports.DateWiseReport,
                                         invoice_details: Reports.InvoiceDetailsReport,
                                         month: Reports.MonthReport,
                                         month_amount: Reports.MonthAmountReport,

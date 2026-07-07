@@ -82,7 +82,7 @@
         .info-label {
             display: inline-block;
             width: 60px;
-            color: #333;
+            color: #181717ff;
         }
 
         .info-value {
@@ -108,7 +108,7 @@
             font-size: 8px;
             font-style: italic;
             margin-top: 2px;
-            color: #444;
+            color: #000;
         }
 
         .alloc-table {
@@ -135,9 +135,8 @@
         .remarks-section {
             margin-top: 5px;
             font-size: 8px;
-            background-color: #f9f9f9;
-            padding: 3px;
-            border: 0.5px solid #ddd;
+            padding: 4px;
+            border: 1px dashed #000;
         }
 
         .remarks-title {
@@ -173,7 +172,7 @@
 
         .footer-note {
             font-size: 7.5px;
-            color: #666;
+            color: #1f1e1eff;
             margin-top: 8px;
         }
 
@@ -220,7 +219,7 @@
             <div class="brand-name">{{ $f_name }}</div>
             <div class="contact-info">{{ $f_sub }}</div>
             @if($payment->firm)
-                <div style="font-size: 7px; color: #555555; margin-bottom: 2px;">{{ $f_addr }}</div>
+                <div style="font-size: 7px; color: #000000; margin-bottom: 2px;">{{ $f_addr }}</div>
             @endif
         </div>
 
@@ -251,48 +250,15 @@
 
         <div class="divider"></div>
 
-        <!-- Amount & Ledger Summary Band (Redesigned) -->
-        <div class="amount-section" style="margin: 6px 0;  padding: 5px;">
-            <div style="display: table; width: 100%; font-size: 8.5px; line-height: 1.4;">
-                <div style="display: table-row;">
-                    <div style="display: table-cell; text-align: left; color: #555;">Previous Balance:</div>
-                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format(abs($previous_balance), 2) }} {{ $previous_balance < 0 ? '' : $orientation }}</div>
-                </div>
-                <div style="display: table-row;">
-                    <div style="display: table-cell; text-align: left; color: #555;">Gross Settlement:</div>
-                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalAmount, 2) }}</div>
-                </div>
-                @if($totalDiscount > 0)
-                    <div style="display: table-row; color: #131212ff;">
-                        <div style="display: table-cell; text-align: left;">Discount (Adj):</div>
-                        <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalDiscount, 2) }}</div>
-                    </div>
-                @endif
-                <div style="display: table-row; color: #121312ff; font-size: 9px; font-weight: bold;">
-                    <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1px dashed #aaaaaa;">Amount Received/Paid:</div>
-                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1px dashed #aaaaaa;">PKR {{ number_format($totalActualPaid, 2) }}</div>
-                </div>
-                <div style="display: table-row; font-size: 9px;">
-                    <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">Net Balance:</div>
-                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">PKR {{ number_format(abs($net_balance), 2) }} {{ $net_balance < 0 ? '' : $orientation }}</div>
-                </div>
-            </div>
-            
-            <div class="amount-words text-center" style="font-size: 8px; font-style: italic; margin-top: 5px; color: #000000; border-top: 1px dashed #dddddd; padding-top: 3px; font-weight: bold; line-height: 1.2;">
-                "{{ $payment->amount_in_words ?: \NumberFormatter::create('en', \NumberFormatter::SPELLOUT)->format($totalAmount) . ' rupees only' }}"
-            </div>
-        </div>
-
-        <!-- Payment Details Table Section -->
-        <div class="divider"></div>
+        
         <div class="bold" style="font-size: 8px; text-transform: uppercase; margin-bottom: 2px;">Payment Details:</div>
         <table class="alloc-table">
             <thead>
                 <tr>
-                    <th>Account</th>
-                    <th>Method</th>
-                    <th>Chq # / Date</th>
-                    <th class="text-right" style="padding-right: 1mm;">Amount</th>
+                    <th style="width: 35%;">Account</th>
+                    <th style="width: 20%;">Method</th>
+                    <th style="width: 25%;">Chq # / Date</th>
+                    <th style="width: 20%;" class="text-right" style="padding-right: 1mm;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -319,7 +285,40 @@
                 @endforeach
             </tbody>
         </table>
+<!-- Amount & Ledger Summary Band (Redesigned) -->
+        <div class="amount-section" style="margin: 6px 0;  padding: 5px;">
+            <div style="display: table; width: 100%; font-size: 8.5px; line-height: 1.4;">
+                <div style="display: table-row;">
+                    <div style="display: table-cell; text-align: left; color: #000000;">Previous Balance:</div>
+                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format(abs($previous_balance), 2) }} {{ $previous_balance < 0 ? '' : $orientation }}</div>
+                </div>
+                <div style="display: table-row;">
+                    <div style="display: table-cell; text-align: left; color: #000000;">Gross Settlement:</div>
+                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalAmount, 2) }}</div>
+                </div>
+                @if($totalDiscount > 0)
+                    <div style="display: table-row; color: #000000;">
+                        <div style="display: table-cell; text-align: left;">Discount (Adj):</div>
+                        <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalDiscount, 2) }}</div>
+                    </div>
+                @endif
+                <div style="display: table-row; color: #000000; font-size: 9px; font-weight: bold;">
+                    <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1px dashed #aaaaaa;">Amount Received/Paid:</div>
+                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1px dashed #aaaaaa;">PKR {{ number_format($totalActualPaid, 2) }}</div>
+                </div>
+                <div style="display: table-row; font-size: 9px;">
+                    <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">Net Balance:</div>
+                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">PKR {{ number_format(abs($net_balance), 2) }} {{ $net_balance < 0 ? '' : $orientation }}</div>
+                </div>
+            </div>
+            
+            <div class="amount-words text-center" style="font-size: 8px; font-style: italic; margin-top: 5px; color: #000000; border-top: 1px dashed #dddddd; padding-top: 3px; font-weight: bold; line-height: 1.2;">
+                "{{ $payment->amount_in_words ?: \NumberFormatter::create('en', \NumberFormatter::SPELLOUT)->format($totalAmount) . ' rupees only' }}"
+            </div>
+        </div>
 
+        <!-- Payment Details Table Section -->
+        
         <!-- Remarks & Communication -->
         @php
             $msgLine = $payment->messageLine ?? $payment->message_line ?? null;
@@ -341,14 +340,14 @@
         <div class="signatures">
             <div class="sig-row">
                 <div class="sig-col">
-                    <div style="height: 12px; font-weight: bold; font-size: 7.5px; text-align: center; width: 100%;">
+                    <div style="height: 30px; font-weight: bold; font-size: 7.5px; text-align: center; width: 100%; margin-bottom: 3px; display: flex; align-items: flex-end; justify-content: center;">
                         {{ $payment->created_by_user->name ?? 'Fayyaz Ahmed' }}
                     </div>
                     <div class="sig-line"></div>
                     <div>Prepared By</div>
                 </div>
                 <div class="sig-col">
-                    <div style="height: 12px;">&nbsp;</div>
+                    <div style="height: 30px; margin-bottom: 3px;">&nbsp;</div>
                     <div class="sig-line"></div>
                     <div>Authorised / Receiver</div>
                 </div>

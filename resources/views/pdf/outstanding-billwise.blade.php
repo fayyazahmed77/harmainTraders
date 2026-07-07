@@ -218,7 +218,7 @@ if (file_exists($logo_path)) {
                         </td>
                         <td class="font-bold">{{ $bill['party_name'] }}</td>
                         <td class="text-center">{{ date('d-M-y', strtotime($bill['due_date'])) }}</td>
-                        <td class="text-center {{ $agingWeight }}" style="color: <?php echo $agingColor; ?>;">
+                        <td class="text-center {{ $agingWeight }}" style="color: {{ $agingColor }};">
                             {{ $bill['days'] > 0 ? $bill['days'].' d' : abs($bill['days']).' l' }}
                         </td>
                         <td class="text-right">{{ formatNum($bill['bill_amt']) }}</td>
@@ -248,22 +248,14 @@ if (file_exists($logo_path)) {
     <div class="net-footer">
         <table class="net-grid">
             <tr>
-                <td width="30%">
-                    <div class="stat-label">Total Receivables (Inbound)</div>
-                    <div class="stat-value">Rs. {{ number_format($globalReceivable, 2) }}</div>
-                </td>
-                <td width="30%">
-                    <div class="stat-label">Total Payables (Outbound)</div>
+                <td width="50%">
+                    <div class="stat-label">Total Outbound Payables</div>
                     <div class="stat-value">Rs. {{ number_format($globalPayable, 2) }}</div>
                 </td>
-                <td width="40%" align="right">
-                    @php
-                        $netVal = $globalReceivable - $globalPayable;
-                        $netColor = $netVal >= 0 ? '#34d399' : '#f87171';
-                    @endphp
-                    <div class="stat-label" style="color: #818cf8;">Net Portfolio Position</div>
-                    <div class="stat-value" style="font-size: 20px; color: <?php echo $netColor; ?>;">
-                        Rs. {{ number_format($netVal, 2) }}
+                <td width="50%" align="right">
+                    <div class="stat-label" style="color: #818cf8;">Total Outstanding Balance</div>
+                    <div class="stat-value" style="font-size: 20px; color: #f87171;">
+                        Rs. {{ number_format($globalPayable, 2) }}
                     </div>
                 </td>
             </tr>

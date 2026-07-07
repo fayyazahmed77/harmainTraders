@@ -19,9 +19,9 @@ export const salesReports = [
     },
     {
         id: 'details_wise',
-        title: 'Details Wise',
-        description: 'Complete line-item breakdown of all sales',
-        icon: 'List'
+        title: 'Date Wise',
+        description: 'Complete day-by-day summarized breakdown of all sales',
+        icon: 'Calendar'
     },
     {
         id: 'detail',

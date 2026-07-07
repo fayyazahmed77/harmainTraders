@@ -6,8 +6,8 @@
     <title>{{ $payment->voucher_no }}</title>
     <style>
         @page {
-            size: A5 landscape;
-            margin: 6mm 8mm 4mm 8mm;
+            size: A4 portrait;
+            margin: 15mm 15mm 15mm 15mm;
         }
 
         * {
@@ -36,8 +36,8 @@
             display: table;
             width: 100%;
             border-bottom: 2px solid #000000;
-            padding-bottom: 6px;
-            margin-bottom: 6px;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
         }
 
         .header-left {
@@ -90,7 +90,7 @@
             display: table;
             width: 100%;
             border: 1px solid #bbbbbb;
-            margin-bottom: 6px;
+            margin-bottom: 15px;
         }
 
         .info-cell {
@@ -130,7 +130,7 @@
             display: table;
             width: 100%;
             border: 1.5px solid #000000;
-            margin-bottom: 6px;
+            margin-bottom: 15px;
         }
 
         .amount-label-cell {
@@ -193,7 +193,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 10px;
-            margin-bottom: 6px;
+            margin-bottom: 15px;
         }
 
         .alloc-table thead th {
@@ -241,7 +241,7 @@
             display: table;
             width: 100%;
             border: 1px solid #bbbbbb;
-            margin-bottom: 6px;
+            margin-bottom: 15px;
         }
 
         .remarks-label-cell {
@@ -270,8 +270,8 @@
         .signatures-grid {
             display: table;
             width: 100%;
-            margin-top: 4px;
-            margin-bottom: 6px;
+            margin-top: 25px;
+            margin-bottom: 25px;
         }
 
         .sig-cell {
@@ -283,7 +283,7 @@
         }
 
         .sig-space {
-            height: 28px;
+            height: 48px;
         }
 
         .sig-line {

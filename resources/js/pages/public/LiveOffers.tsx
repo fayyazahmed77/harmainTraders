@@ -597,6 +597,14 @@ function OfferRow({ item, variant }: { item: OfferItem, variant: 'group' | 'mark
                 </div>
 
                 <div className="flex items-center gap-6 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+                   <div className="flex items-center gap-3">
+                        {item.scheme && (
+                            <Badge className="bg-amber/10 text-amber border-amber/20 h-7 hidden md:flex items-center">
+                                <Sparkles className="w-3 h-3 mr-1.5" />
+                                <span className="text-[10px] font-bold">{item.scheme}</span>
+                            </Badge>
+                        )}
+                    </div>
                     <div className="flex flex-col items-end">
                         <span className="font-mono-jet text-[8px] tracking-[0.1em] uppercase text-text-muted font-bold">
                             {isGroup ? "Ctn Rate" : "Rate"}
@@ -614,14 +622,7 @@ function OfferRow({ item, variant }: { item: OfferItem, variant: 'group' | 'mark
                         <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{item.mrp.toLocaleString()}</span>
                     </div>
                     
-                    <div className="flex items-center gap-3">
-                        {item.scheme && (
-                            <Badge className="bg-amber/10 text-amber border-amber/20 h-7 hidden md:flex items-center">
-                                <Sparkles className="w-3 h-3 mr-1.5" />
-                                <span className="text-[10px] font-bold">{item.scheme}</span>
-                            </Badge>
-                        )}
-                    </div>
+                    
                 </div>
             </div>
         </motion.div>
