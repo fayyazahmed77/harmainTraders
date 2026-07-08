@@ -458,8 +458,8 @@ class DashboardController extends Controller
         $txSubColor = $txDiff >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
 
         // KPI 2: Counter sales today
-        $todaySalesSum = (float)(clone $todaySalesQuery)->sum('net_total');
-        $allDaysSalesSum = Sales::whereIn('id', $userSalesIds)->sum('net_total');
+        $todaySalesSum = (float)(clone $todaySalesQuery)->selectRaw('SUM(net_total - extra_discount) as total')->value('total');
+        $allDaysSalesSum = (float)Sales::whereIn('id', $userSalesIds)->selectRaw('SUM(net_total - extra_discount) as total')->value('total');
         $uniqueDaysCount = Sales::whereIn('id', $userSalesIds)->distinct('date')->count('date') ?: 1;
         $avgDailySales = $allDaysSalesSum / $uniqueDaysCount;
         $salesDiff = $todaySalesSum - $avgDailySales;
@@ -540,7 +540,7 @@ class DashboardController extends Controller
                 'id' => $sale->invoice,
                 'customer' => $sale->customer?->title ?? 'Walk-in (Cash)',
                 'items' => $sale->no_of_items,
-                'amount' => 'Rs ' . number_format($sale->net_total),
+                'amount' => 'Rs ' . number_format($sale->net_total - $sale->extra_discount),
                 'payment' => $getPaymentMethod($sale),
                 'status' => $sale->remaining_amount <= 0 ? 'Paid' : ($sale->paid_amount > 0 ? 'Partial' : 'Pending'),
             ];
@@ -663,7 +663,8 @@ class DashboardController extends Controller
                 $salesSum = Sales::whereIn('id', $userSalesIds)
                     ->whereDate('date', $today)
                     ->whereRaw('HOUR(DATE_ADD(created_at, INTERVAL 5 HOUR)) = ?', [$h])
-                    ->sum('net_total');
+                    ->selectRaw('SUM(net_total - extra_discount) as total')
+                    ->value('total');
                 $cashSum = Payment::whereIn('id', $userPaymentIds)
                     ->whereDate('date', $today)
                     ->whereRaw('HOUR(DATE_ADD(created_at, INTERVAL 5 HOUR)) = ?', [$h])
@@ -722,7 +723,10 @@ class DashboardController extends Controller
         });
 
         // 8. Shift Summary
-        $shiftSales = (float)Sales::whereIn('id', $userSalesIds)->whereDate('date', $today)->sum('net_total');
+        $shiftSales = (float)Sales::whereIn('id', $userSalesIds)
+            ->whereDate('date', $today)
+            ->selectRaw('SUM(net_total - extra_discount) as total')
+            ->value('total');
         $shiftReturns = (float)SalesReturn::whereIn('original_invoice', $userSalesInvoices)->whereDate('date', $today)->sum('net_total');
         
         $shiftSummary = [

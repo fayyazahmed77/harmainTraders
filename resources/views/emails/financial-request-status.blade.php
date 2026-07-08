@@ -1,43 +1,48 @@
-@extends('emails.layout')
+@extends('emails.layouts.master')
 
 @section('content')
-    <div class="content">
-        <h2>Hello {{ $finRequest->investor->full_name }},</h2>
-        
-        <p>Your financial request has been reviewed by our administration team.</p>
+    <h2 style="color: #111827; margin-top: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Financial Request Update</h2>
+    <p style="color: #4B5563; line-height: 1.6; font-size: 15px; margin-top: 8px; margin-bottom: 20px;">
+        Hello <strong style="color: #111827;">{{ $finRequest->investor->full_name }}</strong>,<br>
+        Your financial request has been reviewed by our administration team.
+    </p>
 
-        <div style="display: inline-block; padding: 6px 16px; border-radius: 50px; font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; background-color: {{ $status === 'approved' ? '#d1fae5' : '#fee2e2' }}; color: {{ $status === 'approved' ? '#065f46' : '#991b1b' }};">
-            Request {{ ucfirst($status) }}
-        </div>
-
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin: 25px 0;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                <span style="color: #64748b; font-weight: 500;">Request Type:</span>
-                <span style="color: #1e293b; font-weight: 700;">{{ ucwords(str_replace('_', ' ', $finRequest->request_type)) }}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                <span style="color: #64748b; font-weight: 500;">Amount:</span>
-                <span style="color: #1e293b; font-weight: 700;">PKR {{ number_format($finRequest->amount, 2) }}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                <span style="color: #64748b; font-weight: 500;">Requested On:</span>
-                <span style="color: #1e293b; font-weight: 700;">{{ $finRequest->created_at->format('d M Y, h:i A') }}</span>
-            </div>
-        </div>
-
-        @if($adminNote)
-        <div style="margin-top: 20px;">
-            <p style="font-weight: bold; margin-bottom: 5px;">Admin Note:</p>
-            <p style="color: #475569; font-style: italic; background: #fffbeb; padding: 15px; border-left: 4px solid #f59e0b;">
-                "{{ $adminNote }}"
-            </p>
-        </div>
-        @endif
-
-        <p>You can view the full details of your transaction history and current balance by logging into your investor dashboard.</p>
-        
-        <div style="text-align: center;">
-            <a href="{{ config('app.url') }}/investor/dashboard" class="button">Go to Dashboard</a>
-        </div>
+    {{-- Status Badge --}}
+    <div style="margin-bottom: 24px;">
+        <span style="font-weight: 600; font-size: 14px; color: #4B5563; margin-right: 10px; vertical-align: middle;">Request Status:</span>
+        @component('emails.components.badge', ['status' => $status === 'approved' ? 'approved' : 'rejected'])
+        @endcomponent
     </div>
+
+    {{-- Request Details Card (email-safe table layout, no flexbox) --}}
+    @component('emails.components.card', ['padding' => '20px', 'margin' => '24px 0'])
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.8;">
+            <tr>
+                <td style="width: 140px; color: #6B7280; font-weight: 600; vertical-align: top; padding: 5px 0; white-space: nowrap;">Request Type:</td>
+                <td style="color: #111827; font-weight: 700; vertical-align: top; padding: 5px 0;">{{ ucwords(str_replace('_', ' ', $finRequest->request_type)) }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 5px 0;">Amount:</td>
+                <td style="color: #111827; font-weight: 700; vertical-align: top; padding: 5px 0; font-size: 16px;">PKR {{ number_format($finRequest->amount, 2) }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 5px 0;">Requested On:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 5px 0;">{{ $finRequest->created_at->format('d M Y, h:i A') }}</td>
+            </tr>
+        </table>
+    @endcomponent
+
+    @if($adminNote)
+        <h4 style="color: #374151; font-size: 14px; font-weight: 700; margin-top: 24px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Admin Note</h4>
+        @component('emails.components.alert', ['type' => 'warning'])
+            <span style="font-style: italic; color: #92400E;">"{{ $adminNote }}"</span>
+        @endcomponent
+    @endif
+
+    <p style="color: #4B5563; font-size: 14px; line-height: 1.5; margin-top: 24px;">
+        You can view the full details of your transaction history and current balance by logging into your investor dashboard.
+    </p>
+
+    @component('emails.components.button', ['url' => config('app.url') . '/investor/dashboard', 'text' => 'Go to Dashboard', 'variant' => 'primary', 'align' => 'left'])
+    @endcomponent
 @endsection

@@ -98,6 +98,7 @@ interface Sales {
     discount_total: number;
     tax_total: number;
     net_total: number;
+    courier_charges: number;
     paid_amount: number;
     remaining_amount: number;
     customer: {
@@ -228,7 +229,11 @@ export default function DataTable({ data }: DataTableProps) {
         { 
             accessorKey: "gross_total", 
             header: "Gross Total",
-            cell: ({ row }) => <span className="font-mono">{Number(row.original.gross_total || 0).toLocaleString()}</span>
+            cell: ({ row }) => {
+                const gross = Number(row.original.gross_total || 0);
+                const courier = Number(row.original.courier_charges || 0);
+                return <span className="font-mono">{(gross + courier).toLocaleString()}</span>;
+            }
         },
         { 
             accessorKey: "discount_total", 

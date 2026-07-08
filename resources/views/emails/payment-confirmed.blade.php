@@ -1,93 +1,62 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <style>
-        body { 
-            background-color: #080706; 
-            color: #F5F0E8; 
-            font-family: 'Outfit', 'Barlow', Arial, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-text-size-adjust: none;
-            width: 100% !important;
-        }
-        .wrapper { 
-            width: 100%; 
-            padding: 40px 0; 
-            background-color: #080706;
-        }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: #12100e; 
-            border: 1px solid #231F1B; 
-            border-radius: 12px; 
-            overflow: hidden; 
-        }
-        .header { 
-            background-color: #1A1714; 
-            padding: 25px; 
-            text-align: center; 
-            border-bottom: 1px solid #231F1B;
-        }
-        .content { 
-            padding: 40px; 
-        }
-        .headline { 
-            font-size: 20px; 
-            font-weight: 900; 
-            margin-bottom: 20px; 
-            text-transform: uppercase; 
-            color: #E8941A; 
-            letter-spacing: 1px;
-        }
-        p {
-            font-size: 14px;
-            color: #9B958C;
-            line-height: 1.6;
-        }
-        strong {
-            color: #F5F0E8;
-        }
-        .details-box { 
-            background-color: #1A1714; 
-            border-left: 4px solid #E8941A; 
-            padding: 20px; 
-            margin: 25px 0; 
-            border-radius: 4px; 
-            color: #F5F0E8;
-            font-size: 13px;
-        }
-    </style>
-</head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <span style="color: #E8941A; font-weight: 900; letter-spacing: 3px; font-size: 12px; text-transform: uppercase;">HARNAIN TRADERS ERP</span>
-            </div>
-            <div class="content">
-                <div class="headline">Payment Voucher Confirmed</div>
-                <p>Hello Salesman,</p>
-                <p>A customer payment receipt voucher has been successfully created and allocated in the system.</p>
-                
-                <div class="details-box">
-                    <strong>Voucher No:</strong> {{ $payment->voucher_no }}<br/>
-                    <strong>Payment Date:</strong> {{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}<br/>
-                    <strong>Customer Account:</strong> {{ $payment->account->title ?? 'N/A' }} (Code: {{ $payment->account->code ?? 'N/A' }})<br/><br/>
-                    <strong>Amount Collected:</strong> Rs {{ number_format($payment->amount) }}<br/>
-                    <strong>Payment Method:</strong> {{ $payment->payment_method }}<br/>
-                    @if ($payment->cheque_no)
-                        <strong>Cheque No:</strong> {{ $payment->cheque_no }} (Due: {{ \Carbon\Carbon::parse($payment->cheque_date)->format('d M Y') }})<br/>
-                    @endif
-                    <strong>Remarks / Description:</strong> "{{ $payment->remarks }}"
-                </div>
+@extends('emails.layouts.master')
 
-                <p>This payment has been applied to the customer ledger balance.</p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+@section('content')
+    <h2 style="color: #111827; margin-top: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Payment Voucher Confirmed</h2>
+    <p style="color: #4B5563; line-height: 1.6; font-size: 15px; margin-top: 8px;">
+        Hello <strong style="color: #111827;">{{ $payment->salesman->name ?? 'Team' }}</strong>,<br>
+        A customer payment receipt voucher has been successfully created and allocated in the system.
+    </p>
+
+    {{-- Payment Summary Card --}}
+    @component('emails.components.card', ['padding' => '20px', 'margin' => '24px 0'])
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.9;">
+            <tr>
+                <td style="width: 155px; color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Voucher No:</td>
+                <td style="color: #111827; font-weight: 800; font-size: 15px; vertical-align: top; padding: 4px 0; font-family: monospace;">{{ $payment->voucher_no }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Payment Date:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 4px 0;">{{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Customer Account:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 4px 0;">
+                    {{ $payment->account->title ?? 'N/A' }}
+                    <span style="color: #9CA3AF; font-size: 12px; margin-left: 4px;">({{ $payment->account->code ?? 'N/A' }})</span>
+                </td>
+            </tr>
+            <tr><td colspan="2" style="border-top: 1px solid #E5E7EB; padding: 0;"></td></tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 8px 0 4px 0;">Amount Collected:</td>
+                <td style="color: #111827; font-weight: 800; font-size: 18px; vertical-align: top; padding: 8px 0 4px 0; color: #059669;">Rs {{ number_format($payment->amount) }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Payment Method:</td>
+                <td style="vertical-align: top; padding: 4px 0;">
+                    @component('emails.components.badge', ['status' => strtolower($payment->payment_method)])
+                    @endcomponent
+                </td>
+            </tr>
+            @if ($payment->cheque_no)
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Cheque No:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 4px 0; font-family: monospace;">
+                    {{ $payment->cheque_no }}
+                    <span style="color: #9CA3AF; font-size: 12px; font-family: inherit; font-weight: 400; margin-left: 4px;">(Due: {{ \Carbon\Carbon::parse($payment->cheque_date)->format('d M Y') }})</span>
+                </td>
+            </tr>
+            @endif
+        </table>
+    @endcomponent
+
+    @if($payment->remarks)
+        <h4 style="color: #374151; font-size: 13px; font-weight: 700; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Remarks / Description</h4>
+        @component('emails.components.alert', ['type' => 'info'])
+            <span style="font-style: italic; color: #1F2937;">"{{ $payment->remarks }}"</span>
+        @endcomponent
+    @endif
+
+    <p style="color: #4B5563; font-size: 14px; line-height: 1.5; margin-top: 24px;">
+        This payment has been applied to the customer ledger balance. No further action is required.
+    </p>
+@endsection

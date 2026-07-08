@@ -28,6 +28,7 @@ interface Sales {
     no_of_items: number;
     gross_total: number;
     discount_total: number;
+    courier_charges: number;
     tax_total: number;
     net_total: number;
     paid_amount: number;

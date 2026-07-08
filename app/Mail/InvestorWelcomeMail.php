@@ -44,7 +44,7 @@ class InvestorWelcomeMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.investors.welcome',
+            view: 'emails.investors.welcome',
         );
     }
 

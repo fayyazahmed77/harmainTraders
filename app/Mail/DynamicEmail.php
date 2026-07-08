@@ -47,7 +47,7 @@ class DynamicEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.dynamic',
+            view: 'emails.dynamic',
         );
     }
 }

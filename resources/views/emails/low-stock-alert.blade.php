@@ -1,108 +1,51 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <style>
-        body { 
-            background-color: #080706; 
-            color: #F5F0E8; 
-            font-family: 'Outfit', 'Barlow', Arial, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-text-size-adjust: none;
-            width: 100% !important;
-        }
-        .wrapper { 
-            width: 100%; 
-            padding: 40px 0; 
-            background-color: #080706;
-        }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: #12100e; 
-            border: 1px solid #231F1B; 
-            border-radius: 12px; 
-            overflow: hidden; 
-        }
-        .header { 
-            background-color: #1A1714; 
-            padding: 25px; 
-            text-align: center; 
-            border-bottom: 1px solid #231F1B;
-        }
-        .content { 
-            padding: 40px; 
-        }
-        .headline { 
-            font-size: 20px; 
-            font-weight: 900; 
-            margin-bottom: 20px; 
-            text-transform: uppercase; 
-            color: #EF4444; 
-            letter-spacing: 1px;
-        }
-        p {
-            font-size: 14px;
-            color: #9B958C;
-            line-height: 1.6;
-        }
-        strong {
-            color: #F5F0E8;
-        }
-        .details-box { 
-            background-color: #1A1714; 
-            border-left: 4px solid #EF4444; 
-            padding: 20px; 
-            margin: 25px 0; 
-            border-radius: 4px; 
-            color: #F5F0E8;
-            font-size: 13px;
-        }
-        .btn-container {
-            margin-top: 35px;
-            text-align: left;
-        }
-        .btn {
-            padding: 12px 25px; 
-            text-decoration: none; 
-            border-radius: 6px; 
-            font-weight: 900; 
-            display: inline-block; 
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background-color: #E8941A; 
-            color: #080706; 
-        }
-    </style>
-</head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <span style="color: #E8941A; font-weight: 900; letter-spacing: 3px; font-size: 12px; text-transform: uppercase;">HARNAIN TRADERS ERP</span>
-            </div>
-            <div class="content">
-                <div class="headline">Inventory Low Stock Alert</div>
-                <p>Hello Administrator,</p>
-                <p>This is an automated system alert notifying you that inventory levels for the item below have dropped below the minimum threshold (reorder level).</p>
-                
-                <div class="details-box">
-                    <strong>Product Title:</strong> {{ $item->title }}<br/>
-                    <strong>SKU / Code:</strong> {{ $item->code }}<br/>
-                    <strong>Category:</strong> {{ $item->category->name ?? 'N/A' }}<br/><br/>
-                    <strong>Current Stock Level:</strong> {{ $item->total_stock_pcs }} pieces ({{ $item->stock_breakdown }})<br/>
-                    <strong>Minimum Re-order Level:</strong> {{ $item->reorder_level }} pieces
-                </div>
+@extends('emails.layouts.master')
 
-                <p>Please place a supplier purchase order to replenish stock levels soon.</p>
-                <div class="btn-container">
-                    <a href="{{ url('/items/' . $item->id . '/show') }}" class="btn">VIEW ITEM STOCK</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+@section('content')
+    {{-- Urgency Alert Banner --}}
+    @component('emails.components.alert', ['type' => 'danger'])
+        <strong>⚠ Inventory Alert:</strong> Stock level has dropped below the minimum reorder threshold and requires immediate action.
+    @endcomponent
+
+    <h2 style="color: #111827; margin-top: 20px; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Low Stock Alert</h2>
+    <p style="color: #4B5563; line-height: 1.6; font-size: 15px; margin-top: 8px;">
+        Hello <strong style="color: #111827;">Administrator</strong>,<br>
+        This is an automated system notification. The following inventory item has dropped below its minimum reorder level.
+    </p>
+
+    {{-- Item Details Card --}}
+    @component('emails.components.card', ['padding' => '20px', 'margin' => '24px 0'])
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.9;">
+            <tr>
+                <td style="width: 155px; color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Product Title:</td>
+                <td style="color: #111827; font-weight: 700; vertical-align: top; padding: 4px 0;">{{ $item->title }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">SKU / Code:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 4px 0; font-family: monospace; background-color: transparent;">{{ $item->code }}</td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Category:</td>
+                <td style="color: #111827; font-weight: 600; vertical-align: top; padding: 4px 0;">{{ $item->category->name ?? 'N/A' }}</td>
+            </tr>
+            <tr><td colspan="2" style="border-top: 1px solid #E5E7EB; padding: 0;"></td></tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 8px 0 4px 0;">Current Stock:</td>
+                <td style="vertical-align: top; padding: 8px 0 4px 0;">
+                    <span style="color: #DC2626; font-weight: 800; font-size: 16px;">{{ $item->total_stock_pcs }}</span>
+                    <span style="color: #9CA3AF; font-size: 13px; margin-left: 4px;">pieces ({{ $item->stock_breakdown }})</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="color: #6B7280; font-weight: 600; vertical-align: top; padding: 4px 0;">Reorder Level:</td>
+                <td style="color: #374151; font-weight: 700; vertical-align: top; padding: 4px 0;">{{ $item->reorder_level }} pieces (minimum)</td>
+            </tr>
+        </table>
+    @endcomponent
+
+    <p style="color: #4B5563; font-size: 14px; line-height: 1.5; margin-top: 8px;">
+        Please place a supplier purchase order to replenish stock levels before operations are impacted.
+    </p>
+
+    @component('emails.components.button', ['url' => url('/items/' . $item->id . '/show'), 'text' => 'VIEW ITEM STOCK', 'variant' => 'primary', 'align' => 'left'])
+    @endcomponent
+@endsection

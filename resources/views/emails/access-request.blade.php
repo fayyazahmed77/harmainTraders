@@ -1,117 +1,51 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <style>
-        body { 
-            background-color: #080706; 
-            color: #F5F0E8; 
-            font-family: 'Outfit', 'Barlow', Arial, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-text-size-adjust: none;
-            width: 100% !important;
-        }
-        .wrapper { 
-            width: 100%; 
-            padding: 40px 0; 
-            background-color: #080706;
-        }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: #12100e; 
-            border: 1px solid #231F1B; 
-            border-radius: 12px; 
-            overflow: hidden; 
-        }
-        .header { 
-            background-color: #1A1714; 
-            padding: 25px; 
-            text-align: center; 
-            border-bottom: 1px solid #231F1B;
-        }
-        .content { 
-            padding: 40px; 
-        }
-        .headline { 
-            font-size: 20px; 
-            font-weight: 900; 
-            margin-bottom: 20px; 
-            text-transform: uppercase; 
-            color: #E8941A; 
-            letter-spacing: 1px;
-        }
-        p {
-            font-size: 14px;
-            color: #9B958C;
-            line-height: 1.6;
-        }
-        strong {
-            color: #F5F0E8;
-        }
-        .justification-box { 
-            background-color: #1A1714; 
-            border-left: 4px solid #E8941A; 
-            padding: 20px; 
-            margin: 25px 0; 
-            border-radius: 4px; 
-            font-style: italic; 
-            color: #F5F0E8;
-            font-size: 13px;
-        }
-        .btn-container {
-            margin-top: 35px;
-            text-align: left;
-        }
-        .btn {
-            padding: 12px 25px; 
-            text-decoration: none; 
-            border-radius: 6px; 
-            font-weight: 900; 
-            display: inline-block; 
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-right: 15px;
-        }
-        .btn-approve { 
-            background-color: #E8941A; 
-            color: #080706; 
-        }
-        .btn-reject { 
-            background-color: #231F1B; 
-            color: #9B958C;
-            border: 1px solid #231F1B;
-        }
-        .btn-reject:hover {
-            color: #F5F0E8;
-        }
-    </style>
-</head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <span style="color: #E8941A; font-weight: 900; letter-spacing: 3px; font-size: 12px; text-transform: uppercase;">HARNAIN TRADERS ERP</span>
-            </div>
-            <div class="content">
-                <div class="headline">Access Privilege Request</div>
-                <p>Hello Administrator,</p>
-                <p><strong>{{ $userName }}</strong> has requested <strong>{{ $actionType }}</strong> privileges to module <strong>{{ $resourceType }}</strong>.</p>
-                
-                <div class="justification-box">
-                    "{{ $justification }}"
-                </div>
+@extends('emails.layouts.master')
 
-                <p>Verify this request and execute actions using the secure, single-use links below (valid for 24 hours):</p>
-                <div class="btn-container">
-                    <a href="{{ $approveUrl }}" class="btn btn-approve">APPROVE ACCESS</a>
-                    <a href="{{ $rejectUrl }}" class="btn btn-reject">REJECT REQUEST</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+@section('content')
+    <h2 style="color: #111827; margin-top: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Access Privilege Request</h2>
+    <p style="color: #4B5563; line-height: 1.6; font-size: 15px; margin-top: 8px;">
+        Hello Administrator,<br>
+        A user has requested privilege escalation on the platform:
+    </p>
+
+    <!-- Request Details Card -->
+    @component('emails.components.card', ['padding' => '20px', 'margin' => '24px 0'])
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; color: #4B5563;">
+            <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #374151; width: 120px; vertical-align: top;">Requester:</td>
+                <td style="padding: 6px 0; color: #111827; vertical-align: top;">{{ $userName }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #374151; vertical-align: top;">Privilege Type:</td>
+                <td style="padding: 6px 0; color: #111827; vertical-align: top;"><span style="font-family: monospace; background-color: #F3F4F6; padding: 2px 6px; border-radius: 4px; font-weight: bold; text-transform: uppercase;">{{ $actionType }}</span></td>
+            </tr>
+            <tr>
+                <td style="padding: 6px 0; font-weight: 600; color: #374151; vertical-align: top;">Resource/Module:</td>
+                <td style="padding: 6px 0; color: #111827; vertical-align: top; font-weight: 600;">{{ $resourceType }}</td>
+            </tr>
+        </table>
+    @endcomponent
+
+    <!-- Justification Box -->
+    <h3 style="color: #111827; font-size: 14px; font-weight: 700; margin-top: 24px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Reason / Justification</h3>
+    @component('emails.components.alert', ['type' => 'info'])
+        <span style="font-style: italic; color: #1F2937;">"{{ $justification }}"</span>
+    @endcomponent
+
+    <p style="color: #4B5563; font-size: 14px; line-height: 1.5; margin-top: 24px; margin-bottom: 24px;">
+        Please review this request and perform the action using the secure links below (valid for 24 hours):
+    </p>
+
+    <!-- Secure Action Buttons side-by-side or stacked -->
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="width: 50%; padding-right: 12px; vertical-align: top;">
+                @component('emails.components.button', ['url' => $approveUrl, 'text' => 'APPROVE ACCESS', 'variant' => 'primary', 'align' => 'center'])
+                @endcomponent
+            </td>
+            <td style="width: 50%; padding-left: 12px; vertical-align: top;">
+                @component('emails.components.button', ['url' => $rejectUrl, 'text' => 'REJECT REQUEST', 'variant' => 'outline', 'align' => 'center'])
+                @endcomponent
+            </td>
+        </tr>
+    </table>
+@endsection
