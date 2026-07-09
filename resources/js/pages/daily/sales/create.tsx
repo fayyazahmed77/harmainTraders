@@ -237,6 +237,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [creditDays, setCreditDays] = useState<number>(0);
   const [active, setActive] = useState<boolean>(true);
   const [invoiceNo, setInvoiceNo] = useState<string>(nextInvoiceNo);
+  useEffect(() => {
+    setInvoiceNo(nextInvoiceNo);
+  }, [nextInvoiceNo]);
   const [salesman, setSalesman] = useState<number | null>(null);
   const [customerCategory, setCustomerCategory] = useState<string | null>(null);
   const [cashCredit, setCashCredit] = useState<string>("CREDIT");
@@ -690,8 +693,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           totalFull: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.full), 0),
           totalPcs: rowsWithComputed.reduce((acc, r) => acc + toNumber(r.pcs), 0),
           totalDiscount: totals.discTotal + extraDiscount,
-          saleId: id
+          saleId: id,
+          invoiceNo: invoiceNo
         });
+
+        clearForm();
 
         setShowSuccessDialog(true);
       },
@@ -703,17 +709,28 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     });
   };
 
-  const resetForm = () => {
+  const clearForm = () => {
     setRows([getEmptyRow()]);
     setAccountType(null);
+    setCode("");
+    setParty("");
+    setCreditLimit("");
+    setCreditDays(0);
+    setCustomerCategory(null);
     setSalesman(null);
     setExtraDiscount(0);
+    setCourier(0);
     setSplits([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }]);
     setIsMultiPayment(true);
     setIsPayNow(false);
-    setShowSuccessDialog(false);
     setUseAdvance(false);
     setPreviousBalance(0);
+    setSelectedItemId(null);
+  };
+
+  const resetForm = () => {
+    clearForm();
+    setShowSuccessDialog(false);
   };
 
   return (
@@ -1796,7 +1813,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           <SuccessDialog
             open={showSuccessDialog}
             onOpenChange={setShowSuccessDialog}
-            invoiceNo={invoiceNo}
+            invoiceNo={successData?.invoiceNo || invoiceNo}
             saleId={successData?.saleId || 0}
             customerName={successData?.customerName}
             totalAmount={successData?.totalAmount}

@@ -59,6 +59,7 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
                     'F' => 18,
                     'G' => 15,
                     'H' => 18,
+                    'I' => 18,
                 ];
             case 'detail':
                 return [
@@ -110,6 +111,7 @@ class SalesReportExport implements FromView, ShouldAutoSize, WithStyles, WithCol
                     'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                     'G' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                     'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+                    'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
                 ];
             case 'detail':
                 return [

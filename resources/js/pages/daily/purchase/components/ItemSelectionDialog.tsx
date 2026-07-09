@@ -303,7 +303,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         type="number"
                                         value={dialogFull || ""}
                                         onChange={e => setDialogFull(toNumber(e.target.value))}
-                                        className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all shadow-inner"
+                                        className="w-24 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all shadow-inner"
                                         autoFocus
                                     />
                                 </div>
@@ -315,7 +315,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             type="number"
                                             value={dialogPcs || ""}
                                             onChange={e => setDialogPcs(toNumber(e.target.value))}
-                                            className="w-16 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all shadow-inner"
+                                            className="w-24 h-12 text-center text-xl font-black rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all shadow-inner"
                                         />
                                     </div>
                                 )}
@@ -326,7 +326,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         type="number"
                                         value={dialogBonusFull || ""}
                                         onChange={e => setDialogBonusFull(toNumber(e.target.value))}
-                                        className="w-16 h-12 text-center text-xl font-black rounded-xl border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all shadow-inner"
+                                        className="w-24 h-12 text-center text-xl font-black rounded-xl border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all shadow-inner"
                                     />
                                 </div>
 
@@ -337,7 +337,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             type="number"
                                             value={dialogBonusPcs || ""}
                                             onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
-                                            className="w-16 h-12 text-center text-xl font-black rounded-xl border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all shadow-inner"
+                                            className="w-24 h-12 text-center text-xl font-black rounded-xl border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all shadow-inner"
                                         />
                                     </div>
                                 )}

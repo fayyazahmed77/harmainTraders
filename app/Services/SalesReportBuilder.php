@@ -223,18 +223,18 @@ class SalesReportBuilder
             $itemsSummary->where('items.company', $filters['company_id']);
         }
 
-        $query = DB::table('sales')
+        $salesQuery = DB::table('sales')
             ->joinSub($itemsSummary, 'items_sum', 'sales.id', '=', 'items_sum.sale_id')
             ->join('accounts', 'sales.customer_id', '=', 'accounts.id')
             ->whereBetween('sales.date', [$fromDate, $toDate]);
 
-        if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
-        if ($filters['salesman_id']) $query->where('sales.salesman_id', $filters['salesman_id']);
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
-        if ($filters['firm_id']) $query->where('sales.firm_id', $filters['firm_id']);
+        if ($filters['customer_id']) $salesQuery->where('sales.customer_id', $filters['customer_id']);
+        if ($filters['salesman_id']) $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
+        if ($filters['area_id']) $salesQuery->where('accounts.area_id', $filters['area_id']);
+        if ($filters['sub_area_id']) $salesQuery->where('accounts.subarea_id', $filters['sub_area_id']);
+        if ($filters['firm_id']) $salesQuery->where('sales.firm_id', $filters['firm_id']);
 
-        $results = $query->select(
+        $salesResults = $salesQuery->select(
             'sales.date',
             DB::raw('COUNT(DISTINCT sales.id) as bill_count'),
             DB::raw('SUM(items_sum.qty_full) as qty_full'),
@@ -244,10 +244,74 @@ class SalesReportBuilder
             DB::raw('SUM(items_sum.items_amount - items_sum.items_discount) as amount')
         )
         ->groupBy('sales.date')
-        ->orderBy('sales.date', 'desc')
-        ->get();
+        ->get()
+        ->keyBy('date');
 
-        return $this->transformToArray($results);
+        // Query sales returns for same date range and matching filters
+        $returnsQuery = DB::table('sales_returns')
+            ->join('accounts', 'sales_returns.customer_id', '=', 'accounts.id')
+            ->whereBetween('sales_returns.date', [$fromDate, $toDate]);
+
+        if ($filters['customer_id']) $returnsQuery->where('sales_returns.customer_id', $filters['customer_id']);
+        if ($filters['salesman_id']) $returnsQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
+        if ($filters['area_id']) $returnsQuery->where('accounts.area_id', $filters['area_id']);
+        if ($filters['sub_area_id']) $returnsQuery->where('accounts.subarea_id', $filters['sub_area_id']);
+        
+        if ($filters['firm_id']) {
+            $returnsQuery->join('sales', 'sales_returns.sale_id', '=', 'sales.id')
+                         ->where('sales.firm_id', $filters['firm_id']);
+        }
+
+        if ($filters['item_id'] || $filters['category_id'] || $filters['company_id']) {
+            $returnsQuery->join('sales_return_items', 'sales_returns.id', '=', 'sales_return_items.sales_return_id');
+            if ($filters['item_id']) {
+                $returnsQuery->where('sales_return_items.item_id', $filters['item_id']);
+            }
+            if ($filters['category_id'] || $filters['company_id']) {
+                $returnsQuery->join('items', 'sales_return_items.item_id', '=', 'items.id');
+                if ($filters['category_id']) $returnsQuery->where('items.category', $filters['category_id']);
+                if ($filters['company_id']) $returnsQuery->where('items.company', $filters['company_id']);
+            }
+            $returnsGroup = $returnsQuery->select(
+                'sales_returns.date',
+                DB::raw('SUM(sales_return_items.subtotal) as total_return')
+            );
+        } else {
+            $returnsGroup = $returnsQuery->select(
+                'sales_returns.date',
+                DB::raw('SUM(sales_returns.net_total - sales_returns.extra_discount) as total_return')
+            );
+        }
+
+        $returnsResults = $returnsGroup->groupBy('sales_returns.date')
+            ->get()
+            ->keyBy('date');
+
+        // Merge Sales and Returns by Date
+        $allDates = array_unique(array_merge($salesResults->keys()->toArray(), $returnsResults->keys()->toArray()));
+        rsort($allDates);
+
+        $merged = [];
+        foreach ($allDates as $date) {
+            $sale = $salesResults->get($date);
+            $return = $returnsResults->get($date);
+
+            $sales_return_val = $return ? (float)$return->total_return : 0.0;
+            $amount_val = $sale ? (float)$sale->amount : 0.0;
+
+            $merged[] = [
+                'date' => $date,
+                'bill_count' => $sale ? (int)$sale->bill_count : 0,
+                'qty_full' => $sale ? (float)$sale->qty_full : 0.0,
+                'qty_pcs' => $sale ? (float)$sale->qty_pcs : 0.0,
+                'gross' => $sale ? (float)$sale->gross : 0.0,
+                'discount' => $sale ? (float)$sale->discount : 0.0,
+                'sales_return' => $sales_return_val,
+                'amount' => $amount_val - $sales_return_val
+            ];
+        }
+
+        return $merged;
     }
 
     public function details($fromDate, $toDate, $filters = [])

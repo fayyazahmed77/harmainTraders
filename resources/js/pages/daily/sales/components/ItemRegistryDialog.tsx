@@ -287,7 +287,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                     type="number" 
                     value={dialogFull || ""} 
                     onChange={e => setDialogFull(toNumber(e.target.value))} 
-                    className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
+                    className="w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
                     autoFocus 
                  />
               </div>
@@ -298,7 +298,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                       type="number" 
                       value={dialogPcs || ""} 
                       onChange={e => setDialogPcs(toNumber(e.target.value))} 
-                      className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
+                      className="w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-[#FF5C00] focus:ring-2 transition-all font-mono" 
                    />
                 </div>
               )}
@@ -308,7 +308,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                     type="number" 
                     value={dialogBonusFull || ""} 
                     onChange={e => setDialogBonusFull(toNumber(e.target.value))} 
-                    className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
+                    className="w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
                  />
               </div>
               {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
@@ -318,7 +318,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                       type="number" 
                       value={dialogBonusPcs || ""} 
                       onChange={e => setDialogBonusPcs(toNumber(e.target.value))} 
-                      className="w-14 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
+                      className="w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono" 
                    />
                 </div>
               )}

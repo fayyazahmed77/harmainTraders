@@ -314,6 +314,11 @@ export default function Purchase({
     const [creditLimit, setCreditLimit] = useState<number | "">("");
     const [creditDays, setCreditDays] = useState<number>(0);
     const [invoiceNo, setInvoiceNo] = useState<string>(nextInvoiceNo);
+    useEffect(() => {
+        if (nextInvoiceNo) {
+            setInvoiceNo(nextInvoiceNo);
+        }
+    }, [nextInvoiceNo]);
     const [salesman, setSalesman] = useState<number | null>(null);
     const [cashCredit, setCashCredit] = useState<string>("CREDIT");
     const [accountType, setAccountType] = useState<Option | null>(null);
@@ -659,6 +664,9 @@ export default function Purchase({
                     nextInvoiceNo: newProps.nextInvoiceNo
                 });
 
+                // Clear the form first, updating invoiceNo to the new nextInvoiceNo
+                clearForm(newProps.nextInvoiceNo);
+
                 setShowSuccessDialog(true);
                 setShowPriceDialog(false); // Close price dialog if open
             },
@@ -669,7 +677,7 @@ export default function Purchase({
         });
     };
 
-    const resetForm = (nextInvoiceNo?: string) => {
+    const clearForm = (nextInvoiceNo?: string) => {
         resetRows();
         if (nextInvoiceNo) {
             setInvoiceNo(nextInvoiceNo);
@@ -689,6 +697,11 @@ export default function Purchase({
         setIsPayNow(false);
         setPaymentSplits([]);
         setShowPaymentDialog(false);
+    };
+
+    const resetForm = (nextInvoiceNo?: string) => {
+        clearForm(nextInvoiceNo);
+        setShowSuccessDialog(false);
     };
 
     const handleSave = async () => {

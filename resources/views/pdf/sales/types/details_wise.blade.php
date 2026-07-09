@@ -11,6 +11,7 @@
             <th style="width: 70px;" class="text-right">Qty P</th>
             <th style="width: 90px;" class="text-right">Gross</th>
             <th style="width: 90px;" class="text-right">Discount</th>
+            <th style="width: 90px;" class="text-right">Sales Return</th>
             <th style="width: 100px;" class="text-right">Net Amount</th>
         </tr>
     </thead>
@@ -24,6 +25,7 @@
             <td class="text-right">{{ number_format($row['qty_pcs'], 0) }}</td>
             <td class="text-right">{{ number_format($row['gross'], 2) }}</td>
             <td class="text-right">{{ number_format($row['discount'], 2) }}</td>
+            <td class="text-right">{{ number_format($row['sales_return'] ?? 0, 2) }}</td>
             <td class="text-right font-bold">{{ number_format($row['amount'], 2) }}</td>
         </tr>
         @endforeach
@@ -36,6 +38,7 @@
             <td class="text-right">{{ collect($data)->sum('qty_pcs') }}</td>
             <td class="text-right">{{ number_format(collect($data)->sum('gross'), 2) }}</td>
             <td class="text-right">{{ number_format(collect($data)->sum('discount'), 2) }}</td>
+            <td class="text-right">{{ number_format(collect($data)->sum('sales_return'), 2) }}</td>
             <td class="text-right">{{ number_format(collect($data)->sum('amount'), 2) }}</td>
         </tr>
     </tfoot>

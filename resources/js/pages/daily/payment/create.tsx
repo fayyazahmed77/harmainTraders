@@ -171,6 +171,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, [errors]);
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [successData, setSuccessData] = useState<any>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -182,7 +183,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, []);
 
   const handleDirectPrint = (format: 'small' | 'big') => {
-    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
+    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id || successData?.printId;
     if (!printId) {
       toast.error("Voucher ID not found. Please check reports.");
       return;
@@ -216,8 +217,43 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     };
   };
 
+  const clearFormStates = () => {
+     setAmount(0);
+     setDiscount(0);
+     setSelectedBillIds(new Set());
+     setAllocations({});
+     setRemarks("");
+     setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
+     setSelectedAccountId("");
+     setPaymentAccountId("");
+     setChequeNo("");
+     setChequeDate("");
+     setClearDate("");
+     setPaymentMethod("");
+     setOriginalChequeId("");
+     setUseAdvance(false);
+     setSelectedMessageId("0");
+     setIsMultiPayment(false);
+     setTotalSalesPurchases(0);
+     setTotalReceivedPaid(0);
+     setTotalBalance(0);
+     setAdvancePaid(0);
+  };
+
   useEffect(() => {
     if (flash?.success) {
+      setSuccessData({
+        partyName: accounts.find(a => a.id.toString() === selectedAccountId)?.title || "General Party",
+        amount: flash?.saved_payments 
+          ? flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0)
+          : ((isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : (amount || 0)) - (discount || 0)),
+        invoicesCount: selectedBillIds.size,
+        method: isMultiPayment ? "Multi" : (paymentMethod || "Cash"),
+        discount: discount,
+        voucherNo: flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---',
+        printId: flash?.print_id || flash?.saved_payments?.[0]?.id
+      });
+      clearFormStates();
       setSuccessDialogOpen(true);
     }
   }, [flash?.success]);
@@ -1705,7 +1741,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   transition={{ delay: 0.4 }}
                   className="text-sm font-medium tracking-wide uppercase opacity-80"
                 >
-                  Voucher record saved with ID: {flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---'}
+                  Voucher record saved with ID: {successData?.voucherNo || '---'}
                 </motion.p>
               </div>
             </div>
@@ -1715,17 +1751,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 <div className="space-y-1">
                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Ledger Account</span>
                   <h3 className="text-lg font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tighter leading-none">
-                    {accounts.find(a => a.id.toString() === selectedAccountId)?.title || "General Party"}
+                    {successData?.partyName || "General Party"}
                   </h3>
                 </div>
                 <div className="text-right space-y-1">
                   <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block">Settlement Amount</span>
                   <div className={`text-2xl font-mono font-black ${t.text} items-center flex gap-1 justify-end leading-none`}>
                     <span className="text-xs opacity-50 font-bold">Rs</span>
-                    {flash?.saved_payments 
-                      ? (flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0)).toLocaleString()
-                      : ((isMultiPayment ? splitPayments.reduce((s, p) => s + Number(p.amount), 0) : (amount || 0)) - (discount || 0)).toLocaleString()
-                    }
+                    {successData?.amount?.toLocaleString() || '0'}
                   </div>
                 </div>
               </div>
@@ -1733,17 +1766,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Invoices</span>
-                  <span className="text-xl font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{selectedBillIds.size}</span>
+                  <span className="text-xl font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{successData?.invoicesCount || 0}</span>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Method</span>
                   <span className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase leading-none truncate w-full pt-1">
-                    {isMultiPayment ? "Multi" : (paymentMethod || "Cash")}
+                    {successData?.method || "Cash"}
                   </span>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 text-center flex flex-col items-center">
                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1.5">Total Adj</span>
-                  <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{discount?.toLocaleString() || '0'}</span>
+                  <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 font-mono leading-none">{successData?.discount?.toLocaleString() || '0'}</span>
                 </div>
               </div>
 
@@ -1751,7 +1784,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 <span className="text-xs font-black text-emerald-600/60 uppercase tracking-widest">Total Discount</span>
                 <div className="text-lg font-mono font-black text-emerald-600 flex items-center gap-1">
                   <span className="text-[10px] font-bold">Rs</span>
-                  {discount?.toLocaleString() || '0'}
+                  {successData?.discount?.toLocaleString() || '0'}
                 </div>
               </div>
 
@@ -1775,7 +1808,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
                 <Button 
                   onClick={() => {
-                    const printId = flash?.print_id || flash?.saved_payments?.[0]?.id;
+                    const printId = successData?.printId;
                     if (printId) {
                       window.open(`/payments/${printId}/view`, '_blank');
                     } else {
@@ -1792,26 +1825,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 <Button 
                   onClick={() => {
                      setSuccessDialogOpen(false);
-                     setAmount(0);
-                     setDiscount(0);
-                     setSelectedBillIds(new Set());
-                     setAllocations({});
-                     setRemarks("");
-                     setSplitPayments([{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "", original_cheque_id: "" }]);
-                     setSelectedAccountId("");
-                     setPaymentAccountId("");
-                     setChequeNo("");
-                     setChequeDate("");
-                     setClearDate("");
-                     setPaymentMethod("");
-                     setOriginalChequeId("");
-                     setUseAdvance(false);
-                     setSelectedMessageId("0");
-                     setIsMultiPayment(false);
-                     setTotalSalesPurchases(0);
-                     setTotalReceivedPaid(0);
-                     setTotalBalance(0);
-                     setAdvancePaid(0);
+                     clearFormStates();
                   }} 
                   variant="outline"
                   className="h-14 border-orange-200 dark:border-orange-900/30 text-orange-600 dark:text-orange-400 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-orange-50 dark:hover:bg-orange-500/10"
