@@ -822,7 +822,10 @@ class PurchaseController extends Controller implements HasMiddleware
 
         if ($format === 'small') {
             // Receipt size for thermal printers
-            $pdf->setPaper([0, 0, 226.77, 600], 'portrait'); // ~80mm width
+            $itemCount = count($purchase->items);
+            $height = 320 + ($itemCount * 16);
+            $height = max(280, $height);
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait'); // ~80mm width
         } else {
             $pdf->setPaper('A4', 'portrait');
         }

@@ -4,7 +4,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Card } from "@/components/ui/card";
 import { BreadcrumbItem } from "@/types";
-import { MoreHorizontal, Pencil, Plus, Mail, Phone, Search, MapPin, X } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Mail, Phone, Search, MapPin, X, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -256,6 +256,7 @@ export default function StaffIndex({ staff }: Props) {
                                                         >
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-4">
+                                                                    
                                                                     <Avatar className="h-10 w-10 border border-zinc-200 dark:border-zinc-800 shadow-sm transition-transform group-hover:scale-105">
                                                                         <AvatarImage src={user.image ? `/storage/${user.image}` : ""} />
                                                                         <AvatarFallback className="bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-black text-xs">
@@ -314,11 +315,6 @@ export default function StaffIndex({ staff }: Props) {
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center justify-center gap-2">
-                                                                    <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-orange-500/10 hover:text-orange-500">
-                                                                        <Link href={`/staff/${user.id}/edit`}>
-                                                                            <Pencil className="h-4 w-4" />
-                                                                        </Link>
-                                                                    </Button>
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild>
                                                                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
@@ -328,14 +324,17 @@ export default function StaffIndex({ staff }: Props) {
                                                                         <DropdownMenuContent align="end" className="w-48 rounded-xl border-zinc-200 dark:border-zinc-800">
                                                                             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 p-3">Manage Member</DropdownMenuLabel>
                                                                             <DropdownMenuItem asChild className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer">
-                                                                                <Link href={`/staff/${user.id}`}>View Details</Link>
+                                                                                <Link href={`/staff/${user.id}`}><Eye className="w-4 h-4" /> View Details</Link>
+                                                                            </DropdownMenuItem>
+                                                                            <DropdownMenuItem asChild className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer">
+                                                                                <Link href={`/staff/${user.id}/edit`}><Pencil className="w-4 h-4" /> Edit</Link>
                                                                             </DropdownMenuItem>
                                                                             <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
                                                                             <DropdownMenuItem
                                                                                 className="rounded-lg m-1 font-bold text-xs uppercase cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-500/10"
                                                                                 onClick={() => handleDelete(user.id)}
                                                                             >
-                                                                                Delete Staff
+                                                                                <Trash2 className="h-4 w-4" /> Delete Staff
                                                                             </DropdownMenuItem>
                                                                         </DropdownMenuContent>
                                                                     </DropdownMenu>

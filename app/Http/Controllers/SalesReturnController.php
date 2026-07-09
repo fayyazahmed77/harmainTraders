@@ -657,7 +657,10 @@ class SalesReturnController extends Controller implements HasMiddleware
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('salesReturn'));
 
         if ($format === 'small') {
-            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+            $itemCount = count($salesReturn->items);
+            $height = 320 + ($itemCount * 16);
+            $height = max(280, $height);
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
         } else {
             $pdf->setPaper('A4', 'portrait');
         }

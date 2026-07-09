@@ -111,42 +111,7 @@ function numberToWords(amount: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT (fallback)
 // ─────────────────────────────────────────────────────────────────────────────
-const defaultPayment: Payment = {
-  id: 66,
-  voucher_number: 'CRV-0066',
-  voucher_date: '01 July 2026',
-  received_from: 'SAFDASF Trading Co.',
-  party_label: 'Received From',
-  account_type_label: 'Customer',
-  method: 'Cheque',
-  cheque_number: 'CHQ-88776',
-  cheque_date: '01 July 2026',
-  clear_date: null,
-  cheque_status: 'Pending',
-  account: 'Cheque in Hand',
-  total_amount: 60000,
-  amount: 60000,
-  discount: 0,
-  amount_in_words: 'Sixty Thousand Rupees Only',
-  status: 'pending',
-  type: 'RECEIPT',
-  prepared_by: 'Fayyaz Ahmed',
-  remarks: null,
-  message_line: null,
-  allocations: [
-    { ref: 'Sales #119', invoice_ref: 'INV-0119', date: '2026-06-15', invoice_total: 70000, amount_applied: 60000 },
-  ],
-  company: {
-    name: 'Harmain Traders',
-    tagline: 'Wholesale & Supply Chain ERP',
-    address: 'Karachi, Pakistan',
-    phone: '+92 300 0000000',
-    email: 'info@harmaintraders.com',
-    website: 'aishtycoons.agency',
-  },
-  current_balance: 0,
-  orientation: 'DR',
-};
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COPY BUTTON
@@ -319,71 +284,7 @@ const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment
 
         {/* ══════════════════════════════════════════════════════════════════
             SUMMARY CARDS
-        ══════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-4 border-b border-[#e2e8f0]">
-          {/* Card 1: Voucher Total */}
-          <div className="px-6 py-5 border-r border-[#e2e8f0]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-                <Banknote size={14} className="text-emerald-600" />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Voucher Total</span>
-            </div>
-            <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className="text-[22px] font-black text-emerald-600 leading-tight">{formatPKR(totalAmount)}</div>
-            {totalDiscount > 0 && (
-              <div className="text-[10px] text-[#94a3b8] mt-0.5">Disc: PKR {formatPKR(totalDiscount)}</div>
-            )}
-          </div>
-
-          {/* Card 2: Previous Balance */}
-          <div className="px-6 py-5 border-r border-[#e2e8f0]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
-                <TrendingUp size={14} className="text-orange-500" />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Previous Balance</span>
-            </div>
-            <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className="text-[22px] font-black text-orange-500 leading-tight">{formatPKR(Math.abs(previousBalance))}</div>
-            <div className="text-[10px] text-[#94a3b8] mt-0.5 font-bold uppercase tracking-wider">
-              {previousBalance < 0 ? 'Paid in Advance' : orientation}
-            </div>
-          </div>
-
-          {/* Card 3: Amount Paid / Received */}
-          <div className="px-6 py-5 border-r border-[#e2e8f0]">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg bg-[#eff6ff] flex items-center justify-center">
-                <CheckCircle2 size={14} className="text-[#3b82f6]" />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">
-                {p.type === 'RECEIPT' ? 'Amount Received' : 'Amount Paid'}
-              </span>
-            </div>
-            <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className="text-[22px] font-black text-[#1e3a8a] leading-tight">{formatPKR(totalActualPaid)}</div>
-            <div className="text-[10px] text-[#94a3b8] mt-0.5 font-bold uppercase tracking-wider">Cleared</div>
-          </div>
-
-          {/* Card 4: Net Balance */}
-          <div className="px-6 py-5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${currentBalance <= 0 ? 'bg-emerald-50' : 'bg-amber-50'}`}>
-                <CreditCard size={14} className={currentBalance <= 0 ? 'text-emerald-600' : 'text-amber-500'} />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Net Balance</span>
-            </div>
-            <div className="text-[10px] text-[#94a3b8] font-medium">PKR</div>
-            <div className={`text-[22px] font-black leading-tight ${currentBalance <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-              {formatPKR(Math.abs(currentBalance))}
-            </div>
-            <div className={`text-[10px] mt-0.5 font-bold uppercase tracking-wider ${currentBalance <= 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
-              {currentBalance < 0 ? 'Paid in Advance' : orientation}
-            </div>
-          </div>
-        </div>
-
+        
         {/* ══════════════════════════════════════════════════════════════════
             BODY
         ══════════════════════════════════════════════════════════════════ */}
@@ -482,7 +383,9 @@ const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment
                 }`}>
                   {p.type === 'RECEIPT' ? 'Total Amount Received' : 'Total Amount Paid'}
                 </div>
-                <div className="text-[12px] text-[#64748b] italic mt-1 font-medium">{p.amount_in_words}</div>
+                <div className="text-[12px] text-[#64748b] italic mt-1 font-medium">
+                  {mappedGroupPayments.length > 1 ? numberToWords(totalAmount) : p.amount_in_words}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-[#3b82f6] mb-0.5">PKR</div>
@@ -738,7 +641,7 @@ function safeStr(val: any, fallback = ''): string {
 }
 
 function mapPayment(raw: any): Payment {
-  if (!raw) return defaultPayment;
+  if (!raw) return {} as Payment;
 
   const isPayment = (raw.type ?? '').toUpperCase() === 'PAYMENT';
   const partyLabel = isPayment ? 'Paid To' : 'Received From';
@@ -758,55 +661,55 @@ function mapPayment(raw: any): Payment {
 
   const netAmount = raw.net_amount !== undefined
     ? Number(raw.net_amount)
-    : (raw.amount ? Number(raw.amount) + Number(raw.discount || 0) : defaultPayment.total_amount);
+    : (raw.amount ? Number(raw.amount) + Number(raw.discount || 0) : 0);
 
   const rawMsg = raw.message_line ?? raw.messageLine ?? null;
   const messageLineVal = rawMsg ? rawMsg.messageline : null;
 
   // Extract selected firm branding if assigned to this payment
   const firmObj = raw.firm ?? null;
-  const companyName = firmObj ? firmObj.name : (raw.company?.name ?? defaultPayment.company.name);
-  const companyTagline = firmObj ? (firmObj.business || firmObj.tagline) : (raw.company?.tagline ?? defaultPayment.company.tagline);
-  const companyAddress = firmObj ? [firmObj.address1, firmObj.address2].filter(Boolean).join(' ') : (raw.company?.address ?? defaultPayment.company.address);
-  const companyPhone = firmObj ? firmObj.phone : (raw.company?.phone ?? defaultPayment.company.phone);
-  const companyEmail = firmObj ? firmObj.email : (raw.company?.email ?? defaultPayment.company.email);
-  const companyWebsite = firmObj ? firmObj.website : (raw.company?.website ?? defaultPayment.company.website);
+  const companyName = firmObj ? firmObj.name : (raw.company?.name ?? '');
+  const companyTagline = firmObj ? (firmObj.business || firmObj.tagline) : (raw.company?.tagline ?? '');
+  const companyAddress = firmObj ? [firmObj.address1, firmObj.address2].filter(Boolean).join(' ') : (raw.company?.address ?? '');
+  const companyPhone = firmObj ? firmObj.phone : (raw.company?.phone ?? '');
+  const companyEmail = firmObj ? firmObj.email : (raw.company?.email ?? '');
+  const companyWebsite = firmObj ? firmObj.website : (raw.company?.website ?? '');
 
   const currentBalance = raw.account ? Number(raw.account.current_balance ?? 0) : 0;
   const isPurchase = raw.account ? Boolean(raw.account.purchase) : false;
   const orientation = isPurchase ? 'CR' : 'DR';
 
   return {
-    id:                  raw.id             ?? defaultPayment.id,
-    voucher_number:      raw.voucher_no     ?? raw.voucher_number ?? defaultPayment.voucher_number,
-    voucher_date:        raw.date           ?? raw.voucher_date   ?? defaultPayment.voucher_date,
-    received_from:       raw.received_from  ? safeStr(raw.received_from) : safeStr(raw.account, defaultPayment.received_from),
+    id:                  raw.id             ?? '',
+    voucher_number:      raw.voucher_no     ?? raw.voucher_number ?? '',
+    voucher_date:        raw.date           ?? raw.voucher_date   ?? '',
+    received_from:       raw.received_from  ? safeStr(raw.received_from) : safeStr(raw.account, ''),
     party_label:         partyLabel,
     account_type_label:  accountTypeLabel,
-    method:              raw.payment_method ?? raw.method         ?? defaultPayment.method,
+    method:              raw.payment_method ?? raw.method         ?? '',
     cheque_number:       raw.cheque_no      ?? raw.cheque_number  ?? null,
     cheque_date:         raw.cheque_date    ?? null,
     clear_date:          raw.clear_date     ?? null,
     cheque_status:       typeof raw.cheque_status === 'string' ? raw.cheque_status : null,
-    account:             safeStr(raw.paymentAccount, '') || safeStr(raw.account_name, '') || (typeof raw.account === 'string' ? raw.account : '') || defaultPayment.account,
+    account:             safeStr(raw.payment_account, '') || safeStr(raw.paymentAccount, '') || safeStr(raw.account_name, '') || '',
     total_amount:        netAmount,
-    amount:              raw.amount   !== undefined ? Number(raw.amount)   : defaultPayment.amount,
+    amount:              raw.amount   !== undefined ? Number(raw.amount)   : 0,
     discount:            raw.discount !== undefined ? Number(raw.discount) : 0,
     amount_in_words:     typeof raw.amount_in_words === 'string' && raw.amount_in_words
                            ? raw.amount_in_words
                            : numberToWords(netAmount),
     status:              ((raw.cheque_status ?? raw.status ?? 'pending') as string).toLowerCase(),
     type:                typeof raw.type === 'string' ? raw.type.toUpperCase() : 'RECEIPT',
-    prepared_by:         typeof raw.prepared_by === 'string' ? raw.prepared_by : defaultPayment.prepared_by,
+    prepared_by:         typeof raw.prepared_by === 'string' ? raw.prepared_by : '',
     remarks:             typeof raw.remarks === 'string' ? raw.remarks : null,
     message_line:        messageLineVal,
     allocations: Array.isArray(raw.allocations) ? raw.allocations.map((a: any) => ({
       ref:            a.ref           ?? (a.bill_type ? `${a.bill_type.split('\\').pop()} #${a.bill_id}` : 'Invoice'),
       invoice_ref:    a.invoice_ref   ?? (a.bill_id ? `INV-${String(a.bill_id).padStart(4, '0')}` : 'INV-0001'),
-      date:           a.date          ?? raw.date ?? defaultPayment.voucher_date,
+      date:           a.date          ?? raw.date ?? '',
       invoice_total:  a.invoice_total  !== undefined ? Number(a.invoice_total)  : Number(a.amount ?? 0),
       amount_applied: a.amount_applied !== undefined ? Number(a.amount_applied) : Number(a.amount ?? 0),
-    })) : defaultPayment.allocations,
+    })) : [],
     company: {
       name:    companyName,
       tagline: companyTagline || 'Wholesale & Supply Chain',

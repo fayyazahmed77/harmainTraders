@@ -557,7 +557,21 @@ class PaymentController extends Controller implements HasMiddleware
         }
 
         if ($format === 'small') {
-            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+            $rowCount = 1;
+            if ($payment->group_id) {
+                $rowCount = Payment::where('group_id', $payment->group_id)->count();
+            }
+            
+            $height = 330 + ($rowCount * 18);
+            if ($payment->remarks) {
+                $height += 35;
+            }
+            $msgLine = $payment->messageLine ?? $payment->message_line ?? null;
+            if ($msgLine) {
+                $height += 35;
+            }
+            
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
         } else {
             $pdf->setPaper('A4', 'portrait');
         }

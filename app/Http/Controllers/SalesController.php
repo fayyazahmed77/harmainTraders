@@ -867,7 +867,13 @@ class SalesController extends Controller implements HasMiddleware
 
         if ($format === 'small') {
             // Receipt size for thermal printers
-            $pdf->setPaper([0, 0, 226.77, 600], 'portrait'); // ~80mm width
+            $itemCount = count($sale->items);
+            $height = 320 + ($itemCount * 16);
+            if ($sale->extra_discount > 0) {
+                $height += 15;
+            }
+            $height = max(280, $height);
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait'); // ~80mm width
         } else {
             $pdf->setPaper('A4', 'portrait');
         }
@@ -892,7 +898,13 @@ class SalesController extends Controller implements HasMiddleware
         $pdf = Pdf::loadView($view, compact('sale'));
 
         if ($format === 'small') {
-            $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+            $itemCount = count($sale->items);
+            $height = 320 + ($itemCount * 16);
+            if ($sale->extra_discount > 0) {
+                $height += 15;
+            }
+            $height = max(280, $height);
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
         } else {
             $pdf->setPaper('A4', 'portrait');
         }
