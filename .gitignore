@@ -10,7 +10,7 @@ Homestead.yaml
 auth.json
 /.phpunit.cache
 /.phpunit.result.cache
-
+.zip
 # PHPUnit
 .phpunit.cache/
 .phpunit.result.cache
