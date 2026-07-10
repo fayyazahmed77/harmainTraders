@@ -78,6 +78,10 @@ interface IndexProps {
   subareas: Subarea[];
   filters: {
     search?: string;
+    country_id?: string | number;
+    province_id?: string | number;
+    city_id?: string | number;
+    area_id?: string | number;
   };
 }
 
@@ -185,15 +189,45 @@ export default function Index({ countries, provinces, cities, areas, subareas, f
   const technicalSelectStyles = {
     control: (base: any, state: any) => ({
       ...base,
-      borderRadius: '12px',
-      border: '1px solid #e4e4e7',
-      '&:hover': { borderColor: '#f97316' },
+      borderRadius: 'var(--radius)',
+      borderColor: state.isFocused ? 'var(--ring)' : 'var(--input)',
+      '&:hover': { borderColor: state.isFocused ? 'var(--ring)' : 'var(--border-hover, #a1a1aa)' },
       boxShadow: 'none',
-      height: '48px',
+      height: '40px',
       fontSize: '0.875rem',
-      fontWeight: '700',
-      backgroundColor: state.isDisabled ? '#f4f4f5' : 'white',
+      fontWeight: '400',
+      backgroundColor: state.isDisabled ? 'var(--muted)' : 'var(--background)',
+      color: 'var(--foreground)',
       opacity: state.isDisabled ? 0.5 : 1
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: 'var(--muted-foreground)'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--popover)',
+      color: 'var(--popover-foreground)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      zIndex: 50
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected 
+        ? 'var(--accent)' 
+        : state.isFocused 
+          ? 'var(--accent)' 
+          : 'transparent',
+      color: state.isSelected 
+        ? 'var(--accent-foreground)' 
+        : 'inherit',
+      fontSize: '0.875rem',
+      cursor: 'pointer'
     })
   };
 
@@ -202,29 +236,29 @@ export default function Index({ countries, provinces, cities, areas, subareas, f
       <Head title="Subareas Management" />
       <SidebarProvider>
         <AppSidebar variant="inset" />
-        <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
+        <SidebarInset className="bg-background">
           <SiteHeader breadcrumbs={breadcrumbs} />
 
           <div className="flex-1 w-full h-full overflow-y-auto">
-            <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8">
+            <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-6">
               <motion.div
-                initial={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col md:flex-row md:items-center justify-between gap-6"
+                className="flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div>
-                  <h1 className="text-3xl font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
-                    Subareas <span className="text-orange-500 italic">Management</span>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                    Subareas
                   </h1>
-                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mt-1 opacity-60">
-                    Manage fine-grained locations within areas
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Manage fine-grained locations within areas.
                   </p>
                 </div>
 
                 <Button
                   onClick={() => setOpenCreateDialog(true)}
                   disabled={!canCreate}
-                  className="rounded-xl h-12 px-6 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-widest text-[10px] hover:shadow-xl hover:shadow-orange-500/20 transition-all active:scale-95 flex items-center gap-2"
+                  className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
                   Add Subarea
@@ -232,13 +266,18 @@ export default function Index({ countries, provinces, cities, areas, subareas, f
               </motion.div>
 
               <SubareaSummary total={subareas.length} />
-              <SubareaFilters filters={filters} />
+              <SubareaFilters
+                filters={filters}
+                countries={countries}
+                provinces={provinces}
+                cities={cities}
+                areas={areas}
+              />
 
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden"
               >
                 <DataTable
                   subareas={subareas}
@@ -254,88 +293,80 @@ export default function Index({ countries, provinces, cities, areas, subareas, f
       </SidebarProvider>
 
       <Dialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}>
-        <DialogContent className="max-w-2xl rounded-2xl border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl">
-          <DialogHeader className="border-b border-zinc-100 dark:border-zinc-800 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-                <Layers className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-black uppercase tracking-widest leading-none">Add New Subarea</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mt-1">Create a localized zone entry</DialogDescription>
-              </div>
-            </div>
+        <DialogContent className="max-w-2xl rounded-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Subarea</DialogTitle>
+            <DialogDescription>Create a localized zone entry.</DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="py-6 space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                         <Globe className="w-3 h-3" />
                         Country
                       </Label>
                       <Select options={countryOptions} value={country} onChange={handleCountryChange} placeholder="Select" styles={technicalSelectStyles} />
-                      {errors.country_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.country_id}</p>}
+                      {errors.country_id && <p className="text-xs text-destructive">{errors.country_id}</p>}
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                         <Navigation className="w-3 h-3" />
                         Province
                       </Label>
                       <Select options={provinceOptions} value={province} onChange={handleProvinceChange} placeholder={country ? "Pick" : "..."} isDisabled={!country} styles={technicalSelectStyles} />
-                      {errors.province_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.province_id}</p>}
+                      {errors.province_id && <p className="text-xs text-destructive">{errors.province_id}</p>}
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                         <Building2 className="w-3 h-3" />
                         City
                       </Label>
                       <Select options={cityOptions} value={city} onChange={handleCityChange} placeholder={province ? "Pick" : "..."} isDisabled={!province} styles={technicalSelectStyles} />
-                      {errors.city_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.city_id}</p>}
+                      {errors.city_id && <p className="text-xs text-destructive">{errors.city_id}</p>}
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                         <MapPin className="w-3 h-3" />
                         Area
                       </Label>
                       <Select options={areaOptions} value={area} onChange={(opt) => setArea(opt)} placeholder={city ? "Pick" : "..."} isDisabled={!city} styles={technicalSelectStyles} />
-                      {errors.area_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.area_id}</p>}
+                      {errors.area_id && <p className="text-xs text-destructive">{errors.area_id}</p>}
                     </div>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Subarea Name</Label>
+                  <Label className="text-xs font-semibold text-muted-foreground">Subarea Name</Label>
                   <Input
                     required
                     value={subareaName}
                     onChange={(e) => setSubareaName(e.target.value)}
                     placeholder="e.g. Block A"
-                    className="h-12 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold transition-all text-sm"
+                    className="h-10 text-sm"
                   />
-                  {errors.name && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.name}</p>}
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
                 
-                <div className="p-4 bg-orange-500/5 rounded-xl border border-orange-500/10">
-                    <p className="text-[9px] font-bold text-orange-600 uppercase tracking-widest">Zone Classification</p>
-                    <p className="text-[10px] text-zinc-500 mt-1">This subarea will be grouped under the selected area node for localized logistics.</p>
+                <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                    <p className="text-xs font-semibold text-muted-foreground">Zone Classification</p>
+                    <p className="text-xs text-muted-foreground mt-1">This subarea will be grouped under the selected area node for localized logistics.</p>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="pt-6 border-t border-zinc-100 dark:border-zinc-800">
+            <DialogFooter className="pt-4 border-t gap-2">
               <Button
-                variant="ghost"
+                variant="outline"
                 type="button"
-                className="rounded-xl font-bold uppercase tracking-widest text-[10px]"
                 onClick={() => setOpenCreateDialog(false)}
               >
                 Cancel
@@ -343,7 +374,6 @@ export default function Index({ countries, provinces, cities, areas, subareas, f
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="rounded-xl px-8 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-widest text-[10px]"
               >
                 {isSubmitting ? "Saving..." : "Create Subarea"}
               </Button>

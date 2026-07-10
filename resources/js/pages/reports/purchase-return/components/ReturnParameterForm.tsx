@@ -52,6 +52,8 @@ interface ReturnParameterFormProps {
         salesmen: any[];
         users: any[];
         companies: any[];
+        provinces?: any[];
+        cities?: any[];
     };
     onExecute: () => void;
 }
@@ -127,6 +129,31 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
     const handleChange = (field: string, value: any) => {
         setData((prev: any) => ({ ...prev, [field]: value }));
     };
+
+    // Cascading geo handlers
+    const handleProvinceChange = (v: string) => {
+        setData((prev: any) => ({ ...prev, provinceId: v, cityId: 'ALL', areaId: 'ALL', subAreaId: 'ALL' }));
+    };
+    const handleCityChange = (v: string) => {
+        setData((prev: any) => ({ ...prev, cityId: v, areaId: 'ALL', subAreaId: 'ALL' }));
+    };
+    const handleAreaChange = (v: string) => {
+        setData((prev: any) => ({ ...prev, areaId: v, subAreaId: 'ALL' }));
+    };
+
+    const provinces = bootstrap.provinces || [];
+    const cities = bootstrap.cities || [];
+    const filteredCities = data.provinceId && data.provinceId !== 'ALL'
+        ? cities.filter((c: any) => c.province_id?.toString() === data.provinceId)
+        : cities;
+    const filteredAreas = data.cityId && data.cityId !== 'ALL'
+        ? (bootstrap.areas || []).filter((a: any) => a.city_id?.toString() === data.cityId)
+        : data.provinceId && data.provinceId !== 'ALL'
+            ? (bootstrap.areas || []).filter((a: any) => a.province_id?.toString() === data.provinceId)
+            : (bootstrap.areas || []);
+    const filteredSubAreas = data.areaId && data.areaId !== 'ALL'
+        ? (bootstrap.sub_areas || []).filter((s: any) => s.area_id?.toString() === data.areaId)
+        : (bootstrap.sub_areas || []);
 
     const selectedAccountData = data.accountId !== 'ALL' 
         ? bootstrap.accounts.find(acc => acc.id.toString() === data.accountId) 
@@ -269,6 +296,34 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Province</Label>
+                                            <SearchableSelect 
+                                                value={data.provinceId || 'ALL'} 
+                                                onValueChange={handleProvinceChange}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL PROVINCES' },
+                                                    ...provinces.map((p: any) => ({ value: p.id.toString(), label: p.name }))
+                                                ]}
+                                                placeholder="Select Province"
+                                                emptyMessage="No provinces found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">City</Label>
+                                            <SearchableSelect 
+                                                value={data.cityId || 'ALL'} 
+                                                onValueChange={handleCityChange}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL CITIES' },
+                                                    ...filteredCities.map((c: any) => ({ value: c.id.toString(), label: c.name }))
+                                                ]}
+                                                placeholder="Select City"
+                                                emptyMessage="No cities found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
                                             <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Business Firm</Label>
                                             <SearchableSelect 
                                                 value={data.firmId} 
@@ -286,10 +341,10 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                                             <Label className="text-[9px] font-black text-rose-500/60 uppercase tracking-widest ml-1">Region / Area</Label>
                                             <SearchableSelect 
                                                 value={data.areaId} 
-                                                onValueChange={(v: string) => handleChange('areaId', v)}
+                                                onValueChange={handleAreaChange}
                                                 options={[
                                                     { value: 'ALL', label: 'ALL AREAS' },
-                                                    ...(bootstrap.areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                    ...filteredAreas.map((a: any) => ({ value: a.id.toString(), label: a.name }))
                                                 ]}
                                                 placeholder="Select Area"
                                                 emptyMessage="No areas found"
@@ -303,7 +358,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                                                 onValueChange={(v: string) => handleChange('subAreaId', v)}
                                                 options={[
                                                     { value: 'ALL', label: 'ALL SUB AREAS' },
-                                                    ...(bootstrap.sub_areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                    ...filteredSubAreas.map((a: any) => ({ value: a.id.toString(), label: a.name }))
                                                 ]}
                                                 placeholder="Select Sub Area"
                                                 emptyMessage="No sub areas found"

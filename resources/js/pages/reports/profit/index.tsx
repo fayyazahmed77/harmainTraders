@@ -24,6 +24,8 @@ interface PageProps {
     account_categories: any[];
     item_categories: any[];
     users: any[];
+    provinces: any[];
+    cities: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -36,7 +38,7 @@ import { useAppearance } from '@/hooks/use-appearance';
 
 export default function ProfitReports({ 
     accounts, items, firms, salesmen, areas, subareas, 
-    account_types, account_categories, item_categories, users 
+    account_types, account_categories, item_categories, users, provinces, cities
 }: PageProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === 'dark';
@@ -49,6 +51,8 @@ export default function ProfitReports({
         reportId: 'transaction',
         firmId: 'ALL',
         salemanId: 'ALL',
+        provinceId: 'ALL',
+        cityId: 'ALL',
         areaId: 'ALL',
         subareaId: 'ALL',
         type: 'ALL',
@@ -183,7 +187,9 @@ export default function ProfitReports({
                                         accountTypes: account_types, 
                                         accountCategories: account_categories, 
                                         itemCategories: item_categories,
-                                        users
+                                        users,
+                                        provinces,
+                                        cities
                                     }} 
                                 />
                             </motion.div>

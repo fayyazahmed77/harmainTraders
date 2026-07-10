@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\Account;
 use App\Models\Saleman;
 use App\Models\SalesReturnItem;
+use App\Traits\Auditable;
 
 class SalesReturn extends Model
 {
-    use HasFactory;
+    use HasFactory, Auditable;
 
     protected $fillable = [
         'date',

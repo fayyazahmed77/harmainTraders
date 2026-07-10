@@ -34,6 +34,7 @@ class PurchaseReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
         if (!empty($filters['firm_id'])) $query->where('purchases.firm_id', $filters['firm_id']);
+        $this->applyGeoFilters($query, $filters);
         if (!empty($filters['company_id'])) {
             $query->whereExists(function ($q) use ($filters) {
                 $q->select(DB::raw(1))
@@ -66,6 +67,12 @@ class PurchaseReportBuilder
     public function dateWise($fromDate, $toDate, $filters = [])
     {
         $query = $this->getPurchaseQuery($fromDate, $toDate);
+        $hasGeo = !empty($filters['area_id']) || !empty($filters['sub_area_id']) || !empty($filters['city_id']) || !empty($filters['province_id']);
+        if ($hasGeo || !empty($filters['account_id'])) {
+            $query->join('accounts', 'purchases.supplier_id', '=', 'accounts.id');
+            if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
+            $this->applyGeoFilters($query, $filters);
+        }
         if (!empty($filters['firm_id'])) $query->where('firm_id', $filters['firm_id']);
 
         $results = $query->select(
@@ -93,6 +100,7 @@ class PurchaseReportBuilder
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
         if (!empty($filters['item_id'])) $query->where('purchase_items.item_id', $filters['item_id']);
         if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
+        $this->applyGeoFilters($query, $filters);
 
         $results = $query->select(
             'purchases.invoice',
@@ -125,6 +133,7 @@ class PurchaseReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
         if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
+        $this->applyGeoFilters($query, $filters);
 
         $results = $query->select(
             'purchases.invoice',
@@ -154,7 +163,12 @@ class PurchaseReportBuilder
     {
         $query = $this->getPurchaseItemsQuery($fromDate, $toDate)
             ->join('items', 'purchase_items.item_id', '=', 'items.id');
-
+        $hasGeo = !empty($filters['area_id']) || !empty($filters['sub_area_id']) || !empty($filters['city_id']) || !empty($filters['province_id']);
+        if ($hasGeo || !empty($filters['account_id'])) {
+            $query->join('accounts', 'purchases.supplier_id', '=', 'accounts.id');
+            if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
+            $this->applyGeoFilters($query, $filters);
+        }
         if (!empty($filters['item_id'])) $query->where('purchase_items.item_id', $filters['item_id']);
         if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
 
@@ -179,6 +193,8 @@ class PurchaseReportBuilder
     {
         $query = $this->getPurchaseQuery($fromDate, $toDate)
             ->join('accounts', 'purchases.supplier_id', '=', 'accounts.id');
+        if (!empty($filters['account_id'])) $query->where('purchases.supplier_id', $filters['account_id']);
+        $this->applyGeoFilters($query, $filters);
 
         $results = $query->select(
             DB::raw("DATE_FORMAT(date, '%Y-%m') as month_key"),
@@ -207,6 +223,7 @@ class PurchaseReportBuilder
             ->leftJoin('areas', 'accounts.area_id', '=', 'areas.id');
 
         if (!empty($filters['account_id'])) $query->where('accounts.id', $filters['account_id']);
+        $this->applyGeoFilters($query, $filters);
 
         // Range Purchases
         $purchases = DB::table('purchases')
@@ -269,6 +286,10 @@ class PurchaseReportBuilder
             'item_id' => ($params['itemId'] ?? 'ALL') === 'ALL' ? null : $params['itemId'],
             'firm_id' => ($params['firmId'] ?? 'ALL') === 'ALL' ? null : $params['firmId'],
             'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
+            'area_id' => ($params['areaId'] ?? 'ALL') === 'ALL' ? null : $params['areaId'],
+            'sub_area_id' => ($params['subAreaId'] ?? 'ALL') === 'ALL' ? null : $params['subAreaId'],
+            'province_id' => ($params['provinceId'] ?? 'ALL') === 'ALL' ? null : $params['provinceId'],
+            'city_id' => ($params['cityId'] ?? 'ALL') === 'ALL' ? null : $params['cityId'],
         ];
 
         switch ($reportId) {
@@ -373,5 +394,19 @@ class PurchaseReportBuilder
             default:
                 return $data;
         }
+    }
+
+    private function applyGeoFilters($query, $filters)
+    {
+        if (!empty($filters['sub_area_id'])) {
+            $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        } elseif (!empty($filters['area_id'])) {
+            $query->where('accounts.area_id', $filters['area_id']);
+        } elseif (!empty($filters['city_id'])) {
+            $query->where('accounts.city_id', $filters['city_id']);
+        } elseif (!empty($filters['province_id'])) {
+            $query->where('accounts.province_id', $filters['province_id']);
+        }
+        return $query;
     }
 }

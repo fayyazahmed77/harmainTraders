@@ -132,6 +132,8 @@ interface ParameterFormProps {
     categories: any[];
     users: any[];
     companies: any[];
+    provinces?: any[];
+    cities?: any[];
 }
 
 export function ParameterForm({ 
@@ -147,7 +149,9 @@ export function ParameterForm({
     sub_areas,
     categories,
     users,
-    companies
+    companies,
+    provinces = [],
+    cities = []
 }: ParameterFormProps) {
     const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
     const [isItemDialogOpen, setIsItemDialogOpen] = useState(false);
@@ -157,6 +161,29 @@ export function ParameterForm({
     const updateParam = (key: string, value: any) => {
         setParams({ ...params, [key]: value });
     };
+
+    // Cascading geo filter handlers
+    const handleProvinceChange = (v: string) => {
+        setParams({ ...params, provinceId: v, cityId: 'ALL', areaId: 'ALL', subAreaId: 'ALL' });
+    };
+    const handleCityChange = (v: string) => {
+        setParams({ ...params, cityId: v, areaId: 'ALL', subAreaId: 'ALL' });
+    };
+    const handleAreaChange = (v: string) => {
+        setParams({ ...params, areaId: v, subAreaId: 'ALL' });
+    };
+
+    const filteredCities = params.provinceId && params.provinceId !== 'ALL'
+        ? cities.filter((c: any) => c.province_id?.toString() === params.provinceId)
+        : cities;
+    const filteredAreas = params.cityId && params.cityId !== 'ALL'
+        ? areas.filter((a: any) => a.city_id?.toString() === params.cityId)
+        : params.provinceId && params.provinceId !== 'ALL'
+            ? areas.filter((a: any) => a.province_id?.toString() === params.provinceId)
+            : areas;
+    const filteredSubAreas = params.areaId && params.areaId !== 'ALL'
+        ? sub_areas.filter((s: any) => s.area_id?.toString() === params.areaId)
+        : sub_areas;
 
     const selectedAccountData = params.customerId !== 'ALL' 
         ? customers.find(acc => acc.id.toString() === params.customerId) 
@@ -300,13 +327,41 @@ export function ParameterForm({
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-orange-600/60 uppercase tracking-widest ml-1">Province</Label>
+                                            <SearchableSelect 
+                                                value={params.provinceId || 'ALL'} 
+                                                onValueChange={handleProvinceChange}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL PROVINCES' },
+                                                    ...provinces.map((p: any) => ({ value: p.id.toString(), label: p.name }))
+                                                ]}
+                                                placeholder="Select Province"
+                                                emptyMessage="No provinces found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black text-orange-600/60 uppercase tracking-widest ml-1">City</Label>
+                                            <SearchableSelect 
+                                                value={params.cityId || 'ALL'} 
+                                                onValueChange={handleCityChange}
+                                                options={[
+                                                    { value: 'ALL', label: 'ALL CITIES' },
+                                                    ...filteredCities.map((c: any) => ({ value: c.id.toString(), label: c.name }))
+                                                ]}
+                                                placeholder="Select City"
+                                                emptyMessage="No cities found"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
                                             <Label className="text-[9px] font-black text-orange-600/60 uppercase tracking-widest ml-1">Sales Area</Label>
                                             <SearchableSelect 
                                                 value={params.areaId} 
-                                                onValueChange={(v: string) => updateParam('areaId', v)}
+                                                onValueChange={handleAreaChange}
                                                 options={[
                                                     { value: 'ALL', label: 'ALL AREAS' },
-                                                    ...areas.map(a => ({ value: a.id.toString(), label: a.name }))
+                                                    ...filteredAreas.map((a: any) => ({ value: a.id.toString(), label: a.name }))
                                                 ]}
                                                 placeholder="Select Area"
                                                 emptyMessage="No areas found"
@@ -320,7 +375,7 @@ export function ParameterForm({
                                                 onValueChange={(v: string) => updateParam('subAreaId', v)}
                                                 options={[
                                                     { value: 'ALL', label: 'ALL SUB AREAS' },
-                                                    ...(sub_areas || []).map(a => ({ value: a.id.toString(), label: a.name }))
+                                                    ...filteredSubAreas.map((a: any) => ({ value: a.id.toString(), label: a.name }))
                                                 ]}
                                                 placeholder="Select Sub Area"
                                                 emptyMessage="No sub areas found"

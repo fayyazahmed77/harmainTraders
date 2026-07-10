@@ -194,8 +194,10 @@ class ReportsController extends Controller implements HasMiddleware
                 ->get(),
             'firms' => Firm::select('id', 'name', 'code')->get(),
             'salesmen' => Saleman::select('id', 'name', 'code')->get(),
-            'areas' => Areas::select('id', 'name')->get(),
+            'areas' => Areas::select('id', 'name', 'city_id', 'province_id')->get(),
             'subareas' => Subarea::select('id', 'name', 'area_id')->get(),
+            'provinces' => \App\Models\Province::select('id', 'name', 'country_id')->get(),
+            'cities' => \App\Models\City::select('id', 'name', 'province_id')->get(),
             'account_types' => AccountType::select('id', 'name')->get(),
             'account_categories' => AccountCategory::select('id', 'name')->get(),
             'users' => User::select('id', 'name')->get(),
@@ -522,7 +524,7 @@ class ReportsController extends Controller implements HasMiddleware
 
         return Inertia::render('reports/audit/index', [
             'users' => \App\Models\User::select('id', 'name')->get(),
-            'modules' => ['Sales', 'Purchase', 'Items', 'Payment', 'Account'],
+            'modules' => ['Sales', 'Purchase', 'Items', 'Payment', 'Account', 'SalesReturn', 'PurchaseReturn'],
             'actions' => ['created', 'updated', 'deleted']
         ]);
     }

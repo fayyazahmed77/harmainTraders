@@ -34,8 +34,7 @@ class PurchaseReturnReportBuilder
 
         if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
         if (!empty($filters['salesman_id'])) $query->where('purchase_returns.salesman_id', $filters['salesman_id']);
-        if (!empty($filters['area_id'])) $query->where('accounts.area_id', $filters['area_id']);
-        if (!empty($filters['sub_area_id'])) $query->where('accounts.sub_area_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
         
         if (!empty($filters['company_id']) || !empty($filters['category_id'])) {
             $query->whereExists(function ($q) use ($filters) {
@@ -65,6 +64,12 @@ class PurchaseReturnReportBuilder
     public function dateWise($fromDate, $toDate, $filters = [])
     {
         $query = $this->getReturnQuery($fromDate, $toDate);
+        $hasGeo = !empty($filters['area_id']) || !empty($filters['sub_area_id']) || !empty($filters['city_id']) || !empty($filters['province_id']);
+        if ($hasGeo || !empty($filters['account_id'])) {
+            $query->join('accounts', 'purchase_returns.supplier_id', '=', 'accounts.id');
+            if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
+            $this->applyGeoFilters($query, $filters);
+        }
 
         $results = $query->select(
             'date',
@@ -91,8 +96,7 @@ class PurchaseReturnReportBuilder
         if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
         if (!empty($filters['item_id'])) $query->where('purchase_return_items.item_id', $filters['item_id']);
         if (!empty($filters['salesman_id'])) $query->where('purchase_returns.salesman_id', $filters['salesman_id']);
-        if (!empty($filters['area_id'])) $query->where('accounts.area_id', $filters['area_id']);
-        if (!empty($filters['sub_area_id'])) $query->where('accounts.sub_area_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
         if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
         if (!empty($filters['category_id'])) $query->where('items.category_id', $filters['category_id']);
 
@@ -118,7 +122,12 @@ class PurchaseReturnReportBuilder
     {
         $query = $this->getReturnItemsQuery($fromDate, $toDate)
             ->join('items', 'purchase_return_items.item_id', '=', 'items.id');
-
+        $hasGeo = !empty($filters['area_id']) || !empty($filters['sub_area_id']) || !empty($filters['city_id']) || !empty($filters['province_id']);
+        if ($hasGeo || !empty($filters['account_id'])) {
+            $query->join('accounts', 'purchase_returns.supplier_id', '=', 'accounts.id');
+            if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
+            $this->applyGeoFilters($query, $filters);
+        }
         if (!empty($filters['item_id'])) $query->where('purchase_return_items.item_id', $filters['item_id']);
         if (!empty($filters['company_id'])) $query->where('items.company', $filters['company_id']);
         if (!empty($filters['category_id'])) $query->where('items.category_id', $filters['category_id']);
@@ -154,6 +163,8 @@ class PurchaseReturnReportBuilder
             'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
             'salesman_id' => ($params['salesmanId'] ?? 'ALL') === 'ALL' ? null : $params['salesmanId'],
             'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
+            'province_id' => ($params['provinceId'] ?? 'ALL') === 'ALL' ? null : $params['provinceId'],
+            'city_id' => ($params['cityId'] ?? 'ALL') === 'ALL' ? null : $params['cityId'],
         ];
 
         switch ($reportId) {
@@ -278,6 +289,7 @@ class PurchaseReturnReportBuilder
             ->join('accounts', 'purchase_returns.supplier_id', '=', 'accounts.id');
 
         if (!empty($filters['account_id'])) $query->where('purchase_returns.supplier_id', $filters['account_id']);
+        $this->applyGeoFilters($query, $filters);
 
         $results = $query->select(
             'purchase_returns.invoice',
@@ -291,5 +303,19 @@ class PurchaseReturnReportBuilder
         ->get();
 
         return $this->transformToArray($results);
+    }
+
+    private function applyGeoFilters($query, $filters)
+    {
+        if (!empty($filters['sub_area_id'])) {
+            $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        } elseif (!empty($filters['area_id'])) {
+            $query->where('accounts.area_id', $filters['area_id']);
+        } elseif (!empty($filters['city_id'])) {
+            $query->where('accounts.city_id', $filters['city_id']);
+        } elseif (!empty($filters['province_id'])) {
+            $query->where('accounts.province_id', $filters['province_id']);
+        }
+        return $query;
     }
 }

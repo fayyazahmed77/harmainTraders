@@ -383,22 +383,26 @@ class ReportBuilder
      */
     public function applyAccountFilters($query, $params)
     {
-        if (isset($params['areaId']) && $params['areaId'] !== 'ALL') {
-            $query->where('area_id', $params['areaId']);
-        } elseif (isset($params['area_id']) && $params['area_id'] !== 'ALL') {
-            $query->where('area_id', $params['area_id']);
+        // Cascading geo filter: subarea > area > city > province (most specific wins)
+        $subareaId = $params['subareaId'] ?? $params['subarea_id'] ?? null;
+        $areaId    = $params['areaId']    ?? $params['area_id']    ?? null;
+        $cityId    = $params['cityId']    ?? null;
+        $provinceId = $params['provinceId'] ?? null;
+
+        if ($subareaId && $subareaId !== 'ALL') {
+            $query->where('subarea_id', $subareaId);
+        } elseif ($areaId && $areaId !== 'ALL') {
+            $query->where('area_id', $areaId);
+        } elseif ($cityId && $cityId !== 'ALL') {
+            $query->where('city_id', $cityId);
+        } elseif ($provinceId && $provinceId !== 'ALL') {
+            $query->where('province_id', $provinceId);
         }
 
         if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
             $query->where('saleman_id', $params['salemanId']);
         } elseif (isset($params['saleman_id']) && $params['saleman_id'] !== 'ALL') {
             $query->where('saleman_id', $params['saleman_id']);
-        }
-
-        if (isset($params['subareaId']) && $params['subareaId'] !== 'ALL') {
-            $query->where('subarea_id', $params['subareaId']);
-        } elseif (isset($params['subarea_id']) && $params['subarea_id'] !== 'ALL') {
-            $query->where('subarea_id', $params['subarea_id']);
         }
 
         if (isset($params['type']) && $params['type'] !== 'ALL') {

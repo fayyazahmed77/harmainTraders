@@ -33,8 +33,20 @@ class SubareaController extends Controller implements HasMiddleware
 
         $query = Subarea::with(['creator', 'province', 'country', 'city', 'area']);
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
+        }
+        if ($request->filled('country_id')) {
+            $query->where('country_id', $request->country_id);
+        }
+        if ($request->filled('province_id')) {
+            $query->where('province_id', $request->province_id);
+        }
+        if ($request->filled('city_id')) {
+            $query->where('city_id', $request->city_id);
+        }
+        if ($request->filled('area_id')) {
+            $query->where('area_id', $request->area_id);
         }
 
         $subareas = $query->latest()
@@ -53,7 +65,7 @@ class SubareaController extends Controller implements HasMiddleware
             'cities' => $cities,
             'countries' => $countries,
             'provinces' => $provinces,
-            'filters' => $request->only(['search'])
+            'filters' => $request->only(['search', 'country_id', 'province_id', 'city_id', 'area_id'])
         ]);
     }
     public function store(Request $request)

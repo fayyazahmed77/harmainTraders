@@ -58,6 +58,12 @@ const getActionColor = (action: string) => {
     }
 };
 
+const getModuleLabel = (module: string) => {
+    if (module === 'SalesReturn') return 'Sales Return';
+    if (module === 'PurchaseReturn') return 'Purchase Return';
+    return module;
+};
+
 export default function AuditIndex({ users, modules, actions }: Props) {
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: subDays(new Date(), 30),
@@ -87,6 +93,7 @@ export default function AuditIndex({ users, modules, actions }: Props) {
         {
             accessorKey: 'module',
             header: 'Module',
+            cell: ({ row }) => getModuleLabel(row.original.module)
         },
         {
             accessorKey: 'action',
@@ -255,7 +262,7 @@ export default function AuditIndex({ users, modules, actions }: Props) {
                                         <SelectContent>
                                             <SelectItem value="all">All Modules</SelectItem>
                                             {modules.map(m => (
-                                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                <SelectItem key={m} value={m}>{getModuleLabel(m)}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>

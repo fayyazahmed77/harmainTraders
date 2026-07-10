@@ -68,6 +68,8 @@ interface PageProps {
     account_types: any[];
     account_categories: any[];
     users: any[];
+    provinces: any[];
+    cities: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -76,7 +78,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function AccountReports({ 
-    accounts, firms, salesmen, areas, subareas, account_types, account_categories, users 
+    accounts, firms, salesmen, areas, subareas, account_types, account_categories, users, provinces, cities
 }: PageProps) {
     // Large state object for all parameters
     const [params, setParams] = useState({
@@ -88,6 +90,8 @@ export default function AccountReports({
         salemanId: 'ALL',
         areaId: 'ALL',
         subareaId: 'ALL',
+        provinceId: 'ALL',
+        cityId: 'ALL',
         type: 'ALL',
         noteHead: 'ALL',
         nature: 'ALL',
@@ -354,7 +358,9 @@ export default function AccountReports({
                                         accounts, firms, salesmen, areas, subareas, 
                                         accountTypes: account_types, 
                                         accountCategories: account_categories, 
-                                        users
+                                        users,
+                                        provinces,
+                                        cities
                                     }} 
                                 />
                             </motion.div>

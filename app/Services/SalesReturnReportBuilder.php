@@ -41,6 +41,8 @@ class SalesReturnReportBuilder
             'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
             'sub_area_id' => ($params['subAreaId'] ?? 'ALL') === 'ALL' ? null : $params['subAreaId'],
             'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
+            'province_id' => ($params['provinceId'] ?? 'ALL') === 'ALL' ? null : $params['provinceId'],
+            'city_id' => ($params['cityId'] ?? 'ALL') === 'ALL' ? null : $params['cityId'],
         ];
 
         switch ($reportId) {
@@ -136,8 +138,7 @@ class SalesReturnReportBuilder
             ->join('accounts', 'sales_returns.customer_id', '=', 'accounts.id');
 
         if ($filters['customer_id']) $query->where('sales_returns.customer_id', $filters['customer_id']);
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
 
         if ($filters['company_id'] || $filters['category_id']) {
             $query->whereExists(function ($q) use ($filters) {
@@ -173,8 +174,7 @@ class SalesReturnReportBuilder
         if ($filters['customer_id']) $query->where('sales_returns.customer_id', $filters['customer_id']);
         if ($filters['item_id']) $query->where('sales_return_items.item_id', $filters['item_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
         if ($filters['company_id']) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
@@ -237,7 +237,7 @@ class SalesReturnReportBuilder
             ->leftJoin('subareas', 'accounts.subarea_id', '=', 'subareas.id')
             ->whereBetween('sales_returns.date', [$fromDate, $toDate]);
 
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        $this->applyGeoFilters($query, $filters);
         if ($filters['customer_id']) $query->where('sales_returns.customer_id', $filters['customer_id']);
         if ($filters['item_id']) $query->where('sales_return_items.item_id', $filters['item_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
@@ -307,5 +307,19 @@ class SalesReturnReportBuilder
         ->get();
 
         return $this->transformToArray($results);
+    }
+
+    private function applyGeoFilters($query, $filters)
+    {
+        if (!empty($filters['sub_area_id'])) {
+            $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        } elseif (!empty($filters['area_id'])) {
+            $query->where('accounts.area_id', $filters['area_id']);
+        } elseif (!empty($filters['city_id'])) {
+            $query->where('accounts.city_id', $filters['city_id']);
+        } elseif (!empty($filters['province_id'])) {
+            $query->where('accounts.province_id', $filters['province_id']);
+        }
+        return $query;
     }
 }

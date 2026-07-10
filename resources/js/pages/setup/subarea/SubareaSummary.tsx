@@ -1,6 +1,7 @@
 import React from "react";
 import { Layers } from "lucide-react";
 import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface SubareaSummaryProps {
     total: number;
@@ -10,29 +11,28 @@ export default function SubareaSummary({ total }: SubareaSummaryProps) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="group relative overflow-hidden rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-sm transition-all hover:shadow-xl"
+                transition={{ duration: 0.3 }}
             >
-                <div className="absolute -right-4 -top-4 h-32 w-32 rounded-full bg-orange-500/5 transition-transform group-hover:scale-150" />
-                
-                <div className="relative flex items-center justify-between">
-                    <div className="space-y-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-600 shadow-inner">
-                            <Layers className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Total Subareas</h3>
+                <Card className="rounded-lg border bg-card text-card-foreground shadow-sm">
+                    <CardContent className="p-6 flex items-center justify-between">
+                        <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Subareas</p>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black tracking-tighter text-zinc-900 dark:text-zinc-100">
+                                <span className="text-3xl font-bold tracking-tight text-foreground">
                                     {total.toString().padStart(2, '0')}
                                 </span>
-                                <span className="text-xs font-bold text-orange-500 uppercase tracking-widest">Entries</span>
+                                <span className="text-xs font-medium text-muted-foreground">Entries</span>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <div className="h-10 w-10 rounded-md border bg-muted/50 flex items-center justify-center text-muted-foreground">
+                            <Layers className="h-5 w-5" />
+                        </div>
+                    </CardContent>
+                </Card>
             </motion.div>
         </div>
     );
 }
+

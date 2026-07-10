@@ -26,6 +26,8 @@ interface PageProps {
     categories: any[];
     users: any[];
     companies: any[];
+    provinces: any[];
+    cities: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -34,7 +36,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Sales Playground", href: "/reports/sales" },
 ];
 
-export default function SalesReportsIndex({ customers, items, firms, salesmen, areas, sub_areas, categories, users, companies }: PageProps) {
+export default function SalesReportsIndex({ customers, items, firms, salesmen, areas, sub_areas, categories, users, companies, provinces, cities }: PageProps) {
     const { appearance } = useAppearance();
     const isDark = appearance === 'dark';
 
@@ -59,6 +61,8 @@ export default function SalesReportsIndex({ customers, items, firms, salesmen, a
         customerId: 'ALL',
         itemId: 'ALL',
         salesmanId: 'ALL',
+        provinceId: 'ALL',
+        cityId: 'ALL',
         areaId: 'ALL',
         firmId: 'ALL',
         categoryId: 'ALL',
@@ -194,6 +198,8 @@ export default function SalesReportsIndex({ customers, items, firms, salesmen, a
                                 categories={categories}
                                 users={users}
                                 companies={companies}
+                                provinces={provinces}
+                                cities={cities}
                             />
                         </motion.div>
 

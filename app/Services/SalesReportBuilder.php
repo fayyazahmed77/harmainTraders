@@ -41,6 +41,8 @@ class SalesReportBuilder
             'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
             'sub_area_id' => ($params['subAreaId'] ?? 'ALL') === 'ALL' ? null : $params['subAreaId'],
             'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
+            'province_id' => ($params['provinceId'] ?? 'ALL') === 'ALL' ? null : $params['provinceId'],
+            'city_id' => ($params['cityId'] ?? 'ALL') === 'ALL' ? null : $params['cityId'],
         ];
 
         // Routing to specific methods
@@ -164,8 +166,7 @@ class SalesReportBuilder
 
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['salesman_id']) $query->where('sales.salesman_id', $filters['salesman_id']);
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
         
         if ($filters['company_id'] || $filters['category_id']) {
             $query->whereExists(function ($q) use ($filters) {
@@ -230,8 +231,7 @@ class SalesReportBuilder
 
         if ($filters['customer_id']) $salesQuery->where('sales.customer_id', $filters['customer_id']);
         if ($filters['salesman_id']) $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
-        if ($filters['area_id']) $salesQuery->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $salesQuery->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($salesQuery, $filters);
         if ($filters['firm_id']) $salesQuery->where('sales.firm_id', $filters['firm_id']);
 
         $salesResults = $salesQuery->select(
@@ -254,8 +254,7 @@ class SalesReportBuilder
 
         if ($filters['customer_id']) $returnsQuery->where('sales_returns.customer_id', $filters['customer_id']);
         if ($filters['salesman_id']) $returnsQuery->where('sales_returns.salesman_id', $filters['salesman_id']);
-        if ($filters['area_id']) $returnsQuery->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $returnsQuery->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($returnsQuery, $filters);
         
         if ($filters['firm_id']) {
             $returnsQuery->join('sales', 'sales_returns.sale_id', '=', 'sales.id')
@@ -323,8 +322,7 @@ class SalesReportBuilder
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['item_id']) $query->where('sales_items.item_id', $filters['item_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
-        if ($filters['sub_area_id']) $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        $this->applyGeoFilters($query, $filters);
         if ($filters['company_id']) $query->where('items.company', $filters['company_id']);
 
         $results = $query->select(
@@ -458,7 +456,7 @@ class SalesReportBuilder
             ->leftJoin('subareas', 'accounts.subarea_id', '=', 'subareas.id')
             ->whereBetween('sales.date', [$fromDate, $toDate]);
 
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        $this->applyGeoFilters($query, $filters);
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['salesman_id']) $query->where('sales.salesman_id', $filters['salesman_id']);
 
@@ -484,7 +482,7 @@ class SalesReportBuilder
             ->leftJoin('subareas', 'accounts.subarea_id', '=', 'subareas.id')
             ->whereBetween('sales.date', [$fromDate, $toDate]);
 
-        if ($filters['area_id']) $query->where('accounts.area_id', $filters['area_id']);
+        $this->applyGeoFilters($query, $filters);
         if ($filters['customer_id']) $query->where('sales.customer_id', $filters['customer_id']);
         if ($filters['item_id']) $query->where('sales_items.item_id', $filters['item_id']);
         if ($filters['category_id']) $query->where('items.category', $filters['category_id']);
@@ -688,5 +686,19 @@ class SalesReportBuilder
             $row->percentage = $totalAmount > 0 ? ($row->amount / $totalAmount) * 100 : 0;
             return (array)$row;
         })->toArray();
+    }
+
+    private function applyGeoFilters($query, $filters)
+    {
+        if (!empty($filters['sub_area_id'])) {
+            $query->where('accounts.subarea_id', $filters['sub_area_id']);
+        } elseif (!empty($filters['area_id'])) {
+            $query->where('accounts.area_id', $filters['area_id']);
+        } elseif (!empty($filters['city_id'])) {
+            $query->where('accounts.city_id', $filters['city_id']);
+        } elseif (!empty($filters['province_id'])) {
+            $query->where('accounts.province_id', $filters['province_id']);
+        }
+        return $query;
     }
 }

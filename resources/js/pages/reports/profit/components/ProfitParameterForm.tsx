@@ -56,6 +56,8 @@ interface ProfitParameterFormProps {
         accountCategories: any[];
         itemCategories: any[];
         users: any[];
+        provinces?: any[];
+        cities?: any[];
     };
     onExecute: () => void;
 }
@@ -67,8 +69,30 @@ export function ProfitParameterForm({ data, setData, bootstrap, onExecute }: Pro
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     const handleChange = (field: string, value: any) => {
-        setData((prev: any) => ({ ...prev, [field]: value }));
+        if (field === 'provinceId') {
+            setData((prev: any) => ({ ...prev, provinceId: value, cityId: 'ALL', areaId: 'ALL', subareaId: 'ALL' }));
+        } else if (field === 'cityId') {
+            setData((prev: any) => ({ ...prev, cityId: value, areaId: 'ALL', subareaId: 'ALL' }));
+        } else if (field === 'areaId') {
+            setData((prev: any) => ({ ...prev, areaId: value, subareaId: 'ALL' }));
+        } else {
+            setData((prev: any) => ({ ...prev, [field]: value }));
+        }
     };
+
+    const provinces = bootstrap.provinces || [];
+    const cities = bootstrap.cities || [];
+    const filteredCities = data.provinceId && data.provinceId !== 'ALL'
+        ? cities.filter((c: any) => c.province_id?.toString() === data.provinceId)
+        : cities;
+    const filteredAreas = data.cityId && data.cityId !== 'ALL'
+        ? (bootstrap.areas || []).filter((a: any) => a.city_id?.toString() === data.cityId)
+        : data.provinceId && data.provinceId !== 'ALL'
+            ? (bootstrap.areas || []).filter((a: any) => a.province_id?.toString() === data.provinceId)
+            : (bootstrap.areas || []);
+    const filteredSubareas = data.areaId && data.areaId !== 'ALL'
+        ? (bootstrap.subareas || []).filter((s: any) => s.area_id?.toString() === data.areaId)
+        : (bootstrap.subareas || []);
 
     const selectedAccountData = data.accountId !== 'ALL' 
         ? bootstrap.accounts.find(acc => acc.id.toString() === data.accountId) 
@@ -81,8 +105,10 @@ export function ProfitParameterForm({ data, setData, bootstrap, onExecute }: Pro
     const filterGroup1 = [
         { label: 'Firm', key: 'firmId', options: bootstrap.firms, icon: Building2 },
         { label: 'Salemen', key: 'salemanId', options: bootstrap.salesmen, icon: Users },
-        { label: 'Area', key: 'areaId', options: bootstrap.areas, icon: MapPin },
-        { label: 'Sub Area', key: 'subareaId', options: bootstrap.subareas, icon: MapPin },
+        { label: 'Province', key: 'provinceId', options: provinces, icon: MapPin },
+        { label: 'City', key: 'cityId', options: filteredCities, icon: MapPin },
+        { label: 'Area', key: 'areaId', options: filteredAreas, icon: MapPin },
+        { label: 'Sub Area', key: 'subareaId', options: filteredSubareas, icon: MapPin },
         { label: 'Account Typed', key: 'type', options: bootstrap.accountTypes, icon: Tag },
         { label: 'Account Nature', key: 'nature', options: bootstrap.accountCategories, icon: Filter },
         { label: 'Shelf', key: 'shelfId', options: [], icon: Boxes }, 
