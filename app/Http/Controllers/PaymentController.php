@@ -340,17 +340,8 @@ class PaymentController extends Controller implements HasMiddleware
             }
 
             // 4. Restore distributed cheque in hand status if type was PAYMENT and method was Cheque
-            if ($payment->type === 'PAYMENT' && $payment->payment_method === 'Cheque') {
-                $paymentAccount = Account::with('accountType')->find($payment->payment_account_id);
-                if ($paymentAccount && $paymentAccount->accountType && $paymentAccount->accountType->name === 'Cheque in hand') {
-                    $source = Payment::where('type', 'RECEIPT')
-                        ->where('cheque_no', $payment->cheque_no)
-                        ->where('cheque_status', 'Distributed')
-                        ->first();
-                    if ($source) {
-                        $source->update(['cheque_status' => 'In Hand']);
-                    }
-                }
+            if ($payment->source_payment_id) {
+                Payment::where('id', $payment->source_payment_id)->update(['cheque_status' => 'In Hand']);
             }
 
             // 5. Check/issue new cheque if applicable
@@ -387,6 +378,10 @@ class PaymentController extends Controller implements HasMiddleware
                 'remarks' => $request->remarks,
                 'payment_method' => $request->payment_method,
                 'cheque_id' => $chequeId ?? $payment->cheque_id,
+                'source_payment_id' => ($request->type === 'PAYMENT') ? $request->original_cheque_id : null,
+                'cheque_status' => $request->payment_method === 'Cheque'
+                    ? ($payment->payment_method === 'Cheque' ? $payment->cheque_status : ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending'))
+                    : 'Clear',
                 'message_line_id' => $request->message_line_id,
                 'firm_id' => $request->firm_id,
             ]);
@@ -1135,9 +1130,12 @@ class PaymentController extends Controller implements HasMiddleware
                     'remarks' => !empty($request->remarks) ? $request->remarks : null,
                     'payment_method' => !empty($split['payment_method']) ? $split['payment_method'] : null,
                     'cheque_id' => $chequeId,
-                    'cheque_status' => ($split['payment_method'] ?? null) === 'Cheque' ? 'Pending' : 'Pending',
+                    'cheque_status' => ($split['payment_method'] ?? null) === 'Cheque'
+                        ? ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending')
+                        : 'Clear',
                     'message_line_id' => !empty($request->message_line_id) ? $request->message_line_id : null,
                     'firm_id' => !empty($request->firm_id) ? $request->firm_id : null,
+                    'source_payment_id' => ($request->type === 'PAYMENT' && !empty($split['original_cheque_id'])) ? $split['original_cheque_id'] : null,
                 ]);
 
                 // Handle "Cheque in hand" Logic

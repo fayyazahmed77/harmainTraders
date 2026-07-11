@@ -1689,8 +1689,17 @@ console.log(lastPurchaseInfo);
                                         </div>
 
                                         {/* Pay Now Toggle */}
-                                        <div className="pt-2">
-                                            <div className="flex items-center justify-between p-3 rounded-sm bg-orange-500/5 border border-orange-500/10 transition-all hover:bg-orange-500/10 group cursor-pointer" onClick={() => setIsPayNow(!isPayNow)}>
+                                        <div className="pt-2 flex flex-col gap-2">
+                                            <div className="flex items-center justify-between p-3 rounded-sm bg-orange-500/5 border border-orange-500/10 transition-all hover:bg-orange-500/10 group cursor-pointer" onClick={() => {
+                                                const next = !isPayNow;
+                                                setIsPayNow(next);
+                                                if (next) {
+                                                    if (paymentSplits.length === 0) {
+                                                        addPaymentSplit();
+                                                    }
+                                                    setShowPaymentDialog(true);
+                                                }
+                                            }}>
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn(
                                                         "w-10 h-10 rounded-sm flex items-center justify-center transition-all duration-300",
@@ -1705,10 +1714,29 @@ console.log(lastPurchaseInfo);
                                                 </div>
                                                 <Checkbox 
                                                     checked={isPayNow}
-                                                    onCheckedChange={(checked) => setIsPayNow(!!checked)}
+                                                    onCheckedChange={(checked) => {
+                                                        const next = !!checked;
+                                                        setIsPayNow(next);
+                                                        if (next) {
+                                                            if (paymentSplits.length === 0) {
+                                                                addPaymentSplit();
+                                                            }
+                                                            setShowPaymentDialog(true);
+                                                        }
+                                                    }}
                                                     className="w-5 h-5 rounded-md border-zinc-300 dark:border-zinc-700 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600 shadow-none border-none bg-zinc-200 dark:bg-zinc-800"
                                                 />
                                             </div>
+                                            {isPayNow && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setShowPaymentDialog(true)}
+                                                    className="h-8 w-full text-[9px] font-black uppercase tracking-widest text-orange-600 hover:text-orange-700 bg-orange-50/50 border-orange-200 dark:bg-orange-500/10 dark:border-orange-500/20"
+                                                >
+                                                    Edit Payment Details
+                                                </Button>
+                                            )}
                                         </div>
 
                                         {/* Action */}
@@ -1880,6 +1908,7 @@ console.log(lastPurchaseInfo);
                     previousBalance={toNumber(accounts.find(a => a.id === Number(accountType?.value))?.current_balance)}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
+                    extraDiscount={extraDiscount}
                 />
 
                 {/* Success Summary Dialog */}

@@ -31,6 +31,7 @@ class Payment extends Model
         'is_return_refund', // B1: marks cash refunds from SalesReturn to exclude from ledger formula
         'customer_credit_id',
         'firm_id',
+        'source_payment_id',
     ];
 
     public function messageLine()
@@ -61,5 +62,15 @@ class Payment extends Model
     public function allocations()
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    public function sourcePayment()
+    {
+        return $this->belongsTo(Payment::class, 'source_payment_id');
+    }
+
+    public function childPayments()
+    {
+        return $this->hasMany(Payment::class, 'source_payment_id');
     }
 }

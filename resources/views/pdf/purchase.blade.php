@@ -437,7 +437,7 @@ if (file_exists($logo_path)) {
                         <!-- Gross Amount -->
                         <tr>
                             <td class="label">Gross Amount :-</td>
-                            <td class="value">{{ number_format($purchase->net_total - ($purchase->courier_charges ?? 0), 2) }}</td>
+                            <td class="value">{{ number_format($purchase->net_total, 2) }}</td>
                         </tr>
                         <!-- Courier Charges -->
                         <tr>
@@ -459,8 +459,7 @@ if (file_exists($logo_path)) {
                         <!-- Previous Balance -->
                         @php
                         $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
-                        $purchase_net = $purchase->net_total;
-                        $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
+                        $prev_balance = $supplier_current_balance - $purchase->net_total + $purchase->paid_amount;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
@@ -474,7 +473,7 @@ if (file_exists($logo_path)) {
                         <!-- Total Balance -->
                         <tr>
                             <td class="label">Total Balance :-</td>
-                            <td class="value">{{ number_format($purchase->net_total + $prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format(($purchase->net_total - ($purchase->extra_discount ?? 0)) + $prev_balance, 2) }}</td>
                         </tr>
                         <!-- Cash Received -->
                         <tr>
@@ -489,7 +488,7 @@ if (file_exists($logo_path)) {
                         <!-- Total Payable -->
                         <tr>
                             <td class="label">Net Payable :</td>
-                            <td class="value">{{ number_format(($purchase->net_total + $prev_balance) - $purchase->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format((($purchase->net_total - ($purchase->extra_discount ?? 0)) + $prev_balance) - $purchase->paid_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

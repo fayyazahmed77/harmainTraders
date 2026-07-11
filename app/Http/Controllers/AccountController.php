@@ -413,18 +413,23 @@ class AccountController extends Controller implements HasMiddleware
                 'current_balance' => $currentBalance,
             ];
         } elseif (in_array($typeLower, ['bank', 'cash', 'cheque in hand'])) {
-            // Total money received INTO this account (customer payments received)
-            // Exclude only Canceled — Pending/Online/Cashed/Cleared all count
+            // Total money received INTO this account — only cleared cheques affect real balance
             $totalIn = \App\Models\Payment::where('payment_account_id', $account->id)
                 ->where('type', 'RECEIPT')
-                ->where('cheque_status', '!=', 'Canceled')
-                ->sum('amount');
-                
-            // Total money paid OUT from this account (supplier/expense payments)
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                })->sum('amount');
+
+            // Total money paid OUT from this account — only cleared cheques affect real balance
             $totalOut = \App\Models\Payment::where('payment_account_id', $account->id)
                 ->where('type', 'PAYMENT')
-                ->where('cheque_status', '!=', 'Canceled')
-                ->sum('amount');
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                })->sum('amount');
 
             $summary = [
                 'total_in' => $totalIn,

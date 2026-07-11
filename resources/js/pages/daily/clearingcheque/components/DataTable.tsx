@@ -217,6 +217,9 @@ export default function DataTable({ data }: DataTableProps) {
                     'Clear': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
                     'Pending': 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
                     'Canceled': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+                    'In Hand': 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+                    'Distributed': 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+                    'Refund': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
                 }[status] || 'bg-muted text-muted-foreground border-border';
 
                 return (
@@ -233,7 +236,7 @@ export default function DataTable({ data }: DataTableProps) {
             cell: ({ row }) => {
                 const payment = row.original;
 
-                if (payment.cheque_status !== 'Pending') {
+                if (payment.cheque_status !== 'Pending' && payment.cheque_status !== 'In Hand') {
                     return null;
                 }
 

@@ -89,7 +89,9 @@ export default function View({ purchase }: Props) {
     const invoiceTotal = Math.max(0, netTotal - extraDiscount);
     const paid = Number(purchase.paid_amount || 0);
     const supplierBal = Number(purchase.supplier?.current_balance || 0);
-    const prevBal = supplierBal - invoiceTotal + paid;
+    // Backend current_balance sums raw net_total (no extra_discount deduction for suppliers),
+    // so we reverse using netTotal (not invoiceTotal) to get the correct previous balance.
+    const prevBal = supplierBal - netTotal + paid;
     const netBal = invoiceTotal + prevBal - paid;
     const remaining = Math.max(0, invoiceTotal - paid);
     const totalPcs = purchase.items.reduce((a, c) => a + Number(c.total_pcs), 0);

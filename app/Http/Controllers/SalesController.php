@@ -364,7 +364,7 @@ class SalesController extends Controller implements HasMiddleware
                         'cheque_no' => $split['cheque_no'] ?? null,
                         'cheque_date' => $split['cheque_date'] ?? null,
                         'clear_date' => $split['clear_date'] ?? null,
-                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Pending',
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Clear',
                         'remarks' => 'Auto-generated from Sale ' . $sale->invoice,
                     ]);
 
@@ -698,7 +698,7 @@ class SalesController extends Controller implements HasMiddleware
                         'cheque_no' => $split['cheque_no'] ?? null,
                         'cheque_date' => $split['cheque_date'] ?? null,
                         'clear_date' => $split['clear_date'] ?? null,
-                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Pending',
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'In Hand' : 'Clear',
                         'remarks' => 'Auto-generated from Edition of Sale ' . $sale->invoice,
                     ]);
 

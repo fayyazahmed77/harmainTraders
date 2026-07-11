@@ -135,6 +135,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'type' => 'RECEIPT',
                 'payment_method' => 'Journal',
                 'remarks' => $request->remarks,
+                'cheque_status' => 'Clear',
             ]);
 
             $groupId = $receipt->id;
@@ -185,6 +186,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'payment_method' => 'Journal',
                 'remarks' => $request->remarks,
                 'group_id' => $groupId,
+                'cheque_status' => 'Clear',
             ]);
 
             // Process Destination Allocations
@@ -405,6 +407,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'amount' => $request->amount,
                 'net_amount' => $request->amount,
                 'remarks' => $request->remarks,
+                'cheque_status' => 'Clear',
             ]);
 
             $payment->update([
@@ -413,6 +416,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'amount' => $request->amount,
                 'net_amount' => $request->amount,
                 'remarks' => $request->remarks,
+                'cheque_status' => 'Clear',
             ]);
 
             // 3. Process new allocations

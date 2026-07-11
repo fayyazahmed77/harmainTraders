@@ -319,6 +319,7 @@ class PurchaseController extends Controller implements HasMiddleware
                         'clear_date' => $split['clear_date'] ?? null,
                         'remarks' => 'Auto-generated from Purchase ' . $purchase->invoice,
                         'cheque_id' => $split['cheque_id'] ?? null,
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'Pending' : 'Clear',
                     ]);
 
                     // Update Chequebook status if it's a bank cheque
@@ -651,6 +652,7 @@ class PurchaseController extends Controller implements HasMiddleware
                         'clear_date' => $split['clear_date'] ?? null,
                         'remarks' => 'Auto-generated from Edition of Purchase ' . $purchase->invoice,
                         'cheque_id' => $split['cheque_id'] ?? null,
+                        'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'Pending' : 'Clear',
                     ]);
 
                     // Update Chequebook status if it's a bank cheque

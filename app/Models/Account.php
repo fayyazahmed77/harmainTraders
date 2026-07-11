@@ -185,13 +185,13 @@ class Account extends Model
             $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
                 })->sum('amount');
 
             $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
                 })->sum('amount');
             
             return (float)$this->opening_balance + $totalIn - $totalOut;

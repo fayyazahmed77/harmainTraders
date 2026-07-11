@@ -45,8 +45,8 @@ class ClearingChequeController extends Controller implements HasMiddleware
             ],
             'clearing' => [
                 'available_funds' => Sales::sum('paid_amount') - Payment::where('type', 'PAYMENT')->where('cheque_status', 'Clear')->sum('amount'),
-                'pending_receipts_amount' => Payment::where('type', 'RECEIPT')->where('payment_method', 'Cheque')->where('cheque_status', 'Pending')->sum('amount'),
-                'pending_payments_amount' => Payment::where('type', 'PAYMENT')->where('payment_method', 'Cheque')->where('cheque_status', 'Pending')->sum('amount'),
+                'pending_receipts_amount' => Payment::where('type', 'RECEIPT')->where('payment_method', 'Cheque')->whereIn('cheque_status', ['Pending', 'In Hand'])->sum('amount'),
+                'pending_payments_amount' => Payment::where('type', 'PAYMENT')->where('payment_method', 'Cheque')->whereIn('cheque_status', ['Pending', 'In Hand'])->sum('amount'),
             ]
         ];
 
@@ -55,7 +55,7 @@ class ClearingChequeController extends Controller implements HasMiddleware
 
         // Filter by Status
         if ($status === 'Pending') {
-            $query->where('cheque_status', 'Pending');
+            $query->whereIn('cheque_status', ['Pending', 'In Hand','Distributed']);
             $query->orderBy('clear_date', 'asc');
         } elseif ($status === 'Clear') {
             $query->where('cheque_status', 'Clear');
@@ -82,17 +82,17 @@ class ClearingChequeController extends Controller implements HasMiddleware
             $dayAfterTomorrow = now()->addDays(2)->format('Y-m-d');
 
             $tomorrowAmount = Payment::where('payment_method', 'Cheque')
-                ->where('cheque_status', 'Pending')
+                ->whereIn('cheque_status', ['Pending', 'In Hand'])
                 ->whereDate('clear_date', $tomorrow)
                 ->sum('amount');
 
             $dayAfterTomorrowAmount = Payment::where('payment_method', 'Cheque')
-                ->where('cheque_status', 'Pending')
+                ->whereIn('cheque_status', ['Pending', 'In Hand'])
                 ->whereDate('clear_date', $dayAfterTomorrow)
                 ->sum('amount');
 
             $bankSummaries = Payment::where('payments.payment_method', 'Cheque')
-                ->where('payments.cheque_status', 'Pending')
+                ->whereIn('payments.cheque_status', ['Pending', 'In Hand'])
                 ->join('accounts', 'payments.payment_account_id', '=', 'accounts.id')
                 ->selectRaw('accounts.title as bank_name, count(*) as count, sum(payments.amount) as total_amount')
                 ->groupBy('payments.payment_account_id', 'accounts.title')
@@ -133,33 +133,68 @@ class ClearingChequeController extends Controller implements HasMiddleware
     {
         DB::beginTransaction();
         try {
-            $payment = Payment::with('allocations')->findOrFail($id);
+            // Find target payment and load its relationships
+            $payment = Payment::with(['allocations', 'childPayments.allocations', 'sourcePayment.allocations'])->findOrFail($id);
 
-            // Reverse allocations impact on bills
-            foreach ($payment->allocations as $allocation) {
-                if ($allocation->bill_type === 'App\Models\Sales') {
-                    $bill = Sales::find($allocation->bill_id);
-                } else {
-                    $bill = Purchase::find($allocation->bill_id);
+            if ($payment->cheque_status === 'Canceled') {
+                DB::rollBack();
+                return redirect()->back()->with('error', 'Cheque is already canceled.');
+            }
+
+            // Identify all payments in the group that must be canceled
+            $paymentsToCancel = collect([$payment]);
+
+            if ($payment->type === 'RECEIPT' && $payment->cheque_status === 'Distributed') {
+                // If canceling the distributed customer cheque, also cancel the child supplier payment(s)
+                foreach ($payment->childPayments as $child) {
+                    $paymentsToCancel->push($child);
                 }
-
-                if ($bill) {
-                    $bill->paid_amount -= $allocation->amount;
-                    $bill->remaining_amount += $allocation->amount;
-                    $bill->save();
+            } elseif ($payment->type === 'PAYMENT' && $payment->source_payment_id) {
+                // If canceling the supplier payment, also cancel the parent customer receipt
+                if ($payment->sourcePayment) {
+                    $paymentsToCancel->push($payment->sourcePayment);
                 }
             }
 
-            $payment->cheque_status = 'Canceled';
-            $payment->save();
+            // Reverse allocations for all affected payments
+            foreach ($paymentsToCancel as $p) {
+                foreach ($p->allocations as $allocation) {
+                    $bill = $allocation->bill_type === 'App\Models\Sales'
+                        ? Sales::find($allocation->bill_id)
+                        : Purchase::find($allocation->bill_id);
 
-            // If it's a bank cheque issued by us, mark it as cancelled in chequebook
-            if ($payment->cheque_id) {
-                \App\Models\Chequebook::where('id', $payment->cheque_id)->update(['status' => 'cancelled']);
+                    if ($bill) {
+                        $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
+                        
+                        // Recalculate remaining amount safely
+                        $sumOfReturns = $allocation->bill_type === 'App\Models\Sales'
+                            ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
+                            : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+                        
+                        $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+
+                        // Restore status based on remaining amount
+                        if ($allocation->bill_type === 'App\Models\Sales') {
+                            $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : ($bill->paid_amount > 0 ? 'Partial' : 'Unpaid');
+                        } else {
+                            $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : 'Completed';
+                        }
+                        $bill->save();
+                    }
+                }
+
+                // Update cheque status to Canceled
+                $p->cheque_status = 'Canceled';
+                $p->save();
+
+                // If it's a bank cheque issued by us, cancel it in the chequebook leaf
+                if ($p->cheque_id) {
+                    \App\Models\Chequebook::where('id', $p->cheque_id)->update(['status' => 'cancelled']);
+                }
             }
 
             DB::commit();
-            return redirect()->back()->with('success', 'Cheque canceled and bill balances restored.');
+            return redirect()->back()->with('success', 'Cheque and linked transactions successfully canceled. Invoice balances restored.');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Failed to cancel cheque: ' . $e->getMessage());

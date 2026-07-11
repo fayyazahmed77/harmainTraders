@@ -180,7 +180,7 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                                                     <div className="space-y-1">
                                                         <h3 className="text-sm font-black text-foreground dark:text-white tracking-tight">
                                                             <span className="text-[10px] opacity-30 mr-1 font-sans">Rs</span>
-                                                            {new Intl.NumberFormat('en-PK', { notation: 'compact' }).format(bank.total_amount)}
+                                                            {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(bank.total_amount)}
                                                         </h3>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className={`h-1 w-1 rounded-full ${color.accent} opacity-40`}></div>
