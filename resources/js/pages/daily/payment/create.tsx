@@ -163,6 +163,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [mobileAccOpen, setMobileAccOpen] = useState(false);
   const [desktopAccOpen, setDesktopAccOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
+  const [clearDateOpen, setClearDateOpen] = useState(false);
 
   useEffect(() => {
     if (errors && Object.keys(errors).length > 0) {
@@ -1229,7 +1230,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} />
                     </TechLabel>
                     <TechLabel label="Clear Date" icon={Clock}>
-                      <Input value={clearDate} onChange={e => setClearDate(e.target.value)} type="date" className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-[10px] ${PREMIUM_ROUNDING_MD} p-2`} />
+                      <Popover open={clearDateOpen} onOpenChange={setClearDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
+                            {clearDate ? fmtDate(clearDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
+                            <CalendarIcon size={14} className="text-zinc-400" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                          <Calendar mode="single" selected={clearDate ? parseLocalDate(clearDate) : undefined} onSelect={(d) => { if (d) { setClearDate(formatLocalDate(d)); setClearDateOpen(false); } }} />
+                        </PopoverContent>
+                      </Popover>
                     </TechLabel>
                   </div>
 
@@ -1570,10 +1581,30 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                         )}
                       </td>
                       <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                        <Input value={row.cheque_date} onChange={e => updateSplitRow(row.id, 'cheque_date', e.target.value)} type="date" className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs" />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="h-12 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-sm">
+                              {row.cheque_date ? fmtDate(row.cheque_date) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
+                              <CalendarIcon size={14} className="text-zinc-400" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                            <Calendar mode="single" selected={row.cheque_date ? parseLocalDate(row.cheque_date) : undefined} onSelect={(d) => { if (d) updateSplitRow(row.id, 'cheque_date', formatLocalDate(d)); }} />
+                          </PopoverContent>
+                        </Popover>
                       </td>
                       <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                        <Input value={row.clear_date} onChange={e => updateSplitRow(row.id, 'clear_date', e.target.value)} type="date" className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs" />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="h-12 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-sm">
+                              {row.clear_date ? fmtDate(row.clear_date) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
+                              <CalendarIcon size={14} className="text-zinc-400" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                            <Calendar mode="single" selected={row.clear_date ? parseLocalDate(row.clear_date) : undefined} onSelect={(d) => { if (d) updateSplitRow(row.id, 'clear_date', formatLocalDate(d)); }} />
+                          </PopoverContent>
+                        </Popover>
                       </td>
                       <td className="p-4 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                         <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className={`h-12 bg-zinc-50 dark:bg-zinc-800/50 ${t.borderAlpha} text-right font-mono text-sm font-black`} placeholder="0.00" />

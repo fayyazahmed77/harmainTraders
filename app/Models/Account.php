@@ -164,7 +164,7 @@ class Account extends Model
             
             return (float)$this->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
         } elseif ($type === 'supplier') {
-            $totalPurchases = $this->purchases()->sum('net_total');
+            $totalPurchases = (float)$this->purchases()->sum('net_total') - (float)$this->purchases()->sum('extra_discount');
             $totalReturns = (float)$this->purchaseReturns()->sum('net_total') - (float)$this->purchaseReturns()->sum('extra_discount');
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {

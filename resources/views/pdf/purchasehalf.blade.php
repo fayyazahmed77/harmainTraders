@@ -212,7 +212,7 @@
                     <td class="text-center" style="border-left: 1px solid #000;">{{ (int)$item->qty_pcs }}</td>
                     <td>{{ $item->item->title }}</td>
                     <td class="text-right">{{ number_format($item->trade_price, 2) }}</td>
-                    <td class="text-right" style="padding-right: 1mm;">{{ number_format($item->subtotal, 0) }}</td>
+                    <td class="text-right" style="padding-right: 1mm;">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -249,16 +249,16 @@
             </div>
             @endif
 
-            <div class="total-row clearfix bold">
-                <span class="total-label">Total Rs. :-</span>
-                <span class="total-value">{{ number_format($purchase->net_total, 2) }}</span>
-            </div>
-
             @php
             $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
-            $purchase_net = $purchase->net_total;
+            $purchase_net = $purchase->net_total + ($purchase->courier_charges ?? 0) - ($purchase->extra_discount ?? 0);
             $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
             @endphp
+
+            <div class="total-row clearfix bold">
+                <span class="total-label">Total Bill :-</span>
+                <span class="total-value">{{ number_format($purchase_net, 2) }}</span>
+            </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>

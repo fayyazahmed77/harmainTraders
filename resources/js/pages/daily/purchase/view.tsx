@@ -89,9 +89,8 @@ export default function View({ purchase }: Props) {
     const invoiceTotal = Math.max(0, netTotal - extraDiscount);
     const paid = Number(purchase.paid_amount || 0);
     const supplierBal = Number(purchase.supplier?.current_balance || 0);
-    // Backend current_balance sums raw net_total (no extra_discount deduction for suppliers),
-    // so we reverse using netTotal (not invoiceTotal) to get the correct previous balance.
-    const prevBal = supplierBal - netTotal + paid;
+    // Reconcile previous balance using the final invoice total (net of extra discount)
+    const prevBal = supplierBal - invoiceTotal + paid;
     const netBal = invoiceTotal + prevBal - paid;
     const remaining = Math.max(0, invoiceTotal - paid);
     const totalPcs = purchase.items.reduce((a, c) => a + Number(c.total_pcs), 0);
@@ -180,7 +179,7 @@ export default function View({ purchase }: Props) {
                                             <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                                                 <th className="px-6 py-3">#</th>
                                                 <th className="px-3 py-3">Product Specification</th>
-                                                <th className="px-3 py-3 text-center">Carton</th>
+                                                <th className="px-3 py-3 text-center">Full</th>
                                                 <th className="px-3 py-3 text-center">Pcs</th>
                                                 <th className="px-4 py-3 text-right">Rate</th>
                                                 <th className="px-4 py-3 text-right">Discount</th>
@@ -203,7 +202,7 @@ export default function View({ purchase }: Props) {
                                                         <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
                                                         <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">{fmt(it.trade_price)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">{it.discount > 0 ? `-${fmt(it.discount)}` : "0.00"}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">{dp > 0 ? `${dp % 1 === 0 ? dp.toFixed(0) : dp.toFixed(2)}%` : "0%"}</td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
                                                         <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>
                                                     </tr>

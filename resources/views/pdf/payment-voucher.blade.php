@@ -484,10 +484,6 @@
             </div>
             <div style="display: table-cell; width: 45%; padding: 0; vertical-align: top;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
-                    <tr>
-                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Voucher Total:</td>
-                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold;">PKR {{ number_format($totalAmount, 2) }}</td>
-                    </tr>
                     @php
                         $prev_is_advance = $previous_balance < 0;
                         $prev_label = $prev_is_advance ? ($is_receipt ? 'Prev Advance:' : 'Prev Balance (CR):') : 'Previous Balance:';

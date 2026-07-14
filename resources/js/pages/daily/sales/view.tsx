@@ -375,7 +375,7 @@ export default function View({ sale }: Props) {
                                             <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                                                 <th className="px-6 py-3">#</th>
                                                 <th className="px-3 py-3">Product Specification</th>
-                                                <th className="px-3 py-3 text-center">Carton</th>
+                                                <th className="px-3 py-3 text-center">Full</th>
                                                 <th className="px-3 py-3 text-center">Pcs</th>
                                                 <th className="px-4 py-3 text-right">Rate</th>
                                                 <th className="px-4 py-3 text-right">Discount</th>

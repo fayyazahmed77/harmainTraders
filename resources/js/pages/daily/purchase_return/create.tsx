@@ -395,7 +395,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             if (purchase.items) {
                 const loadedRows = purchase.items.map((pi: any) => {
                     const it = pi.item;
-                    const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
+                    const packing = toNum(it?.packing_qty || it?.packing_full || 1);
                     return {
                         id: Math.random(),
                         item_id: pi.item_id,
@@ -489,7 +489,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         const s_pcs = toNum(pi.qty_pcs);
                         const rate = toNum(pi.trade_price);
                         const it = pi.item;
-                        const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
+                        const packing = toNum(it?.packing_qty || it?.packing_full || 1);
 
                         const discVal = toNum(pi.discount);
                         const taxVal = toNum(pi.gst_amount);
@@ -544,7 +544,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         if (!found) return;
 
         const it = found.item;
-        const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
+        const packing = toNum(it?.packing_qty || it?.packing_full || 1);
 
         setRows(prev => prev.map(r => r.id === rowId ? {
             ...r,
@@ -597,7 +597,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         const itemsToAdd = (supplierItems ?? []).filter(ci => selectedAssignIds.includes(ci.id));
         const newRows = itemsToAdd.map(pi => {
             const it = pi.item;
-            const packing = toNum(it?.packing_full ?? it?.packing_qty ?? 1);
+            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
             const bAlready = toNum(pi.already_returned_pcs);
             const bReturnable = pi.returnable_pcs !== undefined
                 ? toNum(pi.returnable_pcs)

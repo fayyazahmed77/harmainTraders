@@ -393,7 +393,8 @@ if (file_exists($logo_path)) {
                     @foreach($purchase->items as $item)
                     @php
                     // Calculations
-                    $subtotal_gross = $item->trade_price * $item->total_pcs;
+                    $packing = $item->item->packing_qty ?: 1;
+                    $subtotal_gross = ($item->trade_price / $packing) * $item->total_pcs;
                     $disc_percent = $subtotal_gross > 0 ? ($item->discount / $subtotal_gross) * 100 : 0;
                     $after_disc_rate = $item->trade_price * (1 - ($disc_percent / 100));
                     @endphp
@@ -444,11 +445,7 @@ if (file_exists($logo_path)) {
                             <td class="label">Courier Charges :-</td>
                             <td class="value">{{ number_format($purchase->courier_charges ?? 0, 2) }}</td>
                         </tr>
-                        <!-- Total Rs. (Net of current invoice) -->
-                        <tr>
-                            <td class="label">Total Rs. :-</td>
-                            <td class="value">{{ number_format($purchase->net_total, 2) }}</td>
-                        </tr>
+                       
                         <!-- Extra Discount -->
                         @if(($purchase->extra_discount ?? 0) > 0)
                         <tr>
@@ -456,10 +453,16 @@ if (file_exists($logo_path)) {
                             <td class="value">{{ number_format($purchase->extra_discount, 2) }}</td>
                         </tr>
                         @endif
+                         <!-- Total Rs. (Net of current invoice) -->
+                        <tr>
+                            <td class="label">Total Bill  :-</td>
+                            <td class="value">{{ number_format($purchase->net_total-$purchase->extra_discount, 2) }}</td>
+                        </tr>
                         <!-- Previous Balance -->
                         @php
                         $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
-                        $prev_balance = $supplier_current_balance - $purchase->net_total + $purchase->paid_amount;
+                        $purchase_net = $purchase->net_total + ($purchase->courier_charges ?? 0) - ($purchase->extra_discount ?? 0);
+                        $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
@@ -473,7 +476,7 @@ if (file_exists($logo_path)) {
                         <!-- Total Balance -->
                         <tr>
                             <td class="label">Total Balance :-</td>
-                            <td class="value">{{ number_format(($purchase->net_total - ($purchase->extra_discount ?? 0)) + $prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format($purchase_net + $prev_balance, 2) }}</td>
                         </tr>
                         <!-- Cash Received -->
                         <tr>
@@ -488,7 +491,7 @@ if (file_exists($logo_path)) {
                         <!-- Total Payable -->
                         <tr>
                             <td class="label">Net Payable :</td>
-                            <td class="value">{{ number_format((($purchase->net_total - ($purchase->extra_discount ?? 0)) + $prev_balance) - $purchase->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format(($purchase_net + $prev_balance) - $purchase->paid_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

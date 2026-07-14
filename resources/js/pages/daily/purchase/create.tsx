@@ -1357,6 +1357,16 @@ console.log(lastPurchaseInfo);
                                                         </span>
                                                     </div>
                                                 </div>
+
+                                                <div className="flex flex-col items-end border-l border-orange-300 dark:border-orange-800 pl-8">
+                                                    <span className="text-[9px] font-black uppercase text-orange-500 tracking-widest leading-none mb-1">Total of this Bill</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-[10px] font-bold text-orange-400">Rs</span>
+                                                        <span className="text-lg font-black text-orange-600 dark:text-orange-400 leading-none">
+                                                            {(totals.gross - totals.discTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1670,19 +1680,6 @@ console.log(lastPurchaseInfo);
                                                                 {msg.messageline}
                                                             </SelectItem>
                                                         ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black uppercase text-zinc-400">Output Format</label>
-                                                <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                                                    <SelectTrigger className="w-full h-8 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="big" className="text-xs font-bold flex items-center gap-2 italic">A4 Paper Print</SelectItem>
-                                                        <SelectItem value="small" className="text-xs font-bold flex items-center gap-2 italic">80mm Thermal</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>

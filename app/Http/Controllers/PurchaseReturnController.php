@@ -240,8 +240,8 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ->where('bill_type', 'App\Models\Purchase')
                 ->sum('amount');
 
-            // Remaining = Net - (Payments + Returns)
-            $purchase->remaining_amount = max(0, $purchase->net_total - ($totalPayments + $totalReturns));
+            // Remaining = Net - Extra Discount - (Payments + Returns)
+            $purchase->remaining_amount = max(0, $purchase->net_total - (float)($purchase->extra_discount ?? 0) - ($totalPayments + $totalReturns));
             
             // Status Logic
             if ($purchase->remaining_amount <= 0.005) {

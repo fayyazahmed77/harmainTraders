@@ -314,7 +314,7 @@ class PaymentController extends Controller implements HasMiddleware
                 if ($bill) {
                     $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
                     $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
-                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                    $bill->remaining_amount = $bill->net_total - (float)($bill->extra_discount ?? 0) - $bill->paid_amount - $sumOfReturns;
 
                     $isSale = ($allocation->bill_type === 'App\Models\Sales');
                     if ($bill->remaining_amount <= 0) {
@@ -446,11 +446,11 @@ class PaymentController extends Controller implements HasMiddleware
                           ->where('original_invoice', $bill->invoice)
                           ->where('customer_id', $bill->customer_id);
                   });
-            })->sum('net_total');
+            })->sum(DB::raw('net_total - extra_discount'));
         } else {
             return (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)
                 ->where('supplier_id', $bill->supplier_id)
-                ->sum('net_total');
+                ->sum(DB::raw('net_total - extra_discount'));
         }
     }
 
@@ -475,7 +475,7 @@ class PaymentController extends Controller implements HasMiddleware
                 if ($bill) {
                     $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
                     $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
-                    $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
+                    $bill->remaining_amount = $bill->net_total - (float)($bill->extra_discount ?? 0) - $bill->paid_amount - $sumOfReturns;
 
                     // Re-evaluate status
                     if ($bill->remaining_amount <= 0 && $bill->paid_amount > 0) {
@@ -863,7 +863,7 @@ class PaymentController extends Controller implements HasMiddleware
 
             if ($type === 'customers') {
                 $totalSalesVal = (float) $account->sales()->sum('net_total') - (float) $account->sales()->sum('extra_discount');
-                $totalReturnsVal = (float) $account->salesReturns()->sum('net_total');
+                $totalReturnsVal = (float) $account->salesReturns()->sum('net_total') - (float) $account->salesReturns()->sum('extra_discount');
                 $totalSalesOrPurchases = $totalSalesVal - $totalReturnsVal + (float) $account->opening_balance;
 
                 $totalReceiptsVal = (float) $account->partyPayments()->where('type', 'RECEIPT')
@@ -889,8 +889,8 @@ class PaymentController extends Controller implements HasMiddleware
                     $advancePaid = abs($netLedgerBalance);
                 }
             } elseif ($type === 'supplier') {
-                $totalPurchasesVal = (float) $account->purchases()->sum('net_total');
-                $totalReturnsVal = (float) $account->purchaseReturns()->sum('net_total');
+                $totalPurchasesVal = (float) $account->purchases()->sum('net_total') - (float) $account->purchases()->sum('extra_discount');
+                $totalReturnsVal = (float) $account->purchaseReturns()->sum('net_total') - (float) $account->purchaseReturns()->sum('extra_discount');
                 $totalSalesOrPurchases = $totalPurchasesVal - $totalReturnsVal + (float) $account->opening_balance;
 
                 $totalPaymentsVal = (float) $account->partyPayments()->where('type', 'PAYMENT')

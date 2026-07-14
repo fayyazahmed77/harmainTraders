@@ -723,8 +723,8 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ->where('bill_type', 'App\Models\Sales')
                 ->sum('amount');
 
-            // Recalculate remaining balance
-            $sale->remaining_amount = max(0, $sale->net_total - ($totalPayments + $totalReturns));
+            // Recalculate remaining balance (Net - Extra Discount - (Payments + Returns))
+            $sale->remaining_amount = max(0, $sale->net_total - (float)($sale->extra_discount ?? 0) - ($totalPayments + $totalReturns));
 
             // Determine status based on returned quantity vs sold quantity
             $totalSoldQty = \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');

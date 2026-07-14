@@ -78,6 +78,7 @@ interface Purchases {
     paid_amount: number;
     remaining_amount: number;
     status: string;
+    extra_discount?: number;
 }
 
 interface DataTableProps {
@@ -201,7 +202,7 @@ export default function DataTable({ data }: DataTableProps) {
             cell: ({ row }) => (
                 <div className="flex flex-col items-end min-w-[80px]">
                     <span className="font-mono text-xs font-black text-zinc-900 dark:text-zinc-100 tabular-nums">
-                        {formatCurrency(row.original.net_total)}
+                        {formatCurrency(row.original.net_total - (row.original.extra_discount || 0))}
                     </span>
                     <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">Gross: {formatCurrency(row.original.gross_total)}</span>
                 </div>

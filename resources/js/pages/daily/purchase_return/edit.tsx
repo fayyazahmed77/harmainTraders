@@ -176,7 +176,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
     useEffect(() => {
         if (returnData.items) {
             const initialRows = returnData.items.map(it => {
-                const packing = toNum(it.item?.packing_full ?? 1);
+                const packing = toNum(it.item?.packing_qty || it.item?.packing_full || 1);
                 const base = (toNum(it.qty_carton) * packing + toNum(it.qty_pcs)) * toNum(it.trade_price);
                 const discAmt = toNum(it.discount);
                 const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
@@ -255,7 +255,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                         const s_pcs = toNum(pi.qty_pcs);
                         const rate = toNum(pi.trade_price);
                         const it = pi.item;
-                        const packing = toNum(it?.packing_full ?? 1);
+                        const packing = toNum(it?.packing_qty || it?.packing_full || 1);
                         const base = (s_full * packing + s_pcs) * rate;
                         const discAmt = toNum(pi.discount || 0);
                         const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
@@ -289,7 +289,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
             const s_pcs = toNum(pi.qty_pcs);
             const rate = toNum(pi.last_trade_price ?? 0);
             const it = pi.item;
-            const packing = toNum(it?.packing_full ?? 1);
+            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
             const base = (s_full * packing + s_pcs) * rate;
             const discAmt = toNum(pi.discount || 0);
             const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;

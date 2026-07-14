@@ -85,7 +85,7 @@ class PurchaseController extends Controller implements HasMiddleware
             $returnQuery->where('supplier_id', $request->supplier_id);
         }
 
-        $totalPurchase = $purchases->sum('net_total');
+        $totalPurchase = $purchases->sum(fn($p) => $p->net_total - ($p->extra_discount ?? 0));
         $totalPaid = $purchases->sum('paid_amount');
         $totalUnpaid = $purchases->sum('remaining_amount'); // or net_total - paid_amount
         $totalReturns = $returnQuery->sum('net_total');
@@ -232,9 +232,10 @@ class PurchaseController extends Controller implements HasMiddleware
             }
 
             // Calculate how much goes to THIS bill vs Surplus (Previous Balance)
-            $actualPaidOnThisBill = min($totalPaidAmount, $request->net_total);
-            $surplusAmount = max(0, $totalPaidAmount - $request->net_total);
-            $remainingAmount = max(0, $request->net_total - $actualPaidOnThisBill);
+            $netPurchaseTotal = $request->net_total - ($request->extra_discount ?? 0);
+            $actualPaidOnThisBill = min($totalPaidAmount, $netPurchaseTotal);
+            $surplusAmount = max(0, $totalPaidAmount - $netPurchaseTotal);
+            $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
 
             // Create purchase
             $purchase = Purchase::create([
@@ -562,14 +563,16 @@ class PurchaseController extends Controller implements HasMiddleware
             }
 
             // Calculate updated totals
+            $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netTotal = (float) $request->net_total;
+            $netPurchaseTotal = $netTotal - $extraDiscount;
             $existingPaid = (float) $purchase->paid_amount;
             
             // Increment paid amount with NEW payments made during this edit
             $newTotalPaid = $existingPaid + $totalNewPaid;
             
-            $actualPaidOnThisBill = min($newTotalPaid, $netTotal);
-            $remainingAmount = max(0, $netTotal - $actualPaidOnThisBill);
+            $actualPaidOnThisBill = min($newTotalPaid, $netPurchaseTotal);
+            $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
 
             $purchase->update([
                 'date'            => $request->date,
