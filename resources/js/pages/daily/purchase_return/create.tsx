@@ -15,7 +15,7 @@ import {
     Trash2, Plus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
-    ArrowDownToLine, Clock, Banknote, Database, ShieldCheck, History, Tags, ListRestart
+    ArrowDownToLine, Clock, Banknote, Database, ShieldCheck, History, Tags, ListRestart, Building2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -26,6 +26,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -118,9 +119,21 @@ interface Props {
     accounts: Account[];
     salemans: { id: number; name: string }[];
     purchase?: any;
+    firms: { id: number; name: string; defult: boolean }[];
 }
 
 const toNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
+
+const fmtBalance = (val: number | null, isSupplier = false) => {
+    if (val === null) return "Rs 0";
+    const absVal = Math.abs(val);
+    if (absVal === 0) return "Rs 0";
+    if (isSupplier) {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "CR" : "DR"}`;
+    } else {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "DR" : "CR"}`;
+    }
+};
 
 const fmtDate = (d: string) => {
     if (!d) return "";
@@ -290,7 +303,7 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
     );
 };
 
-export default function PurchaseReturnCreatePage({ items, accounts, salemans, purchase }: Props) {
+export default function PurchaseReturnCreatePage({ items, accounts, salemans, purchase, firms }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
@@ -303,10 +316,24 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [salesman, setSalesman] = useState<number | null>(null);
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(0);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [selectedInvoice, setSelectedInvoice] = useState<(Invoice & { firm_id?: number }) | null>(null);
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState("");
     const [supplierBalance, setSupplierBalance] = useState<number | null>(null);
+    const [outstandingBalance, setOutstandingBalance] = useState<number | null>(null);
+    const [creditBalance, setCreditBalance] = useState<number | null>(null);
+    const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
     const [extraDiscount, setExtraDiscount] = useState<number>(0);
+
+    // Firm state
+    const defaultFirm = firms?.find(f => f.defult);
+    const [selectedFirmId, setSelectedFirmId] = useState<string>(defaultFirm ? defaultFirm.id.toString() : "0");
+
+    // Automatically detect and select the firm of the selected original invoice
+    useEffect(() => {
+        if (selectedInvoice && selectedInvoice.firm_id) {
+            setSelectedFirmId(selectedInvoice.firm_id.toString());
+        }
+    }, [selectedInvoice]);
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -383,6 +410,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [rows, setRows] = useState<RowData[]>([getEmptyRow()]);
     const [selectedRowItemId, setSelectedRowItemId] = useState<number | null>(null);
     const [focusedRowId, setFocusedRowId] = useState<number | null>(null);
+    const [inventoryContextOpen, setInventoryContextOpen] = useState(false);
     const manifestRef = useRef<HTMLDivElement>(null);
 
     // Initial state from purchase if present
@@ -443,15 +471,23 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         setRows([getEmptyRow()]);
         setInvoices([]);
         setSupplierBalance(null);
+        setOutstandingBalance(null);
+        setCreditBalance(null);
+        setAdvanceBalance(null);
         setExtraDiscount(0);
 
         if (acc) {
             setSalesman(acc.saleman_id ?? null);
-            
-            // Fetch Balance
-            fetch(`/account/balance/${accId}`)
+
+            // Fetch Detailed Balances
+            fetch(`/account/${accId}/detailed-balances`)
                 .then(r => r.json())
-                .then(data => setSupplierBalance(toNum(data.balance)))
+                .then(data => {
+                    setSupplierBalance(toNum(data.previous_balance));
+                    setOutstandingBalance(toNum(data.outstanding));
+                    setCreditBalance(toNum(data.credit_balance));
+                    setAdvanceBalance(toNum(data.advance_balance));
+                })
                 .catch(console.error);
 
             fetch(`/purchase-return/supplier/${accId}/purchased-items`)
@@ -810,6 +846,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             supplier_id: selectedAccount.id,
             previous_balance: toNum(supplierBalance),
             salesman_id: salesman,
+            firm_id: selectedFirmId && selectedFirmId !== "0" ? Number(selectedFirmId) : null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
@@ -910,8 +947,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                         </Popover>
                                         {supplierBalance !== null && (
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 mr-6 pointer-events-none">
-                                                <span className={`text-[10px] font-black ${toNum(supplierBalance) >= 0 ? "text-emerald-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
-                                                    Rs {toNum(supplierBalance).toLocaleString()}
+                                                <span className={`text-[10px] font-black ${toNum(supplierBalance) <= 0 ? "text-sky-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
+                                                    {toNum(supplierBalance) < 0 ? `Advance Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()}` : fmtBalance(supplierBalance, true)}
                                                 </span>
                                             </div>
                                         )}
@@ -974,17 +1011,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 </div>
                                             </PopoverContent>
                                         </Popover>
-                                        {supplierBalance !== null && (
-                                            <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none">
-                                                <div className="bg-zinc-900 border border-zinc-800 text-[9px] font-black px-2 py-0.5 rounded shadow-xl flex items-center gap-1.5">
-                                                    <div className="w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
-                                                    <span className="text-zinc-500">BAL:</span>
-                                                    <span className={toNum(supplierBalance) >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                                                        Rs {toNum(supplierBalance).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
+
                                     </TechLabel>
                                 </div>
 
@@ -1138,12 +1165,20 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 </div>
 
                                                 {/* Subtotal & Action */}
-                                                <div className="col-span-2 flex items-center justify-end gap-3 pr-4">
+                                                <div className="col-span-2 flex items-center justify-end gap-2 pr-4">
                                                     <div className="text-right">
                                                         <span className={`text-[11px] font-black font-mono transition-all duration-300 ${rowAmount.amount > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-300 dark:text-zinc-700'}`}>
                                                             {rowAmount.amount.toLocaleString()}
                                                         </span>
                                                     </div>
+                                                    {row.item_id && (
+                                                        <Button variant="ghost" size="icon"
+                                                            title="Inventory Context"
+                                                            className="h-7 w-7 text-blue-400 hover:text-blue-500 hover:bg-blue-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                                                            onClick={(e) => { e.stopPropagation(); setFocusedRowId(row.id); setInventoryContextOpen(true); }}>
+                                                            <Info size={12} />
+                                                        </Button>
+                                                    )}
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
                                                         onClick={(e) => { e.stopPropagation(); setRows(p => p.filter(r => r.id !== row.id).length === 0 ? [getEmptyRow()] : p.filter(r => r.id !== row.id)); }}>
                                                         <Trash2 size={12} />
@@ -1178,16 +1213,24 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     Purge Workspace
                                 </Button>
                             </div>
+
+                            {/* Purchase Detail Cards (Context Registry) - Desktop */}
+                            {rowsWithAmount.some(r => r.item_id && r.id === focusedRowId) && (
+                                <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10">
+                                    <div className="flex items-center gap-2 mb-3 px-1">
+                                        <Info size={14} className="text-orange-500" />
+                                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em]">Active Item Intelligence</span>
+                                    </div>
+                                    <div className="w-full">
+                                        {rowsWithAmount.filter(r => r.item_id && r.id === focusedRowId).map((row) => (
+                                            <ItemDetailCard key={row.id} row={row} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </Card>
 
-                        {/* Item Intelligence Panel */}
-                        <AnimatePresence>
-                            {focusedRowId && rows.find(r => r.id === focusedRowId)?.item_id && (
-                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="hidden md:block">
-                                    <ItemDetailCard row={rowsWithAmount.find(r => r.id === focusedRowId)!} />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+
                     </div>
 
                     {/* ── FINANCIAL AUDITOR (Sidebar) ── */}
@@ -1237,26 +1280,88 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                     <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
+                                    {/* Supplier Ledger Breakdown */}
+                                    {supplierBalance !== null && (
+                                        <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 overflow-hidden">
+                                            <div className="px-4 py-2 border-b border-zinc-800">
+                                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Supplier Ledger</span>
+                                            </div>
+                                            <div className="px-4 py-2 space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Prev Balance</span>
+                                                    <span className={`text-[10px] font-black ${toNum(supplierBalance) >= 0 ? 'text-rose-400' : 'text-sky-400'}`}>
+                                                        {toNum(supplierBalance) < 0
+                                                            ? `Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()} (Adv)`
+                                                            : fmtBalance(supplierBalance, true)}
+                                                    </span>
+                                                </div>
+                                                {outstandingBalance !== null && toNum(outstandingBalance) > 0 && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Payable</span>
+                                                        <span className="text-[10px] font-black text-rose-400">Rs {toNum(outstandingBalance).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                                {creditBalance !== null && toNum(creditBalance) > 0 && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Credit</span>
+                                                        <span className="text-[10px] font-black text-emerald-400">Rs {toNum(creditBalance).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                                {advanceBalance !== null && toNum(advanceBalance) > 0 && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Advance</span>
+                                                        <span className="text-[10px] font-black text-sky-400">Rs {toNum(advanceBalance).toLocaleString()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-0.5">
                                             <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                                                Previous Balance
+                                                {toNum(supplierBalance) < 0 ? 'Advance Paid' : 'Previous Balance'}
                                             </div>
-                                            <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                Rs {supplierBalance !== null ? toNum(supplierBalance).toLocaleString() : "0"}
+                                            <div className={`text-sm font-bold font-mono tracking-tighter ${toNum(supplierBalance) < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                                {toNum(supplierBalance) < 0
+                                                    ? `Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()}`
+                                                    : fmtBalance(supplierBalance, true)}
                                             </div>
                                         </div>
                                         <div className="space-y-0.5 text-right">
                                             <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
                                                 New Balance
                                             </div>
-                                            <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                Rs {(toNum(supplierBalance) - (totals.net - extraDiscount) + refundAmount).toLocaleString()}
-                                            </div>
+                                            {(() => {
+                                                const newBal = toNum(supplierBalance) - (totals.net - extraDiscount) + refundAmount;
+                                                return (
+                                                    <div className={`text-sm font-bold font-mono tracking-tighter ${newBal < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                                        {newBal < 0
+                                                            ? `Rs ${Math.abs(newBal).toLocaleString()} (Adv)`
+                                                            : fmtBalance(newBal, true)}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
 
                                     <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                    <TechLabel label="Firm Branding" icon={Building2}>
+                                        <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                            <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
+                                                <SelectValue placeholder="Select Firm..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="0">No Branding</SelectItem>
+                                                {firms?.map((firm) => (
+                                                    <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </TechLabel>
 
                                     <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
                                         <div className="relative group/refund">
@@ -1490,6 +1595,101 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 </div>
                             </div>
                         </Card>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Inventory Context Dialog */}
+                <Dialog open={inventoryContextOpen} onOpenChange={setInventoryContextOpen}>
+                    <DialogContent className="max-w-sm p-0 overflow-hidden border-zinc-200 dark:border-zinc-800">
+                        <DialogTitle className="sr-only">Inventory Context</DialogTitle>
+                        <DialogDescription className="sr-only">Stock, pricing and purchase details for the selected item</DialogDescription>
+                        {(() => {
+                            const row = focusedRowId ? rowsWithAmount.find(r => r.id === focusedRowId) : null;
+                            if (!row || !row.item_id) {
+                                return (
+                                    <div className="p-8 text-center text-[11px] font-black text-zinc-400 uppercase tracking-widest">
+                                        No item selected.
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="relative overflow-hidden">
+                                    {/* Header */}
+                                    <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                                            <Package size={16} className="text-orange-500" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Inventory Context</div>
+                                            <div className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-tight">
+                                                {row.item_title}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Body */}
+                                    <div className="p-5 space-y-3.5 text-xs">
+                                        {/* SKU */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">SKU Registry</span>
+                                            <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                                                {row.item_id.toString().padStart(6, '0')}
+                                            </span>
+                                        </div>
+
+                                        {/* Unit Config */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Unit Config</span>
+                                            <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                                1 × {toNum(row.packing)} PCS
+                                            </span>
+                                        </div>
+
+                                        {/* Live Stock */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Live Stock</span>
+                                            <span className="font-bold text-emerald-600">
+                                                {toNum(row.current_stock).toLocaleString()} <span className="text-[10px] opacity-60">PCS</span>
+                                            </span>
+                                        </div>
+
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                        {/* Purchase Invoice */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Purchase Invoice</span>
+                                            <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                                                {row.purchase_invoice || "N/A"}
+                                            </span>
+                                        </div>
+
+                                        {/* Purchase Date */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Purchase Date</span>
+                                            <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                                                {row.purchase_date ? fmtDate(row.purchase_date) : "N/A"}
+                                            </span>
+                                        </div>
+
+                                        {/* Purchased Quantity */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Purchased Qty</span>
+                                            <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                                                {row.sold_full}F &bull; {row.sold_pcs}P
+                                            </span>
+                                        </div>
+
+                                        {/* Purchase Price */}
+                                        <div className="bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800 rounded-lg p-3 flex justify-between items-center">
+                                            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Purchase Price</span>
+                                            <span className="font-black text-zinc-800 dark:text-zinc-100 font-mono">
+                                                Rs {toNum(row.rate).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </DialogContent>
                 </Dialog>
 

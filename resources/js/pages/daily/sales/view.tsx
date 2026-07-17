@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -7,13 +7,8 @@ import {
     ArrowLeftIcon,
     PrinterIcon,
     DownloadIcon,
-    Calendar,
-    Hash,
-    User,
-    CreditCard,
     ShieldCheck,
     Receipt,
-    Tag,
     RefreshCcw,
     CheckCircle,
     RotateCw,
@@ -21,28 +16,14 @@ import {
     Clock,
     AlertCircle,
     CheckCircle2,
-    Share2,
-    Copy,
-    CornerUpLeft,
-    Building2,
-    CircleDollarSign,
-    UserCheck,
-    CalendarDays,
-    Layers,
-    History,
-    MoreHorizontal
+    Calendar,
+    User,
+    Building
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { 
     Dialog, 
     DialogContent, 
@@ -160,7 +141,6 @@ export default function View({ sale }: Props) {
     const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
     const [courierCharges, setCourierCharges] = useState<number>(sale.courier_charges || 0);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [copied, setCopied] = useState(false);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
@@ -185,8 +165,7 @@ export default function View({ sale }: Props) {
     const currentInvoiceTotal = Math.max(0, netTotal - extraDiscount);
     const paidAmount = Number(sale.paid_amount || 0);
 
-    // Calculate remaining amount dynamically to cover both old legacy data and new data
-    const remainingAmountCalculated = Math.max(0, currentInvoiceTotal - paidAmount);
+
 
     // Robust previous balance formula: total_receivable - (remaining_amount_stored + paid_amount_stored)
     const previousBalance = totalReceivable > 0 
@@ -231,11 +210,7 @@ export default function View({ sale }: Props) {
 
     const currentStatus = statusConfig[sale.status] || statusConfig.Completed;
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(window.location.href);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
+
 
     return (
         <SidebarProvider>
@@ -248,45 +223,55 @@ export default function View({ sale }: Props) {
                     {/* ──────────────────────────────────────────────────
                         HEADER: Large Invoice Header & Actions
                         ────────────────────────────────────────────────── */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-200 dark:border-zinc-800 pb-6 print:hidden">
-                        <div className="flex items-center gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 border-b border-zinc-200 dark:border-zinc-800 pb-6 print:hidden">
+                        <div className="flex items-start gap-4">
                             <Button
                                 variant="outline"
                                 size="icon"
                                 onClick={() => window.history.back()}
-                                className="h-10 w-10 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+                                className="h-10 w-10 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mt-1 shrink-0"
                             >
                                 <ArrowLeftIcon className="h-4 w-4" />
                             </Button>
-                            <div>
+                            <div className="space-y-4">
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
-                                        Sales Invoice <span className="font-mono text-primary">{sale.invoice}</span>
+                                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                                        Sales Invoice <span className="font-mono text-orange-500 bg-orange-500/5 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg text-xl border border-orange-500/10">{sale.invoice}</span>
                                     </h1>
                                     <Badge className={cn("px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none", currentStatus.color)}>
                                         {currentStatus.icon}
                                         {currentStatus.label}
                                     </Badge>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-zinc-500 font-medium">
-                                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 font-bold border border-emerald-500/10">
                                         <ShieldCheck className="h-3.5 w-3.5" /> Transaction Verified
                                     </span>
-                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                                    <span>Date: <span className="font-bold text-zinc-700 dark:text-zinc-300">{formatDateLong(sale.date)}</span></span>
-                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                                    <span>Created: <span className="font-bold text-zinc-700 dark:text-zinc-300">{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : formatDateLong(sale.date)}</span></span>
-                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                                    <span>Customer: <span className="font-bold text-zinc-805 dark:text-zinc-200 uppercase">{sale.customer?.title || "Cash Customer"}</span></span>
-                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                                    <span>Agent: <span className="font-bold text-zinc-805 dark:text-zinc-200 uppercase">{sale.salesman?.name || "Direct Sale"}</span></span>
-                                    <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                                    <span>Firm: <span className="font-bold text-zinc-805 dark:text-zinc-200 uppercase">{sale.firm?.name || "Haramain Traders"}</span></span>
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
+                                        <Calendar className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+                                        Date: <span className="text-zinc-900 dark:text-zinc-200">{formatDateLong(sale.date)}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
+                                        <Clock className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+                                        Created: <span className="text-zinc-900 dark:text-zinc-200">{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : formatDateLong(sale.date)}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
+                                        <User className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+                                        Customer: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.customer?.title || "Cash Customer"}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
+                                        <User className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+                                        Agent: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.salesman?.name || "Direct Sale"}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
+                                        <Building className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
+                                        Firm: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.firm?.name || "Haramain Traders"}</span>
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
                             {sale.status === "Pending Order" && (
                                 <>
                                     <Button
@@ -313,7 +298,7 @@ export default function View({ sale }: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-all shadow-sm flex items-center gap-2"
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                             >
                                 <PrinterIcon className="h-4 w-4 text-orange-500" />
                                 Print Small
@@ -321,7 +306,7 @@ export default function View({ sale }: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-all shadow-sm flex items-center gap-2"
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                             >
                                 <PrinterIcon className="h-4 w-4 text-blue-500" />
                                 Print Large
@@ -329,12 +314,11 @@ export default function View({ sale }: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-all shadow-sm flex items-center gap-2"
+                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                             >
                                 <DownloadIcon className="h-4 w-4 text-emerald-500" />
                                 Download PDF
                             </Button>
-                            
                         </div>
                     </div>
 
@@ -347,10 +331,7 @@ export default function View({ sale }: Props) {
                     {/* ──────────────────────────────────────────────────
                         MAIN CONTENT LAYOUT: GRID (8 COLS / 4 COLS)
                         ────────────────────────────────────────────────── */}
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-                        
-                        {/* LEFT COLUMN: Items Table & Notices (8 COLS) */}
-                        <div className="xl:col-span-8 min-w-0 space-y-8">
+                    <div className="space-y-8">
                             
                             {/* SECTION 2: Invoice Items Table */}
                             <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
@@ -373,14 +354,18 @@ export default function View({ sale }: Props) {
                                     <table className="w-full text-left border-collapse table-auto">
                                         <thead>
                                             <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
-                                                <th className="px-6 py-3">#</th>
-                                                <th className="px-3 py-3">Product Specification</th>
-                                                <th className="px-3 py-3 text-center">Full</th>
-                                                <th className="px-3 py-3 text-center">Pcs</th>
-                                                <th className="px-4 py-3 text-right">Rate</th>
-                                                <th className="px-4 py-3 text-right">Discount</th>
-                                                <th className="px-4 py-3 text-right">After Disc</th>
-                                                <th className="px-6 py-3 text-right">Subtotal</th>
+                                                <th rowSpan={2} className="px-6 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">#</th>
+                                                <th rowSpan={2} className="px-3 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">Description of Goods</th>
+                                                <th colSpan={2} className="px-3 py-1.5 text-center border-b border-zinc-200 dark:border-zinc-800">Quantity</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Retail</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Rate</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Disc %</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">After Discount</th>
+                                                <th rowSpan={2} className="px-6 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Net Amount</th>
+                                            </tr>
+                                            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                                <th className="px-3 py-1.5 text-center">Box</th>
+                                                <th className="px-3 py-1.5 text-center">Pcs</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
@@ -403,10 +388,13 @@ export default function View({ sale }: Props) {
                                                         <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
                                                         <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
+                                                            {it.item?.retail ? formatCurrency(it.item.retail).replace('PKR', '').trim() : "0.00"}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
                                                             {formatCurrency(it.trade_price).replace('PKR', '').trim()}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-rose-500">
-                                                            {it.discount > 0 ? `-${formatCurrency(it.discount).replace('PKR', '').trim()}` : "0.00"}
+                                                            {discPercent > 0 ? discPercent.toFixed(2) : "0.00"}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
                                                             {formatCurrency(afterDiscRate).replace('PKR', '').trim()}
@@ -420,14 +408,14 @@ export default function View({ sale }: Props) {
                                         </tbody>
                                         <tfoot className="bg-zinc-50/50 dark:bg-zinc-950/20 font-black text-xs border-t border-zinc-200 dark:border-zinc-800">
                                             <tr>
-                                                <td className="px-6 py-3.5 text-zinc-500">Total</td>
-                                                <td className="px-3 py-3.5"></td>
+                                                <td colSpan={2} className="px-6 py-3.5 text-zinc-500">Total</td>
                                                 <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
                                                     {sale.items.reduce((acc, it) => acc + Number(it.qty_carton || 0), 0)}
                                                 </td>
                                                 <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
                                                     {sale.items.reduce((acc, it) => acc + Number(it.qty_pcs || 0), 0)}
                                                 </td>
+                                                <td className="px-4 py-3.5"></td>
                                                 <td className="px-4 py-3.5"></td>
                                                 <td className="px-4 py-3.5 text-right text-rose-500 font-mono">
                                                     -{formatCurrency(sale.items.reduce((acc, it) => acc + Number(it.discount || 0), 0)).replace('PKR', '').trim()}
@@ -439,6 +427,88 @@ export default function View({ sale }: Props) {
                                             </tr>
                                         </tfoot>
                                     </table>
+                                </div>
+
+                                {/* Summary section matching Image 1 */}
+                                <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-950/20">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                                        
+                                        {/* Left Column: Total Items & Signature */}
+                                        <div className="space-y-12">
+                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                                <span>Total # Of Items:</span>
+                                                <span className="font-mono text-zinc-900 dark:text-zinc-100 font-black">
+                                                    {sale.items.length}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="pt-6">
+                                                <div className="w-48 border-b border-zinc-300 dark:border-zinc-700"></div>
+                                                <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-black mt-2">
+                                                    Check By Name & Time
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Middle Column: Discount Amount */}
+                                        <div className="flex flex-col justify-start">
+                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                                <span>Discount Amount:</span>
+                                                <span className="font-mono text-rose-500 font-black">
+                                                    {formatCurrency(Number(sale.discount_total || 0) + extraDiscount).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Right Column: Financial Figures */}
+                                        <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
+                                            <div className="flex justify-between items-center">
+                                                <span>Courier Charges :-</span>
+                                                <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                                                    {formatCurrency(sale.courier_charges).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Rs. :-</span>
+                                                <span className="font-mono">
+                                                    {formatCurrency(currentInvoiceTotal).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span>Previous Balance :-</span>
+                                                <span className={cn(
+                                                    "font-mono font-bold",
+                                                    previousBalance > 0 ? "text-rose-500" : previousBalance < 0 ? "text-emerald-500" : "text-zinc-500"
+                                                )}>
+                                                    {previousBalance < 0 ? "-" : ""}{formatCurrency(Math.abs(previousBalance)).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Balance :-</span>
+                                                <span className="font-mono text-orange-500">
+                                                    {formatCurrency(currentInvoiceTotal + previousBalance).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold">
+                                                <span>Cash Received :-</span>
+                                                <span className="font-mono font-black">
+                                                    {formatCurrency(sale.paid_amount).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Receivable :</span>
+                                                <span className={cn(
+                                                    "font-mono font-black text-base",
+                                                    netBalance > 0 ? "text-rose-600" : "text-emerald-600"
+                                                )}>
+                                                    {formatCurrency(netBalance).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
                                 </div>
                             </Card>
 
@@ -516,213 +586,6 @@ export default function View({ sale }: Props) {
                             )}
 
                         </div>
-
-                        {/* RIGHT COLUMN: Unified Ledger Summary & Timeline (4 COLS) */}
-                        <div className="xl:col-span-4 min-w-0 space-y-8">
-                            
-                            {/* Unified Financial Revenue Ledger & Payment Summary */}
-                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
-                                <CardHeader className="px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200 flex items-center gap-2">
-                                            <CircleDollarSign className="h-4.5 w-4.5 text-emerald-500" />
-                                            Financial Revenue Ledger
-                                        </CardTitle>
-                                        {(() => {
-                                            const rem = remainingAmountCalculated;
-                                            const paid = Number(sale.paid_amount || 0);
-                                            
-                                            let label = "Unpaid";
-                                            let color = "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-300";
-                                            
-                                            if (rem === 0) {
-                                                label = "Fully Paid";
-                                                color = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-300";
-                                            } else if (paid > 0) {
-                                                label = "Partial Paid";
-                                                color = "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300";
-                                            }
-                                            
-                                            return (
-                                                <Badge className={cn("px-2.5 py-0.5 rounded-full shadow-none font-bold text-[9px] uppercase tracking-wider border", color)}>
-                                                    {label}
-                                                </Badge>
-                                            );
-                                        })()}
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-5 space-y-3.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                                    <div className="flex justify-between items-center">
-                                        <span>Gross Subtotal</span>
-                                        <span className="font-mono text-zinc-800 dark:text-zinc-200">
-                                            {formatCurrency(sale.gross_total).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-rose-500">
-                                        <span>Standard Item Discount</span>
-                                        <span className="font-mono">
-                                            -{formatCurrency(sale.discount_total).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    {extraDiscount > 0 && (
-                                        <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-bold">
-                                            <span>Extra Discount (current bill)</span>
-                                            <span className="font-mono">
-                                                -{formatCurrency(extraDiscount).replace('PKR', '').trim()}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {sale.courier_charges > 0 && (
-                                        <div className="flex justify-between items-center text-purple-600 dark:text-purple-400">
-                                            <span>Courier/Freight Charges</span>
-                                            <span className="font-mono">
-                                                +{formatCurrency(sale.courier_charges).replace('PKR', '').trim()}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {sale.tax_total > 0 && (
-                                        <div className="flex justify-between items-center text-blue-500">
-                                            <span>Sales Tax (GST)</span>
-                                            <span className="font-mono">
-                                                +{formatCurrency(sale.tax_total).replace('PKR', '').trim()}
-                                            </span>
-                                        </div>
-                                    )}
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-bold">
-                                        <span>Current Invoice Total</span>
-                                        <span className="font-mono text-zinc-900 dark:text-zinc-100">
-                                            {formatCurrency(currentInvoiceTotal).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-zinc-500">
-                                        <span>Customer Previous Balance</span>
-                                        <span className={cn(
-                                            "font-mono font-bold",
-                                            previousBalance > 0 ? "text-rose-500" : previousBalance < 0 ? "text-emerald-500" : "text-zinc-500"
-                                        )}>
-                                            {previousBalance < 0 ? "-" : ""}{formatCurrency(Math.abs(previousBalance)).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
-                                        <span>Net Balance Payable</span>
-                                        <span className="font-mono text-orange-500">
-                                            {formatCurrency(currentInvoiceTotal + previousBalance).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                        <span>Amount Received (paid)</span>
-                                        <span className="font-mono font-bold">
-                                            {formatCurrency(sale.paid_amount).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
-                                        <span>Net Balance Outstanding</span>
-                                        <span className={cn(
-                                            "font-mono",
-                                            netBalance > 0 ? "text-rose-600" : "text-emerald-600"
-                                        )}>
-                                            {formatCurrency(netBalance).replace('PKR', '').trim()}
-                                        </span>
-                                    </div>
-
-                                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60 mt-2 space-y-1.5 text-[10px] text-zinc-400 font-medium">
-                                        <div className="flex justify-between">
-                                            <span>Payment Method</span>
-                                            <span className="font-bold text-zinc-650 dark:text-zinc-400">Cash / Ledger</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Payment Terms</span>
-                                            <span className="font-bold text-zinc-655 dark:text-zinc-400 uppercase">{sale.type || "CREDIT"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Terminal ID</span>
-                                            <span className="font-mono">SYS_T_{sale.id}</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* SECTION 7: Audit Timeline */}
-                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 block mb-4 flex items-center gap-1.5">
-                                    <History className="h-4 w-4 text-purple-500" /> Audit Transaction Timeline
-                                </span>
-                                <div className="relative pl-6 border-l-2 border-zinc-100 dark:border-zinc-800 space-y-5 ml-1">
-                                    {/* Timeline Item 1 */}
-                                    <div className="relative">
-                                        <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 border-emerald-500 bg-white dark:bg-zinc-900 flex items-center justify-center">
-                                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Invoice Drafted & Created</p>
-                                            <span className="text-[9px] text-zinc-400 font-mono font-medium block mt-0.5">
-                                                {sale.created_at 
-                                                    ? `${new Date(sale.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})} ${new Date(sale.created_at).toLocaleTimeString()}` 
-                                                    : formatDateLong(sale.date)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Timeline Item 2 */}
-                                    <div className="relative">
-                                        <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 border-emerald-500 bg-white dark:bg-zinc-900 flex items-center justify-center">
-                                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Stock Depletion Logged</p>
-                                            <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">Automated inventory update completed</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Timeline Item 3 */}
-                                    <div className="relative">
-                                        <div className={cn(
-                                            "absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 bg-white dark:bg-zinc-900 flex items-center justify-center",
-                                            sale.paid_amount > 0 ? "border-emerald-500" : "border-zinc-300 dark:border-zinc-700"
-                                        )}>
-                                            <div className={cn("h-1.5 w-1.5 rounded-full", sale.paid_amount > 0 ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-750")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Payment Collection Processed</p>
-                                            <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">
-                                                {sale.paid_amount > 0 ? `Collected: Rs ${sale.paid_amount.toLocaleString()}` : "Credit Term Account Terms"}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Timeline Item 4 */}
-                                    {sale.status !== "Pending Order" && (
-                                        <div className="relative">
-                                            <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 border-emerald-500 bg-white dark:bg-zinc-900 flex items-center justify-center">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Audit Status Confirmed</p>
-                                                <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">Verified by system administrator</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Timeline Item 5 (If returned) */}
-                                    {sale.returns && sale.returns.length > 0 && (
-                                        <div className="relative">
-                                            <div className="absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 border-rose-500 bg-white dark:bg-zinc-900 flex items-center justify-center">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-rose-500">Sales Return Logged</p>
-                                                <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">Adjustment credit vouchers matched</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </Card>
-
-                        </div>
-                    </div>
 
                     {/* print footer info */}
                     <div className="hidden print:flex flex-col items-center justify-center border-t border-zinc-200 pt-6 mt-12 text-center text-xs text-zinc-400 font-mono">

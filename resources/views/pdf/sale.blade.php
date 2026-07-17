@@ -562,7 +562,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Gross Amount -->
                         <tr>
                             <td class="label">Gross Amount :-</td>
-                            <td class="value">{{ number_format($sale->net_total - ($sale->courier_charges ?? 0), 2) }}</td>
+                            <td class="value">{{ number_format($sale->gross_total, 2) }}</td>
                         </tr>
                         <!-- Courier Charges -->
                         <tr>
@@ -572,7 +572,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Total Rs. (Net of current invoice) -->
                         <tr>
                             <td class="label">Total Rs. :-</td>
-                            <td class="value">{{ number_format($sale->net_total, 2) }}</td>
+                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</td>
                         </tr>
                         <!-- Extra Discount -->
                         @if($sale->extra_discount > 0)
@@ -583,9 +583,12 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         @endif
                         <!-- Previous Balance -->
                         @php
-                        $current_balance = (float) ($sale->customer->current_balance ?? 0);
-                        $invoice_net = $sale->net_total - $sale->extra_discount;
-                        $prev_balance = $current_balance - $invoice_net + $sale->paid_amount;
+                        $total_receivable = (float)($sale->total_receivable ?? 0);
+                        $remaining_amount = (float)($sale->remaining_amount ?? 0);
+                        $paid_amount = (float)($sale->paid_amount ?? 0);
+                        $prev_balance = $total_receivable > 0 
+                            ? max(0, round($total_receivable - ($remaining_amount + $paid_amount))) 
+                            : 0;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
@@ -599,7 +602,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Total Balance -->
                         <tr>
                             <td class="label">Total Balance :-</td>
-                            <td class="value">{{ number_format(($sale->net_total + $prev_balance) - $sale->extra_discount, 2) }}</td>
+                            <td class="value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 2) }}</td>
                         </tr>
                         <!-- Cash Received -->
                         <tr>
@@ -614,7 +617,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Total Receivable -->
                         <tr>
                             <td class="label">Total Receivable :</td>
-                            <td class="value">{{ number_format(($sale->net_total + $prev_balance - $sale->extra_discount) - $sale->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

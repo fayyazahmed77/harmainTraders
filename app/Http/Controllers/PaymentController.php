@@ -286,7 +286,7 @@ class PaymentController extends Controller implements HasMiddleware
             'date' => 'required|date',
             'account_id' => 'required|integer',
             'payment_account_id' => 'nullable|integer',
-            'amount' => 'required|numeric',
+            'amount' => 'required|numeric|gt:0',
             'discount' => 'nullable|numeric',
             'type' => 'required|string|in:RECEIPT,PAYMENT',
             'payment_method' => 'nullable|string',
@@ -301,6 +301,7 @@ class PaymentController extends Controller implements HasMiddleware
         ]);
 
         $payment = Payment::with('allocations')->findOrFail($id);
+        $account = Account::findOrFail($request->account_id);
 
         DB::beginTransaction();
 
@@ -379,9 +380,11 @@ class PaymentController extends Controller implements HasMiddleware
                 'payment_method' => $request->payment_method,
                 'cheque_id' => $chequeId ?? $payment->cheque_id,
                 'source_payment_id' => ($request->type === 'PAYMENT') ? $request->original_cheque_id : null,
-                'cheque_status' => $request->payment_method === 'Cheque'
-                    ? ($payment->payment_method === 'Cheque' ? $payment->cheque_status : ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending'))
-                    : 'Clear',
+                'cheque_status' => ($account->accountType?->name === 'Bank')
+                    ? 'Clear'
+                    : ($request->payment_method === 'Cheque'
+                        ? ($payment->payment_method === 'Cheque' ? $payment->cheque_status : ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending'))
+                        : 'Clear'),
                 'message_line_id' => $request->message_line_id,
                 'firm_id' => $request->firm_id,
             ]);
@@ -714,7 +717,7 @@ class PaymentController extends Controller implements HasMiddleware
         $accounts = Account::with('accountType')
             ->select('id', 'title', 'type')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers', 'Supplier', 'Expense', 'Other']);
+                $q->whereIn('name', ['Customers', 'Supplier', 'Expense', 'Other', 'Bank']);
             })
             ->get();
         $paymentAccounts = Account::with('accountType')
@@ -914,6 +917,62 @@ class PaymentController extends Controller implements HasMiddleware
                     $totalBalance = 0;
                     $advancePaid = abs($netLedgerBalance);
                 }
+            } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
+                $baseQuery = $account->financialPayments()
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                    });
+
+                $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                          ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                    })->sum('amount');
+
+                $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')
+                    ->where(function($q) {
+                        $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                          ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                    })->sum('amount');
+
+                $partyQuery = $account->partyPayments()
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                    });
+
+                $partyIn = (clone $partyQuery)->where('type', 'PAYMENT')
+                    ->where(function($q) {
+                        $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                          ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                    })->sum('amount');
+
+                $partyOut = (clone $partyQuery)->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                          ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                    })->sum('amount');
+
+                $totalSalesOrPurchases = (float)$totalIn + (float)$partyIn;
+                $totalReceivedOrPaid = (float)$totalOut + (float)$partyOut;
+
+                if ($paymentObj) {
+                    if ($paymentObj->payment_account_id == $account->id) {
+                        if ($paymentObj->type === 'RECEIPT') {
+                            $totalSalesOrPurchases -= $paymentObj->amount;
+                        } else {
+                            $totalReceivedOrPaid -= $paymentObj->amount;
+                        }
+                    }
+                    if ($paymentObj->account_id == $account->id) {
+                        if ($paymentObj->type === 'PAYMENT') {
+                            $totalSalesOrPurchases -= $paymentObj->amount;
+                        } else {
+                            $totalReceivedOrPaid -= $paymentObj->amount;
+                        }
+                    }
+                }
+
+                $totalBalance = $netLedgerBalance;
             }
 
             return response()->json([
@@ -1052,6 +1111,10 @@ class PaymentController extends Controller implements HasMiddleware
         try {
             // Safety checks (Total aggregate)
             $totalAmount = collect($splitsData)->sum('amount'); // Gross amount total
+            if ($totalAmount <= 0) {
+                DB::rollBack();
+                return back()->withErrors(['error' => 'Payment amount must be greater than 0.']);
+            }
             $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
             $netPaid = $totalAmount - $totalDiscount; // Net cash paid/received
 
@@ -1130,9 +1193,11 @@ class PaymentController extends Controller implements HasMiddleware
                     'remarks' => !empty($request->remarks) ? $request->remarks : null,
                     'payment_method' => !empty($split['payment_method']) ? $split['payment_method'] : null,
                     'cheque_id' => $chequeId,
-                    'cheque_status' => ($split['payment_method'] ?? null) === 'Cheque'
-                        ? ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending')
-                        : 'Clear',
+                    'cheque_status' => ($account->accountType?->name === 'Bank')
+                        ? 'Clear'
+                        : (($split['payment_method'] ?? null) === 'Cheque'
+                            ? ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending')
+                            : 'Clear'),
                     'message_line_id' => !empty($request->message_line_id) ? $request->message_line_id : null,
                     'firm_id' => !empty($request->firm_id) ? $request->firm_id : null,
                     'source_payment_id' => ($request->type === 'PAYMENT' && !empty($split['original_cheque_id'])) ? $split['original_cheque_id'] : null,

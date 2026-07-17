@@ -129,8 +129,21 @@ export default function DataTable({ data }: DataTableProps) {
                 const status = row.original.cheque_status;
                 if (!status || status === 'Pending') return null;
 
+                const colorClasses = (() => {
+                    switch (status) {
+                        case 'Clear':
+                        case 'Cleared':
+                        case 'Deposit':
+                            return 'bg-emerald-100 text-emerald-800';
+                        case 'Withdrawal':
+                            return 'bg-rose-100 text-rose-800';
+                        default:
+                            return 'bg-zinc-100 text-zinc-800';
+                    }
+                })();
+
                 return (
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${status === 'Clear' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colorClasses}`}>
                         {status}
                     </span>
                 );

@@ -30,6 +30,7 @@ class SalesReturn extends Model
         'paid_amount',
         'remaining_amount',
         'remarks',
+        'firm_id',
     ];
 
     protected $casts = [
@@ -55,5 +56,10 @@ class SalesReturn extends Model
     public function sale()
     {
         return $this->belongsTo(Sales::class, 'sale_id');
+    }
+
+    public function firm()
+    {
+        return $this->belongsTo(Firm::class, 'firm_id');
     }
 }

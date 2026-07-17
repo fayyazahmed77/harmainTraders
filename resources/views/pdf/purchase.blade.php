@@ -438,7 +438,7 @@ if (file_exists($logo_path)) {
                         <!-- Gross Amount -->
                         <tr>
                             <td class="label">Gross Amount :-</td>
-                            <td class="value">{{ number_format($purchase->net_total, 2) }}</td>
+                            <td class="value">{{ number_format($purchase->gross_total, 2) }}</td>
                         </tr>
                         <!-- Courier Charges -->
                         <tr>
@@ -454,15 +454,18 @@ if (file_exists($logo_path)) {
                         </tr>
                         @endif
                          <!-- Total Rs. (Net of current invoice) -->
+                        @php
+                        $invoice_total = max(0, $purchase->net_total - $purchase->extra_discount);
+                        @endphp
                         <tr>
                             <td class="label">Total Bill  :-</td>
-                            <td class="value">{{ number_format($purchase->net_total-$purchase->extra_discount, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total, 2) }}</td>
                         </tr>
                         <!-- Previous Balance -->
                         @php
-                        $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
-                        $purchase_net = $purchase->net_total + ($purchase->courier_charges ?? 0) - ($purchase->extra_discount ?? 0);
-                        $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
+                        $supplier_bal = (float)($purchase->supplier->current_balance ?? 0);
+                        $paid = (float)($purchase->paid_amount ?? 0);
+                        $prev_balance = $supplier_bal - $invoice_total + $paid;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
@@ -476,12 +479,12 @@ if (file_exists($logo_path)) {
                         <!-- Total Balance -->
                         <tr>
                             <td class="label">Total Balance :-</td>
-                            <td class="value">{{ number_format($purchase_net + $prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total + $prev_balance, 2) }}</td>
                         </tr>
                         <!-- Cash Received -->
                         <tr>
                             <td class="label">Paid Amount :-</td>
-                            <td class="value">{{ number_format($purchase->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format($paid, 2) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -491,7 +494,7 @@ if (file_exists($logo_path)) {
                         <!-- Total Payable -->
                         <tr>
                             <td class="label">Net Payable :</td>
-                            <td class="value">{{ number_format(($purchase_net + $prev_balance) - $purchase->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total + $prev_balance - $paid, 2) }}</td>
                         </tr>
                     </table>
                 </div>

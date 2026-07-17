@@ -131,6 +131,7 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{account}', [AccountController::class, 'update'])->name('account.update');
         Route::delete('/{account}', [AccountController::class, 'destroy'])->name('account.destroy');
         Route::get('/{id}/balance', [AccountController::class, 'getBalance'])->name('account.balance');
+        Route::get('/{id}/detailed-balances', [AccountController::class, 'getDetailedBalances'])->name('account.detailed-balances');
         Route::get('/next-code', [AccountController::class, 'getNextCode'])->name('account.next-code');
         Route::patch('/{account}/toggle-status', [AccountController::class, 'toggleStatus'])->name('account.toggle-status');
         Route::post('/{id}/reset-guest-token', [GuestController::class, 'resetToken'])->name('account.reset-guest-token');

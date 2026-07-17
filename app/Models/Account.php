@@ -185,16 +185,25 @@ class Account extends Model
             $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
                 })->sum('amount');
 
             $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
                 })->sum('amount');
+
+            $partyQuery = $this->partyPayments()
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                });
+
+            $partyIn = (clone $partyQuery)->where('type', 'PAYMENT')->sum('amount');
+
+            $partyOut = (clone $partyQuery)->where('type', 'RECEIPT')->sum('amount');
             
-            return (float)$this->opening_balance + $totalIn - $totalOut;
+            return (float)$this->opening_balance + $totalIn - $totalOut + $partyIn - $partyOut;
         } elseif (in_array($type, ['expense', 'other'])) {
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {

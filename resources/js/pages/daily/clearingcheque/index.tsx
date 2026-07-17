@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -10,6 +10,7 @@ import DataTable from './components/DataTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface Props {
     stats: {
@@ -39,6 +40,25 @@ interface Props {
 }
 
 export default function ClearingChequeIndex({ stats, payments, accounts, filters, summaries }: Props) {
+
+    const [activeChequeType, setActiveChequeType] = useState<'bank' | 'hand'>('bank');
+
+    const paymentList = payments?.data || [];
+
+    const isChequeInHand = (p: any) => {
+        const title = p.payment_account?.title?.toUpperCase() || "";
+        const status = p.cheque_status;
+        return title.includes("CHEQUE IN HAND") || 
+               status === "In Hand" || 
+               status === "Distributed" ||
+               !p.payment_account;
+    };
+
+    const bankCheques = paymentList.filter(p => !isChequeInHand(p));
+    const handCheques = paymentList.filter(p => isChequeInHand(p));
+
+    const bankTotal = bankCheques.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const handTotal = handCheques.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     const handleTabChange = (value: string) => {
         router.get('/clearing-cheque', { ...filters, status: value }, { preserveState: true, preserveScroll: true });
@@ -195,8 +215,41 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                             </div>
                         )}
 
-                        <div className="mt-4">
-                            <DataTable data={payments.data} />
+                        <div className="mt-6 space-y-6">
+                            <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+                                <button
+                                    onClick={() => setActiveChequeType('bank')}
+                                    className={cn(
+                                        "px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
+                                        activeChequeType === 'bank'
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Building2 className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                                    Banks Cheque
+                                    <span className="ml-1.5 px-2 py-0.5 text-[9px] font-black rounded-full bg-primary/10 text-primary border border-primary/20">
+                                        {bankCheques.length} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(bankTotal)}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveChequeType('hand')}
+                                    className={cn(
+                                        "px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
+                                        activeChequeType === 'hand'
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Clock className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                                    Cheque in hand / Third Party
+                                    <span className="ml-1.5 px-2 py-0.5 text-[9px] font-black rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                                        {handCheques.length} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(handTotal)}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <DataTable data={activeChequeType === 'bank' ? bankCheques : handCheques} />
                         </div>
                     </Tabs>
                 </div>

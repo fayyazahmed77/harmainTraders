@@ -159,6 +159,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   // State
   const [date, setDate] = useState<string>(formatLocalDate(new Date()));
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const selectedAccount = useMemo(() => {
+    return accounts.find(a => a.id.toString() === selectedAccountId);
+  }, [accounts, selectedAccountId]);
+
+  const isBankAccountSelected = useMemo(() => {
+    return selectedAccount?.account_type?.name?.toLowerCase() === 'bank';
+  }, [selectedAccount]);
+
   const [accountSearch, setAccountSearch] = useState("");
   const [mobileAccOpen, setMobileAccOpen] = useState(false);
   const [desktopAccOpen, setDesktopAccOpen] = useState(false);
@@ -644,9 +652,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           toast.error(`Row ${idx + 1}: Missing Ledger Account.`);
           isValid = false;
         }
-        if (p.amount <= 0 && splitPayments.length > 1) {
-          // allow 0 if it's the only row, otherwise it's weird 
-          // but let's let backend handle 0 filtering
+        if (p.amount <= 0) {
+          toast.error(`Row ${idx + 1}: Amount must be greater than 0.`);
+          isValid = false;
         }
 
         const isCashAccount = paymentAccounts.find(a => a.id.toString() === p.payment_account_id)?.account_type?.name === 'Cash';
@@ -688,6 +696,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       };
     } else {
       // Single Payment Validation
+      if (amount <= 0) {
+        toast.error("Please enter a Payment Amount greater than 0.");
+        return;
+      }
       if (!paymentAccountId) {
         toast.error("Please select a Payout Source (Cash/Bank) before confirming.");
         return;
@@ -920,6 +932,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       const name = acc.account_type?.name?.toLowerCase() || "";
                                       if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
                                       if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+                                      if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
                                       return "text-zinc-400 dark:text-zinc-500 opacity-40";
                                     })()
                                   )}
@@ -953,8 +966,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">RECEIPT (IN/CR)</SelectItem>
-                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">PAYMENT (OUT/DR)</SelectItem>
+                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
+                            {isBankAccountSelected ? "WITHDRAWAL (IN/CR)" : "RECEIPT (IN/CR)"}
+                          </SelectItem>
+                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
+                            {isBankAccountSelected ? "DEPOSIT (OUT/DR)" : "PAYMENT (OUT/DR)"}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </TechLabel>
@@ -1030,8 +1047,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                   <CheckCircle2 size={18} />
                                 </div>
                                 <div className="space-y-1">
-                                  <div className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">No Active Invoices</div>
-                                  <p className="text-[11px] text-zinc-400 font-bold max-w-[285px] mx-auto leading-relaxed">This party has no outstanding invoices. Any payout posted will be registered as an advance / on-account credit.</p>
+                                  <div className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                    {isBankAccountSelected ? "Bank Transaction Ready" : "No Active Invoices"}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-400 font-bold max-w-[285px] mx-auto leading-relaxed">
+                                    {isBankAccountSelected 
+                                      ? `This transaction will be recorded directly as a ${paymentType === 'RECEIPT' ? 'withdrawal' : 'deposit'} for the selected Bank Account.`
+                                      : "This party has no outstanding invoices. Any payout posted will be registered as an advance / on-account credit."}
+                                  </p>
                                 </div>
                               </div>
                             )}
@@ -1147,7 +1170,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="space-y-4">
                     <div className="flex justify-between items-center text-[11px]">
                       <span className="text-zinc-500 font-bold">
-                        {paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases"}
+                        {isBankAccountSelected ? "Total In" : (paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases")}
                       </span>
                       <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
                         Rs {totalSalesPurchases.toLocaleString()}
@@ -1155,19 +1178,21 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     </div>
                     <div className="flex justify-between items-center text-[11px]">
                       <span className="text-zinc-500 font-bold">
-                        {paymentType === 'RECEIPT' ? "Total Received" : "Total Paid"}
+                        {isBankAccountSelected ? "Total Out" : (paymentType === 'RECEIPT' ? "Total Received" : "Total Paid")}
                       </span>
                       <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
                         Rs {totalReceivedPaid.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">Total Balance</span>
-                      <span className="font-black font-mono text-rose-500">
+                      <span className="text-zinc-500 font-bold">
+                        {isBankAccountSelected ? "Total Available" : "Total Balance"}
+                      </span>
+                      <span className={cn("font-black font-mono", isBankAccountSelected ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
                         Rs {totalBalance.toLocaleString()}
                       </span>
                     </div>
-                    {advancePaid > 0 && (
+                    {!isBankAccountSelected && advancePaid > 0 && (
                       <div className="flex justify-between items-center text-[11px]">
                         <span className="text-zinc-500 font-bold">Advance Paid</span>
                         <span className="font-black font-mono text-emerald-600">
@@ -1188,14 +1213,16 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-1 relative z-10 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${t.gradient}`} />
-                    <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">PAYMENT</h3>
+                    <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">
+                      {isBankAccountSelected ? "BANK TRANSACTION" : "PAYMENT"}
+                    </h3>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi-Method</span>
                       <Switch checked={isMultiPayment} onCheckedChange={setIsMultiPayment} className="scale-75" />
                     </div>
-                    <SignalBadge text={paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
+                    <SignalBadge text={isBankAccountSelected ? (paymentType === 'RECEIPT' ? 'WITHDRAWAL' : 'DEPOSIT') : paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
                   </div>
                 </div>
 
@@ -1259,9 +1286,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                             <SelectValue placeholder="Select Cash/Bank..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
-                            {paymentAccounts.map(acc => (
-                              <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
-                            ))}
+                            {paymentAccounts
+                              .filter(acc => acc.id.toString() !== selectedAccountId)
+                              .map(acc => (
+                                <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </TechLabel>
@@ -1367,7 +1396,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     onClick={handleSave} disabled={loading}>
                     <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={loading ? { opacity: 0.5 } : {}}>
                       {loading ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                      {loading ? "PROCESSING..." : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")}
+                      {loading ? "PROCESSING..." : (
+                        isBankAccountSelected 
+                          ? (paymentType === 'RECEIPT' ? "WITHDRAWAL" : "DEPOSIT") 
+                          : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")
+                      )}
                     </motion.div>
                   </Button>
                 </div>
@@ -1389,7 +1422,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
             </div>
             <Button onClick={handleSave} className={`h-12 px-6 ${t.btnBg} text-white shadow-lg ${t.gradientShadow} rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-95`} disabled={loading}>
               {loading ? <RotateCcw size={16} className="mr-2 animate-spin" /> : <CheckCircle2 size={16} className="mr-2" />}
-              {loading ? "..." : (paymentType === 'RECEIPT' ? "RECEIVE" : "PAY")}
+              {loading ? "..." : (
+                isBankAccountSelected
+                  ? (paymentType === 'RECEIPT' ? "WITHDRAW" : "DEPOSIT")
+                  : (paymentType === 'RECEIPT' ? "RECEIVE" : "PAY")
+              )}
             </Button>
           </div>
           <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
@@ -1513,9 +1550,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                             <SelectValue placeholder="Account..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {paymentAccounts.map(acc => (
-                              <SelectItem key={acc.id} value={acc.id.toString()} className="text-xs font-bold uppercase">{acc.title}</SelectItem>
-                            ))}
+                            {paymentAccounts
+                              .filter(acc => acc.id.toString() !== selectedAccountId)
+                              .map(acc => (
+                                <SelectItem key={acc.id} value={acc.id.toString()} className="text-xs font-bold uppercase">{acc.title}</SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </td>

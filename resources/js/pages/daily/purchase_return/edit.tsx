@@ -15,7 +15,7 @@ import {
     Trash2, Plus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
-    ArrowDownToLine, Database, Clock, Banknote
+    ArrowDownToLine, Database, Clock, Banknote, Building2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -26,6 +26,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -85,6 +86,7 @@ interface PurchaseReturn {
     original_invoice: string;
     supplier_id: number;
     salesman_id: number;
+    firm_id?: number | null;
     gross_total: number;
     discount_total: number;
     net_total: number;
@@ -96,9 +98,21 @@ interface Props {
     returnData: PurchaseReturn;
     accounts: Account[];
     salemans: { id: number; name: string }[];
+    firms: { id: number; name: string; defult: boolean }[];
 }
 
 const toNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
+
+const fmtBalance = (val: number | null, isSupplier = false) => {
+    if (val === null) return "Rs 0";
+    const absVal = Math.abs(val);
+    if (absVal === 0) return "Rs 0";
+    if (isSupplier) {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "CR" : "DR"}`;
+    } else {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "DR" : "CR"}`;
+    }
+};
 
 const fmtDate = (d: string) => {
     if (!d) return "";
@@ -119,7 +133,7 @@ const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode,
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
-export default function PurchaseReturnEditPage({ returnData, accounts, salemans }: Props) {
+export default function PurchaseReturnEditPage({ returnData, accounts, salemans, firms }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
@@ -132,10 +146,37 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
     const [accountSearch, setAccountSearch] = useState("");
     const [remarks, setRemarks] = useState(returnData.remarks || "");
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [selectedInvoice, setSelectedInvoice] = useState<(Invoice & { firm_id?: number }) | null>(() => {
+        if (returnData.original_invoice) {
+            return {
+                id: 0, // not critical for init
+                invoice: returnData.original_invoice,
+                date: returnData.date,
+                net_total: 0,
+                remaining_amount: 0,
+                status: "",
+                firm_id: returnData.firm_id ?? undefined
+            };
+        }
+        return null;
+    });
     const [previousBalance, setPreviousBalance] = useState<number>(toNum((returnData as any).previous_balance));
+    const [outstandingBalance, setOutstandingBalance] = useState<number | null>(null);
+    const [creditBalance, setCreditBalance] = useState<number | null>(null);
+    const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
     const [extraDiscount, setExtraDiscount] = useState<number>(toNum((returnData as any).extra_discount));
     const [refundAmount, setRefundAmount] = useState(toNum((returnData as any).paid_amount || 0));
+
+    // Firm state
+    const defaultFirm = firms?.find(f => f.defult);
+    const [selectedFirmId, setSelectedFirmId] = useState<string>(returnData.firm_id?.toString() || (defaultFirm ? defaultFirm.id.toString() : "0"));
+
+    // Automatically detect and select the firm of the selected original invoice
+    useEffect(() => {
+        if (selectedInvoice && selectedInvoice.firm_id) {
+            setSelectedFirmId(selectedInvoice.firm_id.toString());
+        }
+    }, [selectedInvoice]);
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -205,9 +246,14 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
 
     useEffect(() => {
         if (selectedAccount) {
-            fetch(`/account/${selectedAccount.id}/balance`)
+            fetch(`/account/${selectedAccount.id}/detailed-balances`)
                 .then(r => r.json())
-                .then(data => setPreviousBalance(toNum(data.balance)))
+                .then(data => {
+                    setPreviousBalance(toNum(data.previous_balance));
+                    setOutstandingBalance(toNum(data.outstanding));
+                    setCreditBalance(toNum(data.credit_balance));
+                    setAdvanceBalance(toNum(data.advance_balance));
+                })
                 .catch(console.error);
 
             fetch(`/purchase-return/supplier/${selectedAccount.id}/purchased-items`)
@@ -226,6 +272,9 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
         setRows([getEmptyRow()]);
         setInvoices([]);
         setPreviousBalance(0);
+        setOutstandingBalance(null);
+        setCreditBalance(null);
+        setAdvanceBalance(null);
         setExtraDiscount(0);
         setDesktopAccOpen(false);
     };
@@ -393,6 +442,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
     };
 
     const handleSave = () => {
+        if (isSaving) return;
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0 || r.bonus_full > 0 || r.bonus_pcs > 0));
 
         if (!selectedAccount) { alert("Please identify the supplier first."); return; }
@@ -406,6 +456,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
             supplier_id: selectedAccount.id,
             previous_balance: previousBalance,
             salesman_id: selectedAccount.saleman_id ?? null,
+            firm_id: selectedFirmId && selectedFirmId !== "0" ? Number(selectedFirmId) : null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
@@ -508,13 +559,26 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                                         </PopoverContent>
                                     </Popover>
                                     {previousBalance !== null && (
-                                        <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none">
-                                            <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[8px] font-black px-2 py-0.5 rounded shadow-xl flex items-center gap-1.5">
-                                                <div className="w-1 h-1 rounded-full bg-orange-500 animate-pulse" />
-                                                <span className="text-zinc-500">BAL:</span>
-                                                <span className={toNum(previousBalance) >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                                                    Rs {toNum(previousBalance).toLocaleString()}
-                                                </span>
+                                        <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none z-10">
+                                            <div className="bg-zinc-900 border border-zinc-700 text-[9px] font-black px-2 py-1 rounded-lg shadow-2xl flex flex-col gap-1 min-w-[160px]">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-zinc-500 uppercase tracking-widest font-bold">Prev Bal</span>
+                                                    <span className={toNum(previousBalance) >= 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                                                        {fmtBalance(previousBalance, true)}
+                                                    </span>
+                                                </div>
+                                                {outstandingBalance !== null && <div className="flex items-center justify-between gap-3 border-t border-zinc-800 pt-0.5">
+                                                    <span className="text-zinc-500 uppercase tracking-widest">Payable</span>
+                                                    <span className="text-rose-400">Rs {toNum(outstandingBalance).toLocaleString()}</span>
+                                                </div>}
+                                                {creditBalance !== null && <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-zinc-500 uppercase tracking-widest">Credit</span>
+                                                    <span className="text-emerald-400">Rs {toNum(creditBalance).toLocaleString()}</span>
+                                                </div>}
+                                                {advanceBalance !== null && <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-zinc-500 uppercase tracking-widest">Advance</span>
+                                                    <span className="text-sky-400">Rs {toNum(advanceBalance).toLocaleString()}</span>
+                                                </div>}
                                             </div>
                                         </div>
                                     )}
@@ -639,7 +703,7 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                                             Previous Balance
                                         </div>
                                         <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                            Rs {previousBalance.toLocaleString()}
+                                            {fmtBalance(previousBalance, true)}
                                         </div>
                                     </div>
                                     <div className="space-y-0.5 text-right">
@@ -647,12 +711,26 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans 
                                             New Balance
                                         </div>
                                         <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                            Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString()}
+                                            {fmtBalance(previousBalance - (totals.net - extraDiscount) + refundAmount, true)}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                <TechLabel label="Firm Branding" icon={Building2}>
+                                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                        <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
+                                            <SelectValue placeholder="Select Firm..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="0">No Branding</SelectItem>
+                                            {firms?.map((firm) => (
+                                                <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </TechLabel>
 
                                 <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
                                     <div className="relative">

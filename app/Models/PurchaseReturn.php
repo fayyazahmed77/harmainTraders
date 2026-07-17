@@ -26,6 +26,7 @@ class PurchaseReturn extends Model
         'paid_amount',
         'remaining_amount',
         'remarks',
+        'firm_id',
     ];
 
     protected $casts = [
@@ -46,5 +47,10 @@ class PurchaseReturn extends Model
     public function salesman()
     {
         return $this->belongsTo(Saleman::class, 'salesman_id');
+    }
+
+    public function firm()
+    {
+        return $this->belongsTo(Firm::class, 'firm_id');
     }
 }

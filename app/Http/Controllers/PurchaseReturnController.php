@@ -57,11 +57,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $purchase = Purchase::with(['items.item', 'supplier', 'salesman'])->find($request->purchase_id);
         }
 
+        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/purchase_return/create", [
             'items' => $items,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'purchase' => $purchase,
+            'firms' => $firms,
         ]);
     }
 
@@ -73,6 +76,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'invoice'         => 'nullable|string',
             'original_invoice' => 'nullable|string',
             'supplier_id'     => 'required|integer',
+            'firm_id'         => 'nullable|integer',
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
@@ -92,10 +96,12 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'items.*.subtotal'        => 'required|numeric',
         ]);
 
-        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)->first();
+        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)
+            ->where('supplier_id', $request->supplier_id)
+            ->first();
         if (!$purchase) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'original_invoice' => 'The selected original purchase invoice does not exist.'
+                'original_invoice' => 'The selected original purchase invoice does not exist or does not belong to the selected supplier.'
             ]);
         }
 
@@ -120,6 +126,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             // Calculate already returned pieces for this item on this purchase
             $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
                 ->where('purchase_returns.original_invoice', $purchase->invoice)
+                ->where('purchase_returns.supplier_id', $request->supplier_id)
                 ->where('purchase_return_items.item_id', $it['item_id'])
                 ->sum('purchase_return_items.total_pcs');
             
@@ -157,6 +164,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 'supplier_id'     => $request->supplier_id,
                 'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?: null,
+                'firm_id'         => $request->firm_id ?? null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -183,7 +191,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ]);
 
                 // DECREASE Stock for Purchase Returns (We are giving items back)
-                $item = Items::find($it['item_id']);
+                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $packing = (float)($item->packing_qty ?? 1);
                     $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
@@ -264,7 +272,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     {
         try {
             $invoices = Purchase::where('supplier_id', $supplierId)
-                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status')
+                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status', 'firm_id')
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->unique('invoice')
@@ -275,8 +283,9 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                         'invoice'          => $p->invoice,
                         'date'             => $p->date,
                         'net_total'        => $p->net_total,
-                        'remaining_amount' => $p->remaining_amount,
+                        'remaining_amount' => max(0.0, (float)$p->remaining_amount),
                         'status'           => $p->status ?? 'Active',
+                        'firm_id'          => $p->firm_id,
                     ];
                 });
 
@@ -343,9 +352,10 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ->orderBy('purchases.id', 'desc')
                 ->with(['item', 'purchase:id,invoice,date'])
                 ->get()
-                ->map(function ($pi) {
+                ->map(function ($pi) use ($supplierId) {
                     $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
                         ->where('purchase_returns.original_invoice', $pi->purchase->invoice)
+                        ->where('purchase_returns.supplier_id', $supplierId)
                         ->where('purchase_return_items.item_id', $pi->item_id)
                         ->sum('purchase_return_items.total_pcs');
 
@@ -378,7 +388,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     //show
     public function show($id)
     {
-        $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item'])->findOrFail($id);
+        $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item', 'firm'])->findOrFail($id);
         return Inertia::render("daily/purchase_return/view", [
             'returnData' => $return,
         ]);
@@ -387,7 +397,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     //edit
     public function edit($id)
     {
-        $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item'])->findOrFail($id);
+        $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item', 'firm'])->findOrFail($id);
         $accounts = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
@@ -395,12 +405,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             ->get();
         $salemans = Saleman::get();
         $items = Items::get();
+        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
 
         return Inertia::render("daily/purchase_return/edit", [
             'returnData' => $return,
             'accounts' => $accounts,
             'salemans' => $salemans,
             'items' => $items,
+            'firms' => $firms,
         ]);
     }
 
@@ -411,6 +423,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'date'            => 'required|date',
             'invoice'         => 'required|string',
             'supplier_id'     => 'required|integer',
+            'firm_id'         => 'nullable|integer',
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
@@ -418,10 +431,12 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'extra_discount'  => 'nullable|numeric|min:0',
         ]);
 
-        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)->first();
+        $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)
+            ->where('supplier_id', $request->supplier_id)
+            ->first();
         if (!$purchase) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'original_invoice' => 'The selected original purchase invoice does not exist.'
+                'original_invoice' => 'The selected original purchase invoice does not exist or does not belong to the selected supplier.'
             ]);
         }
 
@@ -446,6 +461,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             // Calculate already returned pieces (excluding this return instance)
             $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
                 ->where('purchase_returns.original_invoice', $purchase->invoice)
+                ->where('purchase_returns.supplier_id', $request->supplier_id)
                 ->where('purchase_returns.id', '!=', $id) // Exclude current return
                 ->where('purchase_return_items.item_id', $it['item_id'])
                 ->sum('purchase_return_items.total_pcs');
@@ -474,7 +490,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             // 1. Revert Stock for Old Items (Purchase return decreased stock, so increase it back)
             $oldItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
             foreach ($oldItems as $oldItem) {
-                $item = Items::find($oldItem->item_id);
+                $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $packing = (float)($item->packing_qty ?? 1);
                     $totalRevertPcs = (float)($oldItem->total_pcs) + ((float)($oldItem->bonus_qty_carton ?? 0) * $packing) + (float)($oldItem->bonus_qty_pcs ?? 0);
@@ -503,6 +519,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 'supplier_id'     => $request->supplier_id,
                 'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?: null,
+                'firm_id'         => $request->firm_id ?? null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -531,7 +548,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ]);
 
                 // Update Stock (Decrease for Purchase Return)
-                $item = Items::find($it['item_id']);
+                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $packing = (float)($item->packing_qty ?? 1);
                     $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
@@ -597,7 +614,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             // 2. Revert Stock for Items
             $returnItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
             foreach ($returnItems as $ri) {
-                $item = Items::find($ri->item_id);
+                $item = Items::where('id', $ri->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $packing = (float)($item->packing_qty ?? 1);
                     $totalRevertPcs = (float)($ri->total_pcs) + ((float)($ri->bonus_qty_carton ?? 0) * $packing) + (float)($ri->bonus_qty_pcs ?? 0);

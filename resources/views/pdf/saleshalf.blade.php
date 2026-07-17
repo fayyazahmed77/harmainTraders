@@ -255,7 +255,7 @@
 
             <div class="total-row clearfix">
                 <span class="total-label">Gross Amount :-</span>
-                <span class="total-value">{{ number_format($sale->net_total - ($sale->courier_charges ?? 0), 2) }}</span>
+                <span class="total-value">{{ number_format($sale->gross_total, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -265,7 +265,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Rs. :-</span>
-                <span class="total-value">{{ number_format($sale->net_total, 2) }}</span>
+                <span class="total-value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</span>
             </div>
 
             @if($sale->extra_discount > 0)
@@ -276,9 +276,12 @@
             @endif
 
             @php
-            $current_balance = (float) ($sale->customer->current_balance ?? 0);
-            $invoice_net = $sale->net_total - $sale->extra_discount;
-            $prev_balance = $current_balance - $invoice_net + $sale->paid_amount;
+            $total_receivable = (float)($sale->total_receivable ?? 0);
+            $remaining_amount = (float)($sale->remaining_amount ?? 0);
+            $paid_amount = (float)($sale->paid_amount ?? 0);
+            $prev_balance = $total_receivable > 0 
+                ? max(0, round($total_receivable - ($remaining_amount + $paid_amount))) 
+                : 0;
             @endphp
 
             <div class="total-row clearfix">
@@ -290,7 +293,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format(($sale->net_total + $prev_balance) - $sale->extra_discount, 2) }}</span>
+                <span class="total-value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -302,7 +305,7 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Receivable :</span>
-                <span class="total-value">{{ number_format(($sale->net_total + $prev_balance - $sale->extra_discount) - $sale->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2) }}</span>
             </div>
         </div>
 

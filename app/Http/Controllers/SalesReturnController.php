@@ -59,12 +59,15 @@ class SalesReturnController extends Controller implements HasMiddleware
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque In Hand']);
         })->get(['id', 'title', 'code']);
 
+        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/sales_return/create", [
             'accounts'        => $accounts,
             'salemans'        => $salemans,
             'messageLines'    => $messageLines,
             'nextInvoiceNo'   => $nextInvoiceNo,
             'paymentAccounts' => $paymentAccounts,
+            'firms'           => $firms,
         ]);
     }
 
@@ -77,6 +80,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'invoice'         => 'nullable|string',
                 'original_invoice' => 'required|string|exists:sales,invoice',
                 'customer_id'     => 'required|integer',
+                'firm_id'         => 'nullable|integer',
                 'no_of_items'     => 'required|integer',
                 'gross_total'     => 'required|numeric',
                 'discount_total'  => 'required|numeric',
@@ -207,6 +211,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'customer_id'     => $request->customer_id,
                 'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?? 0,
+                'firm_id'         => $request->firm_id ?? null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -234,7 +239,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ]);
 
                 // INCREASE Stock for Returns
-                $item = Items::find($it['item_id']);
+                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $packing = $item->packing_qty ?: 1;
                     $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
@@ -263,7 +268,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     {
         try {
             $invoices = Sales::where('customer_id', $customerId)
-                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status')
+                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status', 'firm_id')
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->unique('invoice')
@@ -274,8 +279,9 @@ class SalesReturnController extends Controller implements HasMiddleware
                         'invoice'          => $sale->invoice,
                         'date'             => $sale->date,
                         'net_total'        => $sale->net_total,
-                        'remaining_amount' => $sale->remaining_amount,
+                        'remaining_amount' => max(0.0, (float)$sale->remaining_amount),
                         'status'           => $sale->status ?? 'Active',
+                        'firm_id'          => $sale->firm_id,
                     ];
                 });
 
@@ -376,7 +382,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     //show
     public function show($id)
     {
-        $return = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
+        $return = SalesReturn::with(['customer', 'salesman', 'items.item', 'firm'])->findOrFail($id);
         return Inertia::render("daily/sales_return/view", [
             'returnData' => $return,
         ]);
@@ -385,7 +391,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     //edit
     public function edit($id)
     {
-        $return = SalesReturn::with(['customer', 'salesman', 'items.item'])->findOrFail($id);
+        $return = SalesReturn::with(['customer', 'salesman', 'items.item', 'firm'])->findOrFail($id);
 
         $accounts = Account::with('accountType')
             ->whereHas('sales')
@@ -399,12 +405,15 @@ class SalesReturnController extends Controller implements HasMiddleware
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque In Hand']);
         })->get(['id', 'title', 'code']);
 
+        $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
+
         return Inertia::render("daily/sales_return/edit", [
             'returnData'    => $return,
             'accounts'      => $accounts,
             'salemans'      => $salemans,
             'messageLines'  => $messageLines,
             'paymentAccounts' => $paymentAccounts,
+            'firms'         => $firms,
         ]);
     }
 
@@ -417,6 +426,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'invoice'         => 'required|string',
                 'original_invoice' => 'required|string|exists:sales,invoice',
                 'customer_id'     => 'required|integer',
+                'firm_id'         => 'nullable|integer',
                 'no_of_items'     => 'required|integer',
                 'gross_total'     => 'required|numeric',
                 'discount_total'  => 'required|numeric',
@@ -526,7 +536,7 @@ class SalesReturnController extends Controller implements HasMiddleware
             // 1. Revert Stock for Old Items
             $oldItems = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($oldItems as $oldItem) {
-                $item = Items::find($oldItem->item_id);
+                $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $packing = $item->packing_qty ?: 1;
                     $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
@@ -554,6 +564,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'customer_id'     => $request->customer_id,
                 'previous_balance' => $previousBalance,
                 'salesman_id'     => $request->salesman_id ?? 0,
+                'firm_id'         => $request->firm_id ?? null,
                 'no_of_items'     => $request->no_of_items,
                 'gross_total'     => $request->gross_total,
                 'discount_total'  => $request->discount_total,
@@ -581,7 +592,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ]);
 
                 // Update Stock (Increase for Return)
-                $item = Items::find($it['item_id']);
+                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $packing = $item->packing_qty ?: 1;
                     $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
@@ -621,7 +632,7 @@ class SalesReturnController extends Controller implements HasMiddleware
             // 1. Revert Stock (Decrease because return added stock)
             $items = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($items as $si) {
-                $product = Items::find($si->item_id);
+                $product = Items::where('id', $si->item_id)->lockForUpdate()->first();
                 if ($product) {
                     $packing = $product->packing_qty ?: 1;
                     $bonusUnits = (($si->bonus_qty_carton ?? 0) * $packing) + ($si->bonus_qty_pcs ?? 0);

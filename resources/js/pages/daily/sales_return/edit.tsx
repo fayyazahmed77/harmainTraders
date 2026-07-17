@@ -14,7 +14,7 @@ import {
     Trash2, Plus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
-    ArrowDownToLine
+    ArrowDownToLine, Building2
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -25,6 +25,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -96,6 +97,7 @@ interface SalesReturn {
     payment_account_id?: number | null;
     items: any[];
     sale_id?: number | null;
+    firm_id?: number | null;
     previous_balance?: number | string;
     extra_discount?: number | string;
 }
@@ -105,9 +107,21 @@ interface Props {
     accounts: Account[];
     salemans: { id: number; name: string }[];
     paymentAccounts: Account[];
+    firms: { id: number; name: string; defult: boolean }[];
 }
 
 const toNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
+
+const fmtBalance = (val: number | null, isSupplier = false) => {
+    if (val === null) return "Rs 0";
+    const absVal = Math.abs(val);
+    if (absVal === 0) return "Rs 0";
+    if (isSupplier) {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "CR" : "DR"}`;
+    } else {
+        return `Rs ${absVal.toLocaleString()} ${val > 0 ? "DR" : "CR"}`;
+    }
+};
 
 const fmtDate = (d: string) => {
     if (!d) return "";
@@ -146,7 +160,7 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 // ───────────────────────────────────────────
 // Main Component
 // ───────────────────────────────────────────
-export default function SalesReturnEditPage({ returnData, accounts, salemans, paymentAccounts }: Props) {
+export default function SalesReturnEditPage({ returnData, accounts, salemans, paymentAccounts, firms }: Props) {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const { errors } = usePage().props as any;
 
@@ -164,11 +178,14 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     const [invoiceNo, setInvoiceNo] = useState(returnData.invoice);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => accounts.find(a => a.id === returnData.customer_id) ?? null);
     const [previousBalance, setPreviousBalance] = useState<number>(toNum(returnData.previous_balance));
+    const [outstandingBalance, setOutstandingBalance] = useState<number | null>(null);
+    const [creditBalance, setCreditBalance] = useState<number | null>(null);
+    const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
     const [extraDiscount, setExtraDiscount] = useState<number>(toNum(returnData.extra_discount));
     const [accountSearch, setAccountSearch] = useState("");
     const [refundAmount, setRefundAmount] = useState(toNum(returnData.paid_amount));
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(() => {
+    const [selectedInvoice, setSelectedInvoice] = useState<(Invoice & { firm_id?: number }) | null>(() => {
         if (returnData.sale_id) {
             return {
                 id: returnData.sale_id,
@@ -176,11 +193,23 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                 date: returnData.date,
                 net_total: 0,
                 remaining_amount: 0,
-                status: ""
+                status: "",
+                firm_id: returnData.firm_id ?? undefined
             };
         }
         return null;
     });
+
+    // Firm state
+    const defaultFirm = firms?.find(f => f.defult);
+    const [selectedFirmId, setSelectedFirmId] = useState<string>(returnData.firm_id?.toString() || (defaultFirm ? defaultFirm.id.toString() : "0"));
+
+    // Automatically detect and select the firm of the selected original invoice
+    useEffect(() => {
+        if (selectedInvoice && selectedInvoice.firm_id) {
+            setSelectedFirmId(selectedInvoice.firm_id.toString());
+        }
+    }, [selectedInvoice]);
 
     // ── Invoice Dialog state ───────────────────
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -295,6 +324,15 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                 .then(r => r.json())
                 .then(data => { if (Array.isArray(data)) setCustomerItems(data); })
                 .catch(console.error);
+
+            fetch(`/account/${selectedAccount.id}/detailed-balances`)
+                .then(r => r.json())
+                .then(data => {
+                    setOutstandingBalance(toNum(data.outstanding));
+                    setCreditBalance(toNum(data.credit_balance));
+                    setAdvanceBalance(toNum(data.advance_balance));
+                })
+                .catch(console.error);
         }
     }, []);
 
@@ -307,6 +345,9 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         setRows([getEmptyRow()]);
         setInvoices([]);
         setPreviousBalance(0);
+        setOutstandingBalance(null);
+        setCreditBalance(null);
+        setAdvanceBalance(null);
         setExtraDiscount(0);
 
         if (acc) {
@@ -315,9 +356,14 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                 .then(data => { if (Array.isArray(data)) setCustomerItems(data); })
                 .catch(console.error);
 
-            fetch(`/account/${accId}/balance`)
+            fetch(`/account/${accId}/detailed-balances`)
                 .then(r => r.json())
-                .then(data => setPreviousBalance(toNum(data.balance)))
+                .then(data => {
+                    setPreviousBalance(toNum(data.previous_balance));
+                    setOutstandingBalance(toNum(data.outstanding));
+                    setCreditBalance(toNum(data.credit_balance));
+                    setAdvanceBalance(toNum(data.advance_balance));
+                })
                 .catch(console.error);
         }
         setMobileAccOpen(false);
@@ -472,7 +518,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             const units = toNum(r.full) * packing + toNum(r.pcs);
             const rate = toNum(r.rate);
             
-            const baseAmount = units * rate;
+            const baseAmount = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
             const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
             const taxableAmount = baseAmount - discAmount;
             const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
@@ -527,6 +573,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
 
     // ── Save/Update ────────────────────────────
     const handleSave = () => {
+        if (isSaving) return;
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
 
         if (!selectedAccount) { alert("Please identify the customer first."); return; }
@@ -541,6 +588,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             customer_id: selectedAccount.id,
             previous_balance: previousBalance,
             salesman_id: selectedAccount.saleman_id ?? null,
+            firm_id: selectedFirmId && selectedFirmId !== "0" ? Number(selectedFirmId) : null,
             no_of_items: validRows.length,
             gross_total: totals.gross,
             discount_total: totals.disc,
@@ -552,7 +600,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             payment_account_id: selectedPaymentAccountId,
             sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
-                const base = (r.full * r.packing + r.pcs) * r.rate;
+                const base = (toNum(r.full) * r.rate) + (toNum(r.pcs) * (r.rate / r.packing));
                 const d = (toNum(r.discPercent) / 100) * base;
                 const t = (toNum(r.taxPercent) / 100) * (base - d);
                 return {
@@ -825,7 +873,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                                     Previous Balance
                                                 </div>
                                                 <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    Rs {previousBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                                    {fmtBalance(previousBalance, false)}
                                                 </div>
                                             </div>
                                             <div className="space-y-0.5 text-right">
@@ -837,9 +885,44 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                                 </div>
                                             </div>
                                         </div>
+                                        {(outstandingBalance !== null || creditBalance !== null || advanceBalance !== null) && (
+                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800 mt-2" />
+                                        )}
+                                        {outstandingBalance !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Outstanding</span>
+                                                <span className="text-xs font-bold text-rose-500 font-mono">Rs {outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                            </div>
+                                        )}
+                                        {creditBalance !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Credit Balance</span>
+                                                <span className="text-xs font-bold text-emerald-500 font-mono">Rs {creditBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                            </div>
+                                        )}
+                                        {advanceBalance !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Advance Balance</span>
+                                                <span className="text-xs font-bold text-sky-500 font-mono">Rs {advanceBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-3 pt-2">
+                                        <TechLabel label="Firm Branding" icon={Building2}>
+                                            <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                                <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
+                                                    <SelectValue placeholder="Select Firm..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="0">No Branding</SelectItem>
+                                                    {firms?.map((firm) => (
+                                                        <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </TechLabel>
+
                                         {isPaidInvoice ? (
                                             <>
                                                 <TechLabel label="Adjusted Cash Repayment" icon={ArrowRightLeft}>

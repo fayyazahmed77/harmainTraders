@@ -7,21 +7,14 @@ import {
     ArrowLeftIcon,
     PrinterIcon,
     DownloadIcon,
-    Calendar,
     ShieldCheck,
     Receipt,
-    Tag,
     Info,
-    CheckCircle,
-    CircleDollarSign,
-    History,
-    Truck,
-    Package,
+    CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface PurchaseItem {
@@ -39,6 +32,7 @@ interface PurchaseItem {
         title: string;
         code?: string;
         packing_qty?: number;
+        retail?: number;
     };
 }
 
@@ -156,10 +150,7 @@ export default function View({ purchase }: Props) {
                     </div>
 
                     {/* MAIN GRID */}
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-
-                        {/* LEFT: Table (8 cols) */}
-                        <div className="xl:col-span-8 min-w-0 space-y-8">
+                    <div className="space-y-8">
                             <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
                                 <CardHeader className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                     <div className="flex items-center justify-between">
@@ -177,14 +168,18 @@ export default function View({ purchase }: Props) {
                                     <table className="w-full text-left border-collapse table-auto">
                                         <thead>
                                             <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
-                                                <th className="px-6 py-3">#</th>
-                                                <th className="px-3 py-3">Product Specification</th>
-                                                <th className="px-3 py-3 text-center">Full</th>
-                                                <th className="px-3 py-3 text-center">Pcs</th>
-                                                <th className="px-4 py-3 text-right">Rate</th>
-                                                <th className="px-4 py-3 text-right">Discount</th>
-                                                <th className="px-4 py-3 text-right">After Disc</th>
-                                                <th className="px-6 py-3 text-right">Subtotal</th>
+                                                <th rowSpan={2} className="px-6 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">#</th>
+                                                <th rowSpan={2} className="px-3 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">Description of Goods</th>
+                                                <th colSpan={2} className="px-3 py-1.5 text-center border-b border-zinc-200 dark:border-zinc-800">Quantity</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Retail</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Rate</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Disc %</th>
+                                                <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">After Discount</th>
+                                                <th rowSpan={2} className="px-6 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">Net Amount</th>
+                                            </tr>
+                                            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                                <th className="px-3 py-1.5 text-center border-r border-zinc-200 dark:border-zinc-800">Box</th>
+                                                <th className="px-3 py-1.5 text-center">Pcs</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
@@ -197,12 +192,17 @@ export default function View({ purchase }: Props) {
                                                         <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
                                                         <td className="px-3 py-3.5">
                                                             <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[300px]">{it.item?.title}</p>
-                                                            <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
+                                                            <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5 font-bold">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
                                                         </td>
-                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400 border-r border-zinc-100 dark:border-zinc-800/40">{it.qty_carton}</td>
                                                         <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
+                                                            {it.item?.retail ? fmt(it.item.retail) : "0.00"}
+                                                        </td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">{fmt(it.trade_price)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">{dp > 0 ? `${dp % 1 === 0 ? dp.toFixed(0) : dp.toFixed(2)}%` : "0%"}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">
+                                                            {dp > 0 ? dp.toFixed(2) : "0.00"}
+                                                        </td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
                                                         <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>
                                                     </tr>
@@ -211,10 +211,10 @@ export default function View({ purchase }: Props) {
                                         </tbody>
                                         <tfoot className="bg-zinc-50/50 dark:bg-zinc-950/20 font-black text-xs border-t border-zinc-200 dark:border-zinc-800">
                                             <tr>
-                                                <td className="px-6 py-3.5 text-zinc-500">Total</td>
-                                                <td></td>
-                                                <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{purchase.items.reduce((a, i) => a + Number(i.qty_carton || 0), 0)}</td>
+                                                <td colSpan={2} className="px-6 py-3.5 text-zinc-500">Total</td>
+                                                <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100 border-r border-zinc-200 dark:border-zinc-800">{purchase.items.reduce((a, i) => a + Number(i.qty_carton || 0), 0)}</td>
                                                 <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{purchase.items.reduce((a, i) => a + Number(i.qty_pcs || 0), 0)}</td>
+                                                <td></td>
                                                 <td></td>
                                                 <td className="px-4 py-3.5 text-right text-rose-500 font-mono">-{fmt(purchase.items.reduce((a, i) => a + Number(i.discount || 0), 0))}</td>
                                                 <td></td>
@@ -223,8 +223,87 @@ export default function View({ purchase }: Props) {
                                         </tfoot>
                                     </table>
                                 </div>
+                                <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-950/20">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                                        
+                                        {/* Left Column: Total Items & Signature */}
+                                        <div className="space-y-12">
+                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                                <span>Total # Of Items:</span>
+                                                <span className="font-mono text-zinc-900 dark:text-zinc-100 font-black">
+                                                    {purchase.items.length}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="pt-6">
+                                                <div className="w-48 border-b border-zinc-300 dark:border-zinc-700"></div>
+                                                <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-black mt-2">
+                                                    Check By Name & Time
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Middle Column: Discount Amount */}
+                                        <div className="flex flex-col justify-start">
+                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                                <span>Discount Amount:</span>
+                                                <span className="font-mono text-rose-500 font-black">
+                                                    {fmt(Number(purchase.discount_total || 0) + extraDiscount)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Right Column: Financial Figures */}
+                                        <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
+                                            <div className="flex justify-between items-center">
+                                                <span>Courier Charges :-</span>
+                                                <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                                                    {fmt(purchase.courier_charges ?? 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Rs. :-</span>
+                                                <span className="font-mono">
+                                                    {fmt(invoiceTotal)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span>Previous Balance :-</span>
+                                                <span className={cn(
+                                                    "font-mono font-bold",
+                                                    prevBal > 0 ? "text-rose-500" : prevBal < 0 ? "text-emerald-500" : "text-zinc-500"
+                                                )}>
+                                                    {prevBal < 0 ? "-" : ""}{fmt(Math.abs(prevBal))}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Balance :-</span>
+                                                <span className="font-mono text-orange-500">
+                                                    {fmt(invoiceTotal + prevBal)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold">
+                                                <span>Cash Paid :-</span>
+                                                <span className="font-mono font-black">
+                                                    {fmt(purchase.paid_amount)}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Outstanding :</span>
+                                                <span className={cn(
+                                                    "font-mono font-black text-base",
+                                                    netBal > 0 ? "text-rose-600" : "text-emerald-600"
+                                                )}>
+                                                    {fmt(netBal)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </div>
                             </Card>
-
                             {purchase.message_line?.messageline && (
                                 <Card className="bg-orange-500/[0.02] border border-orange-500/10 shadow-sm rounded-xl p-5">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 block mb-2 flex items-center gap-1.5">
@@ -234,123 +313,6 @@ export default function View({ purchase }: Props) {
                                 </Card>
                             )}
                         </div>
-
-                        {/* RIGHT: Sidebar (4 cols) */}
-                        <div className="xl:col-span-4 min-w-0 space-y-8">
-
-                           
-
-                            {/* Financial Ledger */}
-                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
-                                <CardHeader className="px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200 flex items-center gap-2">
-                                            <CircleDollarSign className="h-4 w-4 text-emerald-500" />
-                                            Financial Payable Ledger
-                                        </CardTitle>
-                                        <Badge className={cn("px-2.5 py-0.5 rounded-full shadow-none font-bold text-[9px] uppercase tracking-wider border", badge.cls)}>
-                                            {badge.label}
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-5 space-y-3.5 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                                    <div className="flex justify-between items-center">
-                                        <span>Gross Subtotal</span>
-                                        <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(purchase.gross_total)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-rose-500">
-                                        <span>Standard Item Discount</span>
-                                        <span className="font-mono">-{fmt(purchase.discount_total)}</span>
-                                    </div>
-                                    {extraDiscount > 0 && (
-                                        <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-bold">
-                                            <span>Extra Discount (current bill)</span>
-                                            <span className="font-mono">-{fmt(extraDiscount)}</span>
-                                        </div>
-                                    )}
-                                    {(purchase.courier_charges ?? 0) > 0 && (
-                                        <div className="flex justify-between items-center text-purple-600 dark:text-purple-400">
-                                            <span>Courier / Freight Charges</span>
-                                            <span className="font-mono">+{fmt(purchase.courier_charges ?? 0)}</span>
-                                        </div>
-                                    )}
-                                    {(purchase.tax_total ?? 0) > 0 && (
-                                        <div className="flex justify-between items-center text-blue-500">
-                                            <span>Purchase Tax (GST)</span>
-                                            <span className="font-mono">+{fmt(purchase.tax_total ?? 0)}</span>
-                                        </div>
-                                    )}
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-bold">
-                                        <span>Current Invoice Total</span>
-                                        <span className="font-mono">{fmt(invoiceTotal)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-zinc-500">
-                                        <span>Supplier Previous Balance</span>
-                                        <span className={cn("font-mono font-bold", prevBal > 0 ? "text-rose-500" : prevBal < 0 ? "text-emerald-500" : "text-zinc-500")}>
-                                            {prevBal < 0 ? "-" : ""}{fmt(Math.abs(prevBal))}
-                                        </span>
-                                    </div>
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
-                                        <span>Net Balance Payable</span>
-                                        <span className="font-mono text-orange-500">{fmt(invoiceTotal + prevBal)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
-                                        <span>Amount Paid</span>
-                                        <span className="font-mono font-bold">{fmt(purchase.paid_amount)}</span>
-                                    </div>
-                                    <Separator className="border-dashed bg-transparent border-zinc-200 dark:border-zinc-800" />
-                                    <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
-                                        <span>Net Balance Outstanding</span>
-                                        <span className={cn("font-mono", netBal > 0 ? "text-rose-600" : "text-emerald-600")}>{fmt(netBal)}</span>
-                                    </div>
-                                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/60 mt-2 space-y-1.5 text-[10px] text-zinc-400 font-medium">
-                                        <div className="flex justify-between">
-                                            <span>Payment Terms</span>
-                                            <span className="font-bold text-zinc-600 dark:text-zinc-400 uppercase">CREDIT</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Terminal ID</span>
-                                            <span className="font-mono">PUR_T_{purchase.id}</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Audit Timeline */}
-                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 block mb-4 flex items-center gap-1.5">
-                                    <History className="h-4 w-4 text-purple-500" /> Audit Transaction Timeline
-                                </span>
-                                <div className="relative pl-6 border-l-2 border-zinc-100 dark:border-zinc-800 space-y-5 ml-1">
-                                    {[
-                                        {
-                                            label: "Purchase Bill Drafted & Created",
-                                            sub: purchase.created_at ? `${new Date(purchase.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} ${new Date(purchase.created_at).toLocaleTimeString()}` : fmtDate(purchase.date),
-                                            active: true,
-                                        },
-                                        { label: "Stock Replenishment Logged", sub: "Automated inventory update completed", active: true },
-                                        {
-                                            label: "Payment Settlement Processed",
-                                            sub: purchase.paid_amount > 0 ? `Paid: Rs ${purchase.paid_amount.toLocaleString()}` : "Credit Term Account — Pending",
-                                            active: purchase.paid_amount > 0,
-                                        },
-                                        { label: "Audit Status Confirmed", sub: "Verified by system administrator", active: true },
-                                    ].map((item, i) => (
-                                        <div key={i} className="relative">
-                                            <div className={cn("absolute -left-[31px] top-0 h-4 w-4 rounded-full border-2 bg-white dark:bg-zinc-900 flex items-center justify-center", item.active ? "border-emerald-500" : "border-zinc-300 dark:border-zinc-700")}>
-                                                <div className={cn("h-1.5 w-1.5 rounded-full", item.active ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700")} />
-                                            </div>
-                                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{item.label}</p>
-                                            <span className="text-[9px] text-zinc-400 font-mono block mt-0.5">{item.sub}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </Card>
-
-                        </div>
-                    </div>
 
                     <div className="hidden print:flex flex-col items-center justify-center border-t border-zinc-200 pt-6 mt-12 text-center text-xs text-zinc-400 font-mono">
                         <p className="font-bold uppercase tracking-wider">Harnain Traders Wholesale & Supply Chain</p>

@@ -188,6 +188,25 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 {financial_summary.unpaid_invoices} Pending
                             </Badge>
                         </div>
+                        
+                        {financial_summary.outstanding !== undefined && (
+                            <div className="flex items-center justify-between text-sm border-t pt-2">
+                                <span className="text-muted-foreground">Outstanding (Receivable)</span>
+                                <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding)}</span>
+                            </div>
+                        )}
+                        {financial_summary.credit_balance !== undefined && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Credit Balance</span>
+                                <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
+                            </div>
+                        )}
+                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Advance Payment (Advance)</span>
+                                <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             );
@@ -222,6 +241,31 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 {financial_summary.unpaid_bills} Pending
                             </Badge>
                         </div>
+                        
+                        {financial_summary.outstanding !== undefined && (
+                            <div className="flex items-center justify-between text-sm border-t pt-2">
+                                <span className="text-muted-foreground">Outstanding (Payable)</span>
+                                <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding)}</span>
+                            </div>
+                        )}
+                        {financial_summary.credit_balance !== undefined && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Credit Balance</span>
+                                <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
+                            </div>
+                        )}
+                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Advance Payment (Advance)</span>
+                                <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
+                            </div>
+                        )}
+                        {Number(financial_summary.current_balance) < 0 && (
+                            <div className="flex items-center justify-between text-sm border-t pt-2 mt-1">
+                                <span className="font-medium text-sky-600">Advance Paid to Supplier</span>
+                                <span className="font-bold text-sky-600">{formatCurrency(Math.abs(Number(financial_summary.current_balance)))}</span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             );
@@ -375,6 +419,8 @@ export default function AccountView({ account, financial_summary }: Props) {
                                         const balance = financial_summary.current_balance || 0;
                                         const isCustomer = typeLower.includes('customer');
                                         const isSupplier = typeLower.includes('supplier');
+                                        // Supplier with negative balance = we overpaid = advance situation
+                                        const isSupplierAdvance = isSupplier && balance < 0;
                                         
                                         let indicator = "";
                                         let indicatorColor = "";
@@ -386,9 +432,17 @@ export default function AccountView({ account, financial_summary }: Props) {
                                                 indicatorColor = balance > 0 ? "bg-emerald-500" : "bg-rose-500";
                                                 isRed = balance < 0;
                                             } else if (isSupplier) {
-                                                indicator = balance > 0 ? "CR" : "DR";
-                                                indicatorColor = balance > 0 ? "bg-rose-500" : "bg-emerald-500";
-                                                isRed = balance > 0;
+                                                if (balance < 0) {
+                                                    // We overpaid supplier — advance paid
+                                                    indicator = "ADV";
+                                                    indicatorColor = "bg-sky-500";
+                                                    isRed = false;
+                                                } else {
+                                                    // Normal: we owe supplier
+                                                    indicator = "CR";
+                                                    indicatorColor = "bg-rose-500";
+                                                    isRed = true;
+                                                }
                                             } else {
                                                 indicator = balance > 0 ? "BAL" : "OD";
                                                 indicatorColor = balance > 0 ? "bg-zinc-500" : "bg-zinc-700";
@@ -398,14 +452,20 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                                         const textColor = balance === 0
                                             ? "text-zinc-400"
-                                            : isRed
-                                                ? "text-red-500"
-                                                : "text-green-600";
+                                            : isSupplierAdvance
+                                                ? "text-sky-600"
+                                                : isRed
+                                                    ? "text-red-500"
+                                                    : "text-green-600";
 
                                         return (
                                             <div className="pt-2">
                                                 <div className="text-xs text-muted-foreground uppercase mb-1">
-                                                    {typeLower === 'cheque in hand' ? 'Available Amount of Check' : 'Current Balance'}
+                                                    {typeLower === 'cheque in hand'
+                                                        ? 'Available Amount of Check'
+                                                        : isSupplierAdvance
+                                                            ? 'Advance Paid to Supplier'
+                                                            : 'Current Balance'}
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={cn("text-2xl font-bold", textColor)}>

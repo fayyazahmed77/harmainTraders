@@ -422,10 +422,11 @@ export const BankStatementTab = ({ accountId, accountType }: { accountId: number
                                         {item.cheque_no ? ` : ${item.cheque_no}` : ''}
                                     </TableCell>
                                     <TableCell className="px-4">
-                                        {(item.payment_method === 'Cheque' || item.payment_method === 'Online') && item.cheque_status ? (
+                                        {item.cheque_status && (item.payment_method === 'Cheque' || item.payment_method === 'Online' || ['Deposit', 'Withdrawal'].includes(item.cheque_status)) ? (
                                             <Badge variant="outline" className={`text-[10px] py-0 h-5
-                                                ${item.cheque_status === 'Cleared' || item.cheque_status === 'Clear' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                                                ${item.cheque_status === 'Cleared' || item.cheque_status === 'Clear' || item.cheque_status === 'Deposit' ? 'bg-green-50 text-green-700 border-green-200' : ''}
                                                 ${item.cheque_status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
+                                                ${item.cheque_status === 'Withdrawal' ? 'bg-rose-50 text-rose-700 border-rose-200' : ''}
                                                 ${isCanceled ? 'bg-red-100 text-red-800 border-red-300 font-bold' : ''}
                                             `}>
                                                 {item.cheque_status}

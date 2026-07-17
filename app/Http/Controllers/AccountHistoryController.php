@@ -103,57 +103,107 @@ class AccountHistoryController extends Controller implements HasMiddleware
         $perPage = 20;
         $page = (int) $request->get('page', 1);
 
-        // For Bank / Cash, transactions are where they are the intermediate paying/receiving account
-        $transactions = Payment::where('payment_account_id', $account->id)
-            ->with(['account', 'cheque'])
+        // For Bank / Cash, transactions are where they are the intermediate paying/receiving account OR ledger party
+        $transactions = Payment::where(function($q) use ($account) {
+                $q->where('payment_account_id', $account->id)
+                  ->orWhere('account_id', $account->id);
+            })
+            ->with(['account', 'paymentAccount', 'cheque'])
             ->latest('date')
             ->latest('id')
             ->paginate($perPage);
 
-        // Calculate the balance at the start of this page (descending order)
-        // We start from current total and subtract/add transactions that appeared in previous pages
-        $runningBalance = $account->current_balance;
+        $itemsDesc = $transactions->items();
+        $itemsAsc = array_reverse($itemsDesc);
+        $oldestItem = $itemsAsc[0] ?? null;
 
-        if ($page > 1) {
-            // Impact of transactions on pages BEFORE this one
-            $offset = ($page - 1) * $perPage;
-            
-            // Replicate current_balance logic exclude cancel
-            $previousTransactions = Payment::where('payment_account_id', $account->id)
-                ->where(function($q) {
-                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('cheque_status')
-                      ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+        if ($oldestItem) {
+            $olderSum = Payment::where(function($q) use ($account) {
+                    $q->where('payment_account_id', $account->id)
+                      ->orWhere('account_id', $account->id);
                 })
-                ->latest('date')
-                ->latest('id')
-                ->limit($offset)
-                ->get(['type', 'amount']);
+                ->where(function($q) use ($oldestItem) {
+                    $q->where('date', '<', $oldestItem->date)
+                      ->orWhere(function($sub) use ($oldestItem) {
+                          $sub->where('date', '=', $oldestItem->date)
+                              ->where('id', '<', $oldestItem->id);
+                      });
+                })
+                ->selectRaw("SUM(
+                    CASE 
+                        WHEN payment_account_id = ? THEN 
+                            CASE 
+                                WHEN cheque_status IN ('Canceled', 'Returned', 'Refund') THEN 0
+                                WHEN payment_method IN ('Cheque', 'Online') AND (cheque_status IS NULL OR cheque_status NOT IN ('Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal')) THEN 0
+                                ELSE CASE WHEN type = 'RECEIPT' THEN amount ELSE -amount END
+                            END
+                        ELSE 0
+                    END +
+                    CASE 
+                        WHEN account_id = ? THEN 
+                            CASE 
+                                WHEN cheque_status IN ('Canceled', 'Returned', 'Refund') THEN 0
+                                ELSE CASE WHEN type = 'PAYMENT' THEN amount ELSE -amount END
+                            END
+                        ELSE 0
+                    END
+                ) as net_sum", [$account->id, $account->id])
+                ->value('net_sum') ?? 0;
 
-            foreach ($previousTransactions as $t) {
-                if ($t->type === 'RECEIPT') $runningBalance -= $t->amount;
-                else $runningBalance += $t->amount;
-            }
+            $runningBalance = (float)$account->opening_balance + (float)$olderSum;
+        } else {
+            $runningBalance = (float)$account->opening_balance;
         }
 
-        // Attach running balance to each item
-        $items = collect($transactions->items())->map(function ($item) use (&$runningBalance) {
+        // Loop forward to compute the running balance and format each item
+        $items = [];
+        foreach ($itemsAsc as $item) {
+            $netFlow = 0.0;
+
+            // Financial payment flow
+            if ($item->payment_account_id == $account->id) {
+                $status = $item->cheque_status;
+                $isNotCanceled = !in_array($status, ['Canceled', 'Returned', 'Refund']);
+                $isBypassedMethod = !in_array($item->payment_method, ['Cheque', 'Online']);
+                $isClearedStatus = in_array($status, ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                if ($isNotCanceled && ($isBypassedMethod || $isClearedStatus)) {
+                    $netFlow += $item->type === 'RECEIPT' ? (float)$item->amount : -(float)$item->amount;
+                }
+            }
+
+            // Party payment flow
+            if ($item->account_id == $account->id) {
+                $status = $item->cheque_status;
+                $isNotCanceled = !in_array($status, ['Canceled', 'Returned', 'Refund']);
+                if ($isNotCanceled) {
+                    $netFlow += $item->type === 'PAYMENT' ? (float)$item->amount : -(float)$item->amount;
+                }
+            }
+
+            $runningBalance += $netFlow;
+
             $data = $item->toArray();
             $data['running_balance'] = (float)$runningBalance;
-            
-            // Re-attach relationship data that toArray might have handled differently or if we need specific keys
-            $data['account'] = $item->account;
 
-            // For next row (older), we reverse the current transaction ONLY if it is cleared (or is a direct Cash method)
-            $isBypassedMethod = !in_array($item->payment_method, ['Cheque', 'Online']);
-            $isCleared = $isBypassedMethod || empty($item->cheque_status) || in_array($item->cheque_status, ['Clear', 'Cleared', 'In Hand', 'Distributed']);
-            if ($isCleared) {
-                if ($item->type === 'RECEIPT') $runningBalance -= (float)$item->amount;
-                else $runningBalance += (float)$item->amount;
+            // Swap display properties for UI columns compatibility
+            if ($item->account_id == $account->id) {
+                $data['account'] = $item->paymentAccount;
+                $data['type'] = $item->type === 'RECEIPT' ? 'PAYMENT' : 'RECEIPT';
+                if ($data['cheque_status'] === 'Pending' || empty($data['cheque_status']) || $data['cheque_status'] === 'Clear') {
+                    $data['cheque_status'] = $item->type === 'RECEIPT' ? 'Withdrawal' : 'Deposit';
+                }
+            } else {
+                $data['account'] = $item->account;
+                if ($data['cheque_status'] === 'Pending') {
+                    $data['cheque_status'] = 'Clear';
+                }
             }
-            return $data;
-        });
+
+            $items[] = $data;
+        }
+
+        // Reverse back to descending order (newest first) for UI
+        $items = array_reverse($items);
 
         return response()->json([
             'data' => $items,

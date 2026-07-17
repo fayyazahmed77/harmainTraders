@@ -250,14 +250,15 @@
             @endif
 
             @php
-            $supplier_current_balance = (float) ($purchase->supplier->current_balance ?? 0);
-            $purchase_net = $purchase->net_total + ($purchase->courier_charges ?? 0) - ($purchase->extra_discount ?? 0);
-            $prev_balance = $supplier_current_balance - $purchase_net + $purchase->paid_amount;
+            $invoice_total = max(0, $purchase->net_total - $purchase->extra_discount);
+            $supplier_bal = (float)($purchase->supplier->current_balance ?? 0);
+            $paid = (float)($purchase->paid_amount ?? 0);
+            $prev_balance = $supplier_bal - $invoice_total + $paid;
             @endphp
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Bill :-</span>
-                <span class="total-value">{{ number_format($purchase_net, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
@@ -269,19 +270,19 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format($purchase_net + $prev_balance, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total + $prev_balance, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Paid Amount :-</span>
-                <span class="total-value">{{ number_format($purchase->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format($paid, 2) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Net Payable :</span>
-                <span class="total-value">{{ number_format(($purchase_net + $prev_balance) - $purchase->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total + $prev_balance - $paid, 2) }}</span>
             </div>
         </div>
 
