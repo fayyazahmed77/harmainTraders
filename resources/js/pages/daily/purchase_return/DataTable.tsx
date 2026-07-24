@@ -221,10 +221,16 @@ export default function DataTable({ data }: DataTableProps) {
                             <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-3 py-2">Select Action</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-zinc-100 dark:bg-zinc-800" />
                             <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
-                                onClick={() => window.open(`/purchase-return/${doc.id}/pdf`, '_blank')}
+                                onClick={() => window.open(`/purchase-return/${doc.id}/pdf?format=small`, '_blank')}
                             >
                                 <Printer className="h-3.5 w-3.5 text-zinc-400 group-focus:text-white transition-colors" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Print Return</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Thermal Print</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
+                                onClick={() => window.open(`/purchase-return/${doc.id}/pdf?format=big`, '_blank')}
+                            >
+                                <Printer className="h-3.5 w-3.5 text-zinc-400 group-focus:text-white transition-colors" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Print A4</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg m-1 gap-2 cursor-pointer transition-colors focus:bg-orange-500 focus:text-white group"
                                 onClick={() => router.visit(`/purchase-return/${doc.id}/show`)}

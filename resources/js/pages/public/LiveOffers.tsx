@@ -529,7 +529,7 @@ function OfferCard({ item, variant }: { item: OfferItem, variant: 'group' | 'mar
                             </span>
                             <div className="font-mono-jet font-bold text-text-primary leading-none flex items-center justify-center">
                                 <span className="text-[10px] text-text-muted font-normal mr-1">Rs.</span>
-                                <span className="text-[18px]">{item.pack_ctn.toLocaleString()}</span>
+                                <span className="text-[18px]">{(isGroup ? item.pack_ctn : (item.price ?? item.pack_ctn ?? 0)).toLocaleString()}</span>
                             </div>
                         </div>
                         {isGroup && (
@@ -609,7 +609,7 @@ function OfferRow({ item, variant }: { item: OfferItem, variant: 'group' | 'mark
                         <span className="font-mono-jet text-[8px] tracking-[0.1em] uppercase text-text-muted font-bold">
                             {isGroup ? "Ctn Rate" : "Rate"}
                         </span>
-                        <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{item.pack_ctn.toLocaleString()}</span>
+                        <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{(isGroup ? item.pack_ctn : (item.price ?? item.pack_ctn ?? 0)).toLocaleString()}</span>
                     </div>
                     {isGroup && (
                         <div className="flex flex-col items-end">

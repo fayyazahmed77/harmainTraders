@@ -45,9 +45,31 @@ import { stockReports } from '../constants/stockReports';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from 'framer-motion';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import { StockReportSectionDialog } from './StockReportSectionDialog';
 import { StockAccountSelectionDialog } from './StockAccountSelectionDialog';
 import { StockItemSelectionDialog } from './StockItemSelectionDialog';
+
+const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        return new Date(year, month, day);
+    }
+    return new Date(dateStr);
+};
+
+const formatLocalDate = (date: Date | undefined) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 interface ParameterFormProps {
     params: any;
@@ -152,25 +174,33 @@ export function ParameterForm({
             <Card className="p-1.5 bg-surface-1/50 border-border/40 shadow-xl rounded-sm backdrop-blur-md ring-1 ring-border/5">
                 <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-1.5">
                     
-                    {/* Date Range Selection */}
-                    <div className="flex-[1.5] min-w-[320px] flex items-center gap-1 p-1 bg-surface-0/40 rounded-sm border border-border/5">
-                        <div className="px-3 flex items-center gap-2 border-r border-border/10">
+                    {/* Date Range Selection matching Sales Reports */}
+                    <div className="flex-[1.5] min-w-[320px] flex items-center gap-1 bg-surface-1/50 p-1 rounded-sm border border-border/40">
+                        <div className="flex items-center gap-2 px-3 border-r border-border/40">
                             <CalendarIcon className="h-4 w-4 text-emerald-600" />
                         </div>
-                        <div className="flex items-center gap-2 px-2 flex-1">
-                            <Input 
-                                type="date" 
-                                value={params.fromDate} 
-                                onChange={(e) => updateParam('fromDate', e.target.value)}
-                                className="border-none bg-transparent h-9 text-[11px] font-black uppercase focus-visible:ring-0 w-full cursor-pointer hover:bg-surface-1/50 transition-colors"
-                            />
-                            <span className="text-[10px] font-black text-text-muted/40">TO</span>
-                            <Input 
-                                type="date" 
-                                value={params.toDate} 
-                                onChange={(e) => updateParam('toDate', e.target.value)}
-                                className="border-none bg-transparent h-9 text-[11px] font-black uppercase focus-visible:ring-0 w-full cursor-pointer hover:bg-surface-1/50 transition-colors"
-                            />
+                        <div className="flex flex-1 items-center gap-0.5 justify-center">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" className="h-9 px-3 text-[11px] font-bold text-text-primary hover:bg-surface-0 shadow-none rounded-sm">
+                                        {format(parseLocalDate(params.fromDate), "dd MMM yyyy")}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 rounded-sm overflow-hidden z-[100]" align="start">
+                                    <Calendar mode="single" selected={parseLocalDate(params.fromDate)} onSelect={(date) => updateParam('fromDate', formatLocalDate(date))} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                            <div className="h-px w-2 bg-border/40" />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" className="h-9 px-3 text-[11px] font-bold text-text-primary hover:bg-surface-0 shadow-none rounded-sm">
+                                        {format(parseLocalDate(params.toDate), "dd MMM yyyy")}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 rounded-sm overflow-hidden z-[100]" align="start">
+                                    <Calendar mode="single" selected={parseLocalDate(params.toDate)} onSelect={(date) => updateParam('toDate', formatLocalDate(date))} initialFocus />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     </div>
 

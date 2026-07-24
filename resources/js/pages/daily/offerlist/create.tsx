@@ -561,12 +561,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                 </SelectTrigger>
                                                 <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                     <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                    <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
-                                                    <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
-                                                    <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
-                                                    <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
-                                                    <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
-                                                    <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">T.P 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">T.P 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">T.P 7</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -581,12 +581,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                 </SelectTrigger>
                                                 <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                     <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                    <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
-                                                    <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
-                                                    <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
-                                                    <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
-                                                    <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
-                                                    <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
+                                                    <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
+                                                    <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
+                                                    <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
+                                                    <SelectItem value="5" className="text-xs font-bold">T.P 5</SelectItem>
+                                                    <SelectItem value="6" className="text-xs font-bold">T.P 6</SelectItem>
+                                                    <SelectItem value="7" className="text-xs font-bold">T.P 7</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -603,12 +603,12 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                             </SelectTrigger>
                                             <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
                                                 <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
-                                                <SelectItem value="2" className="text-xs font-bold">Trade Price 2</SelectItem>
-                                                <SelectItem value="3" className="text-xs font-bold">Trade Price 3</SelectItem>
-                                                <SelectItem value="4" className="text-xs font-bold">Trade Price 4</SelectItem>
-                                                <SelectItem value="5" className="text-xs font-bold">Trade Price 5</SelectItem>
-                                                <SelectItem value="6" className="text-xs font-bold">Trade Price 6</SelectItem>
-                                                <SelectItem value="7" className="text-xs font-bold">Trade Price 7</SelectItem>
+                                                <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
+                                                <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
+                                                <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
+                                                <SelectItem value="5" className="text-xs font-bold">T.P 5</SelectItem>
+                                                <SelectItem value="6" className="text-xs font-bold">T.P 6</SelectItem>
+                                                <SelectItem value="7" className="text-xs font-bold">T.P 7</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

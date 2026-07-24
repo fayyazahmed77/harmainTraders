@@ -126,170 +126,188 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
         c.title.toLowerCase().includes(custSearch.toLowerCase())
     );
 
-    return (
-        <div className="p-4 rounded-md bg-gray-100 dark:bg-card shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
-            {/* Date Range Picker */}
-            <FieldWrapper label="Date Range" className="flex-1 min-w-[200px]">
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            id="date"
-                            variant={"outline"}
-                            className={cn(
-                                "w-full justify-start text-left font-normal h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors",
-                                !date && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-sky-600" />
-                            {date?.from ? (
-                                date.to ? (
-                                    <>
-                                        {format(date.from, "LLL dd, y")} -{" "}
-                                        {format(date.to, "LLL dd, y")}
-                                    </>
-                                ) : (
-                                    format(date.from, "LLL dd, y")
-                                )
-                            ) : (
-                                <span>Pick a date range</span>
-                            )}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            initialFocus
-                            mode="range"
-                            defaultMonth={date?.from}
-                            selected={date}
-                            onSelect={setDate}
-                            numberOfMonths={2}
-                        />
-                    </PopoverContent>
-                </Popover>
-            </FieldWrapper>
+    const isFiltered = !!(
+        date?.from ||
+        (customerId && customerId !== "all") ||
+        (status && status !== "all") ||
+        search ||
+        isOnline
+    );
 
-            {/* Customer Filter */}
-            <FieldWrapper label="" className="flex-1 min-w-[220px]">
-                <Popover open={customerPopupOpen} onOpenChange={setCustomerPopupOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full h-10 justify-between border-slate-200 hover:border-sky-300 font-bold text-sm bg-white"
-                        >
-                            <span className="truncate">
-                                {customerId === "all" ? "All Customers" : activeCustomer?.title}
-                            </span>
-                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0 shadow-xl border-slate-200" align="start">
-                        <div className="p-2 border-b bg-slate-50">
-                            <Input
-                                placeholder="Search customer..."
-                                value={custSearch}
-                                onChange={(e) => setCustSearch(e.target.value)}
-                                className="h-8 text-xs"
-                            />
-                        </div>
-                        <div className="max-h-[300px] overflow-auto py-1">
-                            <button
+    return (
+        <div className="p-4 rounded-xl bg-card border border-border shadow-sm mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-end">
+                {/* Date Range Picker */}
+                <FieldWrapper label="Date Range" className="w-full min-w-0">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="date"
+                                variant={"outline"}
                                 className={cn(
-                                    "flex w-full items-center px-3 py-2 text-xs font-semibold hover:bg-sky-50 transition-colors capitalize",
-                                    customerId === "all" && "bg-sky-100 text-sky-700"
+                                    "w-full justify-start text-left font-semibold h-10 text-xs border-border bg-background hover:bg-accent",
+                                    !date && "text-muted-foreground"
                                 )}
-                                onClick={() => {
-                                    setCustomerId("all");
-                                    setCustomerPopupOpen(false);
-                                    setCustSearch("");
-                                }}
                             >
-                                All Customers
-                            </button>
-                            {filteredCusts.map((customer) => (
+                                <CalendarIcon className="mr-2 h-3.5 w-3.5 text-primary shrink-0" />
+                                <span className="truncate">
+                                    {date?.from ? (
+                                        date.to ? (
+                                            <>
+                                                {format(date.from, "MMM dd")} - {format(date.to, "MMM dd, y")}
+                                            </>
+                                        ) : (
+                                            format(date.from, "MMM dd, y")
+                                        )
+                                    ) : (
+                                        "All Dates"
+                                    )}
+                                </span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={date?.from}
+                                selected={date}
+                                onSelect={setDate}
+                                numberOfMonths={2}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </FieldWrapper>
+
+                {/* Customer Filter */}
+                <FieldWrapper label="Select Customer" className="w-full min-w-0">
+                    <Popover open={customerPopupOpen} onOpenChange={setCustomerPopupOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full h-10 justify-between font-semibold text-xs bg-background border-border hover:bg-accent px-3"
+                            >
+                                <span className="truncate">
+                                    {customerId === "all" ? "All Customers" : activeCustomer?.title}
+                                </span>
+                                <Search className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[280px] p-0 shadow-xl border-border" align="start">
+                            <div className="p-2 border-b bg-muted/40">
+                                <Input
+                                    placeholder="Search customer..."
+                                    value={custSearch}
+                                    onChange={(e) => setCustSearch(e.target.value)}
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                            <div className="max-h-[260px] overflow-auto py-1">
                                 <button
-                                    key={customer.id}
                                     className={cn(
-                                        "flex w-full items-center px-3 py-2 text-xs font-semibold hover:bg-sky-50 transition-colors text-left capitalize",
-                                        customerId === String(customer.id) && "bg-sky-100 text-sky-700"
+                                        "flex w-full items-center px-3 py-2 text-xs font-semibold hover:bg-accent transition-colors capitalize",
+                                        customerId === "all" && "bg-accent text-accent-foreground"
                                     )}
                                     onClick={() => {
-                                        setCustomerId(String(customer.id));
+                                        setCustomerId("all");
                                         setCustomerPopupOpen(false);
                                         setCustSearch("");
                                     }}
                                 >
-                                    {customer.title}
+                                    All Customers
                                 </button>
-                            ))}
+                                {filteredCusts.map((customer) => (
+                                    <button
+                                        key={customer.id}
+                                        className={cn(
+                                            "flex w-full items-center px-3 py-2 text-xs font-semibold hover:bg-accent transition-colors text-left capitalize truncate",
+                                            customerId === String(customer.id) && "bg-accent text-accent-foreground"
+                                        )}
+                                        onClick={() => {
+                                            setCustomerId(String(customer.id));
+                                            setCustomerPopupOpen(false);
+                                            setCustSearch("");
+                                        }}
+                                    >
+                                        {customer.title}
+                                    </button>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </FieldWrapper>
+
+                {/* Status Filter */}
+                <FieldWrapper label="Status" className="w-full min-w-0">
+                    <Select value={status} onValueChange={(val) => setStatus(val)}>
+                        <SelectTrigger className="h-10 text-xs font-semibold bg-background border-border">
+                            <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Partial Return">Partial Return</SelectItem>
+                            <SelectItem value="Returned">Returned</SelectItem>
+                            <SelectItem value="Pending Order">Pending Order</SelectItem>
+                            <SelectItem value="Canceled">Canceled</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </FieldWrapper>
+
+                {/* Search Invoice & Online & Reset */}
+                <FieldWrapper label="Search Invoice" className="w-full min-w-0">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1 min-w-0">
+                            <Search className="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground z-10" />
+                            <Input
+                                type="text"
+                                placeholder="Invoice no..."
+                                className="pl-8 pr-7 h-10 border-border bg-background focus:border-primary transition-colors font-semibold text-xs"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
                         </div>
-                    </PopoverContent>
-                </Popover>
-            </FieldWrapper>
 
-            {/* Status Badges */}
-            <div className="flex-1 min-w-[300px] flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-md shadow-sm h-10">
-                <button
-                    onClick={() => setStatus("all")}
-                    className={cn(
-                        "flex-1 px-3 py-1.5 rounded-md text-[11px] font-black uppercase tracking-tighter transition-all",
-                        status === "all" ? "bg-sky-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                    )}
-                >
-                    All
-                </button>
-                {["Completed", "Partial Return", "Returned", "Pending Order", "Canceled"].map((s) => (
-                    <button
-                        key={s}
-                        onClick={() => setStatus(s)}
-                        className={cn(
-                            "flex-1 px-3 py-1.5 rounded-md text-[11px] font-black uppercase tracking-tighter transition-all whitespace-nowrap",
-                            status === s 
-                                ? s === "Completed" ? "bg-green-600 text-white shadow-sm"
-                                : s === "Pending Order" ? "bg-orange-500 text-white shadow-sm"
-                                : s === "Canceled" ? "bg-slate-700 text-white shadow-sm"
-                                : "bg-sky-600 text-white shadow-sm"
-                                : "text-slate-500 hover:bg-slate-50"
+                        {/* Online Toggle */}
+                        <Button
+                            type="button"
+                            variant={isOnline ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setIsOnline(!isOnline)}
+                            className={cn(
+                                "h-10 px-2.5 text-[10px] font-black uppercase tracking-tighter shrink-0 transition-all",
+                                isOnline ? "bg-orange-600 hover:bg-orange-700 text-white" : "text-muted-foreground"
+                            )}
+                            title="Filter Online Sales Only"
+                        >
+                            <Filter className="h-3 w-3 mr-1" />
+                            Online
+                        </Button>
+
+                        {/* Clear Action */}
+                        {isFiltered && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearFilters}
+                                className="h-10 px-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
+                                title="Clear All Filters"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                <span className="text-[10px] font-bold uppercase">Reset</span>
+                            </Button>
                         )}
-                    >
-                        {s.replace(" Order", "")}
-                    </button>
-                ))}
-            </div>
-
-            {/* Online Filter */}
-            <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-md shadow-sm h-10">
-                <button
-                    onClick={() => setIsOnline(!isOnline)}
-                    className={cn(
-                        "px-4 py-1.5 rounded-md text-[11px] font-black uppercase tracking-tighter transition-all flex items-center gap-2",
-                        isOnline ? "bg-orange-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                    )}
-                >
-                    <Filter size={12} />
-                    Online Only
-                </button>
-            </div>
-
-            {/* Search Input */}
-            <FieldWrapper label="" className="flex-1 min-w-[200px]">
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-sky-600 z-10" />
-                    <Input
-                        type="text"
-                        placeholder="Search invoice..."
-                        className="pl-8 h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors font-bold text-sm"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-            </FieldWrapper>
-
-            {/* Clear Action */}
-            <div className="flex items-center gap-2 h-10 mt-auto">
-                <Button variant="ghost" onClick={clearFilters} className="text-zinc-400 hover:text-red-500 hover:bg-red-50 h-10 w-10 p-0" title="Clear Filters">
-                    <RefreshCw className="h-4 w-4" />
-                </Button>
+                    </div>
+                </FieldWrapper>
             </div>
         </div>
     );

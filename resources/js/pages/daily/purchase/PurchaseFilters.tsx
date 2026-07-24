@@ -34,7 +34,7 @@ interface FilterProps {
 const PREMIUM_ROUNDING = "rounded-xl";
 
 const FieldWrapper = ({ label, icon: Icon, children, className = "" }: { label: string; icon: any; children: React.ReactNode; className?: string }) => (
-    <div className={cn("relative group flex-1", className)}>
+    <div className={cn("relative group min-w-0 flex-1", className)}>
         <div className="flex items-center gap-2 mb-1.5 px-1">
             <Icon className="h-3 w-3 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
             <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none">
@@ -56,6 +56,8 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
     const [status, setStatus] = useState(filters.status || "all");
     const [search, setSearch] = useState(filters.search || "");
 
+    const searchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Sync local state when server-side props change (e.g. after clearFilters)
     React.useEffect(() => {
         setDate({
@@ -67,24 +69,47 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
         setSearch(filters.search || "");
     }, [filters.start_date, filters.end_date, filters.supplier_id, filters.status, filters.search]);
 
-    const buildParams = () => {
-        const params: Record<string, string> = {};
-        if (date?.from) params.start_date = format(date.from, "yyyy-MM-dd");
-        if (date?.to)   params.end_date   = format(date.to,   "yyyy-MM-dd");
-        if (supplierId && supplierId !== "all") params.supplier_id = supplierId;
-        if (status     && status     !== "all") params.status      = status;
-        if (search.trim()) params.search = search.trim();
-        return params;
-    };
+    const isFiltered = Boolean(
+        (date?.from || date?.to) ||
+        (supplierId && supplierId !== "all") ||
+        (status && status !== "all") ||
+        (search && search.trim() !== "")
+    );
 
-    const applyFilters = () => {
-        router.get("/purchase", buildParams(), {
+    const applyFiltersWith = (overrides?: {
+        date?: DateRange | undefined;
+        supplier_id?: string;
+        status?: string;
+        search?: string;
+    }) => {
+        const targetDate = overrides && "date" in overrides ? overrides.date : date;
+        const targetSupplier = overrides && "supplier_id" in overrides ? overrides.supplier_id : supplierId;
+        const targetStatus = overrides && "status" in overrides ? overrides.status : status;
+        const targetSearch = overrides && "search" in overrides ? overrides.search : search;
+
+        const params: Record<string, string> = {};
+        if (targetDate?.from) params.start_date = format(targetDate.from, "yyyy-MM-dd");
+        if (targetDate?.to)   params.end_date   = format(targetDate.to,   "yyyy-MM-dd");
+        if (targetSupplier && targetSupplier !== "all") params.supplier_id = targetSupplier;
+        if (targetStatus   && targetStatus   !== "all") params.status      = targetStatus;
+        if (targetSearch   && targetSearch.trim())      params.search     = targetSearch.trim();
+
+        router.get("/purchase", params, {
             preserveState: true,
             preserveScroll: true,
         });
     };
 
+    const handleSearchChange = (val: string) => {
+        setSearch(val);
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = setTimeout(() => {
+            applyFiltersWith({ search: val });
+        }, 400);
+    };
+
     const clearFilters = () => {
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
         setDate(undefined);
         setSupplierId("all");
         setStatus("all");
@@ -98,13 +123,13 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
             animate={{ opacity: 1, y: 0 }}
             className={cn(
                 PREMIUM_ROUNDING,
-                "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm"
+                "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 shadow-sm"
             )}
         >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
 
                 {/* 1. Date Range */}
-                <FieldWrapper label="Date Range" icon={CalendarIcon}>
+                <FieldWrapper label="Date Range" icon={CalendarIcon} className="w-full">
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button
@@ -134,7 +159,12 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                                 mode="range"
                                 defaultMonth={date?.from}
                                 selected={date}
-                                onSelect={setDate}
+                                onSelect={(newDate) => {
+                                    setDate(newDate);
+                                    if (newDate?.from) {
+                                        applyFiltersWith({ date: newDate });
+                                    }
+                                }}
                                 numberOfMonths={2}
                                 className="bg-white dark:bg-zinc-900"
                             />
@@ -143,8 +173,14 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                 </FieldWrapper>
 
                 {/* 2. Supplier Selection */}
-                <FieldWrapper label="Select Supplier" icon={User}>
-                    <Select value={supplierId} onValueChange={setSupplierId}>
+                <FieldWrapper label="Select Supplier" icon={User} className="w-full">
+                    <Select
+                        value={supplierId}
+                        onValueChange={(val) => {
+                            setSupplierId(val);
+                            applyFiltersWith({ supplier_id: val });
+                        }}
+                    >
                         <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
                             <SelectValue placeholder="All Suppliers" />
                         </SelectTrigger>
@@ -160,8 +196,14 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                 </FieldWrapper>
 
                 {/* 3. Status Filter */}
-                <FieldWrapper label="Status" icon={ShieldCheck}>
-                    <Select value={status} onValueChange={setStatus}>
+                <FieldWrapper label="Status" icon={ShieldCheck} className="w-full">
+                    <Select
+                        value={status}
+                        onValueChange={(val) => {
+                            setStatus(val);
+                            applyFiltersWith({ status: val });
+                        }}
+                    >
                         <SelectTrigger className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 hover:border-orange-500/50 transition-all text-xs font-bold">
                             <SelectValue placeholder="All Status" />
                         </SelectTrigger>
@@ -177,36 +219,52 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                 </FieldWrapper>
 
                 {/* 4. Document Search */}
-                <FieldWrapper label="Search Bill" icon={Hash}>
-                    <div className="relative">
-                        <Input
-                            type="text"
-                            placeholder="Bill No / ID / Supplier"
-                            className="w-full h-11 px-4 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 focus:border-orange-500/50 focus-visible:ring-0 transition-all text-xs font-bold tabular-nums"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-                        />
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+                <FieldWrapper label="Search Bill" icon={Hash} className="w-full">
+                    <div className="relative flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Input
+                                type="text"
+                                placeholder="Bill No / ID / Supplier"
+                                className="w-full h-11 px-4 pr-9 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:bg-white dark:hover:bg-zinc-900 focus:border-orange-500/50 focus-visible:ring-0 transition-all text-xs font-bold tabular-nums"
+                                value={search}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                                        applyFiltersWith({ search });
+                                    }
+                                }}
+                            />
+                            {search ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearch("");
+                                        applyFiltersWith({ search: "" });
+                                    }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-rose-500 transition-colors p-1 rounded-md"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            ) : (
+                                <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                            )}
+                        </div>
+
+                        {isFiltered && (
+                            <Button
+                                variant="outline"
+                                onClick={clearFilters}
+                                className="h-11 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all shrink-0 text-xs font-bold gap-1.5"
+                                title="Reset All Filters"
+                            >
+                                <X className="h-4 w-4 text-rose-500" />
+                                <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wider">Reset</span>
+                            </Button>
+                        )}
                     </div>
                 </FieldWrapper>
 
-                {/* 5. Search Button */}
-                <div className="flex items-end gap-3 lg:col-span-4 xl:col-span-1">
-                    <Button
-                        onClick={applyFilters}
-                        className="flex-1 bg-zinc-900 dark:bg-zinc-100 hover:bg-orange-600 dark:hover:bg-orange-500 text-white dark:text-zinc-900 h-11 rounded-xl shadow-lg shadow-zinc-200 dark:shadow-none font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
-                    >
-                        <Filter className="mr-2 h-3 w-3" /> Search
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        onClick={clearFilters}
-                        className="h-11 w-11 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all"
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
             </div>
         </motion.div>
     );

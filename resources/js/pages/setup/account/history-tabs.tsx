@@ -263,12 +263,13 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                                 <TableHead>Voucher</TableHead>
                                 <TableHead>Method/Bank</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead className="text-right text-amber-700">Discount</TableHead>
+                                <TableHead className="text-right">Amount (Cash)</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {data.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground italic">No payment transactions found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground italic">No payment transactions found.</TableCell></TableRow>
                             ) : data.map((item: any) => (
                                 <TableRow key={item.id} className="cursor-pointer hover:bg-muted/30">
                                     <TableCell className="text-xs whitespace-nowrap">{formatDate(item.date)}</TableCell>
@@ -290,6 +291,9 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                                         ) : (
                                             <Badge variant="outline" className="text-[10px] bg-slate-50 border-slate-200">Done</Badge>
                                         )}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs font-semibold text-amber-600">
+                                        {Number(item.discount) > 0 ? formatCurrency(item.discount) : '—'}
                                     </TableCell>
                                     <TableCell className="text-right font-bold text-xs text-green-600">
                                         {item.type === 'RECEIPT' ? '+' : '-'}{formatCurrency(item.amount)}

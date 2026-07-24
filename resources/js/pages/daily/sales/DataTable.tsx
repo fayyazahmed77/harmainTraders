@@ -72,6 +72,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 
 /* ------------------------------
@@ -295,29 +296,32 @@ export default function DataTable({ data }: DataTableProps) {
         --------------------------------- */
         {
             accessorKey: "status",
-            header: "Status",
+            header: () => <div className="text-center w-full">Status</div>,
             cell: ({ row }) => {
                 const status = row.original.status;
                 const config = statusMap[status] || {
-                    color: "bg-gray-100 text-gray-800",
+                    color: "bg-gray-100 text-gray-800 border-gray-200",
                     icon: <AlertCircle size={14} />,
                 };
 
                 const { color, icon } = config;
 
                 return (
-                    <span
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold w-fit ${color}`}
-                    >
+                    <div className="flex items-center justify-center">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span className="cursor-help">{icon}</span>
+                                <div className={cn(
+                                    "h-7 w-7 rounded-full border flex items-center justify-center transition-all hover:scale-110 cursor-pointer shadow-sm",
+                                    color
+                                )}>
+                                    {icon}
+                                </div>
                             </TooltipTrigger>
-                            <TooltipContent>
+                            <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-none shadow-xl">
                                 {status}
                             </TooltipContent>
                         </Tooltip>
-                    </span>
+                    </div>
                 );
             },
         },
@@ -421,8 +425,8 @@ export default function DataTable({ data }: DataTableProps) {
     --------------------------------- */
     return (
         <TooltipProvider>
-            <div className="w-full">
-                <div className="rounded-md border overflow-x-auto bg-gray-100 dark:bg-card">
+            <div className="w-full min-w-0">
+                <div className="rounded-xl border border-border overflow-x-auto bg-card shadow-sm">
                     <Table>
                         <TableHeader className="bg-muted sticky top-0 z-10">
                             <TableRow>

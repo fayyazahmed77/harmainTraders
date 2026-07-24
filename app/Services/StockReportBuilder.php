@@ -225,12 +225,19 @@ class StockReportBuilder
             ->leftJoin('accounts', 'purchases.supplier_id', '=', 'accounts.id')
             ->select(
                 'purchases.date',
-                DB::raw('CAST(purchases.id AS CHAR) as voucher_no'),
+                DB::raw("COALESCE(purchases.invoice, CONCAT('PUR-', purchases.id)) as voucher_no"),
                 'accounts.title as account_name',
                 'items.title as item_name',
+                'items.id as item_id',
+                'items.packing_qty as packing_qty',
                 'purchase_items.trade_price as rate',
+                'purchase_items.subtotal as subtotal',
                 'purchase_items.total_pcs as in_qty',
+                'purchase_items.qty_carton as in_full',
+                'purchase_items.qty_pcs as in_pcs',
                 DB::raw('0 as out_qty'),
+                DB::raw('0 as out_full'),
+                DB::raw('0 as out_pcs'),
                 DB::raw("'purchase' as type"),
                 'items.trade_price as cogs_rate'
             )
@@ -242,12 +249,19 @@ class StockReportBuilder
             ->leftJoin('accounts', 'sales.customer_id', '=', 'accounts.id')
             ->select(
                 'sales.date',
-                DB::raw('CAST(sales.id AS CHAR) as voucher_no'),
+                DB::raw("COALESCE(sales.invoice, CONCAT('SLS-', sales.id)) as voucher_no"),
                 'accounts.title as account_name',
                 'items.title as item_name',
+                'items.id as item_id',
+                'items.packing_qty as packing_qty',
                 'sales_items.trade_price as rate',
+                'sales_items.subtotal as subtotal',
                 DB::raw('0 as in_qty'),
+                DB::raw('0 as in_full'),
+                DB::raw('0 as in_pcs'),
                 'sales_items.total_pcs as out_qty',
+                'sales_items.qty_carton as out_full',
+                'sales_items.qty_pcs as out_pcs',
                 DB::raw("'sale' as type"),
                 'items.trade_price as cogs_rate'
             )
@@ -259,12 +273,19 @@ class StockReportBuilder
             ->leftJoin('accounts', 'sales_returns.customer_id', '=', 'accounts.id')
             ->select(
                 'sales_returns.date',
-                DB::raw('CAST(sales_returns.id AS CHAR) as voucher_no'),
+                DB::raw("COALESCE(sales_returns.invoice, CONCAT('SR-', sales_returns.id)) as voucher_no"),
                 'accounts.title as account_name',
                 'items.title as item_name',
+                'items.id as item_id',
+                'items.packing_qty as packing_qty',
                 'sales_return_items.trade_price as rate',
+                'sales_return_items.subtotal as subtotal',
                 'sales_return_items.total_pcs as in_qty',
+                'sales_return_items.qty_carton as in_full',
+                'sales_return_items.qty_pcs as in_pcs',
                 DB::raw('0 as out_qty'),
+                DB::raw('0 as out_full'),
+                DB::raw('0 as out_pcs'),
                 DB::raw("'sale_return' as type"),
                 'items.trade_price as cogs_rate'
             )
@@ -276,12 +297,19 @@ class StockReportBuilder
             ->leftJoin('accounts', 'purchase_returns.supplier_id', '=', 'accounts.id')
             ->select(
                 'purchase_returns.date',
-                DB::raw('CAST(purchase_returns.id AS CHAR) as voucher_no'),
+                DB::raw("COALESCE(purchase_returns.invoice, CONCAT('PR-', purchase_returns.id)) as voucher_no"),
                 'accounts.title as account_name',
                 'items.title as item_name',
+                'items.id as item_id',
+                'items.packing_qty as packing_qty',
                 'purchase_return_items.trade_price as rate',
+                'purchase_return_items.subtotal as subtotal',
                 DB::raw('0 as in_qty'),
+                DB::raw('0 as in_full'),
+                DB::raw('0 as in_pcs'),
                 'purchase_return_items.total_pcs as out_qty',
+                'purchase_return_items.qty_carton as out_full',
+                'purchase_return_items.qty_pcs as out_pcs',
                 DB::raw("'purchase_return' as type"),
                 'items.trade_price as cogs_rate'
             )
@@ -350,13 +378,55 @@ class StockReportBuilder
 
         $balance = 0;
         return $union->map(function($row) use (&$balance) {
-            $balance += ($row->in_qty - $row->out_qty);
-            $row->balance = $balance;
-            $row->amount = $balance * $row->cogs_rate;
+            $packing = max(1, (int)($row->packing_qty ?? 1));
+            $inPcs = (float)($row->in_qty ?? 0);
+            $outPcs = (float)($row->out_qty ?? 0);
             
-            // Calculate Profit/Loss for sales
+            $balance += ($inPcs - $outPcs);
+            $row->balance = $balance;
+            
+            // Format IN QTY string (F for full, P for pcs)
+            $inF = (int)($row->in_full ?? 0);
+            $inP = (int)($row->in_pcs ?? 0);
+            if ($inPcs > 0 && $inF == 0 && $inP == 0) {
+                $inF = (int)floor($inPcs / $packing);
+                $inP = (int)($inPcs % $packing);
+            }
+            $row->in_fmt = $inPcs > 0 ? ($inF > 0 && $inP > 0 ? "{$inF} F, {$inP} P" : ($inF > 0 ? "{$inF} F" : "{$inP} P")) : '-';
+
+            // Format OUT QTY string (F for full, P for pcs)
+            $outF = (int)($row->out_full ?? 0);
+            $outP = (int)($row->out_pcs ?? 0);
+            if ($outPcs > 0 && $outF == 0 && $outP == 0) {
+                $outF = (int)floor($outPcs / $packing);
+                $outP = (int)($outPcs % $packing);
+            }
+            $row->out_fmt = $outPcs > 0 ? ($outF > 0 && $outP > 0 ? "{$outF} F, {$outP} P" : ($outF > 0 ? "{$outF} F" : "{$outP} P")) : '-';
+
+            // Format Balance QTY string (F for full, P for pcs)
+            $balAbs = (int)abs($balance);
+            $balF = (int)floor($balAbs / $packing);
+            $balP = (int)($balAbs % $packing);
+            $sign = $balance < 0 ? '-' : '';
+            $row->balance_fmt = $balance == 0 ? '0' : ($balF > 0 && $balP > 0 ? "{$sign}{$balF} F, {$balP} P" : ($balF > 0 ? "{$sign}{$balF} F" : "{$sign}{$balP} P"));
+
+            // Cost per piece (COGS per piece)
+            $cogsPerCarton = (float)($row->cogs_rate ?? 0);
+            $cogsPerPc = $cogsPerCarton / $packing;
+            
+            // Amount = Valuation of remaining stock in hand
+            $row->amount = round(($balance / $packing) * $cogsPerCarton, 2);
+            
+            // Transaction Subtotal (Real Net Amount)
+            $row->subtotal = (float)($row->subtotal ?? 0);
+            
+            // Calculate Profit/Loss
             if ($row->type === 'sale') {
-                $row->profit_loss = ($row->rate - $row->cogs_rate) * $row->out_qty;
+                $cogsTotal = $outPcs * $cogsPerPc;
+                $row->profit_loss = round($row->subtotal - $cogsTotal, 2);
+            } else if ($row->type === 'sale_return') {
+                $cogsTotal = $inPcs * $cogsPerPc;
+                $row->profit_loss = round(-($row->subtotal - $cogsTotal), 2);
             } else {
                 $row->profit_loss = 0;
             }

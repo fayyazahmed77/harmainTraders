@@ -375,8 +375,15 @@ class AccountController extends Controller implements HasMiddleware
             $totalSales = $totalSalesGross - $totalExtraDiscount;
             $totalReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
 
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
+            $receiptsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+            $totalReceiptsCash = (float) (clone $receiptsQuery)->sum('amount');
+            $totalReceiptsDiscount = (float) (clone $receiptsQuery)->sum('discount');
+            $totalReceipts = $totalReceiptsCash + $totalReceiptsDiscount;
+
+            $paymentsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+            $totalPaymentsCash = (float) (clone $paymentsQuery)->sum('amount');
+            $totalPaymentsDiscount = (float) (clone $paymentsQuery)->sum('discount');
+            $totalPayments = $totalPaymentsCash + $totalPaymentsDiscount;
 
             $unpaidInvoices = \App\Models\Sales::where('customer_id', $account->id)->where('remaining_amount', '>', 0)->count();
 
@@ -392,20 +399,18 @@ class AccountController extends Controller implements HasMiddleware
                 ->whereIn('status', ['Available', 'Partial'])
                 ->sum('available_balance');
 
-            $receiptQuery = \App\Models\Payment::where('account_id', $account->id)
-                ->where('type', 'RECEIPT')
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
-                ->where('is_return_refund', false);
-            $totalReceiptsAmount = (float)$receiptQuery->sum('amount');
-            $totalReceiptsAllocated = (float)\App\Models\PaymentAllocation::whereIn('payment_id', $receiptQuery->pluck('id'))->sum('amount');
-            $advance = max(0.0, $totalReceiptsAmount - $totalReceiptsAllocated);
+            $advance = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
 
             $summary = [
                 'total_sales' => $totalSales,
                 'total_extra_discount' => $totalExtraDiscount,
                 'total_returns' => $totalReturns,
                 'total_receipts' => $totalReceipts,
+                'total_receipts_cash' => $totalReceiptsCash,
+                'total_receipts_discount' => $totalReceiptsDiscount,
                 'total_payments' => $totalPayments,
+                'total_payments_cash' => $totalPaymentsCash,
+                'total_payments_discount' => $totalPaymentsDiscount,
                 'unpaid_invoices' => $unpaidInvoices,
                 'current_balance' => $currentBalance,
                 'outstanding' => $outstanding,
@@ -415,8 +420,16 @@ class AccountController extends Controller implements HasMiddleware
         } elseif ($typeLower === 'supplier') {
             $totalPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->sum('net_total');
             $totalReturns = \App\Models\PurchaseReturn::where('supplier_id', $account->id)->sum('net_total');
-            $totalPayments = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
-            $totalReceipts = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled')->sum(DB::raw('amount + discount'));
+
+            $paymentsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+            $totalPaymentsCash = (float) (clone $paymentsQuery)->sum('amount');
+            $totalPaymentsDiscount = (float) (clone $paymentsQuery)->sum('discount');
+            $totalPayments = $totalPaymentsCash + $totalPaymentsDiscount;
+
+            $receiptsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+            $totalReceiptsCash = (float) (clone $receiptsQuery)->sum('amount');
+            $totalReceiptsDiscount = (float) (clone $receiptsQuery)->sum('discount');
+            $totalReceipts = $totalReceiptsCash + $totalReceiptsDiscount;
 
             $unpaidBills = \App\Models\Purchase::where('supplier_id', $account->id)->where('remaining_amount', '>', 0)->count();
 
@@ -432,18 +445,17 @@ class AccountController extends Controller implements HasMiddleware
                 ->whereIn('status', ['Available', 'Partial'])
                 ->sum('available_balance');
 
-            $paymentQuery = \App\Models\Payment::where('account_id', $account->id)
-                ->where('type', 'PAYMENT')
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned']);
-            $totalPaymentsAmount = (float)$paymentQuery->sum('amount');
-            $totalPaymentsAllocated = (float)\App\Models\PaymentAllocation::whereIn('payment_id', $paymentQuery->pluck('id'))->sum('amount');
-            $advance = max(0.0, $totalPaymentsAmount - $totalPaymentsAllocated);
+            $advance = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
 
             $summary = [
                 'total_purchases' => $totalPurchases,
                 'total_returns' => $totalReturns,
                 'total_payments' => $totalPayments,
+                'total_payments_cash' => $totalPaymentsCash,
+                'total_payments_discount' => $totalPaymentsDiscount,
                 'total_receipts' => $totalReceipts,
+                'total_receipts_cash' => $totalReceiptsCash,
+                'total_receipts_discount' => $totalReceiptsDiscount,
                 'unpaid_bills' => $unpaidBills,
                 'current_balance' => $currentBalance,
                 'outstanding' => $outstanding,
@@ -530,13 +542,7 @@ class AccountController extends Controller implements HasMiddleware
                 ->sum('available_balance');
 
             // Advance Balance: cleared receipts not yet allocated to invoices
-            $receiptQuery = \App\Models\Payment::where('account_id', $id)
-                ->where('type', 'RECEIPT')
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
-                ->where('is_return_refund', false);
-            $totalReceiptsAmount = (float)$receiptQuery->sum('amount');
-            $totalReceiptsAllocated = (float)\App\Models\PaymentAllocation::whereIn('payment_id', $receiptQuery->pluck('id'))->sum('amount');
-            $advance = max(0.0, $totalReceiptsAmount - $totalReceiptsAllocated);
+            $advance = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
 
         } elseif ($type === 'supplier') {
             // Outstanding Payable: unpaid/partial purchases (cap negative remaining_amount to 0)
@@ -551,12 +557,7 @@ class AccountController extends Controller implements HasMiddleware
                 ->sum('available_balance');
 
             // Advance Payment: payments made to supplier not yet allocated to bills
-            $paymentQuery = \App\Models\Payment::where('account_id', $id)
-                ->where('type', 'PAYMENT')
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned']);
-            $totalPaymentsAmount = (float)$paymentQuery->sum('amount');
-            $totalPaymentsAllocated = (float)\App\Models\PaymentAllocation::whereIn('payment_id', $paymentQuery->pluck('id'))->sum('amount');
-            $advance = max(0.0, $totalPaymentsAmount - $totalPaymentsAllocated);
+            $advance = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
 
         } else {
             $outstanding  = 0.0;

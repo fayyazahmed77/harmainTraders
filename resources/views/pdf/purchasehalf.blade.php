@@ -85,7 +85,8 @@
         .info-label {
             display: inline-block;
             width: 60px;
-            color: #333;
+            color: #000;
+            font-weight: bold;
         }
 
         .info-value {
@@ -149,7 +150,8 @@
         .footer-text {
             font-size: 9px;
             margin-top: 10px;
-            color: #444;
+            color: #000;
+            font-weight: bold;
         }
 
         .clearfix::after {
@@ -225,10 +227,7 @@
                 <span class="total-value">{{ $purchase->items->count() }} / {{ $purchase->items->sum('total_pcs') }}</span>
             </div>
 
-            <div class="total-row clearfix">
-                <span class="total-label">Gross Amount :-</span>
-                <span class="total-value">{{ number_format($purchase->gross_total, 2) }}</span>
-            </div>
+            
 
             <div class="total-row clearfix">
                 <span class="total-label">Courier Charges :-</span>

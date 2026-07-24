@@ -176,7 +176,22 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     const [date, setDate] = useState<Date>(new Date(returnData.date));
     const [calOpen, setCalOpen] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState(returnData.invoice);
-    const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => accounts.find(a => a.id === returnData.customer_id) ?? null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => {
+        if (!returnData) return null;
+        const found = accounts.find(a => a.id.toString() === returnData.customer_id?.toString());
+        if (found) return found;
+        if ((returnData as any).customer) {
+            const cust = (returnData as any).customer;
+            return {
+                id: cust.id,
+                title: cust.title || cust.name || "Customer #" + cust.id,
+                aging_days: cust.aging_days ?? 0,
+                credit_limit: cust.credit_limit ?? 0,
+                saleman_id: cust.saleman_id ?? undefined
+            };
+        }
+        return null;
+    });
     const [previousBalance, setPreviousBalance] = useState<number>(toNum(returnData.previous_balance));
     const [outstandingBalance, setOutstandingBalance] = useState<number | null>(null);
     const [creditBalance, setCreditBalance] = useState<number | null>(null);

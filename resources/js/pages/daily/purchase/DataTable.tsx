@@ -122,7 +122,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Calendar className="h-3 w-3 text-orange-500" />
-                    <span>Purchase Date</span>
+                    <span>Date</span>
                 </div>
             ),
             cell: ({ row }) => {
@@ -152,9 +152,7 @@ export default function DataTable({ data }: DataTableProps) {
                     <span className="font-black text-zinc-900 dark:text-zinc-100 tabular-nums text-xs tracking-tight">
                         {row.original.invoice}
                     </span>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest tabular-nums">
-                        #{row.original.code}
-                    </span>
+
                 </div>
             )
         },
@@ -163,7 +161,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3 text-orange-500" />
-                    <span>Supplier / Vendor</span>
+                    <span>Supplier</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -182,7 +180,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Package className="h-3 w-3 text-orange-500" />
-                    <span>Items Count</span>
+                    <span>Items</span>
                 </div>
             ),
             cell: ({ row }) => (
@@ -221,7 +219,7 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "remaining_amount",
-            header: () => <div className="text-right w-full">Balance Due</div>,
+            header: () => <div className="text-right w-full">Balance</div>,
             cell: ({ row }) => (
                 <div className="flex flex-col items-end min-w-[70px] text-right">
                     <span className={cn(
@@ -235,22 +233,29 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             accessorKey: "status",
-            header: "Status",
+            header: () => <div className="text-center w-full">Status</div>,
             cell: ({ row }) => {
                 const status = row.original.status as PurchaseStatus;
                 const safeStatus = statusMap[status] || statusMap.Completed;
                 const StatusIcon = safeStatus.icon;
 
                 return (
-                    <div className="flex items-center gap-3 min-w-[120px]">
-                        <div className={cn(
-                            "flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest leading-none",
-                            safeStatus.color
-                        )}>
-                            <StatusIcon className="h-3 w-3 shrink-0" />
-                            {safeStatus.label}
-                        </div>
-                        <Plane size={14} className="text-orange-500 rotate-90 opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all shrink-0" />
+                    <div className="flex items-center justify-center">
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className={cn(
+                                        "h-7 w-7 rounded-full border flex items-center justify-center transition-all hover:scale-110 cursor-pointer shadow-sm",
+                                        safeStatus.color
+                                    )}>
+                                        <StatusIcon className="h-3.5 w-3.5 shrink-0" />
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-none shadow-xl">
+                                    {safeStatus.label}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
                 );
             },

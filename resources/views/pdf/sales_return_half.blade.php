@@ -84,7 +84,8 @@
         .info-label {
             display: inline-block;
             width: 60px;
-            color: #333;
+            color: #000;
+            font-weight: bold;
         }
 
         .info-value {
@@ -156,7 +157,8 @@
         .footer-text {
             font-size: 9px;
             margin-top: 10px;
-            color: #444;
+            color: #000;
+            font-weight: bold;
         }
 
         .clearfix::after {

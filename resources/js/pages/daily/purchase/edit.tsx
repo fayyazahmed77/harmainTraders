@@ -1,5 +1,5 @@
-// sales.tsx
 import React, { useState, useMemo, useEffect } from "react";
+import { Combobox } from "@/components/ui/combobox";
 import ReactSelect from "react-select";
 import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
@@ -10,7 +10,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
-import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt } from "lucide-react";
+import { Trash2, Plus, ListRestart, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Wallet, Save, ListOrdered, CheckCircle2, Printer, ArrowRight, MoreVertical, AlertTriangle, X, Check, Eye, Search, Box, PackageSearch, Receipt, TrendingDown } from "lucide-react";
 import { ItemSelectionDialog } from "./components/ItemSelectionDialog";
 import { PriceUpdateDialog } from "./components/PriceUpdateDialog";
 import { SuccessSummaryDialog } from "./components/SuccessSummaryDialog";
@@ -141,7 +141,7 @@ interface MessageLine {
     messageline: string;
 }
 interface Option {
-    value: number;
+    value: string;
     label: string;
     code?: string;
 }
@@ -324,7 +324,7 @@ export default function PurchaseEdit({
     const [accountType, setAccountType] = useState<Option | null>(() => {
         if (purchase?.supplier_id && accounts) {
             const acc = accounts.find(a => a.id === purchase.supplier_id);
-            if (acc) return { value: acc.id, label: acc.title };
+            if (acc) return { value: String(acc.id), label: `${acc.title}${acc.code ? ` (${acc.code})` : ""}` };
         }
         return null;
     });
@@ -337,10 +337,22 @@ export default function PurchaseEdit({
         const defaultFirm = firms?.find(f => f.defult === 1);
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
-    const accountTypeOptions: Option[] = accounts.map((a) => ({
-        value: a.id,
-        label: a.title,
-    }));
+
+    const [advanceAvailable, setAdvanceAvailable] = useState<number>(() => {
+        if (purchase?.supplier_id && accounts) {
+            const acc = accounts.find(a => a.id === purchase.supplier_id);
+            if (acc) return toNumber(acc.current_balance);
+        }
+        return 0;
+    });
+    const [useAdvance, setUseAdvance] = useState<boolean>(true);
+
+    const accountTypeOptions: Option[] = useMemo(() => {
+        return accounts.map((a) => ({
+            value: String(a.id),
+            label: `${a.title}${a.code ? ` (${a.code})` : ""}`,
+        }));
+    }, [accounts]);
 
     // Check if over credit limit
 
@@ -588,29 +600,34 @@ export default function PurchaseEdit({
             }
         });
 
-        const selectedAccount = accounts.find(a => a.id === accountType?.value);
-        const prevBal = selectedAccount ? toNumber(selectedAccount.current_balance) : 0;
+        const prevBal = advanceAvailable > 0 ? advanceAvailable : 0;
         const cashReceived = 0;
 
         const roundedGross = Math.round(gross);
         const roundedDisc = Math.round(discTotal);
 
-        const net = roundedGross - roundedDisc + courier;
+        const net = Math.round(roundedGross - roundedDisc + courier);
         const netAfterExtraDiscount = Math.max(0, net - extraDiscount);
+
+        const absAdvance = Math.max(0, -advanceAvailable);
+        const appliedAdvance = useAdvance ? Math.min(netAfterExtraDiscount, absAdvance) : 0;
+        const netSettlement = Math.max(0, netAfterExtraDiscount - appliedAdvance);
 
         return {
             gross: roundedGross,
             discTotal: roundedDisc,
             courier: courier,
-            net: Math.round(net),
+            net: net,
+            appliedAdvance,
+            netSettlement,
             previousBalance: prevBal,
             cashReceived,
-            totalReceivable: Math.round(netAfterExtraDiscount + prevBal - cashReceived),
+            totalReceivable: Math.round(netSettlement + prevBal),
             totalFull,
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier, accounts, accountType, extraDiscount]);
+    }, [rowsWithComputed, items, courier, advanceAvailable, useAdvance, extraDiscount]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -626,7 +643,7 @@ export default function PurchaseEdit({
             date: date ? date.toISOString().slice(0, 10) : null,
             invoice: invoiceNo,
 
-            supplier_id: accountType?.value,
+            supplier_id: accountType?.value ? Number(accountType.value) : null,
             salesman_id: salesman,
             firm_id: selectedFirmId ? Number(selectedFirmId) : null,
             no_of_items: rowsWithComputed.length,
@@ -636,8 +653,9 @@ export default function PurchaseEdit({
             extra_discount: extraDiscount,
             courier_charges: totals.courier,
             net_total: totals.net,
-            paid_amount: isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
-            remaining_amount: totals.net - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            paid_amount: (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            remaining_amount: totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
+            applied_advance: totals.appliedAdvance,
             update_prices: updatePrices,
             print_format: printOption,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
@@ -671,7 +689,7 @@ export default function PurchaseEdit({
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
-                    supplierName: accounts.find(a => a.id === accountType?.value)?.title || "N/A",
+                    supplierName: accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A",
                     totalItems: totals.totalItems,
                     totalFull: totals.totalFull,
                     totalPcs: totals.totalPcs,
@@ -778,7 +796,7 @@ export default function PurchaseEdit({
                                     onValueChange={(value) => {
                                         const id = Number(value);
                                         const selectedAccount = accounts.find((a) => a.id === id) ?? null;
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
                                         if (selectedAccount) {
@@ -836,19 +854,19 @@ export default function PurchaseEdit({
                     <Card className="hidden md:block overflow-hidden border-x-0 mt-3 border-t-0 shadow-none bg-white dark:bg-[#0a0a0a]">
                        
 
-                        <div className="p-4 grid grid-cols-6  lg:grid-cols-12 gap-x-3 gap-y-5 items-end">
+                        <div className="py-2 px-4 flex flex-wrap items-end gap-2.5">
                             {/* Date & Time Picker */}
-                            <FieldWrapper label="Date & Time" className="lg:col-span-3">
+                            <FieldWrapper label="Purchase Date" className="w-[245px] shrink-0">
                                 <div className="flex gap-1">
                                     <Popover open={open} onOpenChange={setOpen}>
                                         <PopoverTrigger asChild>
                                             <Button
                                                 variant="outline"
                                                 id="date-picker"
-                                                className="w-[140px] justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors"
+                                                className="w-[130px] shrink-0 justify-between font-normal h-10 px-2 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors text-xs"
                                             >
                                                 <span className="truncate">{date ? date.toLocaleDateString() : "Date"}</span>
-                                                <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 text-sky-600" />
+                                                <CalendarIcon className="h-3.5 w-3.5 shrink-0 opacity-50 text-sky-600" />
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto overflow-hidden p-0" align="start">
@@ -868,20 +886,21 @@ export default function PurchaseEdit({
                                         id="time-picker"
                                         step="1"
                                         defaultValue={new Date().toLocaleTimeString('en-GB', { hour12: false })}
-                                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors flex-1"
+                                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors w-[105px] shrink-0 px-1.5 text-center text-xs"
                                     />
                                 </div>
                             </FieldWrapper>
 
                             {/* Account Select */}
-                            <FieldWrapper label="Select Account" className="lg:col-span-2">
-                                <Select
-                                    value={accountType?.value?.toString() ?? ""}
-                                    onValueChange={(value) => {
+                            <FieldWrapper label="Select Supplier" className="flex-1 min-w-[160px]">
+                                <Combobox
+                                    options={accountTypeOptions}
+                                    value={accountType?.value || ""}
+                                    onChange={(value) => {
                                         const id = Number(value);
                                         const selectedAccount = accounts.find((a) => a.id === id) ?? null;
 
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === id) ?? null;
+                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
                                         if (selectedAccount) {
@@ -890,64 +909,44 @@ export default function PurchaseEdit({
                                             setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
                                             const salemanId = selectedAccount.saleman_id ?? null;
                                             setSalesman(salemanId);
+                                            
+                                            // Set Advance
+                                            const balance = toNumber(selectedAccount.current_balance);
+                                            setAdvanceAvailable(balance);
+                                            setUseAdvance(balance < 0);
                                         } else {
                                             setCreditDays(0);
                                             setCreditLimit("");
                                             setMarkupPercentage(0);
                                             setSalesman(null);
+                                            setAdvanceAvailable(0);
+                                            setUseAdvance(false);
                                         }
                                     }}
-                                >
-                                    <SelectTrigger className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors">
-                                        <SelectValue placeholder="Account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accountTypeOptions.map((s) => (
-                                            <SelectItem key={s.value} value={s.value.toString()}>
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </FieldWrapper>
-
-                            <FieldWrapper label="Supplier %" className="lg:col-span-1">
-                                <Input
-                                    placeholder="%"
-                                    value={markupPercentage}
-                                    readOnly
-                                    className="h-10 bg-slate-50/50 border-slate-200 text-center font-bold text-orange-600"
-                                />
-                            </FieldWrapper>
-
-                            {/* Credit Days */}
-                            <FieldWrapper label="Days" className="lg:col-span-1">
-                                <Input
-                                    placeholder="Days"
-                                    value={creditDays}
-                                    readOnly
-                                    className="h-10 text-center font-mono border-slate-200 bg-slate-50/50"
+                                    placeholder="Supplier"
+                                    searchPlaceholder="Search by name or code..."
+                                    className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-white dark:bg-zinc-900"
                                 />
                             </FieldWrapper>
 
                             {/* Invoice # */}
-                            <FieldWrapper label="Bill #" className="lg:col-span-1">
+                            <FieldWrapper label="Bill No" className="w-[115px] shrink-0">
                                 <Input
-                                    placeholder="Invoice #"
+                                    placeholder="Bill No"
                                     value={invoiceNo}
                                     onChange={(e) => setInvoiceNo(e.target.value)}
-                                    className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors text-center"
+                                    className="h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors text-center font-semibold text-xs"
                                 />
                             </FieldWrapper>
 
                             {/* Salesman */}
-                            <FieldWrapper label="Salesman" className="lg:col-span-2">
+                            <FieldWrapper label="Employee / Contact" className="w-[150px] shrink-0">
                                 <Select
                                     value={salesman?.toString() || ""}
                                     onValueChange={(val) => setSalesman(val ? Number(val) : null)}
                                 >
-                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left">
-                                        <SelectValue placeholder="Select Salesman" />
+                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left text-xs">
+                                        <SelectValue placeholder="Select Employee" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {salemans.map((s) => (
@@ -959,13 +958,65 @@ export default function PurchaseEdit({
                                 </Select>
                             </FieldWrapper>
 
+                            {/* Firm / Company */}
+                            <FieldWrapper label="Firm" className="w-[90px] shrink-0 2xl:hidden">
+                                <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left text-xs">
+                                        <SelectValue placeholder="Firm" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {firms?.map((f) => (
+                                            <SelectItem key={f.id} value={f.id.toString()} className="text-xs font-bold">
+                                                {f.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FieldWrapper>
+
+                            {/* Message Line */}
+                            <FieldWrapper label="Message Line" className="w-[140px] shrink-0 2xl:hidden">
+                                <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                    <SelectTrigger className="h-10 w-full border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-background text-left text-xs">
+                                        <SelectValue placeholder="No Message" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="0" className="text-xs font-bold">No Message Line</SelectItem>
+                                        {messageLines?.map((msg) => (
+                                            <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs font-bold">
+                                                {msg.messageline}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FieldWrapper>
+
                             {/* Items # */}
-                            <FieldWrapper label="Qty" className="lg:col-span-1">
+                            <FieldWrapper label="Items" className="w-[65px] shrink-0">
                                 <Input
-                                    placeholder="Qty"
+                                    placeholder="Items"
                                     value={rowsWithComputed.length}
                                     readOnly
-                                    className="h-10 bg-slate-50/50 font-bold border-slate-200 text-center"
+                                    className="h-10 bg-slate-50/50 font-bold border-slate-200 text-center text-xs"
+                                />
+                            </FieldWrapper>
+
+                            <FieldWrapper label="Disc %" className="hidden 2xl:block w-[70px] shrink-0">
+                                <Input
+                                    placeholder="%"
+                                    value={markupPercentage}
+                                    readOnly
+                                    className="h-10 bg-slate-50/50 border-slate-200 text-center font-bold text-orange-600 text-xs"
+                                />
+                            </FieldWrapper>
+
+                            {/* Credit Days */}
+                            <FieldWrapper label="Days" className="hidden 2xl:block w-[70px] shrink-0">
+                                <Input
+                                    placeholder="Days"
+                                    value={creditDays}
+                                    readOnly
+                                    className="h-10 text-center font-mono border-slate-200 bg-slate-50/50 text-xs"
                                 />
                             </FieldWrapper>
                         </div>
@@ -990,7 +1041,7 @@ export default function PurchaseEdit({
                     </div>
 
                     {/* Items table + right summary */}
-                    <div className="grid grid-cols-1 2xl:grid-cols-12 gap-4 relative">
+                    <div className="grid grid-cols-1 2xl:grid-cols-12 gap-4 relative flex-1">
                         {/* Right Sidebar Toggle Button - Floating - Centered Vertically */}
                         <div className={`hidden 2xl:block absolute ${showRightSidebar ? 'right-[24.9%]' : 'right-0'} top-[40%] -translate-y-1/2 z-50 transition-all duration-500 ease-in-out`}>
                             <Button
@@ -1004,10 +1055,10 @@ export default function PurchaseEdit({
                         </div>
 
                         {/* Table area */}
-                        <div className={`col-span-1 ${showRightSidebar ? '2xl:col-span-9' : '2xl:col-span-12'} pb-24 md:pb-32 2xl:pb-4 transition-all duration-300`}>
-                            <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card">
-                                <div className="overflow-visible md:overflow-x-auto">
-                                    <div className="w-full md:min-w-[1200px]">
+                        <div className={`col-span-1 ${showRightSidebar ? '2xl:col-span-9' : '2xl:col-span-12'} pb-24 md:pb-32 2xl:pb-4 transition-all duration-300 flex flex-col`}>
+                            <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card flex-1 flex flex-col md:min-h-[calc(100vh-230px)]">
+                                <div className="overflow-visible md:overflow-x-auto flex-1 flex flex-col">
+                                    <div className="w-full md:min-w-[1200px] flex-1 flex flex-col">
                                         {/* Table Header (sticky) - Desktop Only */}
                                         <div className="hidden md:grid grid-cols-12 bg-secondary/50 backdrop-blur-sm p-2 text-xs font-semibold border-b sticky top-0 z-10">
                                             <div className="col-span-3">
@@ -1035,7 +1086,7 @@ export default function PurchaseEdit({
                                         </div>
 
                                         {/* Rows (scrollable) */}
-                                        <div className="max-h-none md:max-h-[48vh] md:min-h-[50vh] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm">
+                                        <div className="max-h-none md:min-h-[calc(100vh-290px)] md:max-h-[calc(100vh-290px)] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm flex-1">
                                             {rowsWithComputed.map((row) => (
                                                 <React.Fragment key={row.id}>
                                                     {(() => {
@@ -1326,7 +1377,7 @@ export default function PurchaseEdit({
                                             {/* Financial Summary: Moved to Bottom Right */}
                                             <div className="flex items-center gap-8 pr-4">
                                                 <div className="hidden xs:flex flex-col items-end">
-                                                    <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest leading-none mb-1">Gross Amount</span>
+                                                    <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest leading-none mb-1">Total Amount</span>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-[10px] font-bold text-zinc-400">Rs</span>
                                                         <span className="text-lg font-black text-zinc-800 dark:text-zinc-100 leading-none">
@@ -1336,11 +1387,21 @@ export default function PurchaseEdit({
                                                 </div>
 
                                                 <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-8">
-                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Disc Total</span>
+                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Total Discount</span>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-[10px] font-bold text-red-300">-Rs</span>
                                                         <span className="text-lg font-black text-red-600 dark:text-red-400 leading-none">
                                                             {totals.discTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end border-l border-orange-300 dark:border-orange-800 pl-8">
+                                                    <span className="text-[9px] font-black uppercase text-orange-500 tracking-widest leading-none mb-1">Total of this Bill</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-[10px] font-bold text-orange-400">Rs</span>
+                                                        <span className="text-lg font-black text-orange-600 dark:text-orange-400 leading-none">
+                                                            {(totals.gross - totals.discTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1349,186 +1410,7 @@ export default function PurchaseEdit({
                                     </div>
                                 </div>
                             </Card>
-
-                            {/* Bottom fields / stock & supplier info */}
-                            <div className="mt-1 md:mt-2">
-                                {/* Mobile Toggle Button for Item Info */}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full md:hidden mb-0.5 border-gray-700 dark:border-gray-800 dark:bg-gray-950 text-orange-500 dark:text-orange-400 hover:bg-gray-800 py-1 h-auto text-[11px]"
-                                    onClick={() => setShowInfoPanel(!showInfoPanel)}
-                                >
-                                    {showInfoPanel ? (
-                                        <>Hide Info <ChevronUp className="ml-2 h-3 w-3" /></>
-                                    ) : (
-                                        <>View Info <ChevronDown className="ml-2 h-3 w-3" /></>
-                                    )}
-                                </Button>
-
-                                <div className={`${showInfoPanel ? 'block' : 'hidden'} md:block animate-in slide-in-from-bottom-2`}>
-                                    <Card className="border dark:border-gray-800 dark:bg-gray-950 shadow-sm relative overflow-hidden bg-white/50 backdrop-blur-sm p-0">
-                                        {selectedItem ? (
-                                            <div className="p-0 flex flex-col">
-                                                {/* Item Header Bar - Pro-Level Theme */}
-                                                <div className="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-500 text-white border-b border-orange-600 flex flex-wrap items-center justify-between gap-1 shadow-sm">
-                                                    <div className="flex items-center gap-2 py-1">
-                                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
-                                                        <h3 className="text-sm font-black tracking-widest flex items-center gap-2 uppercase italic leading-none">
-                                                            {selectedItem.title}
-                                                            {selectedItem.short_name && (
-                                                                <span className="text-[10px] font-black text-orange-600 bg-white/95 px-2 py-0.5 rounded leading-none shadow-sm">
-                                                                    {selectedItem.short_name}
-                                                                </span>
-                                                            )}
-                                                        </h3>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] uppercase tracking-widest font-black text-orange-100/90">Supplier Code:</span>
-                                                        <span className="text-[11px] font-black text-orange-600 bg-white px-3 py-1 rounded shadow-md border border-orange-100">
-                                                            {selectedItem.company || 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                </div>
- 
-                                                {/* Metrics Grid - Pro High-Density Visuals */}
-                                                <div className="p-2 sm:p-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 bg-orange-50/20 dark:bg-orange-950/5">
-                                                    {/* Packing */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none mb-1.5">Packing</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 italic">{toNumber(selectedItem.packing_full || selectedItem.packing_qty)}</span>
-                                                            <span className="text-[10px] text-zinc-500 font-bold">pc/box</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Stock Full */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5 opacity-80">Stock Full</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic">
-                                                                {Math.floor(toNumber(selectedItem.total_stock_pcs) / (toNumber(selectedItem.packing_qty) || 1))}
-                                                            </span>
-                                                            <span className="text-[10px] text-zinc-500 font-bold">full</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Stock Pcs */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5 opacity-80">Stock Pcs</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic">
-                                                                {toNumber(selectedItem.total_stock_pcs) % (toNumber(selectedItem.packing_qty) || 1)}
-                                                            </span>
-                                                            <span className="text-[10px] text-zinc-500 font-bold">pcs</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Total Stock */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1 bg-orange-500/5">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Total Inventory</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-xl font-black text-orange-700 dark:text-orange-400 italic font-mono">{toNumber(selectedItem.total_stock_pcs)}</span>
-                                                            <span className="text-[10px] text-zinc-500 font-bold">total</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Trade Price */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Trade @</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-[10px] font-bold text-orange-600/60 uppercase">Rs</span>
-                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 font-mono tracking-tighter">{toNumber(selectedItem.trade_price).toFixed(2)}</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Retail Price */}
-                                                    <div className="flex flex-col border-r border-orange-100 dark:border-orange-900/50 px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none mb-1.5">Retail @</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-[10px] font-bold text-orange-600/60 uppercase">Rs</span>
-                                                            <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 font-mono tracking-tighter">{toNumber(selectedItem.retail).toFixed(2)}</span>
-                                                        </div>
-                                                    </div>
- 
-                                                    {/* Average Price */}
-                                                    <div className="flex flex-col px-2 group hover:bg-white dark:hover:bg-zinc-900 transition-all rounded p-1">
-                                                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1.5">Average</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-[10px] font-bold text-zinc-400 uppercase">Rs</span>
-                                                            <span className="text-xl font-black text-zinc-800 dark:text-zinc-200 font-mono tracking-tighter">{((toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2).toFixed(2)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Horizontal History Row - Elegant & Professional */}
-                                                <div className="px-6 py-6 bg-orange-50/50 dark:bg-orange-950/20 border-t border-orange-200/50 dark:border-orange-900/50 flex flex-col md:flex-row items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-2 shrink-0 md:w-36">
-                                                        <div className="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)] animate-pulse"></div>
-                                                        <span className="text-xs font-black uppercase text-orange-600 dark:text-orange-400 tracking-widest leading-none">Pricing History</span>
-                                                    </div>
-
-                                                    <div className="flex-1 flex flex-wrap items-center justify-start md:justify-end gap-3 text-sm">
-                                                        {loadingPurchaseInfo ? (
-                                                            <div className="w-full flex justify-end gap-3 animate-pulse">
-                                                                {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-muted rounded-md"></div>)}
-                                                            </div>
-                                                        ) : lastPurchaseInfo && Object.keys(lastPurchaseInfo).length > 0 ? (
-                                                            <>
-                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
-                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Date</span>
-                                                                    <span className="font-bold text-foreground">
-                                                                        {lastPurchaseInfo.last_purchase_date ? new Date(lastPurchaseInfo.last_purchase_date).toLocaleDateString() : 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                                
-                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border max-w-[200px]">
-                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Supplier</span>
-                                                                    <span className="font-bold truncate text-sky-600">
-                                                                        {lastPurchaseInfo.supplier_name || 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                                
-                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-background/60 shadow-sm px-3.5 py-1.5 rounded-md border border-border">
-                                                                    <span className="text-muted-foreground font-medium text-[11px] uppercase tracking-wider">Qty</span>
-                                                                    <span className="font-bold text-foreground">{toNumber(lastPurchaseInfo.previous_qty_carton)}F / {toNumber(lastPurchaseInfo.previous_qty_pcs)}P</span>
-                                                                </div>
-
-                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-orange-100/50 dark:bg-orange-950/30 shadow-sm px-4 py-1.5 rounded-md border border-orange-200 dark:border-orange-800">
-                                                                    <span className="text-orange-600/70 dark:text-orange-400/70 font-bold text-[11px] uppercase tracking-wider">Rate</span>
-                                                                    <span className="font-black text-orange-600 dark:text-orange-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_retail_price).toFixed(2)}</span>
-                                                                </div>
-
-                                                                <div className="flex items-baseline gap-1.5 whitespace-nowrap bg-emerald-50 dark:bg-emerald-950/20 shadow-sm px-4 py-1.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                                                                    <span className="text-emerald-600/70 dark:text-emerald-400/70 font-bold text-[11px] uppercase tracking-wider">Total</span>
-                                                                    <span className="font-black text-emerald-600 dark:text-emerald-400 text-base leading-none">Rs {toNumber(lastPurchaseInfo.previous_subtotal).toFixed(2)}</span>
-                                                                </div>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-sm font-medium text-muted-foreground/60 italic w-full text-center py-1">No previous history available</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-12 flex flex-col items-center gap-3 bg-white/30 dark:bg-black/10">
-                                                <div className="p-3 rounded-full bg-orange-500/10 dark:bg-orange-500/5 border border-orange-200/50 dark:border-orange-800/30">
-                                                    <ListOrdered className="w-6 h-6 text-orange-400 flex-shrink-0" />
-                                                </div>
-                                                <div className="text-zinc-500 dark:text-zinc-400 text-sm font-black uppercase tracking-widest opacity-60">
-                                                    Item Intelligence Panel
-                                                </div>
-                                                <div className="text-zinc-400 dark:text-zinc-500 text-[11px] font-medium italic -mt-1">
-                                                    Select an item row to unlock real-time metrics & history
-                                                </div>
-                                            </div>
-                                        )}
-                                    </Card>
-                                </div>
-                            </div>
                         </div>
-
-                        {/* Right summary panel - Visible ONLY on Large Desktop (2xl+) */}
                         {showRightSidebar && (
                             <div className="hidden 2xl:block 2xl:col-span-3 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <Card className="p-0  shadow-2xl shadow-orange-500/5 sticky top-[120px] overflow-hidden  backdrop-blur-sm">
@@ -1596,11 +1478,18 @@ export default function PurchaseEdit({
 
                                         {/* Net Total - Big & Bold */}
                                         <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-sm shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
-                                            <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80">Final Net Total</span>
+                                            <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 opacity-80">
+                                                {totals.appliedAdvance > 0 ? "Net Settlement" : "Final Net Total"}
+                                            </span>
                                             <div className="text-3xl font-black leading-none drop-shadow-md">
                                                 <span className="text-xs font-bold mr-1 italic">Rs</span>
-                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {totals.netSettlement.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </div>
+                                            {totals.appliedAdvance > 0 && (
+                                                <div className="text-[10px] font-bold text-emerald-200 mt-1 flex items-center gap-1">
+                                                    <TrendingDown size={12} /> Applied Advance: Rs {totals.appliedAdvance.toLocaleString()}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Selects */}
@@ -1634,19 +1523,6 @@ export default function PurchaseEdit({
                                                                 {msg.messageline}
                                                             </SelectItem>
                                                         ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black uppercase text-zinc-400">Output Format</label>
-                                                <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                                                    <SelectTrigger className="w-full h-8 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-[10px] font-bold">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="big" className="text-xs font-bold flex items-center gap-2 italic">A4 Paper Print</SelectItem>
-                                                        <SelectItem value="small" className="text-xs font-bold flex items-center gap-2 italic">80mm Thermal</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -1710,7 +1586,7 @@ export default function PurchaseEdit({
                                                 className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-sm gap-2"
                                             >
                                                 <Save size={18} className="stroke-[2.5]" />
-                                                Confirm & Save
+                                                Update Invoice
                                             </Button>
                                         </div>
                                     </div>
@@ -1721,14 +1597,14 @@ export default function PurchaseEdit({
 
                     {/* Laptop Sticky Footer (Visible on md and lg, hidden on mobile and 2xl desktop) */}
                     <div className="hidden md:flex 2xl:hidden sticky bottom-0 -mx-6 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-t border-border p-3 px-8 z-40 items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-all duration-300">
-                        <div className="flex gap-10 items-center">
+                        <div className="flex gap-6 items-center flex-wrap">
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Gross Billing</span>
                                 <div className="text-base font-bold text-foreground">Rs {totals.gross.toLocaleString()}</div>
                             </div>
 
-                            <div className="flex flex-col w-32">
-                                <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier Expense</span>
+                            <div className="flex flex-col w-28">
+                                <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier</span>
                                 <Input
                                     className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
                                     value={courier}
@@ -1736,8 +1612,8 @@ export default function PurchaseEdit({
                                 />
                             </div>
 
-                            <div className="flex flex-col w-32">
-                                <span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 leading-none">Extra Discount</span>
+                            <div className="flex flex-col w-28">
+                                <span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 leading-none">Extra Disc</span>
                                 <Input
                                     className="h-8 bg-zinc-50 dark:bg-zinc-900 border-orange-200/50 focus:border-orange-500 font-bold text-sm"
                                     value={extraDiscount}
@@ -1746,44 +1622,46 @@ export default function PurchaseEdit({
                             </div>
 
                             {totals.previousBalance > 0 && (
-                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-6">
+                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4">
                                     <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Prev Balance</span>
                                     <div className="text-base font-bold text-foreground">Rs {totals.previousBalance.toLocaleString()}</div>
                                 </div>
                             )}
 
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Confirmed Net Total</span>
+                            {/* Advance Information in Laptop Sticky */}
+                            {advanceAvailable < 0 && (
+                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4 bg-emerald-500/10 px-3 py-1 rounded-md border border-emerald-500/20">
+                                    <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest leading-none mb-1 flex items-center gap-1">
+                                        <TrendingDown size={11} /> Advance: Rs {Math.abs(advanceAvailable).toLocaleString()}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Checkbox 
+                                            id="use-advance-sticky" 
+                                            checked={useAdvance} 
+                                            onCheckedChange={(v) => setUseAdvance(!!v)}
+                                            className="w-3.5 h-3.5 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
+                                        />
+                                        <label htmlFor="use-advance-sticky" className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap">
+                                            Apply (-Rs {totals.appliedAdvance.toLocaleString()})
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4">
+                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Net Settlement</span>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
                                     <span className="text-sm font-bold mr-1 italic">Rs</span>
-                                    {totals.net.toLocaleString()}
+                                    {totals.netSettlement.toLocaleString()}
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <div className="flex flex-col w-40">
-                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Print Option</span>
-                                <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                                    <SelectTrigger className="h-8 bg-zinc-50 dark:bg-zinc-900/50">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="big" className="text-xs font-black uppercase">A4 Format</SelectItem>
-                                        <SelectItem value="small" className="text-xs font-black uppercase">Thermal</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2">
-                                    <Save size={18} />
-                                    Process Order
-                                </Button>
-                                <Button variant="outline" className="h-10 border-zinc-200 dark:border-zinc-800 rounded-xl px-4 hover:bg-red-50 hover:text-red-500 transition-all font-bold uppercase text-[10px]" onClick={() => window.history.back()}>
-                                    Exit
-                                </Button>
-                            </div>
+                            <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2">
+                                <Save size={18} />
+                                Update Invoice
+                            </Button>
                         </div>
                     </div>
 
@@ -1853,8 +1731,8 @@ export default function PurchaseEdit({
                         submitPurchase(updatePricesAfterPayment);
                     }}
                     invoiceNo={invoiceNo}
-                    supplierName={accounts.find(a => a.id === accountType?.value)?.title || "N/A"}
-                    previousBalance={toNumber(accounts.find(a => a.id === accountType?.value)?.current_balance)}
+                    supplierName={accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A"}
+                    previousBalance={toNumber(accounts.find(a => a.id === Number(accountType?.value))?.current_balance)}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
                     extraDiscount={extraDiscount}

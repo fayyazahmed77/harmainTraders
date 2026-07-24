@@ -559,21 +559,13 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
             <div class="footer-right">
                 <div style="display: inline-block; width: 100%;">
                     <table class="footer-totals-table" align="right">
-                        <!-- Gross Amount -->
-                        <tr>
-                            <td class="label">Gross Amount :-</td>
-                            <td class="value">{{ number_format($sale->gross_total, 2) }}</td>
-                        </tr>
+                        
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>
                             <td class="value">{{ number_format($sale->courier_charges ?? 0, 2) }}</td>
                         </tr>
-                        <!-- Total Rs. (Net of current invoice) -->
-                        <tr>
-                            <td class="label">Total Rs. :-</td>
-                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</td>
-                        </tr>
+                       
                         <!-- Extra Discount -->
                         @if($sale->extra_discount > 0)
                         <tr>
@@ -581,6 +573,11 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                             <td class="value">{{ number_format($sale->extra_discount, 2) }}</td>
                         </tr>
                         @endif
+                         <!-- Total Rs. (Net of current invoice) -->
+                        <tr>
+                            <td class="label">Total Rs. :-</td>
+                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</td>
+                        </tr>
                         <!-- Previous Balance -->
                         @php
                         $total_receivable = (float)($sale->total_receivable ?? 0);

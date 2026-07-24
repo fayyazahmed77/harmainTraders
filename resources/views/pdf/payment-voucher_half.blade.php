@@ -82,7 +82,8 @@
         .info-label {
             display: inline-block;
             width: 60px;
-            color: #181717ff;
+            color: #000;
+            font-weight: bold;
         }
 
         .info-value {
@@ -172,7 +173,8 @@
 
         .footer-note {
             font-size: 7.5px;
-            color: #1f1e1eff;
+            color: #000;
+            font-weight: bold;
             margin-top: 8px;
         }
 

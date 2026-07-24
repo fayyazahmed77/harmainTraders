@@ -177,9 +177,18 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                         <Separator />
 
+                        {Number(financial_summary.total_receipts_discount) > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Payment Discount</span>
+                                <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_receipts_discount)}</span>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Amount Received</span>
-                            <span className="font-bold text-green-600">{formatCurrency(financial_summary.total_receipts)}</span>
+                            <span className="font-bold text-green-600">
+                                {formatCurrency(financial_summary.total_receipts_cash !== undefined ? financial_summary.total_receipts_cash : financial_summary.total_receipts)}
+                            </span>
                         </div>
                         <Separator />
                         <div className="flex items-center justify-between text-sm">
@@ -226,9 +235,17 @@ export default function AccountView({ account, financial_summary }: Props) {
                             <span className="text-muted-foreground">Total Purchases</span>
                             <span className="font-bold">{formatCurrency(financial_summary.total_purchases)}</span>
                         </div>
+                        {Number(financial_summary.total_payments_discount) > 0 && (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Payment Discount</span>
+                                <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_payments_discount)}</span>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Amount Paid</span>
-                            <span className="font-bold text-blue-600">{formatCurrency(financial_summary.total_payments)}</span>
+                            <span className="font-bold text-blue-600">
+                                {formatCurrency(financial_summary.total_payments_cash !== undefined ? financial_summary.total_payments_cash : financial_summary.total_payments)}
+                            </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Returns</span>

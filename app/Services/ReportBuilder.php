@@ -1192,8 +1192,35 @@ class ReportBuilder
         });
         
         $sales = $query->orderBy('date', 'asc')->get();
+
+        // Query Sales Returns for customer credits
+        $returnQuery = SalesReturn::with(['customer' => function($q) {
+                $q->select('id', 'title', 'aging_days', 'credit_limit');
+            }])
+            ->where(function($q) {
+                $q->where('remaining_amount', '>', 0)
+                  ->orWhere('net_total', '>', 0);
+            });
+
+        if ($accountId !== 'ALL' && !empty($accountId)) {
+            $returnQuery->where('customer_id', $accountId);
+        }
+
+        if (!empty($toDate)) {
+            $returnQuery->whereDate('date', '<=', $toDate);
+        }
+
+        if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+            $returnQuery->where('firm_id', $filters['firmId']);
+        }
+
+        $returnQuery->whereHas('customer', function($q) use ($filters) {
+            $this->applyAccountFilters($q, $filters);
+        });
+
+        $salesReturns = $returnQuery->orderBy('date', 'asc')->get();
         
-        $bills = $sales->map(function($sale) use ($toDate) {
+        $saleBills = $sales->map(function($sale) use ($toDate) {
             $agingDays = (int)($sale->customer->aging_days ?? 0);
             $dueDate = \Carbon\Carbon::parse($sale->date)->addDays($agingDays);
             $asOn = \Carbon\Carbon::parse($toDate);
@@ -1216,6 +1243,35 @@ class ReportBuilder
                 'credit_limit' => (float)($sale->customer->credit_limit ?? 0)
             ];
         });
+
+        $returnBills = $salesReturns->map(function($return) use ($toDate) {
+            $agingDays = (int)($return->customer->aging_days ?? 0);
+            $dueDate = \Carbon\Carbon::parse($return->date);
+            $asOn = \Carbon\Carbon::parse($toDate);
+
+            $daysCalc = $dueDate->diffInDays($asOn, false);
+            $days = (int) $daysCalc;
+            
+            $netReturn = (float)$return->net_total - (float)$return->extra_discount;
+            $remReturn = (float)($return->remaining_amount > 0 ? $return->remaining_amount : $netReturn);
+
+            return [
+                'date' => $return->date,
+                'voucher_no' => str_pad($return->invoice ?? $return->id, 6, "0", STR_PAD_LEFT),
+                'party_name' => $return->customer->title ?? 'Unknown',
+                'type' => 'RETURN',
+                'customer_id' => $return->customer_id,
+                'due_date' => $dueDate->format('Y-m-d'),
+                'days' => $days,
+                'bill_amt' => -$netReturn,
+                'paid' => -(float)$return->paid_amount,
+                'remaining' => -$remReturn,
+                'credit_days' => $agingDays,
+                'credit_limit' => (float)($return->customer->credit_limit ?? 0)
+            ];
+        });
+
+        $bills = $saleBills->concat($returnBills);
 
         $grouped = $bills->groupBy('customer_id');
         

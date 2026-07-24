@@ -240,6 +240,18 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   useEffect(() => {
     setInvoiceNo(nextInvoiceNo);
   }, [nextInvoiceNo]);
+
+  // F2 Shortcut listener for Item Registry Dialog
+  useEffect(() => {
+    const handleF2 = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        setItemDialogOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleF2);
+    return () => window.removeEventListener("keydown", handleF2);
+  }, []);
   const [salesman, setSalesman] = useState<number | null>(null);
   const [customerCategory, setCustomerCategory] = useState<string | null>(null);
   const [cashCredit, setCashCredit] = useState<string>("CREDIT");
@@ -271,7 +283,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [extraDiscount, setExtraDiscount] = useState<number>(0);
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
-  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showRightSidebar, setShowRightSidebar] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1536;
+    }
+    return false;
+  });
   const [showBottomDetails, setShowBottomDetails] = useState(true);
 
   // Split Payments State
@@ -654,7 +671,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       net_total: totals.net,
       total_receivable: totals.finalAmount,
       paid_amount: splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
-      remaining_amount: totals.net - splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
+      remaining_amount: totals.net - splits.reduce((acc, s) => acc + toNumber(s.amount), 0) - totals.appliedAdvance,
+      use_advance: useAdvance,
+      applied_advance: totals.appliedAdvance,
 
       items: rowsWithComputed.map((r) => {
         const item = items.find(i => Number(i.id) === Number(r.item_id));
@@ -875,8 +894,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
 
             {/* Desktop Control Deck - Inline Layout */}
-            <div className="hidden md:block">
-              <Card className={`px-4 py-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} flex flex-row flex-nowrap items-end justify-between gap-4 relative overflow-hidden overflow-x-auto custom-scrollbar`}>
+            <div className="hidden md:block min-w-0">
+              <Card className={`px-3 xl:px-4 py-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} flex flex-row flex-wrap xl:flex-nowrap items-end justify-between gap-2.5 xl:gap-3.5 relative overflow-hidden overflow-x-auto custom-scrollbar min-w-0`}>
                 <div className={`absolute top-0 left-0 w-full h-0.5 ${ACCENT_GRADIENT}`} />
 
                 <TechLabel label="Invoice Date" icon={CalendarIcon} className="space-y-1.5 shrink-0">
@@ -885,10 +904,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       <Button
                         variant="outline"
                         id="date-picker"
-                        className={`w-36 justify-between font-bold text-xs h-9 ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all hover:border-orange-500`}
+                        className={`w-32 xl:w-36 justify-between font-bold text-xs h-9 ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all hover:border-orange-500`}
                       >
                         <span className="truncate">{date ? date.toLocaleDateString() : "Select date"}</span>
-                        <CalendarIcon className="h-3.5 w-3.5 opacity-50 text-orange-600" />
+                        <CalendarIcon className="h-3.5 w-3.5 opacity-50 text-orange-600 shrink-0" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -913,11 +932,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       setTime(e.target.value);
                       setIsTimeLive(false);
                     }}
-                    className={`w-37 h-9 text-xs font-mono border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD} text-orange-600 font-bold`}
+                    className={`w-32 xl:w-36 h-9 text-xs font-mono border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD} text-orange-600 font-bold`}
                   />
                 </TechLabel>
 
-                <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[200px]">
+                <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[170px] xl:min-w-[200px]">
                   <Combobox
                     options={accountTypeOptions}
                     value={accountType?.value || ""}
@@ -948,7 +967,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   />
                 </TechLabel>
 
-                <TechLabel label="Account Code" className="space-y-1.5 shrink-0 hidden lg:block">
+                <TechLabel label="Account Code" className="space-y-1.5 shrink-0 hidden 2xl:block">
                   <Input
                     value={code}
                     readOnly
@@ -956,7 +975,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   />
                 </TechLabel>
 
-                <TechLabel label="Days" className="space-y-1.5 shrink-0 hidden xl:block">
+                <TechLabel label="Days" className="space-y-1.5 shrink-0 hidden 2xl:block">
                   <Input
                     value={creditDays}
                     onChange={(e) => setCreditDays(Number(e.target.value))}
@@ -974,7 +993,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                 <TechLabel label="Bill No" icon={Hash} className="space-y-1.5 shrink-0">
                   <div
-                    className={`flex items-center justify-center w-28 h-9 text-xs font-black text-center border border-orange-200 bg-orange-50/40 text-orange-600 ${PREMIUM_ROUNDING_MD} select-none cursor-default`}
+                    className={`flex items-center justify-center w-24 xl:w-28 h-9 text-xs font-black text-center border border-orange-200 bg-orange-50/40 text-orange-600 ${PREMIUM_ROUNDING_MD} select-none cursor-default`}
                     title="Invoice number is auto-generated"
                   >
                     {invoiceNo}
@@ -986,7 +1005,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     value={salesman?.toString() || ""}
                     onValueChange={(val) => setSalesman(val ? Number(val) : null)}
                   >
-                    <SelectTrigger className={`w-36 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
+                    <SelectTrigger className={`w-28 xl:w-36 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
                       <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -1001,7 +1020,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                 <TechLabel label="Sale Type" className="space-y-1.5 shrink-0">
                   <Select value={cashCredit} onValueChange={setCashCredit}>
-                    <SelectTrigger className={`w-24 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
+                    <SelectTrigger className={`w-20 xl:w-24 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1012,13 +1031,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                 </TechLabel>
 
                 <TechLabel label="Items" className="space-y-1.5 shrink-0">
-                  <div className="w-14 h-9 flex items-center justify-center font-mono text-xs font-black bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md">
+                  <div className="w-12 xl:w-14 h-9 flex items-center justify-center font-mono text-xs font-black bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md">
                     {rowsWithComputed.length}
                   </div>
                 </TechLabel>
 
                 <TechLabel label="Status" className="space-y-1.5 shrink-0">
-                  <div className="flex items-center gap-1.5 h-9 px-3 border rounded-md bg-emerald-500/5 border-emerald-500/20">
+                  <div className="flex items-center gap-1.5 h-9 px-2.5 xl:px-3 border rounded-md bg-emerald-500/5 border-emerald-500/20">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest">Active</span>
                   </div>
@@ -1036,13 +1055,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             </div>
 
             {/* Main Items Workspace & Sidebar */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 mb-0">
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 mb-0 min-w-0 items-stretch">
 
               {/* Left Area: Items Registry */}
-              <div className="flex-1 flex flex-col">
-                <Card className="p-0 overflow-hidden gap-0  border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card">
-                  <div className="overflow-visible md:overflow-x-auto">
-                    <div className="w-full md:min-w-[1200px]">
+              <div className="flex-1 flex flex-col min-w-0 h-full">
+                <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card min-w-0 flex-1 flex flex-col justify-between h-full">
+                  <div className="overflow-visible md:overflow-x-auto min-w-0 flex-1 flex flex-col">
+                    <div className="w-full md:min-w-[950px] xl:min-w-0 flex-1 flex flex-col">
                       <div className="hidden md:grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-3 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20">
                         <div className="col-span-4 text-[10px] font-black uppercase tracking-widest ">Item Identification</div>
                         <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">Full</div>
@@ -1056,7 +1075,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       </div>
 
                       {/* Rows (scrollable) */}
-                      <div className="max-h-none h-auto md:h-[100vh] max-h-[100vh] md:max-h-[100vh] overflow-y-auto custom-scrollbar md:overflow-auto space-y-3 md:space-y-0 text-sm">
+                      <div className="flex-1 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar space-y-3 md:space-y-0 text-sm">
                         {rowsWithComputed.map((row) => (
                           <React.Fragment key={row.id}>
                             {/* Mobile Card View (Visible only on < md) */}
@@ -1191,7 +1210,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   </div>
 
                   {/* Table Footer: Totals */}
-                  <div className="hidden md:flex bg-zinc-50/80 dark:bg-zinc-900/40 border-t border-zinc-200 dark:border-zinc-800 p-3 items-center justify-between">
+                  <div className="hidden md:flex bg-zinc-50/80 dark:bg-zinc-900/40 border-t border-zinc-200 dark:border-zinc-800 p-3 items-center justify-between mt-auto">
                     <div className="flex items-center">
                       <Button
                         type="button"
@@ -1223,313 +1242,146 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     </div>
                   </div>
                 </Card>
-
-
-                {/* Bottom fields / stock & supplier info */}
-                <div className={cn(
-                  "mt-0 flex flex-col transition-all duration-300 relative",
-                  showBottomDetails ? "md:mt-1 md:h-[420px]" : "md:h-12 overflow-hidden"
-                )}>
-                  {/* Desktop Toggle Button for Bottom Details */}
-                  <div className="hidden md:flex absolute -top-3 left-1/2 -translate-x-1/2 z-50">
-                    <button
-                      onClick={() => setShowBottomDetails(!showBottomDetails)}
-                      className="w-12 h-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full flex items-center justify-center shadow-lg hover:bg-orange-50 dark:hover:bg-zinc-800 transition-all text-orange-500"
-                    >
-                      {showBottomDetails ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                    </button>
-                  </div>
-                  {/* Mobile Toggle Button for Item Info */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full md:hidden mb-2 border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/50 text-orange-500 dark:text-orange-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-orange-600 dark:hover:text-orange-400 h-8 font-bold text-xs"
-                    onClick={() => setShowInfoPanel(!showInfoPanel)}
-                  >
-                    {showInfoPanel ? (
-                      <>Hide Item Info <ChevronUp className="ml-1.5 h-3.5 w-3.5" /></>
-                    ) : (
-                      <>View Item Info <ChevronDown className="ml-1.5 h-3.5 w-3.5" /></>
-                    )}
-                  </Button>
-
-                  <div className={cn(
-                    (showInfoPanel || showBottomDetails) ? 'flex' : 'hidden md:hidden',
-                    "md:flex flex-col h-full animate-in slide-in-from-bottom-1 duration-300"
-                  )}>
-                    <Card className={cn("flex-1 p-0 border dark:border-zinc-800 shadow-2xl relative overflow-hidden transition-all duration-300 shadow-zinc-200/40 min-h-[320px]", SOFT_GLASS)}>
-                      {selectedItem ? (
-                        <div className="flex flex-col h-full">
-                          {/* 1. Integrated Identity Hub */}
-                          <div className="px-5 py-3 border-b border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between gap-4 sticky top-0 z-20 backdrop-blur-md">
-                            <div className="flex items-center gap-4">
-                              <div className="relative">
-                                <div className="p-2.5 bg-orange-500 rounded-xl shadow-md ring-2 ring-white dark:ring-zinc-900">
-                                  <Box className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 border border-white dark:border-zinc-900 rounded-full shadow-sm" />
-                              </div>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 leading-none tracking-tight uppercase">
-                                    {selectedItem.title}
-                                  </h3>
-                                  <span className="text-[10px] font-mono font-bold text-orange-500 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full tracking-tighter">
-                                    {(selectedItem as any).code || 'REG-ID'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2.5 mt-1.5 opacity-80">
-                                  <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">{selectedItem.short_name || 'ORIGINAL SPEC'}</span>
-                                  <div className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-                                  <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">{selectedItem.company || 'DIRECT OEM'}</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="hidden md:flex items-center gap-6">
-                              <div className="flex flex-col items-end">
-                                <span className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">Registry ID</span>
-                                <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">#{(selectedItem.id || 0).toString().padStart(6, '0')}</span>
-                              </div>
-                              <div className="h-10 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-                              <div className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl shadow-md text-[10px] font-bold uppercase tracking-tight transition-transform hover:scale-105">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping mr-1.5" />
-                                Live Telemetry
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 2. Unified Content Grid */}
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-0 overflow-y-auto custom-scrollbar">
-                            
-                            {/* SECTION A: INVENTORY PULSE */}
-                            <div className="md:col-span-3 p-4 border-r border-zinc-100 dark:border-zinc-800/80 flex flex-col justify-between">
-                              <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                  <Layers className="w-4 h-4 text-emerald-500" />
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Inventory Status</span>
-                                </div>
-
-                                {(() => {
-                                  const packing = toNumber(selectedItem.packing_qty) || 1;
-                                  const currentTotalStock = toNumber(selectedItem.total_stock_pcs);
-                                  const activeRow = rows.find(r => r.item_id === selectedItem.id);
-                                  const enteredQty = activeRow ? (toNumber(activeRow.full) * packing) + toNumber(activeRow.pcs) + (toNumber(activeRow.bonus_full) * packing) + toNumber(activeRow.bonus_pcs) : 0;
-                                  const remainingStock = currentTotalStock - enteredQty;
-                                  const isNegative = remainingStock < 0;
-
-                                  return (
-                                    <div className="space-y-3">
-                                      <div className="flex flex-col items-center">
-                                        <div className={cn(
-                                          "text-3xl font-extrabold tracking-tight transition-colors duration-500",
-                                          isNegative ? "text-rose-600" : "text-zinc-900 dark:text-zinc-50"
-                                        )}>
-                                          {remainingStock.toLocaleString()}
-                                        </div>
-                                        <div className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mt-0.5">Units Available</div>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-4 pt-1">
-                                        <div className="flex flex-col">
-                                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-                                            {Math.floor(remainingStock / packing).toLocaleString()}
-                                          </span>
-                                          <span className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">Full CTN</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-                                            {(remainingStock % packing).toLocaleString()}
-                                          </span>
-                                          <span className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">Loose PCS</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-
-                              <div className="mt-4 relative pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                                <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
-                                  <span>Total Registry Base</span>
-                                  <span>{selectedItem.total_stock_pcs || 0} PCS</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* SECTION B: PRICING MATRIX */}
-                            <div className="md:col-span-6 p-4 border-r border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/20 dark:bg-zinc-900/20 flex flex-col h-full justify-between">
-                              <div className="grid grid-cols-3 lg:grid-cols-4 gap-3">
-                                {[1, 2, 3, 4, 5, 6, 7].map((num) => {
-                                  const tradePrice = toNumber(selectedItem.trade_price);
-                                  let percentage = 0;
-                                  let calculatedPrice = tradePrice;
-                                  let label = "";
-                                  let tooltipText = "";
-
-                                  if (num === 1) {
-                                    percentage = 0;
-                                    calculatedPrice = tradePrice;
-                                    label = "Trade Price";
-                                    tooltipText = "Base Trade Price";
-                                  } else {
-                                    const priceKey = `pt${num}` as keyof InventoryItem;
-                                    percentage = toNumber(selectedItem[priceKey]);
-                                    calculatedPrice = Math.round(tradePrice * (1 + percentage / 100));
-                                    label = `Tier ${num}`;
-                                    tooltipText = `Trade + ${percentage}%`;
-                                  }
-
-                                  const isActive = String(num) === customerCategory;
-                                  
-                                  if (num !== 1 && percentage === 0 && !isActive) return null;
-
-                                  return (
-                                    <Tooltip key={num}>
-                                      <TooltipTrigger asChild>
-                                        <div className={cn(
-                                          "flex flex-col p-2.5 rounded border transition-all duration-300 relative overflow-hidden group cursor-pointer",
-                                          isActive 
-                                            ? `${ACCENT_GRADIENT} border-transparent text-white shadow-md ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-zinc-900 scale-[1.02] z-10` 
-                                            : "bg-white dark:bg-zinc-900/50 border-zinc-200/60 dark:border-zinc-800/60 hover:border-orange-200 dark:hover:border-orange-500/40"
-                                        )}>
-                                          <div className="flex items-center justify-between mb-1">
-                                            <span className={cn("text-[8px] font-semibold uppercase tracking-wider", isActive ? "text-orange-100" : "text-zinc-400")}>{label}</span>
-                                            <span className={cn("text-[9px] font-bold px-1 py-0.5 rounded", isActive ? "bg-white/20 text-white" : "text-orange-600 bg-orange-500/5")}>
-                                              {num === 1 ? "BASE" : `${percentage}%`}
-                                            </span>
-                                          </div>
-                                          <div className={cn("text-md font-bold tracking-tight", isActive ? "text-white" : "text-zinc-900 dark:text-zinc-100")}>
-                                            <span className="text-[10px] opacity-60 mr-0.5 font-bold">Rs</span>
-                                            {calculatedPrice.toLocaleString()}
-                                          </div>
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="bg-zinc-900 text-[9px] font-semibold uppercase tracking-wider px-3 py-1.5">{tooltipText}</TooltipContent>
-                                    </Tooltip>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Unified Market Scheme Alert Strip */}
-                              {(selectedItem.scheme || selectedItem.scheme2) && (
-                                <div className="mt-4 flex items-center gap-3 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/10 px-4 py-2.5 rounded-xl">
-                                  <div className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center shrink-0 shadow shadow-rose-500/20">
-                                    <Info className="w-3.5 h-3.5 text-white" />
-                                  </div>
-                                  <div className="flex flex-col overflow-hidden">
-                                    <span className="text-[9px] font-semibold text-rose-500 uppercase tracking-wider">Active Market Scheme</span>
-                                    <span className="text-xs font-bold text-rose-800 dark:text-rose-100 truncate">{selectedItem.scheme || selectedItem.scheme2}</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* SECTION C: PRICING INFO */}
-                            <div className="md:col-span-3 p-4 flex flex-col justify-between">
-                              <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                  <Banknote className="w-4 h-4 text-purple-500" />
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Pricing Info</span>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  {[
-                                    { label: "Trade Price", val: selectedItem.trade_price, color: "text-purple-600 dark:text-purple-400" },
-                                    { label: "Retail MSRP", val: selectedItem.retail, color: "text-orange-600 dark:text-orange-400" },
-                                    { label: "Avg Cost", val: (toNumber(selectedItem.trade_price) + toNumber(selectedItem.retail)) / 2, color: "text-emerald-600 dark:text-emerald-400" }
-                                  ].map((m, i) => (
-                                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
-                                      <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">{m.label}</span>
-                                      <span className={cn("text-xs font-mono font-bold", m.color)}>Rs {toNumber(m.val).toLocaleString()}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="mt-4 space-y-2 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                                <span className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">Shelf Placement</span>
-                                <div className="flex items-center gap-2.5 bg-zinc-100 dark:bg-zinc-800/80 p-2.5 rounded-xl hover:scale-[1.01] transition-transform">
-                                  <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
-                                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50 uppercase tracking-tight truncate">{(selectedItem as any).shelf || 'LEDGER'}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 3. Deep Insight Bar (Footer) */}
-                          <div className="px-5 py-3 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-transparent flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-8">
-                              <div className="flex items-center gap-3 group">
-                                <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800/85 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-all">
-                                  <CalendarDays className="w-4 h-4 text-zinc-400" />
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[8px] font-semibold text-zinc-400 uppercase tracking-wider leading-none">Last Provider In</span>
-                                  <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-300 tracking-tight mt-1">{selectedItem.last_purchase_date || 'INITIAL_STOCK'}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3 group">
-                                <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800/85 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-all">
-                                  <PackageSearch className="w-4 h-4 text-zinc-400" />
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[8px] font-semibold text-zinc-400 uppercase tracking-wider leading-none">Batch Snapshot</span>
-                                  <div className="flex items-center gap-1.5 mt-1 font-bold text-[11px] tracking-tight">
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedItem.last_purchase_full || 0}F</span>
-                                    <span className="text-zinc-300">/</span>
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedItem.last_purchase_pcs || 0}P</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 h-8 px-4 rounded-lg shadow-sm">
-                                <span className="text-[9px] font-bold uppercase tracking-wider mr-2.5 opacity-60">Supplier:</span>
-                                <span className="text-[10px] font-bold uppercase truncate max-w-[140px]">{selectedItem.last_supplier || 'MARKET_DIRECT'}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/30 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
-                                <Banknote size={14} />
-                                <span className="text-[11px] font-bold font-mono tracking-tight">Rs {toNumber(selectedItem.last_purchase_rate).toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-[300px] text-center p-12 relative z-10 w-full animate-in fade-in duration-700">
-                          <div className="relative">
-                            <Box className="text-zinc-100 dark:text-zinc-800/40 w-24 h-24 mb-6 animate-bounce duration-[2000ms]" />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Search className="text-zinc-300 dark:text-zinc-700 w-8 h-8 opacity-50" />
-                            </div>
-                          </div>
-                          <div className="text-zinc-400 dark:text-zinc-500 text-xs font-black uppercase tracking-[0.2em] mb-2">Registry SKU Teletry Required</div>
-                          <div className="text-[10px] font-bold text-zinc-300 dark:text-zinc-700 uppercase tracking-widest">Select a product to initialize the diagnostic grid</div>
-                        </div>
-                      )}
-                    </Card>
-                  </div>
-                </div>
               </div>
 
-              {/* Always Show Toggle when sidebar is closed - floating on the right screen edge */}
+              {/* Sticky Bottom Bar for Laptop/Responsive View (when Right Sidebar is hidden) */}
               {!showRightSidebar && (
-                <div className="hidden lg:flex fixed top-1/2 right-0 -translate-y-1/2 z-50">
-                  <button
-                    onClick={() => setShowRightSidebar(true)}
-                    className="w-8 h-12 bg-orange-500 rounded-l-xl flex items-center justify-center shadow-2xl hover:w-10 transition-all text-white border-y border-l border-orange-400/30"
-                  >
-                    <ChevronLeft size={20} className="drop-shadow-sm" />
-                  </button>
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 px-4 py-2.5 shadow-[0_-10px_30px_rgba(0,0,0,0.12)] transition-all duration-300">
+                  <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
+                    
+                    {/* 1. Left Section: Financial Summary & Inputs */}
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Final Net Payable */}
+                      <div className="flex flex-col shrink-0">
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net Payable</span>
+                        <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
+                          <span className="text-xs font-semibold mr-0.5">Rs</span>
+                          {totals.finalAmount.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden sm:block" />
+
+                      {/* Receivable / Net Settlement */}
+                      <div className="hidden sm:flex flex-col shrink-0">
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                          {previousBalance < 0 && useAdvance ? "Net Settlement" : "Receivable"}
+                        </span>
+                        <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 font-mono leading-none">
+                          Rs {totals.receivable.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden md:block" />
+
+                      {/* Courier Input */}
+                      <div className="hidden md:flex items-center gap-1.5 shrink-0">
+                        <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Courier:</span>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={courier || ""}
+                          onChange={(e) => setCourier(toNumber(e.target.value))}
+                          className="h-8 w-20 text-xs font-bold bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-center"
+                        />
+                      </div>
+
+                      {/* Extra Discount Input */}
+                      <div className="hidden md:flex items-center gap-1.5 shrink-0">
+                        <span className="text-[9px] font-black uppercase text-rose-500 tracking-wider">Extra Disc:</span>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={extraDiscount || ""}
+                          onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
+                          className="h-8 w-20 text-xs font-bold text-rose-600 bg-rose-50/50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30 text-center"
+                        />
+                      </div>
+
+                      {/* Branding Select */}
+                      <div className="hidden lg:block shrink-0">
+                        <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                          <SelectTrigger className="h-8 w-32 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                            <SelectValue placeholder="Branding" />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            <SelectItem value="0">No Branding</SelectItem>
+                            {firms.map((firm) => (
+                              <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Message Line Select */}
+                      <div className="hidden xl:block shrink-0">
+                        <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                          <SelectTrigger className="h-8 w-36 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                            <SelectValue placeholder="Message Line" />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            <SelectItem value="0">No Message Line</SelectItem>
+                            {messageLines.map((msg) => (
+                              <SelectItem key={msg.id} value={msg.id.toString()}>{msg.messageline}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* 2. Right Section: Checkout & Action Button */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* Instant Checkout Button */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const next = !isPayNow;
+                          setIsPayNow(next);
+                          if (next) {
+                            setCheckoutDialogOpen(true);
+                            setCashReceived(Math.round(totals.finalAmount));
+                          }
+                        }}
+                        className={cn(
+                          "h-9 px-3 text-xs font-bold gap-2 transition-all",
+                          isPayNow ? "bg-orange-500 text-white border-orange-500 shadow-md" : "text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-orange-500"
+                        )}
+                      >
+                        <Banknote size={14} />
+                        <span className="hidden sm:inline">{isPayNow ? "Instant Checkout ON" : "Instant Checkout"}</span>
+                      </Button>
+
+                      {/* Finalize Invoice Main Action */}
+                      <Button
+                        onClick={handleSave}
+                        disabled={processing}
+                        className={`h-9 px-6 ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all`}
+                      >
+                        {processing ? "Syncing..." : "Finalize Invoice"}
+                      </Button>
+
+                      {/* Toggle Sidebar Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowRightSidebar(true)}
+                        className="h-9 w-9 p-0 text-orange-500 hover:bg-orange-50 dark:hover:bg-zinc-800 rounded-lg shrink-0"
+                        title="Expand Full Right Panel"
+                      >
+                        <ChevronLeft size={18} />
+                      </Button>
+                    </div>
+
+                  </div>
                 </div>
               )}
 
               {/* Right Sidebar: Quick Summary & Financials */}
               <div className={cn(
-                "transition-all duration-500 ease-in-out relative flex flex-col",
-                showRightSidebar ? "w-full lg:w-80 opacity-100" : "w-0 lg:w-0 opacity-0 pointer-events-none"
+                "transition-all duration-500 ease-in-out relative flex flex-col min-w-0",
+                showRightSidebar ? "w-full lg:w-72 xl:w-80 opacity-100" : "w-0 lg:w-0 opacity-0 pointer-events-none"
               )}>
                 {/* Desktop Toggle Button for Right Sidebar - Floating on the left edge */}
                 <div className="hidden lg:flex absolute top-1/2 -left-4 -translate-y-1/2 z-50 group">
@@ -1674,15 +1526,6 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 pb-2">
-                        <Select value={printOption} onValueChange={(v) => setPrintOption(v as "big" | "small")}>
-                          <SelectTrigger className="h-9 w-full border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="big">Big Print (A4)</SelectItem>
-                            <SelectItem value="small">Small Print (Thermal)</SelectItem>
-                          </SelectContent>
-                        </Select>
 
                         <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
                           <SelectTrigger className="h-9 w-full border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">

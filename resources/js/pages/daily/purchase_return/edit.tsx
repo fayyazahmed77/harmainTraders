@@ -142,7 +142,20 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
     const [date, setDate] = useState<Date>(new Date(returnData.date));
     const [calOpen, setCalOpen] = useState(false);
     const [invoiceNo, setInvoiceNo] = useState(returnData.invoice);
-    const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => accounts.find(a => a.id === returnData.supplier_id) ?? null);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => {
+        if (!returnData) return null;
+        const found = accounts.find(a => a.id.toString() === returnData.supplier_id?.toString());
+        if (found) return found;
+        if ((returnData as any).supplier) {
+            const supp = (returnData as any).supplier;
+            return {
+                id: supp.id,
+                title: supp.title || supp.name || "Supplier #" + supp.id,
+                saleman_id: supp.saleman_id ?? undefined
+            };
+        }
+        return null;
+    });
     const [accountSearch, setAccountSearch] = useState("");
     const [remarks, setRemarks] = useState(returnData.remarks || "");
     const [originalInvoiceNo, setOriginalInvoiceNo] = useState(returnData.original_invoice);

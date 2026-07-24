@@ -86,11 +86,11 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
         <SidebarProvider>
             <Head title="Purchases | Harnain Traders" />
             <AppSidebar variant="inset" />
-            <SidebarInset className="bg-zinc-50 dark:bg-zinc-950">
+            <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 min-w-0 overflow-x-hidden">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar">
-                    <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
+                <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+                    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 space-y-6 min-w-0">
                         {/* Header Section */}
                         <motion.div
                             initial={{ opacity: 0, y: -20 }}

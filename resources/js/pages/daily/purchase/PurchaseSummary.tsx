@@ -103,7 +103,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
         <div className="bg-card text-card-foreground rounded-[0.5rem] border border-border shadow-sm p-4 md:p-6 mb-8 overflow-hidden">
 
             {/* 1. PROC-BAR (Procurement Stream) */}
-            <div className="bg-muted/30 rounded-[0.5rem] p-4 flex flex-col lg:flex-row items-center justify-between gap-6 mb-6 border border-border px-6">
+            <div className="bg-muted/30 rounded-[0.5rem] p-4 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 mb-6 border border-border px-4 sm:px-6 min-w-0">
                 <div className="flex items-center gap-3 shrink-0">
                     <div className="h-10 w-10 rounded-xl bg-background border border-border flex items-center justify-center shadow-sm">
                         <TrendingUp className="h-5 w-5 text-orange-500" />
@@ -116,7 +116,7 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                     </div>
                 </div>
 
-                <div className="flex-1 w-full lg:max-w-md">
+                <div className="flex-1 w-full md:max-w-md min-w-0">
                     <div className="flex justify-between items-center mb-1.5 px-1">
                         <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Payment Progress</span>
                         <span className="text-[10px] font-black text-orange-500">{cappedPercentage}% PAID</span>
@@ -129,50 +129,50 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                     </div>
                 </div>
 
-                <div className="hidden lg:flex items-center gap-1.5 text-muted-foreground border-l border-border pl-6 h-6">
+                <div className="hidden xl:flex items-center gap-1.5 text-muted-foreground border-l border-border pl-6 h-6 shrink-0">
                     <Calendar className="h-3.5 w-3.5" />
                     <span className="text-[10px] font-black tracking-tight uppercase">Period: Last 12 Days</span>
                 </div>
             </div>
 
             {/* 2. COCKPIT GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch min-h-[260px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 xl:gap-4 items-stretch">
 
                 {/* HERO BLOCK: Commitment */}
-                <div className="flex flex-col bg-orange-500/5 rounded-[0.5rem] p-6 border border-orange-500/10 relative overflow-hidden group">
+                <div className="min-w-0 flex flex-col bg-orange-500/5 rounded-[0.5rem] p-4 xl:p-5 border border-orange-500/10 relative overflow-hidden group">
                     <div className="absolute -top-10 -right-10 h-32 w-32 bg-orange-500/10 rounded-full blur-3xl opacity-60 group-hover:scale-150 transition-transform duration-1000"></div>
-                    <div className="h-8 w-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-md mb-4 relative z-10 font-black italic">
+                    <div className="h-7 w-7 rounded-lg bg-orange-500 text-white flex items-center justify-center shadow-md mb-3 relative z-10 font-black italic text-xs">
                         Σ
                     </div>
-                    <p className="text-[10px] font-black text-orange-500/70 uppercase tracking-[0.2em] mb-1">Total Purchases</p>
-                    <h3 className="text-4xl font-black text-foreground tracking-tight leading-none mb-4 uppercase">
+                    <p className="text-[9px] xl:text-[10px] font-black text-orange-500/70 uppercase tracking-[0.15em] mb-1">Total Purchases</p>
+                    <h3 className="text-2xl xl:text-3xl font-black text-foreground tracking-tight leading-none mb-3 uppercase truncate">
                         Rs {formatCurrency(summary.total_purchase)}
                     </h3>
-                    <div className="mt-auto space-y-3 relative z-10">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Bills</span>
-                            <span className="text-xs font-black text-foreground uppercase tabular-nums">{summary.count} BILLS</span>
+                    <div className="mt-auto space-y-2 relative z-10">
+                        <div className="flex items-center justify-between px-0.5">
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase">Total Bills</span>
+                            <span className="text-[11px] font-black text-foreground uppercase tabular-nums">{summary.count} BILLS</span>
                         </div>
-                        <div className="flex items-center justify-between bg-background/50 backdrop-blur-sm p-3 rounded-[0.5rem] border border-border/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">Overall Status</span>
-                            <span className="text-[10px] font-black text-emerald-500 flex items-center">
-                                <ShieldCheck className="h-3.5 w-3.5 mr-1" /> OPTIMAL
+                        <div className="flex items-center justify-between bg-background/50 backdrop-blur-sm p-2.5 rounded-[0.5rem] border border-border/50">
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase">Overall Status</span>
+                            <span className="text-[9px] font-black text-emerald-500 flex items-center">
+                                <ShieldCheck className="h-3 w-3 mr-1" /> OPTIMAL
                             </span>
                         </div>
                     </div>
                 </div>
 
                 {/* STATS BLOCK: Settlement Flow */}
-                <div className={`flex flex-col rounded-[0.5rem] p-6 border transition-all duration-500 ${theme.card}`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme.textMuted}`}>Payment Summary</p>
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shadow-sm ${theme.icon}`}>
-                            <RefreshCcw className="h-5 w-5" />
+                <div className={`min-w-0 flex flex-col rounded-[0.5rem] p-4 xl:p-5 border transition-all duration-500 ${theme.card}`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className={`text-[9px] xl:text-[10px] font-black uppercase tracking-[0.15em] ${theme.textMuted}`}>Payment Summary</p>
+                        <div className={`h-7 w-7 rounded-lg flex items-center justify-center shadow-sm ${theme.icon}`}>
+                            <RefreshCcw className="h-4 w-4" />
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-8 my-auto p-2">
-                        <div className="relative h-28 w-28 shrink-0">
+                    <div className="flex items-center gap-2.5 xl:gap-4 my-auto p-0.5 min-w-0">
+                        <div className="relative h-20 w-20 xl:h-24 xl:w-24 shrink-0">
                             <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
                                 <circle className={theme.ringTrack} cx="18" cy="18" r="15.9155" strokeWidth="3" fill="none" />
                                 <circle
@@ -185,49 +185,49 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                                 />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-2xl font-black leading-none">{cappedPercentage}%</span>
-                                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter mt-1 tabular-nums">Paid</span>
+                                <span className="text-base xl:text-xl font-black leading-none">{cappedPercentage}%</span>
+                                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter mt-0.5 tabular-nums">Paid</span>
                             </div>
                         </div>
-                        <div className="flex-1 w-full space-y-3">
-                            <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Paid</span>
-                                <span className="text-sm font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_paid)}</span>
+                        <div className="flex-1 w-full min-w-0 space-y-1.5">
+                            <div className={`flex justify-between border-b pb-1 ${theme.border}`}>
+                                <span className="text-[8px] xl:text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Paid</span>
+                                <span className="text-[11px] xl:text-xs font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_paid)}</span>
                             </div>
-                            <div className={`flex justify-between border-b pb-2 ${theme.border}`}>
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Returns</span>
-                                <span className="text-sm font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_returns)}</span>
+                            <div className={`flex justify-between border-b pb-1 ${theme.border}`}>
+                                <span className="text-[8px] xl:text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Returns</span>
+                                <span className="text-[11px] xl:text-xs font-black text-foreground font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_returns)}</span>
                             </div>
-                            <div className="flex justify-between pt-1">
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Remaining</span>
-                                <span className="text-lg font-black text-rose-500 font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_unpaid)}</span>
+                            <div className="flex justify-between pt-0.5">
+                                <span className="text-[8px] xl:text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Remaining</span>
+                                <span className="text-xs xl:text-sm font-black text-rose-500 font-mono tracking-tighter italic">Rs {formatCurrency(summary.total_unpaid)}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* WEEKLY ANALYTICS (Flux Matrix) */}
-                <div className="hidden lg:flex flex-col bg-muted/20 border border-border rounded-[0.5rem] p-5 relative overflow-hidden group">
-                    <div className="flex items-center justify-between mb-4 relative z-10">
+                <div className="min-w-0 flex flex-col bg-muted/20 border border-border rounded-[0.5rem] p-4 xl:p-5 relative overflow-hidden group">
+                    <div className="flex items-center justify-between mb-3 relative z-10">
                         <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center">
+                            <p className="text-[9px] xl:text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em] flex items-center">
                                 <Activity className="h-3 w-3 mr-1 text-orange-500" /> Recent Trends
                             </p>
-                            <p className="text-[8px] font-bold text-muted-foreground uppercase">Purchases vs Payments</p>
+                            <p className="text-[7px] xl:text-[8px] font-bold text-muted-foreground uppercase">Purchases vs Payments</p>
                         </div>
                         <div className="flex flex-col items-end">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                                 <div className="h-1.5 w-1.5 rounded-full bg-orange-500 mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Purchases</span>
+                                <span className="text-[7px] xl:text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Purchases</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                                 <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 mb-0.5"></div>
-                                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Payments</span>
+                                <span className="text-[7px] xl:text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Payments</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-[160px] relative z-10">
+                    <div className="flex-1 min-h-[130px] relative z-10">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={weeklyData}>
                                 <defs>
@@ -241,8 +241,8 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                                     dataKey="date"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fontSize: 8, fontWeight: 700, fill: 'var(--muted-foreground)' }}
-                                    dy={10}
+                                    tick={{ fontSize: 7, fontWeight: 700, fill: 'var(--muted-foreground)' }}
+                                    dy={6}
                                 />
                                 <YAxis hide />
                                 <Tooltip
@@ -252,20 +252,20 @@ export default function PurchaseSummary({ summary, purchases }: SummaryProps) {
                                         borderRadius: '0.5rem',
                                         border: '1px solid var(--border)',
                                         boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                        fontSize: '10px'
+                                        fontSize: '9px'
                                     }}
-                                    itemStyle={{ fontWeight: 900, fontSize: '11px', color: 'var(--foreground)' }}
-                                    labelStyle={{ fontWeight: 900, color: '#f97316', marginBottom: '4px' }}
+                                    itemStyle={{ fontWeight: 900, fontSize: '10px', color: 'var(--foreground)' }}
+                                    labelStyle={{ fontWeight: 900, color: '#f97316', marginBottom: '2px' }}
                                     formatter={(value: any) => [`Rs ${formatCurrency(value as number)}`, '']}
                                 />
-                                <Bar dataKey="purchase" fill="url(#purchaseBar)" radius={[4, 4, 0, 0]} barSize={16} />
+                                <Bar dataKey="purchase" fill="url(#purchaseBar)" radius={[3, 3, 0, 0]} barSize={10} />
                                 <Line
                                     type="monotone"
                                     dataKey="payment"
                                     stroke="#f97316"
-                                    strokeWidth={3}
-                                    dot={{ r: 3, fill: '#f97316', strokeWidth: 1.5, stroke: 'var(--card)' }}
-                                    activeDot={{ r: 5, strokeWidth: 0 }}
+                                    strokeWidth={2}
+                                    dot={{ r: 2, fill: '#f97316', strokeWidth: 1, stroke: 'var(--card)' }}
+                                    activeDot={{ r: 4, strokeWidth: 0 }}
                                 />
                             </ComposedChart>
                         </ResponsiveContainer>

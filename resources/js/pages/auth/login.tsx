@@ -77,6 +77,7 @@ export default function Login({ status }: { status?: string }) {
                                 onChange={(e) => setData('email', e.target.value)}
                                 required
                                 autoFocus
+                                autoComplete="username"
                                 placeholder="email@example.com"
                                 className="h-14 w-full rounded-md border-slate-200 pl-12 pr-4 text-lg transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
                             />
@@ -102,6 +103,7 @@ export default function Login({ status }: { status?: string }) {
                                 value={data.password}
                                 onChange={(e) => setData('password', e.target.value)}
                                 required
+                                autoComplete="current-password"
                                 placeholder="Password"
                                 className="h-14 w-full rounded-md border-slate-200 pl-4 pr-12 text-lg transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
                             />

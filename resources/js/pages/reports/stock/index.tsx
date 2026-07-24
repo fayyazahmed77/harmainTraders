@@ -32,7 +32,12 @@ export default function StockReportsIndex({ items, companies, categories, firms 
     const [reportData, setReportData] = useState<any[]>([]);
     const [params, setParams] = useState({
         reportId: 'summary',
-        fromDate: `${new Date().getFullYear()}-01-01`,
+        fromDate: (() => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}-01`;
+        })(),
         toDate: (() => {
             const d = new Date();
             const year = d.getFullYear();

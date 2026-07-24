@@ -326,6 +326,8 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                                 color="green"
                                 items={[
                                     { label: 'Opening', value: data.cash.opening, isCurrency: true },
+                                    { label: 'IN', value: data.cash.receiving, isCurrency: true, className: 'text-emerald-600 font-bold' },
+                                    { label: 'OUT', value: data.cash.payment, isCurrency: true, className: 'text-rose-600 font-bold' },
                                     { label: 'Closing', value: data.cash.closing, isCurrency: true, isBold: true },
                                 ]}
                             />
@@ -335,6 +337,8 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                                 color="blue"
                                 items={[
                                     { label: 'Opening', value: data.cheque.opening, isCurrency: true },
+                                    { label: 'IN', value: data.cheque.receiving, isCurrency: true, className: 'text-emerald-600 font-bold' },
+                                    { label: 'OUT', value: data.cheque.payment, isCurrency: true, className: 'text-rose-600 font-bold' },
                                     { label: 'Closing', value: data.cheque.closing, isCurrency: true, isBold: true },
                                 ]}
                             />
@@ -401,33 +405,33 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                         </div>
 
                         {/* Bank Overall Summary */}
-                        <div className="p-8 bg-surface-4 text-white space-y-4">
-                            <div className="flex items-center gap-2 mb-4 opacity-70">
-                                <Info className="h-4 w-4" />
-                                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em]">Bank Aggregate Summary</h4>
+                        <div className="p-6 bg-slate-900 text-slate-100 rounded-xl space-y-4 shadow-md border border-slate-800 m-4">
+                            <div className="flex items-center gap-2 mb-3 text-slate-400">
+                                <Info className="h-4 w-4 text-indigo-400" />
+                                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-200">Bank Aggregate Summary</h4>
                             </div>
-                            <div className="grid grid-cols-2 gap-x-12 gap-y-4">
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span className="text-xs text-white/60 uppercase font-medium">Bank Opening</span>
-                                    <span className="font-bold">{formatCurrency(data.bank.summary.opening)}</span>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                                    <span className="text-xs text-slate-400 uppercase font-semibold">Bank Opening</span>
+                                    <span className="font-bold text-slate-200">{formatCurrency(data.bank.summary.opening)}</span>
                                 </div>
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span className="text-xs text-white/60 uppercase font-medium">Bank Receiving</span>
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                                    <span className="text-xs text-slate-400 uppercase font-semibold">Bank Receiving</span>
                                     <span className="font-bold text-emerald-400">+{formatCurrency(data.bank.summary.receiving)}</span>
                                 </div>
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span className="text-xs text-white/60 uppercase font-medium">Bank Payment</span>
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                                    <span className="text-xs text-slate-400 uppercase font-semibold">Bank Payment</span>
                                     <span className="font-bold text-rose-400">−{formatCurrency(data.bank.summary.payment)}</span>
                                 </div>
-                                <div className="flex justify-between items-center bg-white/10 p-2 rounded-lg">
-                                    <span className="text-xs text-indigo-200 uppercase font-bold">Bank Closing</span>
+                                <div className="flex justify-between items-center bg-slate-800/90 px-3 py-2 rounded-lg border border-slate-700/60">
+                                    <span className="text-xs text-indigo-300 uppercase font-bold">Bank Closing</span>
                                     <span className="font-black text-white text-lg">{formatCurrency(data.bank.summary.closing)}</span>
                                 </div>
                                 
                                 {/* Net Movement */}
-                                <div className="flex justify-between items-center col-span-2 border-t border-white/10 pt-2">
-                                    <span className="text-xs text-white/60 uppercase font-medium">Net Movement</span>
-                                    <span className={`font-bold ${(data.bank.summary.closing - data.bank.summary.opening) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                <div className="flex justify-between items-center col-span-2 border-t border-slate-800 pt-3 mt-1">
+                                    <span className="text-xs text-slate-400 uppercase font-bold">Net Movement</span>
+                                    <span className={`font-black text-base ${(data.bank.summary.closing - data.bank.summary.opening) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                         {(data.bank.summary.closing - data.bank.summary.opening) >= 0 ? '+' : ''}
                                         {formatCurrency(data.bank.summary.closing - data.bank.summary.opening)}
                                     </span>

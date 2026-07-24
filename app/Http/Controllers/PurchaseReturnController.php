@@ -400,9 +400,16 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item', 'firm'])->findOrFail($id);
         $accounts = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Supplier']);
+                $q->whereIn('name', ['Supplier', 'Suppliers']);
             })
             ->get();
+
+        if ($return->supplier_id && !$accounts->contains('id', $return->supplier_id)) {
+            $supp = Account::find($return->supplier_id);
+            if ($supp) {
+                $accounts->push($supp);
+            }
+        }
         $salemans = Saleman::get();
         $items = Items::get();
         $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();

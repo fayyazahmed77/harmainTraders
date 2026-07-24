@@ -87,10 +87,10 @@ export default function Index({ sales, summary, filters, customers }: Props) {
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
-            <SidebarInset>
+            <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 min-w-0 overflow-x-hidden">
                 <SiteHeader breadcrumbs={breadcrumbs} />
-                <div className="p-4">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6 space-y-6 min-w-0">
+                    <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold mb-1">Sales Dashboard</h1>
                             <p className="text-sm text-muted-foreground">
@@ -98,7 +98,6 @@ export default function Index({ sales, summary, filters, customers }: Props) {
                             </p>
                         </div>
                         <Button
-                            className=" mb-3"
                             onClick={() => router.visit("/sales/create")}
                         >
                             <Plus className="mr-2" /> New Sale

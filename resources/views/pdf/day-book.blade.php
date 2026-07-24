@@ -296,6 +296,8 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
                         <div class="card-body">
                             <table>
                                 <tr><td class="label">Opening</td><td class="value">{{ f($data['cash']['opening']) }}</td></tr>
+                                <tr><td class="label text-emerald font-bold">IN</td><td class="value text-emerald font-bold">+{{ f($data['cash']['receiving']) }}</td></tr>
+                                <tr><td class="label text-rose font-bold">OUT</td><td class="value text-rose font-bold">-{{ f($data['cash']['payment']) }}</td></tr>
                                 <tr style="background-color: #f0fdf4;"><td class="label font-bold text-emerald">Closing</td><td class="value text-emerald">{{ f($data['cash']['closing']) }}</td></tr>
                             </table>
                         </div>
@@ -307,6 +309,8 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
                         <div class="card-body">
                             <table>
                                 <tr><td class="label">Opening</td><td class="value">{{ f($data['cheque']['opening']) }}</td></tr>
+                                <tr><td class="label text-emerald font-bold">IN</td><td class="value text-emerald font-bold">+{{ f($data['cheque']['receiving']) }}</td></tr>
+                                <tr><td class="label text-rose font-bold">OUT</td><td class="value text-rose font-bold">-{{ f($data['cheque']['payment']) }}</td></tr>
                                 <tr style="background-color: #f5f3ff;"><td class="label font-bold" style="color: #6366f1;">Closing</td><td class="value font-bold" style="color: #6366f1;">{{ f($data['cheque']['closing']) }}</td></tr>
                             </table>
                         </div>

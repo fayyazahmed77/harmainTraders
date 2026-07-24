@@ -206,6 +206,8 @@ if (file_exists($logo_path)) {
                         <td>{{ $bill['party_name'] }}</td>
                         @if($statusType === 'CASH')
                             <td class="text-center" style="font-weight: bold; color: #059669;">CASH</td>
+                        @elseif($statusType === 'RETURN')
+                            <td class="text-center" style="font-weight: bold; color: #dc2626;">RETURN</td>
                         @else
                             <td class="text-center" style="font-weight: bold; color: #2563eb;">CREDIT</td>
                         @endif

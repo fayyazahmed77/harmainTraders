@@ -435,11 +435,7 @@ if (file_exists($logo_path)) {
             <div class="footer-right">
                 <div style="display: inline-block; width: 100%;">
                     <table class="footer-totals-table" align="right">
-                        <!-- Gross Amount -->
-                        <tr>
-                            <td class="label">Gross Amount :-</td>
-                            <td class="value">{{ number_format($purchase->gross_total, 2) }}</td>
-                        </tr>
+                      
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>

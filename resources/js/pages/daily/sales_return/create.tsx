@@ -857,6 +857,21 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             }),
         };
 
+        const resetForm = () => {
+            setRows([getEmptyRow()]);
+            setSelectedAccount(null);
+            setAccountSearch("");
+            setRefundAmount(0);
+            setExtraDiscount(0);
+            setSelectedInvoice(null);
+            setOriginalInvoiceNo("");
+            setPreviousBalance(0);
+            setOutstandingBalance(null);
+            setCreditBalance(null);
+            setAdvanceBalance(null);
+            setSelectedPaymentAccountId("");
+        };
+
         router.post("/sales-return", payload, {
             onSuccess: (page) => {
                 setIsSaving(false);
@@ -871,6 +886,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     totalDiscount: totals.disc,
                     saleId: id,
                 });
+                resetForm();
                 setShowSuccessDialog(true);
             },
             onError: () => setIsSaving(false),

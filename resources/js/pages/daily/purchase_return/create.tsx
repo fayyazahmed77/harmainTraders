@@ -873,6 +873,21 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             }),
         };
 
+        const resetForm = () => {
+            setRows([getEmptyRow()]);
+            setSelectedAccount(null);
+            setAccountSearch("");
+            setRefundAmount(0);
+            setExtraDiscount(0);
+            setSelectedInvoice(null);
+            setOriginalInvoiceNo("");
+            setSupplierBalance(0);
+            setOutstandingBalance(null);
+            setCreditBalance(null);
+            setAdvanceBalance(null);
+            setRemarks("");
+        };
+
         router.post("/purchase-return", payload, {
             onSuccess: (page) => {
                 setIsSaving(false);
@@ -887,6 +902,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                     totalDiscount: totals.disc,
                     purchaseReturnId: id,
                 });
+                resetForm();
                 setShowSuccessDialog(true);
             },
             onError: () => setIsSaving(false),

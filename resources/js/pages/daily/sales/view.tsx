@@ -7,7 +7,6 @@ import {
     ArrowLeftIcon,
     PrinterIcon,
     DownloadIcon,
-    ShieldCheck,
     Receipt,
     RefreshCcw,
     CheckCircle,
@@ -18,12 +17,19 @@ import {
     CheckCircle2,
     Calendar,
     User,
-    Building
+    Building,
+    MoreVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
     Dialog, 
     DialogContent, 
@@ -157,6 +163,15 @@ export default function View({ sale }: Props) {
         return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
+    const formatDateTimeLong = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return 'N/A';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const formattedDate = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const formattedTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return `${formattedDate} ${formattedTime}`;
+    };
+
     // Dynamic Financial Summary Calculations
     const netTotal = Number(sale.net_total || 0);
     const extraDiscount = Number(sale.extra_discount || 0);
@@ -218,68 +233,44 @@ export default function View({ sale }: Props) {
             <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/20">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="mx-auto w-full max-w-[1600px] p-6 lg:p-8 space-y-8 print:p-0">
+                <div className="mx-auto w-full max-w-[1600px] p-4 lg:p-6 space-y-4 print:p-0">
+
 
                     {/* ──────────────────────────────────────────────────
-                        HEADER: Large Invoice Header & Actions
+                        HEADER: Action Buttons & Navigation
                         ────────────────────────────────────────────────── */}
-                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 border-b border-zinc-200 dark:border-zinc-800 pb-6 print:hidden">
-                        <div className="flex items-start gap-4">
+                    <div className="flex items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4 print:hidden">
+                        <div className="flex items-center gap-3">
                             <Button
                                 variant="outline"
                                 size="icon"
                                 onClick={() => window.history.back()}
-                                className="h-10 w-10 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mt-1 shrink-0"
+                                className="h-9 w-9 md:h-10 md:w-10 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0"
                             >
                                 <ArrowLeftIcon className="h-4 w-4" />
                             </Button>
-                            <div className="space-y-4">
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                                        Sales Invoice <span className="font-mono text-orange-500 bg-orange-500/5 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg text-xl border border-orange-500/10">{sale.invoice}</span>
-                                    </h1>
-                                    <Badge className={cn("px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none", currentStatus.color)}>
-                                        {currentStatus.icon}
-                                        {currentStatus.label}
-                                    </Badge>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-xs">
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 font-bold border border-emerald-500/10">
-                                        <ShieldCheck className="h-3.5 w-3.5" /> Transaction Verified
-                                    </span>
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
-                                        <Calendar className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
-                                        Date: <span className="text-zinc-900 dark:text-zinc-200">{formatDateLong(sale.date)}</span>
-                                    </span>
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
-                                        <Clock className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
-                                        Created: <span className="text-zinc-900 dark:text-zinc-200">{sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) : formatDateLong(sale.date)}</span>
-                                    </span>
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
-                                        <User className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
-                                        Customer: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.customer?.title || "Cash Customer"}</span>
-                                    </span>
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
-                                        <User className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
-                                        Agent: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.salesman?.name || "Direct Sale"}</span>
-                                    </span>
-                                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400 font-bold border border-zinc-200 dark:border-zinc-700/60">
-                                        <Building className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500" />
-                                        Firm: <span className="text-zinc-900 dark:text-zinc-200 uppercase">{sale.firm?.name || "Haramain Traders"}</span>
-                                    </span>
-                                </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <h1 className="text-xl md:text-2xl font-black tracking-tight text-black dark:text-white flex items-center gap-2">
+                                    Sales Invoice <span className="font-mono text-orange-500 bg-orange-500/5 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-orange-500/10">{sale.invoice}</span>
+                                </h1>
+                                <Badge className={cn("px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none", currentStatus.color)}>
+                                    {currentStatus.icon}
+                                    {currentStatus.label}
+                                </Badge>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+                        {/* Action Buttons: Desktop, Laptop (compact), Mobile (3-dot menu) */}
+                        <div className="flex items-center gap-2">
                             {sale.status === "Pending Order" && (
                                 <>
                                     <Button
                                         onClick={() => setIsVerifyDialogOpen(true)}
-                                        className="h-10 px-5 text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center gap-2"
+                                        className="h-9 md:h-10 px-3 md:px-5 text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 md:gap-2"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
-                                        Verify & Process
+                                        <span className="hidden sm:inline">Verify & Process</span>
+                                        <span className="sm:hidden">Verify</span>
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -288,54 +279,160 @@ export default function View({ sale }: Props) {
                                                 router.post(`/sales/${sale.id}/cancel`);
                                             }
                                         }}
-                                        className="h-10 px-4 text-xs font-bold rounded-xl border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400 transition-all shadow-sm"
+                                        className="h-9 md:h-10 px-3 md:px-4 text-xs font-bold rounded-xl border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400 transition-all shadow-sm"
                                     >
-                                        <AlertCircle className="h-4 w-4 mr-2" />
-                                        Cancel Order
+                                        <AlertCircle className="h-4 w-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">Cancel Order</span>
                                     </Button>
                                 </>
                             )}
-                            <Button
-                                variant="outline"
-                                onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
-                            >
-                                <PrinterIcon className="h-4 w-4 text-orange-500" />
-                                Print Small
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
-                            >
-                                <PrinterIcon className="h-4 w-4 text-blue-500" />
-                                Print Large
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
-                                className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
-                            >
-                                <DownloadIcon className="h-4 w-4 text-emerald-500" />
-                                Download PDF
-                            </Button>
+
+                            {/* Mobile (3-dot More Menu) */}
+                            <div className="md:hidden">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
+                                        >
+                                            <MoreVertical className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg">
+                                        <DropdownMenuItem
+                                            onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
+                                            className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
+                                        >
+                                            <PrinterIcon className="h-4 w-4 text-orange-500" />
+                                            Print Small
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
+                                            className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
+                                        >
+                                            <PrinterIcon className="h-4 w-4 text-blue-500" />
+                                            Print Large
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
+                                            className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
+                                        >
+                                            <DownloadIcon className="h-4 w-4 text-emerald-500" />
+                                            Download PDF
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+
+                            {/* Laptop (Compact Buttons: md to lg) */}
+                            <div className="hidden md:flex lg:hidden items-center gap-1.5">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
+                                    className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
+                                >
+                                    <PrinterIcon className="h-3.5 w-3.5 text-orange-500" />
+                                    Print Small
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
+                                    className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
+                                >
+                                    <PrinterIcon className="h-3.5 w-3.5 text-blue-500" />
+                                    Print Large
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
+                                    className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
+                                >
+                                    <DownloadIcon className="h-3.5 w-3.5 text-emerald-500" />
+                                    Download PDF
+                                </Button>
+                            </div>
+
+                            {/* Desktop (Full Buttons: lg and up) */}
+                            <div className="hidden lg:flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
+                                    className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
+                                >
+                                    <PrinterIcon className="h-4 w-4 text-orange-500" />
+                                    Print Small
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
+                                    className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
+                                >
+                                    <PrinterIcon className="h-4 w-4 text-blue-500" />
+                                    Print Large
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
+                                    className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
+                                >
+                                    <DownloadIcon className="h-4 w-4 text-emerald-500" />
+                                    Download PDF
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
                     {/* ──────────────────────────────────────────────────
-                        SECTION 1: Invoice Summary Cards
+                        INFORMATION SECTION: Inline Two-Column
                         ────────────────────────────────────────────────── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 px-1 py-3 border-b border-zinc-200 dark:border-zinc-800 text-xs print:hidden">
+                        {/* Left Column */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <User className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Customer:</span>
+                                <span className="text-black dark:text-white font-black uppercase">{sale.customer?.title || "Cash Customer"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Receipt className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Invoice #:</span>
+                                <span className="text-orange-500 font-mono font-black">{sale.invoice}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Invoice Date:</span>
+                                <span className="text-black dark:text-white font-mono font-bold">{formatDateLong(sale.date)}</span>
+                            </div>
+                        </div>
 
+                        {/* Right Column */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Created At:</span>
+                                <span className="text-black dark:text-white font-mono font-bold">
+                                    {sale.created_at ? formatDateTimeLong(sale.created_at) : formatDateLong(sale.date)}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <User className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Agent:</span>
+                                <span className="text-black dark:text-white font-black uppercase">{sale.salesman?.name || "Direct Sale"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Building className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                <span className="text-black dark:text-white font-extrabold min-w-[80px]">Firm:</span>
+                                <span className="text-black dark:text-white font-black uppercase">{sale.firm?.name || "Haramain Traders"}</span>
+                            </div>
+                        </div>
+                    </div>
 
-
-                    {/* ──────────────────────────────────────────────────
-                        MAIN CONTENT LAYOUT: GRID (8 COLS / 4 COLS)
-                        ────────────────────────────────────────────────── */}
-                    <div className="space-y-8">
-                            
+                    {/* MAIN CONTENT */}
+                    <div className="space-y-1">
                             {/* SECTION 2: Invoice Items Table */}
-                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
-                                <CardHeader className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
+                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 py-0 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
+                                <CardHeader className="px-6 py-1 pt-3 pb-0 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2.5">
                                             <Receipt className="h-5 w-5 text-primary" />
@@ -353,7 +450,7 @@ export default function View({ sale }: Props) {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse table-auto">
                                         <thead>
-                                            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                            <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-700 dark:text-zinc-200 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                                                 <th rowSpan={2} className="px-6 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">#</th>
                                                 <th rowSpan={2} className="px-3 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">Description of Goods</th>
                                                 <th colSpan={2} className="px-3 py-1.5 text-center border-b border-zinc-200 dark:border-zinc-800">Quantity</th>
@@ -431,7 +528,7 @@ export default function View({ sale }: Props) {
 
                                 {/* Summary section matching Image 1 */}
                                 <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-950/20">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                                         
                                         {/* Left Column: Total Items & Signature */}
                                         <div className="space-y-12">
@@ -450,22 +547,18 @@ export default function View({ sale }: Props) {
                                             </div>
                                         </div>
                                         
-                                        {/* Middle Column: Discount Amount */}
-                                        <div className="flex flex-col justify-start">
-                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
-                                                <span>Discount Amount:</span>
-                                                <span className="font-mono text-rose-500 font-black">
-                                                    {formatCurrency(Number(sale.discount_total || 0) + extraDiscount).replace('PKR', '').trim()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        
                                         {/* Right Column: Financial Figures */}
                                         <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
                                             <div className="flex justify-between items-center">
                                                 <span>Courier Charges :-</span>
                                                 <span className="font-mono text-zinc-800 dark:text-zinc-200">
                                                     {formatCurrency(sale.courier_charges).replace('PKR', '').trim()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-rose-500">
+                                                <span>Extra Discount :-</span>
+                                                <span className="font-mono font-bold">
+                                                    -{formatCurrency(extraDiscount).replace('PKR', '').trim()}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">

@@ -394,8 +394,17 @@ class SalesReturnController extends Controller implements HasMiddleware
         $return = SalesReturn::with(['customer', 'salesman', 'items.item', 'firm'])->findOrFail($id);
 
         $accounts = Account::with('accountType')
-            ->whereHas('sales')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Customers', 'Customer', 'Client']);
+            })
             ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
+
+        if ($return->customer_id && !$accounts->contains('id', $return->customer_id)) {
+            $cust = Account::find($return->customer_id);
+            if ($cust) {
+                $accounts->push($cust);
+            }
+        }
 
         $salemans = Saleman::get();
         $messageLines = MessageLine::get(['id', 'messageline']);

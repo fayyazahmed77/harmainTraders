@@ -5,6 +5,7 @@
     <thead>
         <tr style="background-color: #f3f4f6; border-bottom: 1px solid #000;">
             <th style="padding: 5px; text-align: left; border: 1px solid #ddd;">Date</th>
+            <th style="padding: 5px; text-align: left; border: 1px solid #ddd;">Inv #</th>
             <th style="padding: 5px; text-align: left; border: 1px solid #ddd;">Account</th>
             <th style="padding: 5px; text-align: left; border: 1px solid #ddd;">Item</th>
             <th style="padding: 5px; text-align: right; border: 1px solid #ddd;">Rate</th>
@@ -20,9 +21,13 @@
             @php
                 $profitClass = $row['profit_loss'] >= 0 ? 'text-success' : 'text-danger';
                 $profitText = $row['profit_loss'] != 0 ? number_format($row['profit_loss'], 2) : '-';
+                $invColor = ($row['type'] === 'sale') ? '#059669' : (($row['type'] === 'purchase') ? '#2563eb' : '#dc2626');
             @endphp
             <tr>
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ strtoupper(\Carbon\Carbon::parse($row['date'])->format('d M y')) }}</td>
+                <td style="padding: 5px; border: 1px solid #ddd; font-weight: bold; color: {{ $invColor }};">
+                    {{ $row['voucher_no'] ?? $row['invoice'] ?? '-' }}
+                </td>
                 <td style="padding: 5px; border: 1px solid #ddd;">
                     @if(isset($is_excel) && $is_excel)
                         {{ $row['account_name'] }} ({{ strtoupper($row['type']) }})
@@ -33,9 +38,9 @@
                 </td>
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ $row['item_name'] }}</td>
                 <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ number_format($row['rate'], 2) }}</td>
-                <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ $row['in_qty'] > 0 ? number_format($row['in_qty'], 0) : '-' }}</td>
-                <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ $row['out_qty'] > 0 ? number_format($row['out_qty'], 0) : '-' }}</td>
-                <td style="padding: 5px; text-align: right; border: 1px solid #ddd; font-weight: bold;">{{ number_format($row['balance'], 0) }}</td>
+                <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ $row['in_fmt'] ?? ($row['in_qty'] > 0 ? number_format($row['in_qty'], 0) : '-') }}</td>
+                <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ $row['out_fmt'] ?? ($row['out_qty'] > 0 ? number_format($row['out_qty'], 0) : '-') }}</td>
+                <td style="padding: 5px; text-align: right; border: 1px solid #ddd; font-weight: bold;">{{ $row['balance_fmt'] ?? number_format($row['balance'], 0) }}</td>
                 <td style="padding: 5px; text-align: right; border: 1px solid #ddd;">{{ number_format($row['amount'], 2) }}</td>
                 <td class="{{ $profitClass }}" style="padding: 5px; text-align: right; border: 1px solid #ddd; font-weight: bold;">
                     {{ $profitText }}

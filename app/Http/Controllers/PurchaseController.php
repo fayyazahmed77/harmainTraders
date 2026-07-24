@@ -117,7 +117,18 @@ class PurchaseController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $items = Items::get();
+        $items = Items::with(['lastPurchaseItem.purchase.supplier'])->get()->map(function ($item) {
+            $lastP = $item->lastPurchaseItem;
+            if ($lastP) {
+                $item->last_purchase_rate = (float) $lastP->trade_price;
+                $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
+                $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
+                $item->last_purchase_qty_full = (float) $lastP->qty_carton;
+                $item->last_purchase_qty_pcs = (float) $lastP->qty_pcs;
+                $item->last_purchase_total = (float) $lastP->subtotal;
+            }
+            return $item;
+        });
         $accounts = Account::with(['accountType', 'accountCategory'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
@@ -460,7 +471,18 @@ class PurchaseController extends Controller implements HasMiddleware
     public function edit($id)
     {
         $purchase = Purchase::with('supplier', 'salesman', 'items')->find($id);
-        $items = Items::get();
+        $items = Items::with(['lastPurchaseItem.purchase.supplier'])->get()->map(function ($item) {
+            $lastP = $item->lastPurchaseItem;
+            if ($lastP) {
+                $item->last_purchase_rate = (float) $lastP->trade_price;
+                $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
+                $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
+                $item->last_purchase_qty_full = (float) $lastP->qty_carton;
+                $item->last_purchase_qty_pcs = (float) $lastP->qty_pcs;
+                $item->last_purchase_total = (float) $lastP->subtotal;
+            }
+            return $item;
+        });
         $accounts = Account::with(['accountType', 'accountCategory'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);

@@ -13,6 +13,8 @@ use App\Models\Firm;
 use App\Models\MessageLine;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\SalesReturnAllocation;
+use App\Models\CustomerCredit;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -303,37 +305,73 @@ class SalesController extends Controller implements HasMiddleware
                 }
             }
 
-            // --- Auto-Allocate Existing Advances (Unallocated Receipts) ---
-            $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
-                ->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhere('cheque_status', '!=', 'Canceled');
-                })
-                ->get()
-                ->filter(function($p) {
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    return $p->net_amount > $allocated;
-                })
-                ->sortBy('date');
+            // --- Auto-Allocate Existing Advances (Unallocated Receipts & CustomerCredit) ---
+            $useAdvanceOnCreate = (bool) $request->input('use_advance', false);
+            if ($useAdvanceOnCreate) {
+                $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
+                    ->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNull('cheque_status')
+                          ->orWhere('cheque_status', '!=', 'Canceled');
+                    })
+                    ->get()
+                    ->filter(function($p) {
+                        $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                        return $p->net_amount > $allocated;
+                    })
+                    ->sortBy('date');
 
-            foreach ($unallocatedPayments as $p) {
-                if ($sale->remaining_amount <= 0) break;
-                
-                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                $avail = $p->net_amount - $allocated;
-                $allocationAmount = min($sale->remaining_amount, $avail);
-                
-                if ($allocationAmount > 0) {
-                    PaymentAllocation::create([
-                        'payment_id' => $p->id,
-                        'bill_id' => $sale->id,
-                        'bill_type' => 'App\Models\Sales',
-                        'amount' => $allocationAmount,
-                    ]);
+                foreach ($unallocatedPayments as $p) {
+                    if ($sale->remaining_amount <= 0) break;
                     
-                    $sale->paid_amount += $allocationAmount;
-                    $sale->remaining_amount -= $allocationAmount;
+                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                    $avail = $p->net_amount - $allocated;
+                    $allocationAmount = min($sale->remaining_amount, $avail);
+                    
+                    if ($allocationAmount > 0) {
+                        PaymentAllocation::create([
+                            'payment_id' => $p->id,
+                            'bill_id' => $sale->id,
+                            'bill_type' => 'App\Models\Sales',
+                            'amount' => $allocationAmount,
+                        ]);
+                        
+                        $sale->paid_amount += $allocationAmount;
+                        $sale->remaining_amount -= $allocationAmount;
+                    }
+                }
+
+                // --- Auto-Allocate CustomerCredit (from Sales Returns) ---
+                $availableCredits = CustomerCredit::where('customer_id', $sale->customer_id)
+                    ->where('status', '!=', 'Refunded')
+                    ->where('available_balance', '>', 0)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                foreach ($availableCredits as $credit) {
+                    if ($sale->remaining_amount <= 0) break;
+
+                    $creditAmount = min($sale->remaining_amount, $credit->available_balance);
+
+                    if ($creditAmount > 0.005) {
+                        SalesReturnAllocation::create([
+                            'sales_return_id' => $credit->sales_return_id,
+                            'sale_id'         => $sale->id,
+                            'amount'          => $creditAmount,
+                        ]);
+
+                        $credit->available_balance -= $creditAmount;
+                        if (round($credit->available_balance, 2) <= 0.005) {
+                            $credit->status = 'Used';
+                            $credit->available_balance = 0;
+                        } else {
+                            $credit->status = 'Partial';
+                        }
+                        $credit->save();
+
+                        $sale->paid_amount    += $creditAmount;
+                        $sale->remaining_amount -= $creditAmount;
+                    }
                 }
             }
             $sale->save();
@@ -505,6 +543,9 @@ class SalesController extends Controller implements HasMiddleware
             $q->where('bill_id', $id)->where('bill_type', 'App\Models\Sales');
         })->get();
 
+        // Flag: does this sale already have a CustomerCredit allocation applied?
+        $sale->has_advance_allocated = SalesReturnAllocation::where('sale_id', $id)->exists();
+
         $accounts = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Customers']);
@@ -610,8 +651,36 @@ class SalesController extends Controller implements HasMiddleware
             $netTotal = (float) $request->net_total;
             $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netPayable = max(0, $netTotal - $extraDiscount);
-            $existingPaid = (float) $sale->paid_amount;
-            
+            $useAdvance = (bool) $request->input('use_advance', false);
+
+            // --- Rollback any previous SalesReturnAllocation for this sale ---
+            // This allows a clean re-application on each save
+            $existingReturnAllocations = SalesReturnAllocation::where('sale_id', $sale->id)->get();
+            foreach ($existingReturnAllocations as $retAlloc) {
+                // Restore the CustomerCredit balance
+                $credit = CustomerCredit::where('sales_return_id', $retAlloc->sales_return_id)->first();
+                if ($credit) {
+                    $credit->available_balance += $retAlloc->amount;
+                    if (round($credit->available_balance, 2) >= round($credit->amount, 2)) {
+                        $credit->status = 'Available';
+                        $credit->available_balance = $credit->amount;
+                    } else {
+                        $credit->status = 'Partial';
+                    }
+                    $credit->save();
+                }
+                $retAlloc->delete();
+            }
+
+            // Re-read existing paid amount from actual PaymentAllocations only (splits),
+            // because $sale->paid_amount may include now-rolled-back return credits.
+            $existingPaid = (float) PaymentAllocation::whereHas('payment', function ($q) use ($sale) {
+                    $q->where('account_id', $sale->customer_id)->where('type', 'RECEIPT');
+                })
+                ->where('bill_id', $sale->id)
+                ->where('bill_type', 'App\Models\Sales')
+                ->sum('amount');
+
             // Increment paid amount with NEW payments made during this edit
             $newTotalPaid = $existingPaid + $totalNewPaid;
             
@@ -640,36 +709,71 @@ class SalesController extends Controller implements HasMiddleware
             ]);
 
             // --- Auto-Allocate Existing Advances (Unallocated Receipts) ---
-            $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
-                ->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhere('cheque_status', '!=', 'Canceled');
-                })
-                ->get()
-                ->filter(function($p) {
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    return $p->net_amount > $allocated;
-                })
-                ->sortBy('date');
+            if ($useAdvance) {
+                $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
+                    ->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNull('cheque_status')
+                          ->orWhere('cheque_status', '!=', 'Canceled');
+                    })
+                    ->get()
+                    ->filter(function($p) {
+                        $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                        return $p->net_amount > $allocated;
+                    })
+                    ->sortBy('date');
 
-            foreach ($unallocatedPayments as $p) {
-                if ($sale->remaining_amount <= 0) break;
-                
-                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                $avail = $p->net_amount - $allocated;
-                $allocationAmount = min($sale->remaining_amount, $avail);
-                
-                if ($allocationAmount > 0) {
-                    PaymentAllocation::create([
-                        'payment_id' => $p->id,
-                        'bill_id' => $sale->id,
-                        'bill_type' => 'App\Models\Sales',
-                        'amount' => $allocationAmount,
-                    ]);
+                foreach ($unallocatedPayments as $p) {
+                    if ($sale->remaining_amount <= 0) break;
                     
-                    $sale->paid_amount += $allocationAmount;
-                    $sale->remaining_amount -= $allocationAmount;
+                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                    $avail = $p->net_amount - $allocated;
+                    $allocationAmount = min($sale->remaining_amount, $avail);
+                    
+                    if ($allocationAmount > 0) {
+                        PaymentAllocation::create([
+                            'payment_id' => $p->id,
+                            'bill_id' => $sale->id,
+                            'bill_type' => 'App\Models\Sales',
+                            'amount' => $allocationAmount,
+                        ]);
+                        
+                        $sale->paid_amount += $allocationAmount;
+                        $sale->remaining_amount -= $allocationAmount;
+                    }
+                }
+
+                // --- Auto-Allocate CustomerCredit (from Sales Returns) ---
+                $availableCredits = CustomerCredit::where('customer_id', $sale->customer_id)
+                    ->where('status', '!=', 'Refunded')
+                    ->where('available_balance', '>', 0)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                foreach ($availableCredits as $credit) {
+                    if ($sale->remaining_amount <= 0) break;
+
+                    $creditAmount = min($sale->remaining_amount, $credit->available_balance);
+
+                    if ($creditAmount > 0.005) {
+                        SalesReturnAllocation::create([
+                            'sales_return_id' => $credit->sales_return_id,
+                            'sale_id'         => $sale->id,
+                            'amount'          => $creditAmount,
+                        ]);
+
+                        $credit->available_balance -= $creditAmount;
+                        if (round($credit->available_balance, 2) <= 0.005) {
+                            $credit->status = 'Used';
+                            $credit->available_balance = 0;
+                        } else {
+                            $credit->status = 'Partial';
+                        }
+                        $credit->save();
+
+                        $sale->paid_amount    += $creditAmount;
+                        $sale->remaining_amount -= $creditAmount;
+                    }
                 }
             }
             $sale->save();

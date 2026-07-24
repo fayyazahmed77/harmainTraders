@@ -39,6 +39,9 @@ export function StockAccountSelectionDialog({
                     <DialogTitle className="text-xl font-black text-text-primary uppercase tracking-tighter italic">
                         Supplier & Customer <span className="text-emerald-600">Database</span>
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Select a supplier or customer account
+                    </DialogDescription>
                     <div className="relative mt-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/40" />
                         <Input 

@@ -761,27 +761,27 @@ export default function Page({ item, categories, companies, pagination }: Props)
                   <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4 space-y-3">
                     <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Advanced Pricing Tiers (TP1 - TP6)</div>
                     <div className="grid grid-cols-2 gap-3">
-                      <TechLabel label="Loose (T.P.1) %" icon={Percent}>
+                      <TechLabel label="T.P.2 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt2} onChange={(e) => onInputChange("pt2", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt2 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt2) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Retail (T.P.2) %" icon={Percent}>
+                      <TechLabel label="T.P.3 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt3} onChange={(e) => onInputChange("pt3", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt3 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt3) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="Agent (T.P.3) %" icon={Percent}>
+                      <TechLabel label="T.P.4 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt4 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt4) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.4 %" icon={Percent}>
+                      <TechLabel label="T.P.4 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt5 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt5) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.5 %" icon={Percent}>
+                      <TechLabel label="T.P.5 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt6 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt6) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.6 %" icon={Percent}>
+                      <TechLabel label="T.P.6 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt7 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}</div>}
                       </TechLabel>

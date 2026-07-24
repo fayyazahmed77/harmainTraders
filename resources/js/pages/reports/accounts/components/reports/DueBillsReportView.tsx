@@ -101,7 +101,9 @@ export function DueBillsReportView({
                                                     <td className="px-3 py-2 text-center border-r border-border/10">
                                                         <span className={cn(
                                                             "px-1.5 py-0.5 rounded-[4px] text-[9px] font-black tracking-tighter uppercase",
-                                                            row.type === 'CASH' ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                                                            row.type === 'CASH' ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : 
+                                                            row.type === 'RETURN' ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" :
+                                                            "bg-blue-500/10 text-blue-600 border border-blue-500/20"
                                                         )}>
                                                             {row.type || 'CREDIT'}
                                                         </span>
@@ -110,7 +112,10 @@ export function DueBillsReportView({
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.paid)}</td>
-                                                    <td className="px-4 py-2 text-right tabular-nums font-bold text-rose-500 border-r border-border/10">{formatCurrency(row.remaining)}</td>
+                                                    <td className={cn(
+                                                        "px-4 py-2 text-right tabular-nums font-bold border-r border-border/10",
+                                                        row.remaining < 0 ? "text-emerald-600" : "text-rose-500"
+                                                    )}>{formatCurrency(row.remaining)}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums font-black text-text-primary">{formatCurrency(row.balance)}</td>
                                                 </tr>
                                             ))}

@@ -39,6 +39,9 @@ export function StockItemSelectionDialog({
                     <DialogTitle className="text-xl font-black text-text-primary uppercase tracking-tighter italic">
                         Inventory <span className="text-emerald-600">Matrix</span>
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Select an item from the inventory matrix
+                    </DialogDescription>
                     <div className="relative mt-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/40" />
                         <Input 

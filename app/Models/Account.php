@@ -145,37 +145,9 @@ class Account extends Model
         $type = strtolower($this->accountType->name ?? '');
         
         if ($type === 'customers') {
-            $totalSales = (float)$this->sales()->sum('net_total') - (float)$this->sales()->sum('extra_discount');
-            $totalReturns = (float)$this->salesReturns()->sum('net_total') - (float)$this->salesReturns()->sum('extra_discount');
-            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
-                })->sum(DB::raw('amount + discount'));
-            // Exclude is_return_refund payments from balance calculation (B1 Fix):
-            // When a Sales Return creates a cash refund payment (type=PAYMENT, is_return_refund=1),
-            // including it in +$totalPayments would cancel out the return's -$totalReturns credit,
-            // leaving the customer balance unchanged when it should decrease by the return amount.
-            // The return's effect on balance is already fully captured by -$totalReturns.
-            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
-                ->where('is_return_refund', false)
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
-                })->sum(DB::raw('amount + discount'));
-            
-            return (float)$this->opening_balance + $totalSales + $totalPayments - $totalReturns - $totalReceipts;
+            return \App\Services\PaymentAccountingService::getCustomerCurrentBalance($this);
         } elseif ($type === 'supplier') {
-            $totalPurchases = (float)$this->purchases()->sum('net_total') - (float)$this->purchases()->sum('extra_discount');
-            $totalReturns = (float)$this->purchaseReturns()->sum('net_total') - (float)$this->purchaseReturns()->sum('extra_discount');
-            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
-                })->sum(DB::raw('amount + discount'));
-            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
-                })->sum(DB::raw('amount + discount'));
-            
-            return (float)$this->opening_balance + $totalPurchases + $totalReceipts - $totalReturns - $totalPayments;
+            return \App\Services\PaymentAccountingService::getSupplierCurrentBalance($this);
         } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {

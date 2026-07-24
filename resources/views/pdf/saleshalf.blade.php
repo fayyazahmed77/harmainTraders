@@ -85,7 +85,8 @@
         .info-label {
             display: inline-block;
             width: 60px;
-            color: #333;
+            color: #000;
+            font-weight: bold;
         }
 
         .info-value {
@@ -157,7 +158,8 @@
         .footer-text {
             font-size: 9px;
             margin-top: 10px;
-            color: #444;
+            color: #000;
+            font-weight: bold;
         }
 
         .clearfix::after {
@@ -253,27 +255,24 @@
                 <span class="total-value">{{ $sale->items->count() }} / {{ $sale->items->sum('total_pcs') }}</span>
             </div>
 
-            <div class="total-row clearfix">
-                <span class="total-label">Gross Amount :-</span>
-                <span class="total-value">{{ number_format($sale->gross_total, 2) }}</span>
-            </div>
+            
 
             <div class="total-row clearfix">
                 <span class="total-label">Courier Charges :-</span>
                 <span class="total-value">{{ number_format($sale->courier_charges ?? 0, 2) }}</span>
             </div>
-
-            <div class="total-row clearfix bold">
-                <span class="total-label">Total Rs. :-</span>
-                <span class="total-value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</span>
-            </div>
-
-            @if($sale->extra_discount > 0)
+           @if($sale->extra_discount > 0)
             <div class="total-row clearfix">
                 <span class="total-label">Extra Discount :-</span>
                 <span class="total-value">{{ number_format($sale->extra_discount, 2) }}</span>
             </div>
             @endif
+            <div class="total-row clearfix bold">
+                <span class="total-label">Total Rs. :-</span>
+                <span class="total-value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</span>
+            </div>
+
+            
 
             @php
             $total_receivable = (float)($sale->total_receivable ?? 0);
