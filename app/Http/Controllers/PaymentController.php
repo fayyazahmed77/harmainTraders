@@ -8,9 +8,12 @@ use App\Models\PaymentAllocation;
 use App\Models\Purchase;
 use App\Models\Sales;
 use App\Models\Firm;
+use App\Http\Requests\StorePaymentRequest;
+use App\Http\Requests\UpdatePaymentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 
@@ -24,9 +27,10 @@ class PaymentController extends Controller implements HasMiddleware
         return [
             new Middleware('permission:view payments', only: [
                 'index', 'show', 'pdf', 'getUnpaidBills', 'getNextCheque', 
-                'getAvailableCheques', 'getBillItems', 'getAvailableCustomerCheques'
+                'getAvailableCheques', 'getBillItems', 'getAvailableCustomerCheques',
+                'getAvailableCredits'
             ]),
-            new Middleware('permission:create payments', only: ['create', 'store']),
+            new Middleware('permission:create payments', only: ['create', 'store', 'refundCredit']),
             new Middleware('permission:edit payments', only: ['edit', 'update']),
         ];
     }
@@ -546,6 +550,18 @@ class PaymentController extends Controller implements HasMiddleware
                 $payment->update(['cheque_status' => 'Cancelled']);
                 PaymentAllocation::where('payment_id', $payment->id)->delete();
             }
+
+            \Illuminate\Support\Facades\Log::info('Financial Audit - Payment Cancelled', [
+                'action' => 'PAYMENT_CANCEL',
+                'payment_id' => $payment->id,
+                'voucher_no' => $payment->voucher_no,
+                'user_id' => request()->user()?->id,
+                'user_name' => request()->user()?->name ?? 'System',
+                'ip_address' => request()->ip(),
+                'reversed_amount' => $payment->amount,
+                'reversed_discount' => $payment->discount,
+                'timestamp' => now()->toIso8601String(),
+            ]);
 
             DB::commit();
             return back()->with('success', 'Payment deleted and allocations reversed.');
@@ -1128,45 +1144,54 @@ class PaymentController extends Controller implements HasMiddleware
         return response()->json($cheques);
     }
 
-    public function store(Request $request)
+    public function store(StorePaymentRequest $request)
     {
-        $isMulti = (bool) $request->input('is_multi', false);
-        $splitsData = $isMulti ? $request->input('splits', []) : [[
-            'payment_account_id' => $request->payment_account_id,
-            'amount' => $request->amount,
-            'discount' => $request->discount ?? 0,
-            'payment_method' => $request->payment_method,
-            'cheque_no' => $request->cheque_no,
-            'cheque_date' => $request->cheque_date,
-            'clear_date' => $request->clear_date,
-            'original_cheque_id' => $request->original_cheque_id,
-        ]];
+        $userId = $request->user()?->id ?? 'guest';
+        $lock = Cache::lock('payment_store_' . $request->account_id . '_' . $userId, 5);
 
-        DB::beginTransaction();
+        if (!$lock->get()) {
+            return back()->withErrors(['error' => 'A payment submission is already being processed. Please wait a moment.']);
+        }
 
         try {
+            $isMulti = (bool) $request->input('is_multi', false);
+            $splitsData = $isMulti ? $request->input('splits', []) : [[
+                'payment_account_id' => $request->payment_account_id,
+                'amount' => $request->amount,
+                'discount' => $request->discount ?? 0,
+                'payment_method' => $request->payment_method,
+                'cheque_no' => $request->cheque_no,
+                'cheque_date' => $request->cheque_date,
+                'clear_date' => $request->clear_date,
+                'original_cheque_id' => $request->original_cheque_id,
+            ]];
+
+            DB::beginTransaction();
+
             // Safety checks (Total aggregate)
             $totalAmount = collect($splitsData)->sum('amount'); // Cash/Bank disbursement total
             if ($totalAmount <= 0) {
                 DB::rollBack();
+                optional($lock)->release();
                 return back()->withErrors(['error' => 'Payment amount must be greater than 0.']);
             }
-            $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
-            $totalGrossSettlement = $totalAmount + $totalDiscount; // Total settlement value (Cash + Discount)
+                $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
+                $totalGrossSettlement = $totalAmount + $totalDiscount; // Total settlement value (Cash + Discount)
 
-            $account = Account::findOrFail($request->account_id);
+                $account = Account::findOrFail($request->account_id);
 
-            // Prevent duplicate rapid voucher submissions (identical account, type, amount within 3 seconds)
-            $recentDuplicate = Payment::where('account_id', $request->account_id)
-                ->where('type', $request->type)
-                ->where('amount', max(0, (float)($splitsData[0]['amount'] ?? 0)))
-                ->where('created_at', '>=', now()->subSeconds(3))
-                ->first();
+                // Prevent duplicate rapid voucher submissions (identical account, type, amount within 3 seconds)
+                $recentDuplicate = Payment::where('account_id', $request->account_id)
+                    ->where('type', $request->type)
+                    ->where('amount', max(0, (float)($splitsData[0]['amount'] ?? 0)))
+                    ->where('created_at', '>=', now()->subSeconds(3))
+                    ->first();
 
-            if ($recentDuplicate) {
-                DB::rollBack();
-                return back()->withErrors(['error' => 'Duplicate payment submission detected. Transaction blocked.']);
-            }
+                if ($recentDuplicate) {
+                    DB::rollBack();
+                    $lock->release();
+                    return back()->withErrors(['error' => 'Duplicate payment submission detected. Transaction blocked.']);
+                }
 
             // Simplified sum logic for performance or use existing if reliable
             $totalAllocated = collect($request->allocations)->sum('amount');
@@ -1364,7 +1389,7 @@ class PaymentController extends Controller implements HasMiddleware
                         continue;
                     }
 
-                    $canAllocate = min($cashRemaining, $alloc['amount'], $billRem);
+                    $canAllocate = round(min($cashRemaining, $alloc['amount'], $billRem), 2);
 
                     if ($canAllocate > 0.001) {
                         PaymentAllocation::create([
@@ -1376,7 +1401,7 @@ class PaymentController extends Controller implements HasMiddleware
 
                         if ($bill) {
                             $bill->paid_amount      += $canAllocate;
-                            $bill->remaining_amount = max(0, $netPayable - $bill->paid_amount - $sumOfReturns);
+                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
 
                             $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
                             if ($bill->remaining_amount <= 0.001) {
@@ -1424,7 +1449,7 @@ class PaymentController extends Controller implements HasMiddleware
                         continue;
                     }
 
-                    $canAllocate = min($discountRemaining, $alloc['amount'], $billRem);
+                    $canAllocate = round(min($discountRemaining, $alloc['amount'], $billRem), 2);
 
                     if ($canAllocate > 0.001) {
                         PaymentAllocation::create([
@@ -1436,7 +1461,7 @@ class PaymentController extends Controller implements HasMiddleware
 
                         if ($bill) {
                             $bill->paid_amount      += $canAllocate;
-                            $bill->remaining_amount = max(0, $netPayable - $bill->paid_amount - $sumOfReturns);
+                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
 
                             $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
                             if ($bill->remaining_amount <= 0.001) {
@@ -1470,7 +1495,22 @@ class PaymentController extends Controller implements HasMiddleware
                 ];
             });
 
+            \Illuminate\Support\Facades\Log::info('Financial Audit - Payment Created', [
+                'action' => 'PAYMENT_STORE',
+                'user_id' => $request->user()?->id,
+                'user_name' => $request->user()?->name ?? 'System',
+                'ip_address' => $request->ip(),
+                'account_id' => $request->account_id,
+                'type' => $request->type,
+                'total_amount' => $totalAmount,
+                'total_discount' => $totalDiscount,
+                'gross_settlement' => $totalGrossSettlement,
+                'vouchers' => collect($createdPayments)->pluck('voucher_no')->toArray(),
+                'timestamp' => now()->toIso8601String(),
+            ]);
+
             DB::commit();
+            optional($lock)->release();
 
             return redirect()->route('payment.create')
                 ->with('success', 'Payment saved successfully.')
@@ -1478,12 +1518,15 @@ class PaymentController extends Controller implements HasMiddleware
                 ->with('saved_payments', $savedPaymentsDetails);
         } catch (\Exception $e) {
             DB::rollBack();
+            optional($lock)->release();
             \Illuminate\Support\Facades\Log::error('Payment Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return back()->withErrors(['error' => 'Failed to save payment: ' . $e->getMessage()]);
+        } finally {
+            optional($lock)->release();
         }
     }
-
-    public function getAvailableCredits($customerId)
+    
+    public function getAvailableCredits(int|string $customerId)
     {
         try {
             $credits = \App\Models\CustomerCredit::where('customer_id', $customerId)

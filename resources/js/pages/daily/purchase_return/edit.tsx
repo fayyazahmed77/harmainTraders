@@ -526,18 +526,18 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 overflow-hidden flex flex-col h-screen">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <main ref={scrollContainerRef} className="flex-1 overflow-auto p-3 md:p-6 flex flex-col md:flex-row gap-6 scroll-smooth text-foreground">
-                    <div className="flex-1 flex flex-col gap-6">
+                <main ref={scrollContainerRef} className="flex-1 overflow-auto md:overflow-hidden p-2.5 md:p-3.5 flex flex-col md:flex-row gap-3 xl:gap-4 scroll-smooth text-foreground">
+                    <div className="flex-1 flex flex-col gap-2.5 xl:gap-3 md:overflow-hidden min-w-0">
                         {/* Control Deck */}
-                        <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-6 items-end relative overflow-hidden`}>
+                        <Card className={`p-2.5 xl:p-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-2.5 xl:gap-3 items-end relative overflow-hidden`}>
                             <div className={`absolute top-0 left-0 w-1.5 h-full bg-orange-500`} />
                             <div className="col-span-3">
                                 <TechLabel label="Return Date" icon={CalendarIcon}>
                                     <Popover open={calOpen} onOpenChange={setCalOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                            <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                 {fmtDate(date.toISOString())}
-                                                <CalendarIcon size={14} className="text-zinc-400" />
+                                                <CalendarIcon size={12} className="text-zinc-400" />
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -551,18 +551,18 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                                 <TechLabel label="Supplier Designation" icon={UserIcon}>
                                     <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                            <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                 {selectedAccount ? selectedAccount.title : "Identify Supplier..."}
-                                                <Search size={14} className="text-zinc-400" />
+                                                <Search size={12} className="text-zinc-400" />
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                            <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                <Input placeholder="SEARCH IDENTITY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-9 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                            <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                                <Input placeholder="SEARCH IDENTITY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                                             </div>
                                             <div className="max-h-64 overflow-auto py-1">
                                                 {filteredAccounts.map(acc => (
-                                                    <button key={acc.id} className="w-full text-left px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
+                                                    <button key={acc.id} className="w-full text-left px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
                                                         onClick={() => handleAccountSelect(acc.id)}>
                                                         <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
                                                         {acc.title}
@@ -600,170 +600,189 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
 
                             <div className="col-span-4">
                                 <TechLabel label="Verification No" icon={Hash}>
-                                    <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
+                                    <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-black text-xs tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
                                 </TechLabel>
                             </div>
                         </Card>
 
                         {/* Transaction Bar */}
                         {selectedAccount && (
-                            <Card className={`p-4 bg-zinc-900 dark:bg-zinc-900 text-white ${PREMIUM_ROUNDING_MD} border border-zinc-800 flex items-center justify-between gap-4 shadow-xl`}>
+                            <Card className={`p-2.5 bg-zinc-900 dark:bg-zinc-900 text-white ${PREMIUM_ROUNDING_MD} border border-zinc-800 flex items-center justify-between gap-4 shadow-xl`}>
                                 <div className="space-y-0.5">
-                                    <div className="text-[9px] uppercase font-black text-zinc-500 tracking-widest">Source Document</div>
-                                    <Button variant="ghost" className="h-auto p-0 text-orange-400 hover:text-orange-300 font-black tracking-tighter text-base flex items-center gap-2" onClick={openInvoiceDialog}>
+                                    <div className="text-[8px] uppercase font-black text-zinc-500 tracking-widest">Source Document</div>
+                                    <Button variant="ghost" className="h-auto p-0 text-orange-400 hover:text-orange-300 font-black tracking-tighter text-xs flex items-center gap-1.5" onClick={openInvoiceDialog}>
                                         {originalInvoiceNo || "SELECT SOURCE INVOICE"}
-                                        <ArrowRightLeft size={14} />
+                                        <ArrowRightLeft size={12} />
                                     </Button>
                                 </div>
-                                <Button onClick={openInvoiceDialog} className={`h-10 px-6 bg-white text-black hover:bg-zinc-200 transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
+                                <Button onClick={openInvoiceDialog} className={`h-7.5 px-3.5 bg-white text-black hover:bg-zinc-200 transition-all font-black text-[9px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
                                     Replace Reference
                                 </Button>
                             </Card>
                         )}
 
                         {/* Item Manifest */}
-                        <div className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden`}>
-                            <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900 p-4 border-b border-zinc-100 dark:border-zinc-800 font-black text-[10px] uppercase tracking-widest text-zinc-500`}>
-                                <div className="col-span-3">Inventory Identification</div>
-                                <div className="col-span-3 text-center text-orange-600">Return Qty</div>
-                                <div className="col-span-2 text-center">Unit Val</div>
-                                <div className="col-span-1 text-center">Dec %</div>
-                                <div className="col-span-3 text-right pr-6">Position Net</div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {rowsWithAmount.map((row) => (
-                                    <div key={row.id} onClick={() => setSelectedRowItemId(row.item_id)}
-                                        className={`grid grid-cols-12 gap-3 p-3 items-center group cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
-                                        <div className="col-span-3">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-black uppercase truncate leading-tight">{row.item_title}</span>
-                                                <span className="text-[9px] font-mono text-zinc-400">ID: {row.item_id}</span>
-                                            </div>
-                                        </div>
-                                        <div className="col-span-3 grid grid-cols-4 gap-1">
-                                            <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="F" title="Full cartons" />
-                                            <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="P" title="Loose pieces" />
-                                            <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BF" title="Bonus cartons" />
-                                            <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BP" title="Bonus pieces" />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
-                                                className={`h-8 text-right font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.discPercent || ""} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
-                                                className={`h-8 text-center font-mono text-[10px] font-bold ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
-                                        <div className="col-span-3 flex items-center justify-end gap-2 pr-4 text-xs font-black">
-                                            Rs {row.amount.toLocaleString()}
-                                            <button className="opacity-0 group-hover:opacity-100 text-rose-500 p-1" onClick={() => setRows(p => p.filter(r => r.id !== row.id))}>
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
+                        <div className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden min-h-0`}>
+                            <div className="overflow-x-auto custom-scrollbar flex-1 flex flex-col min-h-0">
+                                <div className="min-w-[850px] xl:min-w-0 flex-1 flex flex-col min-h-0">
+                                    <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900 p-2 border-b border-zinc-100 dark:border-zinc-800 font-black text-[9px] uppercase tracking-widest text-zinc-500 shrink-0`}>
+                                        <div className="col-span-3">Inventory Identification</div>
+                                        <div className="col-span-3 text-center text-orange-600">Return Qty</div>
+                                        <div className="col-span-2 text-center">Unit Val</div>
+                                        <div className="col-span-1 text-center">Dec %</div>
+                                        <div className="col-span-3 text-right pr-6">Position Net</div>
                                     </div>
-                                ))}
+                                    <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800 min-h-0 custom-scrollbar">
+                                        {rowsWithAmount.map((row) => (
+                                            <div key={row.id} onClick={() => setSelectedRowItemId(row.item_id)}
+                                                className={`grid grid-cols-12 gap-2.5 p-2 items-center group cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
+                                                <div className="col-span-3">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase truncate leading-tight">{row.item_title}</span>
+                                                        <span className="text-[9px] font-mono text-zinc-400">ID: {row.item_id}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="col-span-3 grid grid-cols-4 gap-1">
+                                                    <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="F" title="Full cartons" />
+                                                    <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="P" title="Loose pieces" />
+                                                    <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BF" title="Bonus cartons" />
+                                                    <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BP" title="Bonus pieces" />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
+                                                        className={`h-7 text-right font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <Input type="number" value={row.discPercent || ""} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-bold ${PREMIUM_ROUNDING_MD}`} />
+                                                </div>
+                                                <div className="col-span-3 flex items-center justify-end gap-2 pr-4 text-xs font-black">
+                                                    Rs {row.amount.toLocaleString()}
+                                                    <button className="opacity-0 group-hover:opacity-100 text-rose-500 p-1" onClick={() => setRows(p => p.filter(r => r.id !== row.id))}>
+                                                        <Trash2 size={11} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
-                                <Button variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase" onClick={() => setAssignItemDialogOpen(true)}>
-                                    <Plus size={14} className="mr-2" /> Assign Bulk
+                            <div className="p-2 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
+                                <Button variant="outline" size="sm" className="h-7 text-[9px] font-black uppercase px-2.5" onClick={() => setAssignItemDialogOpen(true)}>
+                                    <Plus size={12} className="mr-1.5" /> Assign Bulk
                                 </Button>
                             </div>
                         </div>
                     </div>
 
-                    <aside className="w-[320px] flex flex-col gap-6">
-                        <Card className={`p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl ${PREMIUM_ROUNDING_MD} space-y-6`}>
-                            <h3 className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Financial Summary</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                    <div className="text-[10px] font-black text-zinc-500 uppercase">Return Subtotal</div>
-                                    <div className="text-sm font-bold">Rs {totals.net.toLocaleString()}</div>
-                                </div>
-                                <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                                    <div className="text-[10px] font-black text-zinc-500 uppercase">Total Boxes</div>
-                                    <div className="text-sm font-bold">{totals.total_full}</div>
-                                </div>
-                                <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                                    <div className="text-[10px] font-black text-zinc-500 uppercase">Total Pieces</div>
-                                    <div className="text-sm font-bold">{totals.total_pcs}</div>
-                                </div>
-                                <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3 border-b pb-2">
-                                    <div className="text-[10px] font-black text-rose-500 uppercase">Discount Delta</div>
-                                    <div className="text-sm font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
-                                </div>
-
-                                <TechLabel label="Extra Discount" icon={BadgePercent}>
-                                    <div className="relative">
-                                        <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
-                                            className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                    {/* Financial Auditor Sidebar */}
+                    <aside className="w-full lg:w-72 xl:w-76 flex flex-col gap-2.5 md:h-full shrink-0 min-w-0">
+                        <Card className={`p-0 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl ${PREMIUM_ROUNDING_MD} flex-1 flex flex-col justify-between max-h-full min-h-0 overflow-hidden`}>
+                            <div className="overflow-y-auto min-h-0 custom-scrollbar p-3 flex-1 space-y-2.5">
+                                <h3 className="text-zinc-500 text-[9px] font-black uppercase tracking-widest">Financial Summary</h3>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-1.5">
+                                        <div className="text-[9px] font-black text-zinc-500 uppercase">Return Subtotal</div>
+                                        <div className="text-xs font-bold">Rs {totals.net.toLocaleString()}</div>
                                     </div>
-                                </TechLabel>
-
-                                <div className="bg-orange-600 text-white p-4 rounded-xl space-y-1">
-                                    <div className="text-[9px] font-black uppercase opacity-60">Net Return Amount</div>
-                                    <div className="text-2xl font-black tracking-tighter">Rs {(totals.net - extraDiscount).toLocaleString()}</div>
-                                </div>
-
-                                <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-0.5">
-                                        <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                                            Previous Balance
-                                        </div>
-                                        <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                            {fmtBalance(previousBalance, true)}
-                                        </div>
+                                    <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1.5">
+                                        <div className="text-[9px] font-black text-zinc-500 uppercase">Total Boxes</div>
+                                        <div className="text-xs font-bold">{totals.total_full}</div>
                                     </div>
-                                    <div className="space-y-0.5 text-right">
-                                        <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                                            New Balance
-                                        </div>
-                                        <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                            {fmtBalance(previousBalance - (totals.net - extraDiscount) + refundAmount, true)}
-                                        </div>
+                                    <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1.5">
+                                        <div className="text-[9px] font-black text-zinc-500 uppercase">Total Pieces</div>
+                                        <div className="text-xs font-bold">{totals.total_pcs}</div>
                                     </div>
-                                </div>
+                                    <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1.5 border-b pb-1.5">
+                                        <div className="text-[9px] font-black text-rose-500 uppercase">Discount Delta</div>
+                                        <div className="text-xs font-bold text-rose-600">- {totals.disc.toLocaleString()}</div>
+                                    </div>
 
-                                <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+                                    <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                        <div className="relative">
+                                            <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                                className={`h-8 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs px-3 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                        </div>
+                                    </TechLabel>
 
-                                <TechLabel label="Firm Branding" icon={Building2}>
-                                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                                        <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
-                                            <SelectValue placeholder="Select Firm..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="0">No Branding</SelectItem>
-                                            {firms?.map((firm) => (
-                                                <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </TechLabel>
+                                    <div className="bg-orange-600 text-white p-2.5 rounded-lg space-y-0.5">
+                                        <div className="text-[8px] font-black uppercase opacity-75">Net Return Amount</div>
+                                        <div className="text-xl font-black tracking-tighter">Rs {(totals.net - extraDiscount).toLocaleString()}</div>
+                                    </div>
 
-                                <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
-                                    <div className="relative">
-                                        <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
-                                            className={`h-11 font-mono font-black text-xl tracking-tighter pl-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 transition-all focus:ring-2 focus:ring-orange-500/20`} placeholder="0.00" />
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
-                                            <ArrowDownToLine size={20} />
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                Previous Balance
+                                            </div>
+                                            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                {fmtBalance(previousBalance, true)}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-0.5 text-right">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                New Balance
+                                            </div>
+                                            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                {fmtBalance(previousBalance - (totals.net - extraDiscount) + refundAmount, true)}
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                    <TechLabel label="Firm Branding" icon={Building2}>
+                                        <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                            <SelectTrigger className={`h-8 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white text-xs ${PREMIUM_ROUNDING_MD}`}>
+                                                <SelectValue placeholder="Select Firm..." />
+                                            </SelectTrigger>
+                                            <SelectContent side="top">
+                                                <SelectItem value="0">No Branding</SelectItem>
+                                                {firms?.map((firm) => (
+                                                    <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </TechLabel>
+
+                                    <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
+                                        <div className="relative">
+                                            <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
+                                                className={`h-8 font-mono font-black text-sm tracking-tighter pl-9 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 transition-all focus:ring-2 focus:ring-orange-500/20`} placeholder="0.00" />
+                                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
+                                                <ArrowDownToLine size={14} />
+                                            </div>
+                                        </div>
+                                    </TechLabel>
+                                </div>
+                                <TechLabel label="Admin Remarks" icon={Info}>
+                                    <Input value={remarks} onChange={e => setRemarks(e.target.value)} className="h-8 text-xs" placeholder="Memo..." />
                                 </TechLabel>
                             </div>
-                            <div className="space-y-4 pt-2">
-                                <TechLabel label="Admin Remarks" icon={Info}>
-                                    <Input value={remarks} onChange={e => setRemarks(e.target.value)} className="h-10 text-xs" placeholder="Memo..." />
-                                </TechLabel>
-                                <Button className="w-full h-12 bg-zinc-900 text-white dark:bg-white dark:text-black font-black uppercase tracking-widest shadow-lg" onClick={handleSave} disabled={isSaving}>
-                                    {isSaving ? "UPDATING..." : "COMMIT CHANGES"}
+
+                            {/* Pinned Sticky Action Footer */}
+                            <div className="p-2.5 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0 space-y-1.5 relative z-10">
+                                <Button className={`w-full h-9.5 ${SIGNAL_ORANGE} ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 group/save overflow-hidden relative shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]`}
+                                    onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? (
+                                        <RotateCcw className="animate-spin" size={15} />
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={15} className="group-hover:scale-110 transition-transform" />
+                                            Update Return
+                                        </>
+                                    )}
                                 </Button>
-                                <Button variant="ghost" className="w-full text-[10px] font-black uppercase text-zinc-400" onClick={() => router.get("/purchase-return")}>
-                                    Discard Changes
+
+                                <Button variant="outline" className={`w-full h-7.5 ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-[9px] text-zinc-500 border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800`}
+                                    onClick={() => router.get("/purchase-return")}>
+                                    Decline Logic
                                 </Button>
                             </div>
                         </Card>

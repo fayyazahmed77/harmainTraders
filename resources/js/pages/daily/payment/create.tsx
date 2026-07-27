@@ -175,6 +175,18 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [chequeDateOpen, setChequeDateOpen] = useState(false);
 
   useEffect(() => {
+    if (flash?.error) {
+      toast.error(flash.error);
+    }
+    if (flash?.warning) {
+      toast.error(flash.warning);
+    }
+    if (flash?.info) {
+      toast(flash.info);
+    }
+  }, [flash]);
+
+  useEffect(() => {
     if (errors && Object.keys(errors).length > 0) {
       Object.values(errors).forEach((err: any) => toast.error(err));
     }
@@ -1475,7 +1487,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="flex-1 overflow-y-auto pr-1 space-y-4 my-3 custom-scrollbar">
                   <div className="flex justify-between items-end gap-4">
                     <div className="flex-1">
-                      <TechLabel label="Primary Disbursement" icon={ArrowRightLeft}>
+                      <TechLabel label={paymentType === 'RECEIPT' ? "Cash / Bank Amount Received" : "Cash / Bank Amount Paid"} icon={ArrowRightLeft}>
                         <div className="relative">
                           <Input type="number" value={amount || ""} onChange={e => setAmount(toNum(e.target.value))}
                             disabled={isMultiPayment}
@@ -1487,8 +1499,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <TechLabel label="Discount (Adj)" icon={BadgePercent}>
-                      <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} />
+                    <TechLabel label="Discount" icon={BadgePercent}>
+                      <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} placeholder="0.00" />
                     </TechLabel>
                     <TechLabel label="Clear Date" icon={Clock}>
                       <Popover open={clearDateOpen} onOpenChange={setClearDateOpen}>
@@ -1506,12 +1518,26 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50 p-3 ${PREMIUM_ROUNDING_MD} border border-zinc-100 dark:border-zinc-800">
-                      <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Net Settlement</div>
-                      <div className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-500">
-                        Rs {(amount - discount).toLocaleString()}
+                    <div className="space-y-1.5 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-900/50 shadow-sm">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                        <span>Gross Invoice Settlement</span>
+                        <span className="text-lg font-mono font-black text-emerald-600 dark:text-emerald-400">
+                          Rs {(toNum(amount) + toNum(discount)).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
+                        <span>Cash: Rs {toNum(amount).toLocaleString()}</span>
+                        <span className="font-bold">+</span>
+                        <span>Discount: Rs {toNum(discount).toLocaleString()}</span>
                       </div>
                     </div>
+
+                    {selectedAccountId && (toNum(amount) > Object.values(allocations).reduce((sum, val) => sum + toNum(val), 0)) && (
+                      <div className="flex items-center gap-2 p-2.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl text-[10px] text-blue-700 dark:text-blue-300 font-semibold animate-in fade-in-50">
+                        <Info size={14} className="flex-shrink-0 text-blue-500" />
+                        <span>Surplus Cash (Rs {(toNum(amount) - Object.values(allocations).reduce((sum, val) => sum + toNum(val), 0)).toLocaleString()}) will be registered as Customer Advance.</span>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <TechLabel label="Payout Source" icon={CreditCard}>

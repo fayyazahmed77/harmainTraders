@@ -189,6 +189,10 @@
 <body>
 
     @php
+        $fmtNum = function($num) {
+            return fmod((float)$num, 1) == 0 ? number_format((float)$num, 0) : number_format((float)$num, 2);
+        };
+
         $f_name = $payment->firm ? $payment->firm->name : 'Harmain Traders';
         $f_sub = $payment->firm ? $payment->firm->business : 'Wholesale & Supply Chain';
         $f_addr = $payment->firm ? trim($payment->firm->address1 . ' ' . $payment->firm->address2) : 'Karachi, Pakistan';
@@ -282,7 +286,7 @@
                         <td>{{ $acctTitle }}</td>
                         <td>{{ $methodTitle }}</td>
                         <td>{{ $chqInfo ?: '-' }}</td>
-                        <td class="text-right" style="padding-right: 1mm; font-weight: bold;">{{ number_format($p->net_amount, 0) }}</td>
+                        <td class="text-right" style="padding-right: 1mm; font-weight: bold;">{{ $fmtNum($p->amount) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -292,25 +296,25 @@
             <div style="display: table; width: 100%; font-size: 8.5px; line-height: 1.4;">
                 <div style="display: table-row;">
                     <div style="display: table-cell; text-align: left; color: #000000;">Previous Balance:</div>
-                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format(abs($previous_balance), 2) }} {{ $previous_balance < 0 ? '' : $orientation }}</div>
+                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum(abs($previous_balance)) }} {{ $previous_balance < 0 ? '' : $orientation }}</div>
                 </div>
                 <div style="display: table-row;">
                     <div style="display: table-cell; text-align: left; color: #000000;">Gross Settlement:</div>
-                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalAmount, 2) }}</div>
+                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum($totalAmount) }}</div>
                 </div>
                 @if($totalDiscount > 0)
                     <div style="display: table-row; color: #000000;">
                         <div style="display: table-cell; text-align: left;">Discount (Adj):</div>
-                        <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ number_format($totalDiscount, 2) }}</div>
+                        <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum($totalDiscount) }}</div>
                     </div>
                 @endif
                 <div style="display: table-row; color: #000000; font-size: 9px; font-weight: bold;">
                     <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1px dashed #aaaaaa;">Amount Received/Paid:</div>
-                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1px dashed #aaaaaa;">PKR {{ number_format($totalActualPaid, 2) }}</div>
+                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1px dashed #aaaaaa;">PKR {{ $fmtNum($totalActualPaid) }}</div>
                 </div>
                 <div style="display: table-row; font-size: 9px;">
                     <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">Net Balance:</div>
-                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">PKR {{ number_format(abs($net_balance), 2) }} {{ $net_balance < 0 ? '' : $orientation }}</div>
+                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">PKR {{ $fmtNum(abs($net_balance)) }} {{ $net_balance < 0 ? '' : $orientation }}</div>
                 </div>
             </div>
             

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Link, usePage } from '@inertiajs/react';
+import toast from "react-hot-toast";
 import {
   ArrowLeft, Printer, Download, MapPin, Phone, Mail, Globe,
   Copy, Check, Building2, CreditCard, FileText, TrendingUp,
@@ -77,7 +78,9 @@ const formatDate = (d: string | null | undefined): string => {
 };
 
 const formatPKR = (n: number): string =>
-  Number(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(n) % 1 === 0
+    ? Number(n).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    : Number(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const printedAt = new Date().toLocaleString('en-GB', {
   day: '2-digit', month: 'long', year: 'numeric',
@@ -432,7 +435,7 @@ const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment
                       <td className="px-4 py-3 text-[12px] text-[#64748b]">{gp.remarks || '—'}</td>
                       <td className="px-4 py-3 text-[12px] text-[#64748b] font-mono">{gp.cheque_number || '—'}</td>
                       <td className="px-4 py-3 text-[12px] text-[#64748b]">{formatDate(gp.cheque_date)}</td>
-                      <td className="px-4 py-3 text-[12px] text-[#1e3a8a] font-bold text-right font-mono">{formatPKR(gp.total_amount)}</td>
+                      <td className="px-4 py-3 text-[12px] text-[#1e3a8a] font-bold text-right font-mono">{formatPKR(gp.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -442,7 +445,7 @@ const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment
                       Total
                     </td>
                     <td className="px-4 py-3 text-[12px] font-black text-[#1e3a8a] text-right font-mono">
-                      {formatPKR(totalAmount)}
+                      {formatPKR(totalActualPaid)}
                     </td>
                   </tr>
                 </tfoot>
@@ -730,6 +733,26 @@ export default function PaymentView({ payment, groupPayments, mode }: Props) {
   const [printMode, setPrintMode] = useState<'a4' | 'thermal' | null>(null);
   const isPrint = mode === 'print';
   const pageProps = usePage().props as any;
+
+  const { flash, errors } = pageProps;
+
+  useEffect(() => {
+    if (flash?.error) {
+      toast.error(flash.error);
+    }
+    if (flash?.warning) {
+      toast.error(flash.warning);
+    }
+    if (flash?.info) {
+      toast(flash.info);
+    }
+    if (flash?.success) {
+      toast.success(flash.success);
+    }
+    if (errors && Object.keys(errors).length > 0) {
+      Object.values(errors).forEach((err: any) => toast.error(err));
+    }
+  }, [flash, errors]);
   
   const rawPayment = payment || pageProps.payment;
   const rawGroupPayments = groupPayments || pageProps.groupPayments || [rawPayment];

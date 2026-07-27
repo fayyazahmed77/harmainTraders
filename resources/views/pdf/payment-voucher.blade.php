@@ -377,14 +377,18 @@
 
         {{-- ═══ PARTY + PAYMENT DETAILS ROW ═══ --}}
         @php
+            $fmtNum = function($num) {
+                return fmod((float)$num, 1) == 0 ? number_format((float)$num, 0) : number_format((float)$num, 2);
+            };
+
             $bal = (float) $payment->account->current_balance;
             $is_purchase = (bool) $payment->account->purchase;
             if ($bal < 0) {
                 $top_balance_label = "Paid in Advance";
-                $top_balance_value = "PKR " . number_format(abs($bal), 2);
+                $top_balance_value = "PKR " . $fmtNum(abs($bal));
             } else {
                 $top_balance_label = "Balance";
-                $top_balance_value = "PKR " . number_format($bal, 2) . " " . ($is_purchase ? 'CR' : 'DR');
+                $top_balance_value = "PKR " . $fmtNum($bal) . " " . ($is_purchase ? 'CR' : 'DR');
             }
         @endphp
         <div class="info-row">
@@ -452,14 +456,14 @@
                         <td>{{ $p->remarks ?: '-' }}</td>
                         <td>{{ $p->cheque_no ?: '-' }}</td>
                         <td>{{ $p->cheque_date ? \Carbon\Carbon::parse($p->cheque_date)->format('d M Y') : '-' }}</td>
-                        <td class="text-right"><strong>PKR {{ number_format($p->net_amount, 2) }}</strong></td>
+                        <td class="text-right"><strong>PKR {{ $fmtNum($p->amount) }}</strong></td>
                     </tr>
                 @endforeach
             </tbody>
             <tfoot>
                 <tr>
                     <td colspan="6">Total</td>
-                    <td class="text-right">PKR {{ number_format($totalAmount, 2) }}</td>
+                    <td class="text-right">PKR {{ $fmtNum($totalActualPaid) }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -477,8 +481,8 @@
                 </div>
                 @if($totalDiscount > 0)
                     <div style="font-size: 8px; color: #444444; margin-top: 8px; border-top: 0.5px solid #cccccc; padding-top: 4px;">
-                        Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}: <strong>PKR {{ number_format($totalActualPaid, 2) }}</strong> &nbsp;|&nbsp; 
-                        Discount (Adj): <strong>PKR {{ number_format($totalDiscount, 2) }}</strong>
+                        Amount {{ $payment->type === 'RECEIPT' ? 'Received' : 'Paid' }}: <strong>PKR {{ $fmtNum($totalActualPaid) }}</strong> &nbsp;|&nbsp; 
+                        Discount (Adj): <strong>PKR {{ $fmtNum($totalDiscount) }}</strong>
                     </div>
                 @endif
             </div>
@@ -487,14 +491,14 @@
                     @php
                         $prev_is_advance = $previous_balance < 0;
                         $prev_label = $prev_is_advance ? ($is_receipt ? 'Prev Advance:' : 'Prev Balance (CR):') : 'Previous Balance:';
-                        $prev_val_formatted = "PKR " . number_format(abs($previous_balance), 2);
+                        $prev_val_formatted = "PKR " . $fmtNum(abs($previous_balance));
                         if (!$prev_is_advance) {
                             $prev_val_formatted .= " " . $orientation;
                         }
 
                         $is_advance = $net_balance < 0;
                         $net_label = $is_advance ? ($is_receipt ? 'Paid in Advance:' : 'Net Balance (CR):') : 'Net Balance:';
-                        $net_val_formatted = "PKR " . number_format(abs($net_balance), 2);
+                        $net_val_formatted = "PKR " . $fmtNum(abs($net_balance));
                         if (!$is_advance) {
                             $net_val_formatted .= " " . $orientation;
                         }
@@ -506,12 +510,12 @@
                     @if($totalDiscount > 0)
                         <tr>
                             <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">Discount (Adj):</td>
-                            <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #111111ff;">PKR {{ number_format($totalDiscount, 2) }}</td>
+                            <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #111111ff;">PKR {{ $fmtNum($totalDiscount) }}</td>
                         </tr>
                     @endif
                     <tr>
                         <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; font-weight: bold; color: #444444;">{{ $payment->type === 'RECEIPT' ? 'Paid/Receipt (Cr):' : 'Paid/Receipt (Dr):' }}</td>
-                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #0d0f0eff;">PKR {{ number_format($totalActualPaid, 2) }}</td>
+                        <td style="padding: 4px 6px; border-bottom: 1px solid #dddddd; text-align: right; font-weight: bold; color: #0d0f0eff;">PKR {{ $fmtNum($totalActualPaid) }}</td>
                     </tr>
                     <tr style="background-color: #f7f9fa;">
                         <td style="padding: 5px 6px; font-weight: 800; color: #000000; font-size: 11px; border-top: 1px solid #bbbbbb;">{{ $net_label }}</td>

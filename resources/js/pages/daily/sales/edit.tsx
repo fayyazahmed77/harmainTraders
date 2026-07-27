@@ -833,8 +833,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               </div>
 
               {/* Desktop Control Deck - Inline Layout */}
-              <div className="hidden md:block">
-                <Card className={`px-4 py-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} flex flex-row flex-nowrap items-end justify-between gap-4 relative overflow-hidden overflow-x-auto custom-scrollbar`}>
+              <div className="hidden md:block min-w-0">
+                <Card className={`px-3 xl:px-4 py-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} flex flex-row flex-wrap xl:flex-nowrap items-end justify-between gap-2.5 xl:gap-3.5 relative overflow-hidden overflow-x-auto custom-scrollbar min-w-0`}>
                   <div className={`absolute top-0 left-0 w-full h-0.5 ${ACCENT_GRADIENT}`} />
 
                   <TechLabel label="Invoice Date" icon={CalendarIcon} className="space-y-1.5 shrink-0">
@@ -843,10 +843,10 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         <Button
                           variant="outline"
                           id="date-picker"
-                          className={`w-36 justify-between font-bold text-xs h-9 ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all hover:border-orange-500`}
+                          className={`w-32 xl:w-36 justify-between font-bold text-xs h-9 ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 transition-all hover:border-orange-500`}
                         >
                           <span className="truncate">{date ? date.toLocaleDateString() : "Select date"}</span>
-                          <CalendarIcon className="h-3.5 w-3.5 opacity-50 text-orange-600" />
+                          <CalendarIcon className="h-3.5 w-3.5 opacity-50 text-orange-600 shrink-0" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -871,11 +871,11 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         setTime(e.target.value);
                         setIsTimeLive(false);
                       }}
-                      className={`w-37 h-9 text-xs font-mono border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD} text-orange-600 font-bold`}
+                      className={`w-32 xl:w-36 h-9 text-xs font-mono border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD} text-orange-600 font-bold`}
                     />
                   </TechLabel>
 
-                  <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[200px]">
+                  <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[170px] xl:min-w-[200px]">
                     <Combobox
                       options={accountTypeOptions}
                       value={accountType?.value || ""}
@@ -906,7 +906,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                     />
                   </TechLabel>
 
-                  <TechLabel label="Account Code" className="space-y-1.5 shrink-0 hidden lg:block">
+                  <TechLabel label="Account Code" className="space-y-1.5 shrink-0 hidden 2xl:block">
                     <Input
                       value={code}
                       readOnly
@@ -914,7 +914,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                     />
                   </TechLabel>
 
-                  <TechLabel label="Days" className="space-y-1.5 shrink-0 hidden xl:block">
+                  <TechLabel label="Days" className="space-y-1.5 shrink-0 hidden 2xl:block">
                     <Input
                       value={creditDays}
                       onChange={(e) => setCreditDays(Number(e.target.value))}
@@ -934,7 +934,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                     <Input
                       value={invoiceNo}
                       onChange={(e) => setInvoiceNo(e.target.value)}
-                      className={`w-28 h-9 text-xs font-black text-center border-orange-200 bg-orange-50/20 text-orange-600 ${PREMIUM_ROUNDING_MD}`}
+                      className={`w-24 xl:w-28 h-9 text-xs font-black text-center border-orange-200 bg-orange-50/20 text-orange-600 ${PREMIUM_ROUNDING_MD}`}
                     />
                   </TechLabel>
 
@@ -943,7 +943,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                       value={salesman?.toString() || ""}
                       onValueChange={(val) => setSalesman(val ? Number(val) : null)}
                     >
-                      <SelectTrigger className={`w-36 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
+                      <SelectTrigger className={`w-28 xl:w-36 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
                         <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -958,7 +958,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
 
                   <TechLabel label="Sale Type" className="space-y-1.5 shrink-0">
                     <Select value={cashCredit} onValueChange={setCashCredit}>
-                      <SelectTrigger className={`w-24 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
+                      <SelectTrigger className={`w-20 xl:w-24 h-9 text-xs border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 ${PREMIUM_ROUNDING_MD}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -969,13 +969,13 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                   </TechLabel>
 
                   <TechLabel label="Items" className="space-y-1.5 shrink-0">
-                    <div className="w-14 h-9 flex items-center justify-center font-mono text-xs font-black bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md">
+                    <div className="w-12 xl:w-14 h-9 flex items-center justify-center font-mono text-xs font-black bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md">
                       {rowsWithComputed.length}
                     </div>
                   </TechLabel>
 
                   <TechLabel label="Status" className="space-y-1.5 shrink-0">
-                    <div className="flex items-center gap-1.5 h-9 px-3 border rounded-md bg-emerald-500/5 border-emerald-500/20">
+                    <div className="flex items-center gap-1.5 h-9 px-2.5 xl:px-3 border rounded-md bg-emerald-500/5 border-emerald-500/20">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest">Active</span>
                     </div>
@@ -993,13 +993,13 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               </div>
 
               {/* Main Items Workspace & Sidebar */}
-              <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 mb-0 items-stretch">
+              <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 mb-0 min-w-0 items-stretch">
 
                 {/* Left Area: Items Registry */}
-                <div className="flex-1 flex flex-col h-full">
-                  <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card flex-1 flex flex-col justify-between h-full">
-                    <div className="overflow-visible md:overflow-x-auto flex-1 flex flex-col">
-                      <div className="w-full md:min-w-[1200px] flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col min-w-0 h-full">
+                  <Card className="p-0 overflow-hidden gap-0 border-0 md:border shadow-none md:shadow-sm bg-transparent md:bg-card min-w-0 flex-1 flex flex-col justify-between h-full">
+                    <div className="overflow-visible md:overflow-x-auto min-w-0 flex-1 flex flex-col">
+                      <div className="w-full md:min-w-[950px] xl:min-w-0 flex-1 flex flex-col">
                         <div className="hidden md:grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-3 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20">
                           <div className="col-span-4 text-[10px] font-black uppercase tracking-widest">Item Identification</div>
                           <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest">Full</div>
@@ -1178,6 +1178,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                           <span className="text-md font-black text-rose-600"><span className="text-[10px] text-rose-400/70 mr-0.5 font-bold">-</span>{totals.discTotal.toLocaleString()}</span>
                         </div>
                       </div>
+                    </div>
                   </Card>
                 </div>
 
@@ -1317,8 +1318,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
 
                 {/* Right Sidebar: Quick Summary & Financials */}
                 <div className={cn(
-                  "transition-all duration-500 ease-in-out relative flex flex-col",
-                  showRightSidebar ? "w-full lg:w-80 opacity-100" : "w-0 lg:w-0 opacity-0 pointer-events-none"
+                  "transition-all duration-500 ease-in-out relative flex flex-col min-w-0",
+                  showRightSidebar ? "w-full lg:w-72 xl:w-80 opacity-100" : "w-0 lg:w-0 opacity-0 pointer-events-none"
                 )}>
                   {/* Toggle Sidebar tab */}
                   <div className="hidden lg:flex absolute top-1/2 -left-4 -translate-y-1/2 z-50 group">
@@ -1507,7 +1508,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         disabled={processing}
                         className={`h-14 w-full ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-lg shadow-xl shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all`}
                       >
-                        {processing ? "Syncing..." : "Finalize Invoice"}
+                        {processing ? "Syncing..." : "Update Invoice"}
                       </Button>
                       <Button
                         variant="outline"

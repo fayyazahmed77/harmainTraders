@@ -323,6 +323,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [creditBalance, setCreditBalance] = useState<number | null>(null);
     const [advanceBalance, setAdvanceBalance] = useState<number | null>(null);
     const [extraDiscount, setExtraDiscount] = useState<number>(0);
+    const [remarks, setRemarks] = useState<string>("");
 
     // Firm state
     const defaultFirm = firms?.find(f => f.defult);
@@ -854,6 +855,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             extra_discount: extraDiscount,
             paid_amount: refundAmount,
             remaining_amount: totals.net - extraDiscount - refundAmount,
+            remarks: remarks,
             items: validRows.map(r => {
                 const packing = toNum(r.packing || 1);
                 const rate = toNum(r.rate);
@@ -915,23 +917,23 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 overflow-hidden flex flex-col h-screen">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <main ref={scrollContainerRef} className="flex-1 overflow-auto md:overflow-hidden p-3 md:p-6 flex flex-col md:flex-row gap-6 scroll-smooth">
+                <main ref={scrollContainerRef} className="flex-1 overflow-auto md:overflow-hidden p-2.5 md:p-3.5 flex flex-col md:flex-row gap-3 xl:gap-4 scroll-smooth">
 
                     {/* ── WORKSPACE ── */}
-                    <div className="flex-1 flex flex-col gap-4 md:gap-6 md:overflow-hidden">
+                    <div className="flex-1 flex flex-col gap-2.5 xl:gap-3 md:overflow-hidden min-w-0">
 
                         {/* Mobile Header (Control Deck) */}
                         <div className="md:hidden space-y-3">
-                            <Card className={`p-4 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} space-y-4 shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                            <Card className={`p-3 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} space-y-3 shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
+                                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-2">
                                     <div className="space-y-0.5">
                                         <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Registry ID</div>
-                                        <div className="text-sm font-black text-orange-600 font-mono tracking-tighter uppercase">{invoiceNo || "AUTO-GEN"}</div>
+                                        <div className="text-xs font-black text-orange-600 font-mono tracking-tighter uppercase">{invoiceNo || "AUTO-GEN"}</div>
                                     </div>
                                     <div className="text-right space-y-0.5">
                                         <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest text-right">Return Date</div>
-                                        <div className="text-sm font-black text-zinc-800 dark:text-zinc-100 flex items-center justify-end gap-1.5 leading-none">
-                                            <CalendarIcon size={12} className="text-zinc-400" />
+                                        <div className="text-xs font-black text-zinc-800 dark:text-zinc-100 flex items-center justify-end gap-1.5 leading-none">
+                                            <CalendarIcon size={11} className="text-zinc-400" />
                                             {fmtDate(date.toISOString())}
                                         </div>
                                     </div>
@@ -941,20 +943,20 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     <div className="relative">
                                         <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
+                                                <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
                                                     <span className="truncate">{selectedAccount ? selectedAccount.title : "Identify Supplier..."}</span>
-                                                    <Search size={14} className="text-zinc-400 flex-shrink-0 ml-2" />
+                                                    <Search size={13} className="text-zinc-400 flex-shrink-0 ml-2" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-[calc(100vw-48px)] p-0 shadow-2xl border-zinc-300 dark:border-zinc-700" align="center" sideOffset={8}>
-                                                <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                                <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                                                 </div>
                                                 <div className="max-h-[60vh] overflow-auto py-1">
                                                     {filteredAccounts.map(acc => (
-                                                        <button key={acc.id} className="w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-3 group border-l-2 border-transparent hover:border-orange-500"
+                                                        <button key={acc.id} className="w-full text-left px-3 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2.5 group border-l-2 border-transparent hover:border-orange-500"
                                                             onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
-                                                            <div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
                                                             <span className="truncate">{acc.title}</span>
                                                         </button>
                                                     ))}
@@ -962,8 +964,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                             </PopoverContent>
                                         </Popover>
                                         {supplierBalance !== null && (
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 mr-6 pointer-events-none">
-                                                <span className={`text-[10px] font-black ${toNum(supplierBalance) <= 0 ? "text-sky-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
+                                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 mr-5 pointer-events-none">
+                                                <span className={`text-[9px] font-black ${toNum(supplierBalance) <= 0 ? "text-sky-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
                                                     {toNum(supplierBalance) < 0 ? `Advance Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()}` : fmtBalance(supplierBalance, true)}
                                                 </span>
                                             </div>
@@ -971,29 +973,29 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     </div>
                                 </TechLabel>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-2.5">
                                     <TechLabel label="Registry No" icon={Hash}>
-                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500 shadow-sm`} />
+                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-black text-xs tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500 shadow-sm`} />
                                     </TechLabel>
                                     <TechLabel label="Ref Invoice" icon={FileText}>
-                                        <Input value={originalInvoiceNo} onChange={e => setOriginalInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500 shadow-sm`} />
+                                        <Input value={originalInvoiceNo} onChange={e => setOriginalInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500 shadow-sm`} />
                                     </TechLabel>
                                 </div>
                             </Card>
                         </div>
 
                         {/* Control Header (Desktop Only) */}
-                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-                            <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-5 items-end relative overflow-hidden`}>
+                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block min-w-0">
+                            <Card className={`p-2.5 xl:p-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-2.5 xl:gap-3 items-end relative overflow-hidden`}>
                                 <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT}`} />
 
                                 <div className="col-span-2">
                                     <TechLabel label="Return Date" icon={CalendarIcon}>
                                         <Popover open={calOpen} onOpenChange={setCalOpen}>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                                <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                     {fmtDate(date.toISOString())}
-                                                    <CalendarIcon size={14} className="text-zinc-400" />
+                                                    <CalendarIcon size={12} className="text-zinc-400" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -1007,18 +1009,18 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     <TechLabel label="Supplier Designation" icon={UserIcon}>
                                         <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                                <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                     {selectedAccount ? selectedAccount.title : "Identify Supplier..."}
-                                                    <Search size={14} className="text-zinc-400" />
+                                                    <Search size={12} className="text-zinc-400" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                                <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-9 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                                <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                                                 </div>
                                                 <div className="max-h-64 overflow-auto py-1">
                                                     {filteredAccounts.map(acc => (
-                                                        <button key={acc.id} className="w-full text-left px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
+                                                        <button key={acc.id} className="w-full text-left px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
                                                             onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
                                                             <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
                                                             {acc.title}
@@ -1033,19 +1035,19 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                 <div className="col-span-2">
                                     <TechLabel label="Ref Invoice" icon={FileText}>
-                                        <Input value={originalInvoiceNo} onChange={e => setOriginalInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500`} />
+                                        <Input value={originalInvoiceNo} onChange={e => setOriginalInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500`} />
                                     </TechLabel>
                                 </div>
 
                                 <div className="col-span-2">
                                     <TechLabel label="Salesman" icon={Clock}>
-                                        <Input value={salesman ?? ""} onChange={e => setSalesman(toNum(e.target.value) || null)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500`} />
+                                        <Input value={salesman ?? ""} onChange={e => setSalesman(toNum(e.target.value) || null)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-bold text-xs bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} focus-visible:ring-zinc-500`} />
                                     </TechLabel>
                                 </div>
 
                                 <div className="col-span-3">
                                     <TechLabel label="Registry No" icon={Hash}>
-                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
+                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-black text-xs tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
                                     </TechLabel>
                                 </div>
                             </Card>
@@ -1059,11 +1061,11 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                         <Card className={`p-0 ${PREMIUM_GRADIENT} ${PREMIUM_ROUNDING_MD} border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden relative group`}>
                                             <div className={`absolute inset-0 opacity-[0.03] dark:opacity-10 ${ACCENT_GRADIENT}`} style={{ mixBlendMode: 'overlay' }} />
                                             <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-zinc-100 dark:divide-zinc-800 relative z-10 font-mono">
-                                                <div className="flex-1 flex items-center p-4">
-                                                    <button onClick={openInvoiceDialog} className={`flex items-center gap-3 px-4 py-2 border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 hover:border-orange-500 transition-all group`}>
+                                                <div className="flex-1 flex items-center p-2.5">
+                                                    <button onClick={openInvoiceDialog} className={`flex items-center gap-2.5 px-2.5 py-1 border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 hover:border-orange-500 transition-all group`}>
                                                         <div className="flex flex-col items-start leading-none uppercase">
-                                                            <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 group-hover:text-orange-500 transition-colors tracking-widest leading-none mb-1">Source Document</span>
-                                                            <span className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 group-hover:text-orange-500 transition-colors tracking-widest leading-none mb-0.5">Source Document</span>
+                                                            <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                                                                 {selectedInvoice ? selectedInvoice.invoice : "SELECT SOURCE INVOICE"}
                                                                 <ArrowRightLeft size={10} className="text-orange-500" />
                                                             </span>
@@ -1073,19 +1075,19 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                                 {selectedInvoice && (
                                                     <>
-                                                        <div className="p-4 px-6 flex flex-col justify-center">
-                                                            <div className="text-[9px] uppercase font-black text-zinc-400 tracking-widest mb-1">Registry Date</div>
+                                                        <div className="p-2.5 px-4 flex flex-col justify-center">
+                                                            <div className="text-[8px] uppercase font-black text-zinc-400 tracking-widest mb-0.5">Registry Date</div>
                                                             <div className="text-xs font-black text-zinc-800 dark:text-zinc-200 italic">{fmtDate(selectedInvoice.date)}</div>
                                                         </div>
-                                                        <div className="p-4 px-6 flex flex-col justify-center bg-zinc-50/50 dark:bg-zinc-900/50">
-                                                            <div className="text-[9px] uppercase font-black text-zinc-400 tracking-widest mb-1">Net Exposure</div>
+                                                        <div className="p-2.5 px-4 flex flex-col justify-center bg-zinc-50/50 dark:bg-zinc-900/50">
+                                                            <div className="text-[8px] uppercase font-black text-zinc-400 tracking-widest mb-0.5">Net Exposure</div>
                                                             <div className="text-xs font-black text-orange-600">Rs {toNum(selectedInvoice.net_total).toLocaleString()}</div>
                                                         </div>
                                                     </>
                                                 )}
 
-                                                <div className="flex items-center gap-3 px-4 py-3 md:py-0">
-                                                    <Button onClick={openInvoiceDialog} className="h-10 px-6 bg-zinc-900 hover:bg-black text-white rounded-md font-black text-[10px] uppercase tracking-widest transition-all">
+                                                <div className="flex items-center gap-2 px-3 py-2 md:py-0">
+                                                    <Button onClick={openInvoiceDialog} className="h-8 px-4 bg-zinc-900 hover:bg-black text-white rounded-md font-black text-[9px] uppercase tracking-widest transition-all">
                                                         Search Registry
                                                     </Button>
                                                 </div>
@@ -1097,31 +1099,31 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         </AnimatePresence>
 
                         {/* Item Manifest */}
-                        <Card className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-2xl shadow-black/5 min-h-[400px] p-0`}>
-                            <div className="hidden md:grid grid-cols-12 gap-2 bg-zinc-900 dark:bg-black text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-2 py-3 items-center border-b border-zinc-800">
+                        <Card className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-2xl shadow-black/5 min-h-0 p-0`}>
+                            <div className="hidden md:grid grid-cols-12 gap-2 bg-zinc-900 dark:bg-black text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 px-2 py-2 items-center border-b border-zinc-800 shrink-0">
                                 <div className="col-span-4 flex items-center gap-2">
-                                    <Database size={12} className="text-orange-500" />
+                                    <Database size={11} className="text-orange-500" />
                                     Entity Designation
                                 </div>
-                                <div className="col-span-1 text-center bg-zinc-800/50 py-1 rounded">Full</div>
-                                <div className="col-span-1 text-center bg-zinc-800/50 py-1 rounded">Pcs</div>
-                                <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-1 rounded">B.Full</div>
-                                <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-1 rounded">B.Pcs</div>
+                                <div className="col-span-1 text-center bg-zinc-800/50 py-0.5 rounded">Full</div>
+                                <div className="col-span-1 text-center bg-zinc-800/50 py-0.5 rounded">Pcs</div>
+                                <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-0.5 rounded">B.Full</div>
+                                <div className="col-span-1 text-center bg-emerald-950/30 text-emerald-500 py-0.5 rounded">B.Pcs</div>
                                 <div className="col-span-1 text-right pr-2">Rate</div>
                                 <div className="col-span-1 text-right pr-2">Disc%</div>
                                 <div className="col-span-2 text-right pr-4 flex items-center justify-end gap-2 text-white">
                                     Sub Total
-                                    <Plus size={14} className="cursor-pointer hover:text-orange-500" onClick={() => setRows(p => [getEmptyRow(), ...p])} />
+                                    <Plus size={13} className="cursor-pointer hover:text-orange-500" onClick={() => setRows(p => [getEmptyRow(), ...p])} />
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-auto bg-white/50 dark:bg-transparent" ref={manifestRef}>
+                            <div className="flex-1 overflow-auto bg-white/50 dark:bg-transparent min-h-0 custom-scrollbar" ref={manifestRef}>
                                 <AnimatePresence initial={false}>
                                     {rows.map((row, idx) => {
                                         const rowAmount = rowsWithAmount.find(r => r.id === row.id) || { amount: 0 };
                                         return (
                                             <motion.div key={row.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
-                                                className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-2 py-3 border-b border-zinc-100 dark:border-zinc-800/50 items-center group transition-colors relative ${focusedRowId === row.id ? 'bg-orange-50/50 dark:bg-orange-500/5' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30'}`}
+                                                className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-2 py-1.5 border-b border-zinc-100 dark:border-zinc-800/50 items-center group transition-colors relative ${focusedRowId === row.id ? 'bg-orange-50/50 dark:bg-orange-500/5' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30'}`}
                                                 onClick={() => setFocusedRowId(row.id)}>
 
                                                 {focusedRowId === row.id && <div className="absolute left-0 top-0 w-0.5 h-full bg-orange-500" />}
@@ -1129,59 +1131,59 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 {/* Entity Selection */}
                                                 <div className="md:col-span-4 pr-2">
                                                     {!row.item_id ? (
-                                                        <Button variant="ghost" className={`h-8 w-full justify-start text-[10px] font-black uppercase tracking-tighter border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500 hover:bg-orange-500/5 ${PREMIUM_ROUNDING_MD}`}
+                                                        <Button variant="ghost" className={`h-7 w-full justify-start text-[9px] font-black uppercase tracking-tighter border-dashed border-zinc-300 dark:border-zinc-700 hover:border-orange-500 hover:bg-orange-500/5 ${PREMIUM_ROUNDING_MD}`}
                                                             onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount}>
-                                                            <Plus size={12} className="mr-2 text-orange-500" />
+                                                            <Plus size={11} className="mr-1.5 text-orange-500" />
                                                             Assign Item to Position
                                                         </Button>
                                                     ) : (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-mono text-zinc-400 w-4">{idx + 1}.</span>
+                                                            <span className="text-[9px] font-mono text-zinc-400 w-4">{idx + 1}.</span>
                                                             <div className="flex-1">
                                                                 <Input value={row.item_title} readOnly placeholder="Identify Entity..."
-                                                                    className={`h-8 text-xs font-black uppercase tracking-tight bg-transparent border-transparent group-hover:bg-zinc-100 dark:group-hover:bg-zinc-800/50 focus:bg-white dark:focus:bg-zinc-800 transition-all ${row.item_id ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`} />
+                                                                    className={`h-7 text-xs font-black uppercase tracking-tight bg-transparent border-transparent group-hover:bg-zinc-100 dark:group-hover:bg-zinc-800/50 focus:bg-white dark:focus:bg-zinc-800 transition-all ${row.item_id ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`} />
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <div className="grid grid-cols-4 md:col-span-4 gap-1.5 md:gap-1 px-1">
+                                                <div className="grid grid-cols-4 md:col-span-4 gap-1 md:gap-1 px-1">
                                                     <div className="flex flex-col md:block">
-                                                        <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1">Full</label>
+                                                        <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5">Full</label>
                                                         <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
-                                                            className="h-8 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
+                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
-                                                        <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1">Pcs</label>
+                                                        <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5">Pcs</label>
                                                         <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
-                                                            className="h-8 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
+                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
-                                                        <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-1">B.Full</label>
+                                                        <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-0.5">B.Full</label>
                                                         <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
-                                                            className="h-8 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
+                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
                                                     </div>
                                                     <div className="flex flex-col md:block">
-                                                        <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-1">B.Pcs</label>
+                                                        <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-0.5">B.Pcs</label>
                                                         <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
-                                                            className="h-8 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
+                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
                                                     </div>
                                                 </div>
 
                                                 {/* Financials */}
                                                 <div className="md:col-span-1 px-1">
-                                                    <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1 text-right block">Rate</label>
+                                                    <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5 text-right block">Rate</label>
                                                     <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
-                                                        className="h-8 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700" />
+                                                        className="h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700" />
                                                 </div>
                                                 <div className="md:col-span-1 px-1">
-                                                    <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-1 text-right block">Disc%</label>
+                                                    <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5 text-right block">Disc%</label>
                                                     <Input type="number" value={row.discPercent || ""} readOnly={row.discReadOnly} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
-                                                        className={`h-8 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.discReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`} />
+                                                        className={`h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.discReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`} />
                                                 </div>
 
                                                 {/* Subtotal & Action */}
-                                                <div className="col-span-2 flex items-center justify-end gap-2 pr-4">
+                                                <div className="col-span-2 flex items-center justify-end gap-1.5 pr-3">
                                                     <div className="text-right">
                                                         <span className={`text-[11px] font-black font-mono transition-all duration-300 ${rowAmount.amount > 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-300 dark:text-zinc-700'}`}>
                                                             {rowAmount.amount.toLocaleString()}
@@ -1190,14 +1192,14 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                     {row.item_id && (
                                                         <Button variant="ghost" size="icon"
                                                             title="Inventory Context"
-                                                            className="h-7 w-7 text-blue-400 hover:text-blue-500 hover:bg-blue-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                                                            className="h-6 w-6 text-blue-400 hover:text-blue-500 hover:bg-blue-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
                                                             onClick={(e) => { e.stopPropagation(); setFocusedRowId(row.id); setInventoryContextOpen(true); }}>
-                                                            <Info size={12} />
+                                                            <Info size={11} />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all rounded-full opacity-0 group-hover:opacity-100"
                                                         onClick={(e) => { e.stopPropagation(); setRows(p => p.filter(r => r.id !== row.id).length === 0 ? [getEmptyRow()] : p.filter(r => r.id !== row.id)); }}>
-                                                        <Trash2 size={12} />
+                                                        <Trash2 size={11} />
                                                     </Button>
                                                 </div>
                                             </motion.div>
@@ -1205,37 +1207,37 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     })}
                                 </AnimatePresence>
                                 {rows.length === 0 && (
-                                    <div className="py-20 text-center space-y-4">
-                                        <div className="bg-zinc-100 dark:bg-zinc-900 w-12 h-12 rounded-2xl flex items-center justify-center mx-auto text-zinc-400">
-                                            <Calculator size={24} />
+                                    <div className="py-16 text-center space-y-3">
+                                        <div className="bg-zinc-100 dark:bg-zinc-900 w-10 h-10 rounded-xl flex items-center justify-center mx-auto text-zinc-400">
+                                            <Calculator size={20} />
                                         </div>
-                                        <div className="text-xs font-black text-zinc-400 uppercase tracking-widest">Manifest Empty</div>
+                                        <div className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">Manifest Empty</div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Workspace Controls */}
-                            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center gap-3">
-                                <Button variant="outline" size="sm" onClick={initializeWorkspace} className={`h-8 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800`}>
-                                    <Plus size={12} className="mr-2 text-orange-500" />
+                            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center gap-2 shrink-0">
+                                <Button variant="outline" size="sm" onClick={initializeWorkspace} className={`h-7 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 px-2.5`}>
+                                    <Plus size={11} className="mr-1.5 text-orange-500" />
                                     Initialize Item Position
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount} className={`h-8 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800`}>
-                                    <Package size={12} className="mr-2 text-orange-500" />
+                                <Button variant="outline" size="sm" onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount} className={`h-7 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 px-2.5`}>
+                                    <Package size={11} className="mr-1.5 text-orange-500" />
                                     Assign Item (Bulk)
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={purgeWorkspace} className={`h-8 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-rose-500 hover:bg-rose-50 hover:text-rose-600`}>
-                                    <RotateCcw size={12} className="mr-2" />
+                                <Button variant="outline" size="sm" onClick={purgeWorkspace} className={`h-7 text-[9px] font-black uppercase tracking-widest ${PREMIUM_ROUNDING_MD} bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-rose-500 hover:bg-rose-50 hover:text-rose-600 px-2.5`}>
+                                    <RotateCcw size={11} className="mr-1.5" />
                                     Purge Workspace
                                 </Button>
                             </div>
 
                             {/* Purchase Detail Cards (Context Registry) - Desktop */}
                             {rowsWithAmount.some(r => r.item_id && r.id === focusedRowId) && (
-                                <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10">
-                                    <div className="flex items-center gap-2 mb-3 px-1">
-                                        <Info size={14} className="text-orange-500" />
-                                        <span className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em]">Active Item Intelligence</span>
+                                <div className="p-2.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10 shrink-0">
+                                    <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                                        <Info size={13} className="text-orange-500" />
+                                        <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em]">Active Item Intelligence</span>
                                     </div>
                                     <div className="w-full">
                                         {rowsWithAmount.filter(r => r.item_id && r.id === focusedRowId).map((row) => (
@@ -1250,46 +1252,46 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                     </div>
 
                     {/* ── FINANCIAL AUDITOR (Sidebar) ── */}
-                    <div className="w-full md:w-80 space-y-6 md:h-full md:flex md:flex-col">
-                        <Card className={`p-6 ${PREMIUM_GRADIENT} ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 shadow-md flex-1 flex flex-col justify-between relative overflow-hidden group/auditor`}>
-                            <div className="absolute top-0 right-0 p-4 opacity-5 text-zinc-900 dark:text-white group-hover/auditor:scale-110 transition-transform duration-700">
-                                <Calculator size={120} />
+                    <div className="w-full lg:w-72 xl:w-76 gap-2.5 md:h-full md:flex md:flex-col min-w-0 shrink-0">
+                        <Card className={`p-0 ${PREMIUM_GRADIENT} ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 shadow-md flex-1 flex flex-col justify-between relative overflow-hidden group/auditor max-h-full min-h-0`}>
+                            <div className="absolute top-0 right-0 p-3 opacity-[0.02] text-zinc-900 dark:text-white pointer-events-none">
+                                <Calculator size={90} />
                             </div>
 
-                            <div className="space-y-6 relative z-10">
-                                <div className="border-b border-zinc-200 dark:border-zinc-800 pb-4">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 dark:text-zinc-500 mb-4 flex items-center gap-2">
-                                        <Calculator size={12} className="text-orange-500" />
+                            <div className="overflow-y-auto min-h-0 custom-scrollbar p-3 flex-1 space-y-2.5">
+                                <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500 dark:text-zinc-500 mb-2 flex items-center gap-1.5">
+                                        <Calculator size={11} className="text-orange-500" />
                                         Valuation Protocol
                                     </h3>
-                                    <div className="space-y-3">
+                                    <div className="space-y-1.5">
                                         <div className="flex justify-between items-end">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Return Subtotal</span>
-                                            <span className="text-sm font-black font-mono tracking-tighter text-zinc-900 dark:text-white">
+                                            <span className="text-[9px] uppercase font-bold text-zinc-400">Return Subtotal</span>
+                                            <span className="text-xs font-black font-mono tracking-tighter text-zinc-900 dark:text-white">
                                                 {totals.net.toLocaleString()}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                                            <span className="text-[10px] uppercase font-bold text-zinc-400">Discount Delta</span>
-                                            <span className="text-sm font-black font-mono tracking-tighter text-rose-600">
+                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-1.5">
+                                            <span className="text-[9px] uppercase font-bold text-zinc-400">Discount Delta</span>
+                                            <span className="text-xs font-black font-mono tracking-tighter text-rose-600">
                                                 -{totals.disc.toLocaleString()}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-2.5">
                                     <TechLabel label="Extra Discount" icon={BadgePercent}>
                                         <div className="relative">
                                             <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
-                                                className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                                className={`h-8 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs px-3 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
                                         </div>
                                     </TechLabel>
 
-                                    <div className="bg-zinc-900 dark:bg-black p-5 rounded-xl border border-zinc-800 shadow-inner group/net">
-                                        <div className="text-[9px] uppercase font-black text-zinc-500 tracking-[0.2em] mb-1 group-hover/net:text-orange-500 transition-colors">Net Return Amount</div>
-                                        <div className="text-4xl font-black text-white font-mono tracking-tighter flex items-baseline gap-1">
-                                            <span className="text-lg opacity-30 font-sans">Rs</span>
+                                    <div className="bg-zinc-900 dark:bg-black p-2.5 rounded-lg border border-zinc-800 shadow-inner group/net">
+                                        <div className="text-[8px] uppercase font-black text-zinc-500 tracking-[0.2em] mb-0.5 group-hover/net:text-orange-500 transition-colors">Net Return Amount</div>
+                                        <div className="text-2xl font-black text-white font-mono tracking-tighter flex items-baseline gap-1">
+                                            <span className="text-sm opacity-30 font-sans">Rs</span>
                                             {(totals.net - extraDiscount).toLocaleString()}
                                         </div>
                                     </div>
@@ -1298,14 +1300,14 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                     {/* Supplier Ledger Breakdown */}
                                     {supplierBalance !== null && (
-                                        <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 overflow-hidden">
-                                            <div className="px-4 py-2 border-b border-zinc-800">
-                                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Supplier Ledger</span>
+                                        <div className="bg-zinc-900 dark:bg-black rounded-lg border border-zinc-800 overflow-hidden">
+                                            <div className="px-2.5 py-1 border-b border-zinc-800">
+                                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">Supplier Ledger</span>
                                             </div>
-                                            <div className="px-4 py-2 space-y-1.5">
+                                            <div className="px-2.5 py-1.5 space-y-0.5">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Prev Balance</span>
-                                                    <span className={`text-[10px] font-black ${toNum(supplierBalance) >= 0 ? 'text-rose-400' : 'text-sky-400'}`}>
+                                                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Prev Balance</span>
+                                                    <span className={`text-[9px] font-black ${toNum(supplierBalance) >= 0 ? 'text-rose-400' : 'text-sky-400'}`}>
                                                         {toNum(supplierBalance) < 0
                                                             ? `Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()} (Adv)`
                                                             : fmtBalance(supplierBalance, true)}
@@ -1313,20 +1315,20 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 </div>
                                                 {outstandingBalance !== null && toNum(outstandingBalance) > 0 && (
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Payable</span>
-                                                        <span className="text-[10px] font-black text-rose-400">Rs {toNum(outstandingBalance).toLocaleString()}</span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Payable</span>
+                                                        <span className="text-[9px] font-black text-rose-400">Rs {toNum(outstandingBalance).toLocaleString()}</span>
                                                     </div>
                                                 )}
                                                 {creditBalance !== null && toNum(creditBalance) > 0 && (
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Credit</span>
-                                                        <span className="text-[10px] font-black text-emerald-400">Rs {toNum(creditBalance).toLocaleString()}</span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Credit</span>
+                                                        <span className="text-[9px] font-black text-emerald-400">Rs {toNum(creditBalance).toLocaleString()}</span>
                                                     </div>
                                                 )}
                                                 {advanceBalance !== null && toNum(advanceBalance) > 0 && (
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Advance</span>
-                                                        <span className="text-[10px] font-black text-sky-400">Rs {toNum(advanceBalance).toLocaleString()}</span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Advance</span>
+                                                        <span className="text-[9px] font-black text-sky-400">Rs {toNum(advanceBalance).toLocaleString()}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -1335,25 +1337,25 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                     <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-2.5">
                                         <div className="space-y-0.5">
-                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
                                                 {toNum(supplierBalance) < 0 ? 'Advance Paid' : 'Previous Balance'}
                                             </div>
-                                            <div className={`text-sm font-bold font-mono tracking-tighter ${toNum(supplierBalance) < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                            <div className={`text-[11px] font-bold font-mono tracking-tighter ${toNum(supplierBalance) < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
                                                 {toNum(supplierBalance) < 0
                                                     ? `Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()}`
                                                     : fmtBalance(supplierBalance, true)}
                                             </div>
                                         </div>
                                         <div className="space-y-0.5 text-right">
-                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
                                                 New Balance
                                             </div>
                                             {(() => {
                                                 const newBal = toNum(supplierBalance) - (totals.net - extraDiscount) + refundAmount;
                                                 return (
-                                                    <div className={`text-sm font-bold font-mono tracking-tighter ${newBal < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
+                                                    <div className={`text-[11px] font-bold font-mono tracking-tighter ${newBal < 0 ? 'text-sky-500' : 'text-zinc-800 dark:text-zinc-100'}`}>
                                                         {newBal < 0
                                                             ? `Rs ${Math.abs(newBal).toLocaleString()} (Adv)`
                                                             : fmtBalance(newBal, true)}
@@ -1367,10 +1369,10 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                     <TechLabel label="Firm Branding" icon={Building2}>
                                         <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                                            <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
+                                            <SelectTrigger className={`h-8 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white text-xs ${PREMIUM_ROUNDING_MD}`}>
                                                 <SelectValue placeholder="Select Firm..." />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent side="top">
                                                 <SelectItem value="0">No Branding</SelectItem>
                                                 {firms?.map((firm) => (
                                                     <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
@@ -1382,30 +1384,34 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                     <TechLabel label="Refund Liquidation (Paid)" icon={Banknote}>
                                         <div className="relative group/refund">
                                             <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
-                                                className={`h-11 font-mono font-black text-xl tracking-tighter pl-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 transition-all focus:ring-2 focus:ring-orange-500/20`} placeholder="0.00" />
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within/refund:text-orange-500 transition-colors">
-                                                <ArrowDownToLine size={20} />
+                                                className={`h-8 font-mono font-black text-sm tracking-tighter pl-9 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 transition-all focus:ring-2 focus:ring-orange-500/20`} placeholder="0.00" />
+                                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within/refund:text-orange-500 transition-colors">
+                                                <ArrowDownToLine size={14} />
                                             </div>
                                         </div>
+                                    </TechLabel>
+
+                                    <TechLabel label="Admin Remarks" icon={Info}>
+                                        <Input value={remarks} onChange={e => setRemarks(e.target.value)} className="h-8 text-xs" placeholder="Memo..." />
                                     </TechLabel>
                                 </div>
                             </div>
 
-                            <div className="mt-8 space-y-3 relative z-10">
-                                <Button className={`w-full h-14 ${SIGNAL_ORANGE} ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 group/save overflow-hidden relative shadow-2xl transition-all hover:scale-[1.02] active:scale-[0.98]`}
+                            {/* Action Buttons - Pinned Sticky Footer */}
+                            <div className="p-2.5 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0 space-y-1.5 relative z-10">
+                                <Button className={`w-full h-9.5 ${SIGNAL_ORANGE} ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 group/save overflow-hidden relative shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]`}
                                     onClick={handleSave} disabled={isSaving}>
                                     {isSaving ? (
-                                        <RotateCcw className="animate-spin" />
+                                        <RotateCcw className="animate-spin" size={15} />
                                     ) : (
                                         <>
-                                            <CheckCircle2 size={20} className="group-hover:scale-120 transition-transform" />
+                                            <CheckCircle2 size={15} className="group-hover:scale-110 transition-transform" />
                                             Commit Registry
                                         </>
                                     )}
-                                    <div className="absolute inset-0 bg-white opacity-0 group-hover/save:opacity-10 transition-opacity" />
                                 </Button>
 
-                                <Button variant="outline" className={`w-full h-11 ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-[10px] text-zinc-500 border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800`}
+                                <Button variant="outline" className={`w-full h-7.5 ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-[9px] text-zinc-500 border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800`}
                                     onClick={() => router.get("/purchase-return")}>
                                     Decline Logic
                                 </Button>

@@ -652,23 +652,23 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 overflow-hidden flex flex-col h-screen">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <main ref={scrollContainerRef} className="flex-1 overflow-auto md:overflow-hidden p-3 md:p-6 flex flex-col md:flex-row gap-6 scroll-smooth text-foreground">
+                <main ref={scrollContainerRef} className="flex-1 overflow-auto md:overflow-hidden p-2.5 md:p-3.5 flex flex-col md:flex-row gap-3 xl:gap-4 scroll-smooth text-foreground">
 
                     {/* ── WORKSPACE ── */}
-                    <div className="flex-1 flex flex-col gap-4 md:gap-6 md:overflow-hidden">
+                    <div className="flex-1 flex flex-col gap-2.5 xl:gap-3 md:overflow-hidden min-w-0">
 
                         {/* Control Header (Desktop Only) */}
-                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-                            <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-6 items-end relative overflow-hidden`}>
+                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block min-w-0">
+                            <Card className={`p-2.5 xl:p-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-2.5 xl:gap-3 items-end relative overflow-hidden`}>
                                 <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT}`} />
 
                                 <div className="col-span-3">
                                     <TechLabel label="Return Date" icon={CalendarIcon}>
                                         <Popover open={calOpen} onOpenChange={setCalOpen}>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                                <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                     {fmtDate(date.toISOString())}
-                                                    <CalendarIcon size={14} className="text-zinc-400" />
+                                                    <CalendarIcon size={12} className="text-zinc-400" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -682,18 +682,18 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                     <TechLabel label="Client Designation" icon={UserIcon}>
                                         <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
+                                                <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
                                                     {selectedAccount ? selectedAccount.title : "Identify Customer..."}
-                                                    <Search size={14} className="text-zinc-400" />
+                                                    <Search size={12} className="text-zinc-400" />
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                                <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                    <Input placeholder="SEARCH IDENTITY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-9 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                                                <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                                    <Input placeholder="SEARCH IDENTITY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                                                 </div>
                                                 <div className="max-h-64 overflow-auto py-1">
                                                     {filteredAccounts.map(acc => (
-                                                        <button key={acc.id} className="w-full text-left px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
+                                                        <button key={acc.id} className="w-full text-left px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
                                                             onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
                                                             <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
                                                             {acc.title}
@@ -707,7 +707,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
 
                                 <div className="col-span-4">
                                     <TechLabel label="Verification No" icon={Hash}>
-                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-10 border-zinc-200 dark:border-zinc-700 font-black text-sm tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
+                                        <Input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className={`h-8 border-zinc-200 dark:border-zinc-700 font-black text-xs tracking-[0.2em] bg-zinc-50 dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} text-orange-600 focus-visible:ring-orange-500`} />
                                     </TechLabel>
                                 </div>
                             </Card>
@@ -717,19 +717,19 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                         <AnimatePresence>
                             {selectedAccount && (
                                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                                    <Card className={`p-4 ${PREMIUM_GRADIENT} text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD} border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between relative gap-4`}>
+                                    <Card className={`p-2.5 ${PREMIUM_GRADIENT} text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD} border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between relative gap-3`}>
                                         <div className={`absolute inset-0 opacity-[0.03] dark:opacity-10 ${ACCENT_GRADIENT}`} style={{ mixBlendMode: 'overlay' }} />
-                                        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 relative z-10 w-full md:w-auto">
-                                            <div className="space-y-0.5 border-b md:border-b-0 border-zinc-100 dark:border-zinc-800 pb-2 md:pb-0">
-                                                <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Source Document</div>
-                                                <Button variant="ghost" className="h-auto p-0 text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300 font-black tracking-tighter text-base flex items-center gap-2 group transition-all" onClick={openInvoiceDialog}>
+                                        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6 relative z-10 w-full md:w-auto">
+                                            <div className="space-y-0.5 border-b md:border-b-0 border-zinc-100 dark:border-zinc-800 pb-1.5 md:pb-0">
+                                                <div className="text-[8px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Source Document</div>
+                                                <Button variant="ghost" className="h-auto p-0 text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300 font-black tracking-tighter text-sm flex items-center gap-1.5 group transition-all" onClick={openInvoiceDialog}>
                                                     {originalInvoiceNo || "SELECT SOURCE INVOICE"}
-                                                    <ArrowRightLeft size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+                                                    <ArrowRightLeft size={12} className="group-hover:rotate-180 transition-transform duration-500" />
                                                 </Button>
                                             </div>
                                         </div>
 
-                                        <Button onClick={openInvoiceDialog} className={`h-11 px-6 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white hover:bg-black transition-all font-black text-[10px] uppercase tracking-widest relative z-10 w-full md:w-auto ${PREMIUM_ROUNDING_MD}`}>
+                                        <Button onClick={openInvoiceDialog} className={`h-8 px-4 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 text-white hover:bg-black transition-all font-black text-[9px] uppercase tracking-widest relative z-10 w-full md:w-auto ${PREMIUM_ROUNDING_MD}`}>
                                             Replace Reference
                                         </Button>
                                     </Card>
@@ -738,252 +738,243 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                         </AnimatePresence>
 
                         {/* Item Grid (Desktop Only) */}
-                        <div className={`hidden md:flex flex-1 overflow-hidden flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
-                            <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-4 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20`}>
-                                <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Inventory Identification</div>
-                                <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-500/5 dark:bg-orange-500/10 -mx-1 py-1">Return Qty</div>
-                                <div className="col-span-2 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
-                                <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
-                                <div className="col-span-1 text-center text-[10px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
-                                <div className="col-span-2 text-right text-[10px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
-                                <div className="col-span-1" />
-                            </div>
+                        <div className={`hidden md:flex flex-1 overflow-hidden flex flex-col min-h-0 ${CARD_BASE} ${PREMIUM_ROUNDING_MD}`}>
+                            <div className="overflow-x-auto custom-scrollbar flex-1 flex flex-col min-h-0">
+                                <div className="min-w-[850px] xl:min-w-0 flex-1 flex flex-col min-h-0">
+                                    <div className={`grid grid-cols-12 bg-zinc-50 dark:bg-zinc-900/80 p-2.5 border-b border-zinc-100 dark:border-zinc-800 sticky top-0 z-20 shrink-0`}>
+                                        <div className="col-span-3 text-[9px] font-black uppercase tracking-widest text-zinc-500">Inventory Identification</div>
+                                        <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-widest text-orange-600 bg-orange-500/5 dark:bg-orange-500/10 -mx-1 py-0.5 rounded">Return Qty</div>
+                                        <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-widest text-zinc-500">Unit Val</div>
+                                        <div className="col-span-1 text-center text-[9px] font-black uppercase tracking-widest text-zinc-500">Duty %</div>
+                                        <div className="col-span-1 text-center text-[9px] font-black uppercase tracking-widest text-zinc-500">Dec %</div>
+                                        <div className="col-span-2 text-right text-[9px] font-black uppercase tracking-widest text-zinc-500">Position Net</div>
+                                        <div className="col-span-1" />
+                                    </div>
 
-                            <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {rowsWithAmount.map((row, idx) => (
-                                    <motion.div key={row.id} initial={{ x: -10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.05 }}
-                                        onClick={() => setSelectedRowItemId(row.item_id)}
-                                        className={`grid grid-cols-12 gap-2 p-3 items-center group transition-colors cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-100 dark:divide-zinc-800">
+                                        {rowsWithAmount.map((row, idx) => (
+                                            <motion.div key={row.id} initial={{ x: -10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.05 }}
+                                                onClick={() => setSelectedRowItemId(row.item_id)}
+                                                className={`grid grid-cols-12 gap-2 px-2.5 py-1.5 items-center group transition-colors cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
 
-                                        <div className="col-span-3">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-black uppercase tracking-tighter truncate leading-tight dark:text-zinc-100">{row.item_title}</span>
-                                                <span className="text-[9px] font-mono text-zinc-400">ITEM_ID: {row.item_id}</span>
-                                            </div>
-                                        </div>
+                                                <div className="col-span-3">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-tighter truncate leading-tight dark:text-zinc-100">{row.item_title}</span>
+                                                        <span className="text-[9px] font-mono text-zinc-400">ITEM_ID: {row.item_id}</span>
+                                                    </div>
+                                                </div>
 
-                                        <div className="col-span-2 grid grid-cols-2 gap-1 px-1">
-                                            <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="F" title="Full Cartons" />
-                                            <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="P" title="Loose Pieces" />
-                                        </div>
+                                                <div className="col-span-2 grid grid-cols-2 gap-1 px-1">
+                                                    <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="F" title="Full Cartons" />
+                                                    <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="P" title="Loose Pieces" />
+                                                </div>
 
-                                        <div className="col-span-2">
-                                            <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
-                                                className={`h-8 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
-                                        </div>
+                                                <div className="col-span-2">
+                                                    <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
+                                                </div>
 
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
-                                                readOnly={row.taxReadOnly} className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
+                                                <div className="col-span-1">
+                                                    <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
+                                                        readOnly={row.taxReadOnly} className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                                </div>
 
-                                        <div className="col-span-1">
-                                            <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
-                                                readOnly={row.discReadOnly} className={`h-8 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
-                                        </div>
+                                                <div className="col-span-1">
+                                                    <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                        readOnly={row.discReadOnly} className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                                </div>
 
-                                        <div className="col-span-2 text-right">
-                                            <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
-                                        </div>
+                                                <div className="col-span-2 text-right">
+                                                    <div className="font-black text-xs tracking-tighter text-zinc-800 dark:text-zinc-100">Rs {row.amount.toLocaleString()}</div>
+                                                </div>
 
-                                        <div className="col-span-1 flex items-center justify-center">
-                                            <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer"
-                                                onClick={() => {
-                                                    if (confirm("Purge this line item from return protocol?")) {
-                                                        setRows(p => p.filter(r => r.id !== row.id));
-                                                    }
-                                                }}>
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                                <div className="col-span-1 flex items-center justify-center">
+                                                    <button className="opacity-0 group-hover:opacity-100 h-6 w-6 flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all cursor-pointer rounded-full"
+                                                        onClick={() => {
+                                                            if (confirm("Purge this line item from return protocol?")) {
+                                                                setRows(p => p.filter(r => r.id !== row.id));
+                                                            }
+                                                        }}>
+                                                        <Trash2 size={11} />
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Table Actions */}
-                            <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 flex gap-4 bg-zinc-50/50 dark:bg-zinc-900/50">
-                                <Button variant="outline" size="sm" className={`h-8 text-[10px] font-black uppercase ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-700 hover:border-orange-500 dark:text-zinc-200`}
+                            <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 flex gap-2 bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0">
+                                <Button variant="outline" size="sm" className={`h-7 text-[9px] font-black uppercase ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-700 hover:border-orange-500 dark:text-zinc-200 px-2.5`}
                                     onClick={() => setAssignItemDialogOpen(true)} disabled={!selectedAccount}>
-                                    <Package size={14} className="mr-2 text-orange-500" />
+                                    <Package size={11} className="mr-1.5 text-orange-500" />
                                     Assign Item (Bulk)
                                 </Button>
                             </div>
                         </div>
                     </div>
 
-                    {/* ── COMMAND CENTER ── */}
-                    <div className="hidden md:flex w-[320px] md:flex-col md:gap-6">
-                        {/* Financial Auditor Panel */}
-                        <motion.div initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-                            <Card className={`${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 shadow-md relative overflow-hidden flex flex-col ${PREMIUM_ROUNDING_MD}`}>
-                                <div className={`absolute inset-0 opacity-[0.03] dark:opacity-10 ${ACCENT_GRADIENT}`} style={{ mixBlendMode: 'overlay' }} />
+                    {/* ── COMMAND CENTER (Desktop Sidebar) ── */}
+                    <div className="hidden md:flex w-full lg:w-72 xl:w-80 flex-col gap-2.5 md:h-full shrink-0 min-w-0">
+                        <Card className={`p-0 ${PREMIUM_GRADIENT} ${PREMIUM_ROUNDING_MD} border-zinc-200 dark:border-zinc-800 shadow-md flex-1 flex flex-col justify-between relative overflow-hidden group/auditor max-h-full min-h-0`}>
+                            <div className="absolute top-0 right-0 p-3 opacity-[0.02] text-zinc-900 dark:text-white pointer-events-none">
+                                <Calculator size={90} />
+                            </div>
 
-                                <div className="p-4 space-y-4 relative z-10">
-                                    <div className="flex justify-between items-start">
-                                        <h3 className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">
-                                            Audit Control
-                                        </h3>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-0.5 group">
-                                            <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-between">
-                                                Return Subtotal
-                                                <Info size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-zinc-400 dark:text-zinc-600 text-base">Rs</span>
-                                                {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                            </div>
+                            <div className="overflow-y-auto min-h-0 custom-scrollbar p-3 flex-1 space-y-2.5">
+                                <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                                    <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-500 dark:text-zinc-500 mb-2 flex items-center gap-1.5">
+                                        <Calculator size={11} className="text-orange-500" />
+                                        Audit Control
+                                    </h3>
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[9px] uppercase font-bold text-zinc-400">Return Subtotal</span>
+                                            <span className="text-xs font-black font-mono tracking-tighter text-zinc-900 dark:text-white">
+                                                Rs {totals.net.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </span>
                                         </div>
-
-                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-0.5">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                                                    <BadgePercent size={10} />
-                                                    Tax Rev
-                                                </div>
-                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    + {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                                </div>
-                                            </div>
-                                            <div className="space-y-0.5 text-right">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1.5">
-                                                    <ArrowDownToLine size={10} className="text-rose-500" />
-                                                    Disc Rec
-                                                </div>
-                                                <div className="text-sm font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
-                                                    - {totals.disc.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <TechLabel label="Extra Discount" icon={BadgePercent}>
-                                            <div className="relative">
-                                                <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
-                                                    className={`h-10 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-sm px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
-                                            </div>
-                                        </TechLabel>
-
-                                        <div className={`bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 p-4 space-y-1 relative ${PREMIUM_ROUNDING_MD}`}>
-                                            <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest flex justify-between">
-                                                Net Return Amount
-                                                <Calculator size={10} className="opacity-50" />
-                                            </div>
-                                            <div className="text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tighter flex items-center gap-2 leading-none">
-                                                <span className="text-orange-600 dark:text-orange-500 text-base opacity-50 font-mono font-normal">Rs</span>
-                                                {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                            </div>
-                                        </div>
-
-                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-0.5">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                                                    Previous Balance
-                                                </div>
-                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    {fmtBalance(previousBalance, false)}
-                                                </div>
-                                            </div>
-                                            <div className="space-y-0.5 text-right">
-                                                <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                                                    New Balance
-                                                </div>
-                                                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
-                                                    Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0 })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {(outstandingBalance !== null || creditBalance !== null || advanceBalance !== null) && (
-                                            <div className="h-px bg-zinc-100 dark:bg-zinc-800 mt-2" />
-                                        )}
-                                        {outstandingBalance !== null && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Outstanding</span>
-                                                <span className="text-xs font-bold text-rose-500 font-mono">Rs {outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
-                                            </div>
-                                        )}
-                                        {creditBalance !== null && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Credit Balance</span>
-                                                <span className="text-xs font-bold text-emerald-500 font-mono">Rs {creditBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
-                                            </div>
-                                        )}
-                                        {advanceBalance !== null && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Advance Balance</span>
-                                                <span className="text-xs font-bold text-sky-500 font-mono">Rs {advanceBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-3 pt-2">
-                                        <TechLabel label="Firm Branding" icon={Building2}>
-                                            <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                                                <SelectTrigger className={`h-11 w-full border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-white/5 text-zinc-900 dark:text-white ${PREMIUM_ROUNDING_MD}`}>
-                                                    <SelectValue placeholder="Select Firm..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="0">No Branding</SelectItem>
-                                                    {firms?.map((firm) => (
-                                                        <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </TechLabel>
-
-                                        {isPaidInvoice ? (
-                                            <>
-                                                <TechLabel label="Adjusted Cash Repayment" icon={ArrowRightLeft}>
-                                                    <div className="relative">
-                                                        <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
-                                                            className={`h-11 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-lg tracking-tighter px-4 ${PREMIUM_ROUNDING_MD} focus-visible:ring-emerald-500`} placeholder="0.00" />
-                                                    </div>
-                                                </TechLabel>
-
-                                                <div className="flex flex-col items-end">
-                                                    <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Adjust Balance</div>
-                                                    <div className="text-sm font-mono font-black text-orange-600 dark:text-orange-500">Rs {(totals.net - extraDiscount - refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-xl space-y-2">
-                                                <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                                                    <Info size={12} className="text-emerald-500" />
-                                                    Credit Balance Protocol
-                                                </div>
-                                                <div className="text-xs font-bold text-zinc-600 dark:text-zinc-400 leading-relaxed italic">
-                                                    This invoice is not fully paid. The return value will adjust the ledger balance instead of a cash refund.
-                                                </div>
-                                                <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                                                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Credit Adjustment</span>
-                                                    <span className="text-sm font-mono font-black text-emerald-600">Rs {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="pt-2">
-                                        <Button className={`w-full h-14 ${ACCENT_GRADIENT} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
-                                            onClick={handleSave} disabled={isSaving}>
-                                            <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={isSaving ? { opacity: 0.5 } : {}}>
-                                                {isSaving ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                                {isSaving ? "UPDATING..." : "COMMIT CHANGES"}
-                                            </motion.div>
-                                        </Button>
-                                        <Button variant="ghost" className="w-full h-10 mt-3 text-zinc-500 hover:text-zinc-300 font-black uppercase text-[10px] tracking-widest" onClick={() => router.get("/sales-return")}>
-                                            Abort Patch
-                                        </Button>
                                     </div>
                                 </div>
-                            </Card>
-                        </motion.div>
+
+                                <div className="space-y-2.5">
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                                                <BadgePercent size={9} />
+                                                Tax Rev
+                                            </div>
+                                            <div className="text-xs font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                + {totals.tax.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-0.5 text-right">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex justify-end items-center gap-1">
+                                                <ArrowDownToLine size={9} className="text-rose-500" />
+                                                Disc Rec
+                                            </div>
+                                            <div className="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono tracking-tighter">
+                                                - {totals.disc.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <TechLabel label="Extra Discount" icon={BadgePercent}>
+                                        <div className="relative">
+                                            <Input type="number" value={extraDiscount || ""} onChange={e => handleExtraDiscountChange(toNum(e.target.value))}
+                                                className={`h-8 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold text-xs px-3 ${PREMIUM_ROUNDING_MD} focus-visible:ring-orange-500`} placeholder="0.00" />
+                                        </div>
+                                    </TechLabel>
+
+                                    <div className="bg-orange-600 text-white p-2.5 rounded-lg space-y-0.5">
+                                        <div className="text-[8px] font-black uppercase opacity-75">Net Return Amount</div>
+                                        <div className="text-2xl font-black tracking-tighter flex items-baseline gap-1">
+                                            <span className="text-sm opacity-30 font-sans">Rs</span>
+                                            {(totals.net - extraDiscount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </div>
+                                    </div>
+
+                                    <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div className="space-y-0.5">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                Previous Balance
+                                            </div>
+                                            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                {fmtBalance(previousBalance, false)}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-0.5 text-right">
+                                            <div className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                                                New Balance
+                                            </div>
+                                            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-100 font-mono tracking-tighter">
+                                                Rs {(previousBalance - (totals.net - extraDiscount) + refundAmount).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {(outstandingBalance !== null || creditBalance !== null || advanceBalance !== null) && (
+                                        <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
+                                    )}
+                                    {outstandingBalance !== null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Outstanding</span>
+                                            <span className="text-[9px] font-bold text-rose-500 font-mono">Rs {outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                        </div>
+                                    )}
+                                    {creditBalance !== null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Credit Balance</span>
+                                            <span className="text-[9px] font-bold text-emerald-500 font-mono">Rs {creditBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                        </div>
+                                    )}
+                                    {advanceBalance !== null && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Advance Balance</span>
+                                            <span className="text-[9px] font-bold text-sky-500 font-mono">Rs {advanceBalance.toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
+                                        </div>
+                                    )}
+
+                                    <TechLabel label="Firm Branding" icon={Building2}>
+                                        <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                                            <SelectTrigger className={`h-8 w-full border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white text-xs ${PREMIUM_ROUNDING_MD}`}>
+                                                <SelectValue placeholder="Select Firm..." />
+                                            </SelectTrigger>
+                                            <SelectContent side="top">
+                                                <SelectItem value="0">No Branding</SelectItem>
+                                                {firms?.map((firm) => (
+                                                    <SelectItem key={firm.id} value={firm.id.toString()}>{firm.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </TechLabel>
+
+                                    {isPaidInvoice ? (
+                                        <TechLabel label="Adjusted Cash Repayment" icon={ArrowRightLeft}>
+                                            <div className="relative">
+                                                <Input type="number" value={refundAmount || ""} onChange={e => setRefundAmount(toNum(e.target.value))}
+                                                    className={`h-8 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-black text-sm tracking-tighter px-3 ${PREMIUM_ROUNDING_MD} focus-visible:ring-emerald-500`} placeholder="0.00" />
+                                            </div>
+                                        </TechLabel>
+                                    ) : (
+                                        <div className="bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-lg space-y-1">
+                                            <div className="text-[8px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                <Info size={11} className="text-emerald-500" />
+                                                Credit Balance Protocol
+                                            </div>
+                                            <div className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 leading-tight italic">
+                                                Ledger balance will adjust automatically.
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Action Buttons - Pinned Sticky Footer */}
+                            <div className="p-2.5 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shrink-0 space-y-1.5 relative z-10">
+                                <Button className={`w-full h-9.5 ${SIGNAL_ORANGE} ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 group/save overflow-hidden relative shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]`}
+                                    onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? (
+                                        <RotateCcw className="animate-spin" size={15} />
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 size={15} className="group-hover:scale-110 transition-transform" />
+                                            Commit Changes
+                                        </>
+                                    )}
+                                </Button>
+
+                                <Button variant="outline" className={`w-full h-7.5 ${PREMIUM_ROUNDING_MD} font-black uppercase tracking-widest text-[9px] text-zinc-500 border-zinc-200 dark:border-zinc-800 transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800`}
+                                    onClick={() => router.get("/sales-return")}>
+                                    Abort Patch
+                                </Button>
+                            </div>
+                        </Card>
                     </div>
                 </main>
 
