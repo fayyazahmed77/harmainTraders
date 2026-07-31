@@ -634,6 +634,8 @@ Route::prefix('g')->group(function () {
 // ============================================================================
 Route::get('/live-offers', [App\Http\Controllers\PublicOfferController::class, 'index'])->name('public.live-offers');
 Route::post('/api/access-my-offer', [App\Http\Controllers\PublicOfferController::class, 'accessMyOffer'])->name('public.access-my-offer');
+Route::post('/api/verify-customer', [App\Http\Controllers\PublicOfferController::class, 'verifyCustomer'])->name('public.verify-customer');
+Route::post('/api/place-offer-order', [App\Http\Controllers\PublicOfferController::class, 'checkoutOfferOrder'])->name('public.place-offer-order');
 
 Route::get('/test-403', function () {
     abort(403);

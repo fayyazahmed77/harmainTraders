@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import { 
     Search, 
@@ -26,23 +26,56 @@ import {
     Zap,
     LayoutGrid,
     Sun,
-    Moon
+    Moon,
+    ShoppingBag,
+    ShoppingCart,
+    Plus,
+    Minus,
+    Box,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
 import { useAppearance } from '@/hooks/use-appearance';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CategoryCarousel, Category } from './components/CategoryCarousel';
+import { OfferCheckoutDialog } from './components/OfferCheckoutDialog';
+import { OfferSuccessDialog } from './components/OfferSuccessDialog';
+import { OfferItemDialog } from './components/OfferItemDialog';
+
+const DEFAULT_IMAGE = "https://placehold.co/400x400/f8fafc/cbd5e1?text=No+Image";
+
+// Helper functions to extract brand name and image
+export const getItemBrandName = (item: any) => {
+    if (!item) return null;
+    return item.companyAccount?.title || item.company_account?.title || (typeof item.company === 'string' && item.company ? item.company : null);
+};
+
+export const getItemBrandImage = (item: any) => {
+    if (!item) return null;
+    return item.companyAccount?.image_url || item.company_account?.image_url || (item.company_account?.image ? `/storage/${item.company_account.image}` : null);
+};
 
 // --- Interfaces ---
+
+interface ItemImage {
+    id: number;
+    image_path: string;
+    is_primary: boolean;
+}
 
 interface Item {
     id: number;
     title: string;
-    company_account?: { title: string };
-    category?: { name: string };
+    code?: string;
+    packing_qty?: number;
+    packing_size?: number;
+    primary_image_url?: string;
+    images?: ItemImage[];
+    companyAccount?: { title: string; image_url?: string };
+    category?: { id: number; name: string };
 }
 
 interface OfferItem {
@@ -68,140 +101,647 @@ interface Props {
     customerOffer: Offer | null;
     marketOffer: Offer | null;
     sharedOfferId?: string | number | null;
+    categories?: Category[];
 }
 
-// --- Main Page Component ---
-
-export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId }: Props) {
+export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, categories = [] }: Props) {
     const { appearance, updateAppearance } = useAppearance();
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-    const [customerId, setCustomerId] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState<'category' | 'company' | 'alphabetical'>('category');
+    const [selectedCategory, setSelectedCategory] = useState<string | number>('all');
+    const [selectedCompany, setSelectedCompany] = useState<string>('all');
+    
+    // Header customer login state
+    const [customerId, setCustomerId] = useState('');
+    const [accessLoading, setAccessLoading] = useState(false);
+    const [accessError, setAccessError] = useState<string | null>(null);
 
-    // Filtering & Sorting Logic
-    const processItems = (offer: Offer | null) => {
-        if (!offer) return [];
-        let items = [...offer.items];
-
-        if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            items = items.filter(it => 
-                it.items.title.toLowerCase().includes(q) || 
-                it.items.company_account?.title?.toLowerCase().includes(q) ||
-                it.items.category?.name?.toLowerCase().includes(q)
-            );
+    // Cart state
+    const [cart, setCart] = useState<Record<number, any>>(() => {
+        try {
+            const saved = localStorage.getItem('offer_cart');
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
         }
+    });
 
-        if (filterType === 'alphabetical') {
-            items.sort((a, b) => a.items.title.localeCompare(b.items.title));
+    const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+    const [checkoutOpen, setCheckoutOpen] = useState(false);
+    const [successData, setSuccessData] = useState<{ invoice: string; customerCode: string; guestToken: string } | null>(null);
+
+    // Item Quantity Modal state
+    const [selectedOfferItem, setSelectedOfferItem] = useState<OfferItem | null>(null);
+    const [itemDialogOpen, setItemDialogOpen] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('offer_cart', JSON.stringify(cart));
+    }, [cart]);
+
+    // Consolidate Active Offer Items
+    const activeOffer = useMemo(() => {
+        return customerOffer || marketOffer || null;
+    }, [customerOffer, marketOffer]);
+
+    const allOfferItems = useMemo(() => {
+        let items: OfferItem[] = [];
+        if (customerOffer) {
+            items = items.concat(customerOffer.items.map(it => ({ ...it, offertype: customerOffer.offertype || '1' })));
         }
-
+        if (marketOffer) {
+            items = items.concat(marketOffer.items.map(it => ({ ...it, offertype: marketOffer.offertype || '2' })));
+        }
         return items;
-    };
+    }, [customerOffer, marketOffer]);
 
-    const customerItems = useMemo(() => processItems(customerOffer), [customerOffer, searchQuery, filterType]);
-    const marketItems = useMemo(() => processItems(marketOffer), [marketOffer, searchQuery, filterType]);
-
-    // Grouping Logic
-    const groupItems = (items: OfferItem[]) => {
-        const groups: Record<string, OfferItem[]> = {};
-        
-        items.forEach(it => {
-            let key = 'All Items';
-            if (filterType === 'category') {
-                key = it.items.category?.name || 'Uncategorized';
-            } else if (filterType === 'company') {
-                key = it.items.company_account?.title || 'Unknown Brand';
+    // Brands / Companies list
+    const companies = useMemo(() => {
+        const counts: Record<string, { count: number; image: string | null }> = {};
+        allOfferItems.forEach(it => {
+            const name = getItemBrandName(it.items);
+            if (!name) return;
+            if (!counts[name]) {
+                counts[name] = { count: 0, image: getItemBrandImage(it.items) };
             }
-            
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(it);
+            counts[name].count++;
         });
 
-        return Object.keys(groups).sort().map(key => ({
-            name: key,
-            items: groups[key]
-        }));
+        return Object.entries(counts).map(([name, data]) => ({
+            name,
+            count: data.count,
+            image: data.image
+        })).sort((a, b) => b.count - a.count);
+    }, [allOfferItems]);
+
+    // Filtered Items
+    const filteredOfferItems = useMemo(() => {
+        const q = searchQuery.toLowerCase();
+        return allOfferItems.filter(it => {
+            const item = it.items;
+            const title = item?.title?.toLowerCase() ?? '';
+            const code = item?.code?.toLowerCase() ?? '';
+            const brand = (getItemBrandName(item) ?? '').toLowerCase();
+            const matchesSearch = title.includes(q) || code.includes(q) || brand.includes(q);
+
+            const catId = item?.category?.id || item?.category;
+            const matchesCategory = selectedCategory === 'all' || String(catId) === String(selectedCategory);
+
+            const matchesCompany = selectedCompany === 'all' || getItemBrandName(item) === selectedCompany;
+
+            return matchesSearch && matchesCategory && matchesCompany;
+        });
+    }, [allOfferItems, searchQuery, selectedCategory, selectedCompany]);
+
+    // Cart Helper Actions
+    const updateCartQty = (offerItem: OfferItem, field: 'qty_carton' | 'qty_pcs', value: number) => {
+        setCart(prev => {
+            const existing = prev[offerItem.id] || {
+                item_id: offerItem.item_id,
+                title: offerItem.items?.title,
+                code: offerItem.items?.code,
+                company: offerItem.items?.companyAccount?.title,
+                qty_carton: 0,
+                qty_pcs: 0,
+                price_carton: offerItem.pack_ctn || offerItem.price || 0,
+                price_piece: offerItem.loos_ctn || (offerItem.price && offerItem.items?.packing_qty ? offerItem.price / offerItem.items.packing_qty : 0),
+                scheme: offerItem.scheme,
+                image: offerItem.items?.primary_image_url || DEFAULT_IMAGE,
+            };
+
+            const updated = { ...existing, [field]: Math.max(0, value) };
+
+            // Packing normalization for loose items
+            const packing = offerItem.items?.packing_qty || 1;
+            if (packing > 1 && updated.qty_pcs >= packing) {
+                const extraCartons = Math.floor(updated.qty_pcs / packing);
+                updated.qty_carton = (updated.qty_carton || 0) + extraCartons;
+                updated.qty_pcs = updated.qty_pcs % packing;
+            }
+
+            const priceCarton = updated.price_carton || 0;
+            const pricePiece = updated.price_piece || 0;
+            updated.subtotal = (updated.qty_carton * priceCarton) + (updated.qty_pcs * pricePiece);
+
+            const newCart = { ...prev };
+            if (updated.qty_carton === 0 && updated.qty_pcs === 0) {
+                delete newCart[offerItem.id];
+            } else {
+                newCart[offerItem.id] = updated;
+            }
+
+            return newCart;
+        });
+    };
+
+    const cartList = Object.values(cart);
+    const cartCount = cartList.length;
+    const cartTotal = cartList.reduce((acc, item) => acc + (item.subtotal || 0), 0);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('en-PK', {
+            style: 'currency',
+            currency: 'PKR',
+            minimumFractionDigits: 0,
+        }).format(value).replace('PKR', 'Rs');
+    };
+
+    const handleSuccess = (invoice: string, customerCode: string, token: string) => {
+        setCart({});
+        setCheckoutOpen(false);
+        setCartDrawerOpen(false);
+        setSuccessData({ invoice, customerCode, guestToken: token });
+    };
+
+    const handleOpenItemModal = (offerItem: OfferItem) => {
+        setSelectedOfferItem(offerItem);
+        setItemDialogOpen(true);
     };
 
     return (
-        <div className="min-h-screen bg-surface-0 text-text-primary selection:bg-amber/30 selection:text-amber-bright">
-            <Head title="Live Offers | Harmain Traders" />
+        <div className="min-h-screen bg-surface-0 text-text-primary selection:bg-amber/30 selection:text-amber-bright flex flex-col pb-24">
+            <Head title="Live Offers & Rates Catalog | Harmain Traders" />
 
+            {/* Site Header */}
             <SiteHeader 
                 customerId={customerId} 
                 setCustomerId={setCustomerId} 
-                loading={loading} 
-                setLoading={setLoading}
-                error={error} 
-                setError={setError}
+                loading={accessLoading} 
+                setLoading={setAccessLoading}
+                error={accessError} 
+                setError={setAccessError}
                 appearance={appearance}
                 updateAppearance={updateAppearance}
+                cartCount={cartCount}
+                onOpenCart={() => setCartDrawerOpen(true)}
             />
 
-            <main>
+            <main className="flex-1">
+                {/* Hero Search Section */}
                 <HeroSection 
                     searchQuery={searchQuery} 
                     setSearchQuery={setSearchQuery} 
-                    filterType={filterType} 
-                    setFilterType={setFilterType} 
                     viewMode={viewMode}
                     setViewMode={setViewMode}
                     sharedOfferId={sharedOfferId}
                 />
 
+                {/* Category Carousel Bar */}
+                {categories && categories.length > 0 && (
+                    <CategoryCarousel 
+                        categories={categories}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        DEFAULT_IMAGE={DEFAULT_IMAGE}
+                    />
+                )}
 
+                {/* Main Content Layout (Sidebar + Product Grid) */}
+                <div className="max-w-[1800px] mx-auto px-4 py-8">
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* Sidebar: Shop By Brand */}
+                        <aside className="w-full lg:w-72 shrink-0">
+                            <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden sticky top-24">
+                                <div className="p-4 border-b border-border flex items-center justify-between bg-surface-2/50">
+                                    <h3 className="text-[11px] font-mono-jet font-black uppercase tracking-wider text-text-muted">Shop by Brand</h3>
+                                    <Badge className="bg-amber/15 text-amber border-none text-[9px] font-black">{companies.length}</Badge>
+                                </div>
+                                
+                                <div className="p-2 max-h-[550px] overflow-y-auto custom-scrollbar space-y-1">
+                                    <button
+                                        onClick={() => setSelectedCompany('all')}
+                                        className={cn(
+                                            "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                            selectedCompany === 'all' 
+                                                ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                : "hover:bg-surface-2 text-text-secondary"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-lg flex items-center justify-center",
+                                                selectedCompany === 'all' ? "bg-surface-0/20" : "bg-surface-2"
+                                            )}>
+                                                <Box size={14} />
+                                            </div>
+                                            <span className="text-xs font-bold">All Brands</span>
+                                        </div>
+                                        <span className={cn("text-[10px] font-black", selectedCompany === 'all' ? "text-surface-0/80" : "text-text-muted")}>
+                                            {allOfferItems.length}
+                                        </span>
+                                    </button>
 
-                <div className="max-w-7xl mx-auto px-5 pb-20 mt-12">
-                    <AnimatePresence mode="wait">
-                        {(customerItems.length > 0 || marketItems.length > 0) ? (
-                            <motion.div
-                                key="content"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="space-y-24"
-                            >
-                                {customerItems.length > 0 && (
-                                    <TierSection 
-                                        title="Group Offers" 
-                                        tier="Tier 01" 
-                                        items={customerItems} 
-                                        variant="group" 
-                                        groupItems={groupItems}
-                                        viewMode={viewMode}
-                                    />
-                                )}
+                                    {companies.map((company) => (
+                                        <button
+                                            key={company.name}
+                                            onClick={() => setSelectedCompany(company.name)}
+                                            className={cn(
+                                                "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                                selectedCompany === company.name 
+                                                    ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                    : "hover:bg-surface-2 text-text-secondary"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-3 text-left min-w-0">
+                                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0">
+                                                    {company.image ? (
+                                                        <img src={company.image} alt={company.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-text-muted">{company.name.charAt(0)}</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs font-bold truncate">{company.name}</span>
+                                            </div>
+                                            <span className={cn("text-[10px] font-black shrink-0 ml-2", selectedCompany === company.name ? "text-surface-0/80" : "text-text-muted")}>
+                                                {company.count}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </aside>
 
-                                {marketItems.length > 0 && (
-                                    <TierSection 
-                                        title="Market Offers" 
-                                        tier="Tier 02" 
-                                        items={marketItems} 
-                                        variant="market" 
-                                        groupItems={groupItems}
-                                        viewMode={viewMode}
-                                    />
-                                )}
-                            </motion.div>
-                        ) : (
-                            <EmptyState key="empty" />
-                        )}
-                    </AnimatePresence>
+                        {/* Main Product Grid */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-2xl sm:text-3xl font-display font-black uppercase text-text-primary tracking-tight">
+                                        {selectedCompany !== 'all' ? selectedCompany : (selectedCategory === 'all' ? 'All Live Offers' : categories.find(c => c.id === selectedCategory)?.name)}
+                                    </h2>
+                                    <Badge className="bg-amber/15 text-amber border-amber/30 font-black px-2.5 py-0.5 text-[10px]">
+                                        {filteredOfferItems.length} ITEMS
+                                    </Badge>
+                                </div>
+
+                                <div className="flex bg-surface-2 p-1 rounded-xl border border-border w-fit">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={cn(
+                                            "p-2 rounded-lg transition-all",
+                                            viewMode === 'grid' ? "bg-amber text-surface-0 shadow-sm" : "text-text-muted hover:text-text-primary"
+                                        )}
+                                    >
+                                        <LayoutGrid size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('list')}
+                                        className={cn(
+                                            "p-2 rounded-lg transition-all",
+                                            viewMode === 'list' ? "bg-amber text-surface-0 shadow-sm" : "text-text-muted hover:text-text-primary"
+                                        )}
+                                    >
+                                        <LayoutList size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {filteredOfferItems.length === 0 ? (
+                                <EmptyState />
+                            ) : viewMode === 'grid' ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {filteredOfferItems.map(it => (
+                                        <OfferProductCard 
+                                            key={it.id} 
+                                            offerItem={it}
+                                            cartItem={cart[it.id]}
+                                            onOpenModal={handleOpenItemModal}
+                                            formatCurrency={formatCurrency}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {filteredOfferItems.map(it => (
+                                        <OfferProductRow 
+                                            key={it.id} 
+                                            offerItem={it}
+                                            cartItem={cart[it.id]}
+                                            onOpenModal={handleOpenItemModal}
+                                            formatCurrency={formatCurrency}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </main>
 
+            {/* Floating Sticky Bottom Bar when items are selected */}
+            <AnimatePresence>
+                {cartCount > 0 && (
+                    <motion.div 
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-xl bg-surface-1/95 backdrop-blur-xl border border-amber/40 rounded-2xl shadow-2xl p-3 sm:p-4 flex items-center justify-between gap-4"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber text-surface-0 flex items-center justify-center font-bold shadow-lg shadow-amber/20">
+                                <ShoppingCart className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <span className="font-mono-jet font-bold text-xs text-text-primary block">
+                                    {cartCount} {cartCount === 1 ? 'Item' : 'Items'} Selected
+                                </span>
+                                <span className="font-display font-black text-xl text-amber leading-none block">
+                                    {formatCurrency(cartTotal)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <Button 
+                            onClick={() => setCartDrawerOpen(true)}
+                            className="bg-amber hover:bg-amber-bright text-surface-0 font-display font-black text-xs uppercase h-11 px-5 rounded-xl shadow-lg flex items-center gap-2"
+                        >
+                            View Cart & Checkout
+                            <ArrowRight className="w-4 h-4" />
+                        </Button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Cart Drawer */}
+            <AnimatePresence>
+                {cartDrawerOpen && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end"
+                    >
+                        <motion.div 
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="w-full max-w-md bg-surface-1 h-full shadow-2xl flex flex-col border-l border-border"
+                        >
+                            {/* Drawer Header */}
+                            <div className="p-5 border-b border-border bg-surface-2 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <ShoppingCart className="w-5 h-5 text-amber" />
+                                    <h3 className="font-display font-black text-lg uppercase tracking-tight text-text-primary">
+                                        Your Offer Order ({cartCount})
+                                    </h3>
+                                </div>
+                                <button 
+                                    onClick={() => setCartDrawerOpen(false)}
+                                    className="w-8 h-8 rounded-lg bg-surface-3 flex items-center justify-center text-text-muted hover:text-text-primary"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Cart List */}
+                            <div className="flex-1 p-5 overflow-y-auto space-y-4">
+                                {cartList.length === 0 ? (
+                                    <div className="py-20 text-center text-text-muted space-y-3">
+                                        <ShoppingCart className="w-12 h-12 mx-auto opacity-30" />
+                                        <p className="font-mono-jet text-xs uppercase font-bold">Your cart is empty</p>
+                                    </div>
+                                ) : (
+                                    cartList.map(item => (
+                                        <div key={item.item_id} className="bg-surface-2 border border-border p-4 rounded-xl flex items-center gap-4">
+                                            <img src={item.image || DEFAULT_IMAGE} alt={item.title} className="w-14 h-14 object-cover rounded-lg bg-surface-1 border" />
+                                            <div className="flex-1 min-w-0">
+                                                <h5 className="font-bold text-sm text-text-primary truncate">{item.title}</h5>
+                                                <p className="text-[10px] font-mono-jet text-text-muted uppercase">{item.company}</p>
+                                                <div className="text-xs font-bold text-amber mt-1">
+                                                    {formatCurrency(item.subtotal)}
+                                                </div>
+                                            </div>
+                                            <div className="text-right text-xs font-mono-jet space-y-1">
+                                                {item.qty_carton > 0 && <span className="block font-bold">{item.qty_carton} Ctn</span>}
+                                                {item.qty_pcs > 0 && <span className="block text-text-muted">{item.qty_pcs} Loose</span>}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Drawer Footer */}
+                            {cartList.length > 0 && (
+                                <div className="p-5 border-t border-border bg-surface-2 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-mono-jet text-xs font-black uppercase text-text-muted">Total Net Amount:</span>
+                                        <span className="font-display font-black text-2xl text-amber">{formatCurrency(cartTotal)}</span>
+                                    </div>
+                                    <Button 
+                                        onClick={() => {
+                                            setCartDrawerOpen(false);
+                                            setCheckoutOpen(true);
+                                        }}
+                                        className="w-full bg-amber hover:bg-amber-bright text-surface-0 font-display font-black text-sm uppercase h-12 rounded-xl shadow-lg shadow-amber/20 flex items-center justify-center gap-2"
+                                    >
+                                        Proceed Order & Checkout
+                                        <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Offer Item Quantity Modal */}
+            <OfferItemDialog 
+                open={itemDialogOpen}
+                onOpenChange={setItemDialogOpen}
+                offerItem={selectedOfferItem}
+                cartItem={selectedOfferItem ? cart[selectedOfferItem.id] : null}
+                onUpdateCart={updateCartQty}
+                formatCurrency={formatCurrency}
+            />
+
+            {/* Offer Checkout Dialog */}
+            <OfferCheckoutDialog 
+                open={checkoutOpen}
+                onOpenChange={setCheckoutOpen}
+                cart={cart}
+                cartTotal={cartTotal}
+                offerId={activeOffer?.id}
+                formatCurrency={formatCurrency}
+                onSuccess={handleSuccess}
+            />
+
+            {/* Offer Success Dialog */}
+            <OfferSuccessDialog 
+                open={!!successData}
+                onOpenChange={(open) => !open && setSuccessData(null)}
+                invoice={successData?.invoice || null}
+                customerCode={successData?.customerCode || null}
+                guestToken={successData?.guestToken || null}
+            />
+
+            {/* Site Footer */}
             <SiteFooter />
         </div>
     );
 }
 
-// --- Sub-Components ---
+// --- Product Cards & Rows ---
 
-function SiteHeader({ customerId, setCustomerId, loading, setLoading, error, setError, appearance, updateAppearance }: {
+function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: {
+    offerItem: OfferItem;
+    cartItem?: any;
+    onOpenModal: (it: OfferItem) => void;
+    formatCurrency: (val: number) => string;
+}) {
+    const item = offerItem.items;
+    const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
+
+    const cartonRate = offerItem.pack_ctn || offerItem.price || 0;
+    const looseRate = offerItem.loos_ctn || (offerItem.price && item?.packing_qty ? offerItem.price / item.packing_qty : 0);
+
+    const qtyCtn = cartItem?.qty_carton || 0;
+    const qtyPcs = cartItem?.qty_pcs || 0;
+
+    const isGroupOffer = (offerItem as any).offertype === '1';
+
+    return (
+        <div 
+            onClick={() => onOpenModal(offerItem)}
+            className="bg-surface-1 border border-border rounded-2xl overflow-hidden hover:border-amber/40 hover:shadow-xl transition-all flex flex-col group cursor-pointer"
+        >
+            {/* Image Container */}
+            <div className="relative aspect-square bg-surface-2 overflow-hidden">
+                <img 
+                    src={primaryImg} 
+                    alt={item?.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => (e.target as HTMLImageElement).src = DEFAULT_IMAGE}
+                />
+                {offerItem.scheme && (
+                    <Badge className="absolute top-3 left-3 bg-amber text-surface-0 font-display font-black text-[10px] uppercase shadow-md flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        {offerItem.scheme}
+                    </Badge>
+                )}
+
+                {/* Floating Add to Cart Button */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenModal(offerItem);
+                    }}
+                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-surface-1/90 backdrop-blur-md shadow-lg flex items-center justify-center text-text-primary hover:bg-amber hover:text-surface-0 transition-all transform hover:scale-110 border border-border"
+                >
+                    <Plus size={18} strokeWidth={3} />
+                </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 flex-1 flex flex-col">
+                <span className="text-[10px] font-mono-jet uppercase text-text-muted font-bold truncate">
+                    {getItemBrandName(item) || 'Harmain Direct'}
+                </span>
+                <h6 className="font-display font-black text-base uppercase tracking-tight text-text-primary group-hover:text-amber transition-colors line-clamp-2 mt-0.5">
+                    {item?.title}
+                </h6>
+
+                {/* Rates Grid */}
+                {isGroupOffer ? (
+                    <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-2 text-center">
+                        <div className="bg-surface-2 p-2 rounded-xl border border-border">
+                            <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">Carton Rate</span>
+                            <span className="font-mono-jet font-bold text-sm text-text-primary">{formatCurrency(cartonRate)}</span>
+                        </div>
+                        <div className="bg-surface-2 p-2 rounded-xl border border-border">
+                            <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">Loose Rate</span>
+                            <span className="font-mono-jet font-bold text-sm text-text-primary">{formatCurrency(looseRate)}</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mt-4 pt-3 border-t border-border grid grid-cols-1 text-center">
+                        <div className="bg-surface-2 p-2.5 rounded-xl border border-border flex justify-between items-center px-4">
+                            <span className="text-[10px] font-mono-jet uppercase text-text-muted font-bold block">Rate</span>
+                            <span className="font-mono-jet font-black text-base text-amber">{formatCurrency(offerItem.price || cartonRate)}</span>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex justify-between items-center mt-3 text-xs font-mono-jet">
+                    <span className="text-text-muted">M.R.P:</span>
+                    <span className="font-bold text-text-primary">{formatCurrency(offerItem.mrp)}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
+    offerItem: OfferItem;
+    cartItem?: any;
+    onOpenModal: (it: OfferItem) => void;
+    formatCurrency: (val: number) => string;
+}) {
+    const item = offerItem.items;
+    const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
+    const cartonRate = offerItem.pack_ctn || offerItem.price || 0;
+    const looseRate = offerItem.loos_ctn || (offerItem.price && item?.packing_qty ? offerItem.price / item.packing_qty : 0);
+    const isGroupOffer = (offerItem as any).offertype === '1';
+
+    return (
+        <div 
+            onClick={() => onOpenModal(offerItem)}
+            className="bg-surface-1 border border-border rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4 hover:border-amber/30 transition-all cursor-pointer"
+        >
+            <img src={primaryImg} alt={item?.title} className="w-16 h-16 object-contain rounded-lg bg-surface-2 p-1 border shrink-0" />
+
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+                <span className="text-[10px] font-mono-jet uppercase text-text-muted font-bold truncate block">
+                    {getItemBrandName(item) || 'Harmain Direct'}
+                </span>
+                <h6 className="font-display font-black text-base uppercase text-text-primary truncate">
+                    {item?.title}
+                </h6>
+                {offerItem.scheme && (
+                    <Badge className="bg-amber/15 text-amber border-none text-[9px] font-bold mt-1">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        {offerItem.scheme}
+                    </Badge>
+                )}
+            </div>
+
+            <div className="flex items-center gap-6 text-center shrink-0">
+                {isGroupOffer ? (
+                    <>
+                        <div>
+                            <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">Carton Rate</span>
+                            <span className="font-mono-jet font-bold text-sm text-text-primary">{formatCurrency(cartonRate)}</span>
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">Loose Rate</span>
+                            <span className="font-mono-jet font-bold text-sm text-text-primary">{formatCurrency(looseRate)}</span>
+                        </div>
+                    </>
+                ) : (
+                    <div>
+                        <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">Rate</span>
+                        <span className="font-mono-jet font-black text-base text-amber">{formatCurrency(offerItem.price || cartonRate)}</span>
+                    </div>
+                )}
+                <div>
+                    <span className="text-[9px] font-mono-jet uppercase text-text-muted font-bold block">M.R.P</span>
+                    <span className="font-mono-jet font-bold text-sm text-text-primary">{formatCurrency(offerItem.mrp)}</span>
+                </div>
+
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenModal(offerItem);
+                    }}
+                    className="h-9 px-3 rounded-xl bg-amber text-surface-0 font-display font-bold text-xs uppercase shadow-md hover:bg-amber-bright transition-all flex items-center gap-1.5"
+                >
+                    <Plus size={14} strokeWidth={3} />
+                    Cart
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function SiteHeader({ customerId, setCustomerId, loading, setLoading, error, setError, appearance, updateAppearance, cartCount, onOpenCart }: {
     customerId: string;
     setCustomerId: (v: string) => void;
     loading: boolean;
@@ -210,6 +750,8 @@ function SiteHeader({ customerId, setCustomerId, loading, setLoading, error, set
     setError: (v: string | null) => void;
     appearance: string;
     updateAppearance: (v: any) => void;
+    cartCount: number;
+    onOpenCart: () => void;
 }) {
     const handleAccessRequest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -243,74 +785,57 @@ function SiteHeader({ customerId, setCustomerId, loading, setLoading, error, set
     };
 
     return (
-        <header className="sticky top-0 z-50  bg-surface-0/85 backdrop-blur-xl border-b border-border min-h-[68px] py-3 sm:py-0">
-            <div className="max-w-7xl mx-auto px-5 h-full py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur-md border-b border-border min-h-[68px] py-3">
+            <div className="max-w-[1800px] mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                 {/* Brand */}
-                <div
-                          
-                          className="data-[state=open]:bg-sidebar-accent flex gap-2 data-[state=open]:text-sidebar-accent-foreground hover:bg-transparent hover:text-sidebar-foreground focus-visible:ring-0"
-                        >
-                          <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
-                            <img src="/storage/img/favicon.png" className="size-8 object-contain" alt="Favicon" />
-                          </div>
-                          <div className="grid flex-1 text-left text-sm leading-tight">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-xl">Harmain</span> <span className="font-semibold text-sidebar-primary text-xl">Traders</span>
-                            </div>
-                            <span className="text-xs">Wholesale <span className="text-sidebar-primary">&</span> Supply Chain</span>
-                          </div>
+                <div className="flex gap-2.5 items-center">
+                    <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-surface-2 border border-border">
+                        <img src="/storage/img/favicon.png" className="size-6 object-contain" alt="Favicon" />
+                    </div>
+                    <div className="grid text-left leading-tight">
+                        <div className="flex items-center gap-1">
+                            <span className="font-display font-black text-xl tracking-tight">Harmain</span> 
+                            <span className="font-display font-black text-amber text-xl tracking-tight">Traders</span>
                         </div>
-              
+                        <span className="text-[10px] font-mono-jet uppercase tracking-[0.15em] text-text-muted leading-none">Wholesale & Supply Chain</span>
+                    </div>
+                </div>
 
-                {/* Access Form & Theme Toggle */}
-                <div className="flex items-center gap-4 flex-1 justify-end max-w-[500px]">
-                    <form onSubmit={handleAccessRequest} className="relative flex items-center gap-2 flex-1">
-                        <div className="relative flex-1">
-                            <Input 
-                                placeholder="Customer ID (e.g. C-001)"
-                                value={customerId}
-                                onChange={(e) => setCustomerId(e.target.value)}
-                                className="bg-surface-3 border-border rounded-lg h-[42px] font-mono-jet text-[12px] px-4 text-text-primary focus:border-amber outline-none transition-all placeholder:text-text-muted"
-                            />
-                            <AnimatePresence>
-                                {error && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: -8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -8 }}
-                                        className="absolute -bottom-6 left-0 right-0 bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-1 rounded-md shadow-lg z-10 flex items-center gap-1.5"
-                                    >
-                                        <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
-                                        {error}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
+                {/* Right controls */}
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                    <form onSubmit={handleAccessRequest} className="relative flex items-center gap-2 max-w-sm flex-1">
+                        <Input 
+                            placeholder="Customer ID / Code"
+                            value={customerId}
+                            onChange={(e) => setCustomerId(e.target.value)}
+                            className="bg-surface-2 border-border rounded-xl h-[40px] font-mono-jet text-xs px-3 text-text-primary focus:border-amber"
+                        />
                         <Button 
                             disabled={loading}
-                            className="bg-amber text-surface-0 font-display font-black text-[13px] tracking-[0.08em] uppercase h-[42px] px-5 rounded-lg hover:bg-amber-bright active:scale-95 transition-all relative overflow-hidden shrink-0"
+                            className="bg-amber text-surface-0 font-display font-black text-xs uppercase h-[40px] px-4 rounded-xl hover:bg-amber-bright shrink-0"
                         >
-                            {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <>
-                                    <span className="hidden sm:inline">Access My Offer</span>
-                                    <span className="sm:hidden">Access</span>
-                                    <ArrowRight className="w-4 h-4 ml-2" />
-                                </>
-                            )}
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Portal'}
                         </Button>
                     </form>
 
+                    <Button 
+                        onClick={onOpenCart}
+                        className="relative bg-surface-2 border border-border hover:bg-surface-3 text-text-primary h-[40px] px-4 rounded-xl flex items-center gap-2 shrink-0"
+                    >
+                        <ShoppingCart className="w-4 h-4 text-amber" />
+                        <span className="font-mono-jet font-bold text-xs hidden sm:inline">Cart</span>
+                        {cartCount > 0 && (
+                            <Badge className="bg-amber text-surface-0 font-mono-jet font-black text-[10px] px-1.5 py-0.5 rounded-full">
+                                {cartCount}
+                            </Badge>
+                        )}
+                    </Button>
+
                     <button
                         onClick={() => updateAppearance(appearance === 'dark' ? 'light' : 'dark')}
-                        className="w-[42px] h-[42px] rounded-lg bg-surface-2 border border-border flex items-center justify-center hover:bg-surface-3 transition-colors shrink-0"
+                        className="w-[40px] h-[40px] rounded-xl bg-surface-2 border border-border flex items-center justify-center hover:bg-surface-3 transition-colors shrink-0"
                     >
-                        {appearance === 'dark' ? (
-                            <Sun className="w-4 h-4 text-amber" />
-                        ) : (
-                            <Moon className="w-4 h-4 text-amber" />
-                        )}
+                        {appearance === 'dark' ? <Sun className="w-4 h-4 text-amber" /> : <Moon className="w-4 h-4 text-amber" />}
                     </button>
                 </div>
             </div>
@@ -318,330 +843,51 @@ function SiteHeader({ customerId, setCustomerId, loading, setLoading, error, set
     );
 }
 
-
-
-function HeroSection({ searchQuery, setSearchQuery, filterType, setFilterType, viewMode, setViewMode, sharedOfferId }: {
+function HeroSection({ searchQuery, setSearchQuery, viewMode, setViewMode, sharedOfferId }: {
     searchQuery: string;
     setSearchQuery: (v: string) => void;
-    filterType: string;
-    setFilterType: (v: any) => void;
     viewMode: 'grid' | 'list';
     setViewMode: (v: 'grid' | 'list') => void;
     sharedOfferId?: string | number | null;
 }) {
     return (
-        <section className="relative w-full overflow-hidden">
-            <div className="absolute inset-0 z-0 bg-cover bg-center opacity-50 dark:opacity-30 transition-opacity pointer-events-none mix-blend-multiply dark:mix-blend-screen" style={{ backgroundImage: "url('/storage/img/hero_bg.png')" }} />
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-surface-0/10 via-surface-0/60 to-surface-0 pointer-events-none" />
-            <div className="relative z-10 max-w-7xl mx-auto px-5 pt-12 pb-9">
-          
-            <div className="flex flex-col lg:flex-row justify-between items-end gap-10">
-                {/* Left: Text */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="max-w-2xl"
-                >
-                    <div className="inline-flex items-center gap-2 bg-amber/8 border border-amber/20 rounded-full px-3 py-1 mb-6">
-                        <div className="w-[6px] h-[6px] bg-emerald-500 rounded-full animate-pulse-dot" />
-                        <span className="font-mono-jet text-[10px] tracking-[0.15em] uppercase text-amber">
-                            Public Gateway · Updated Today
+        <section className="relative w-full overflow-hidden bg-surface-1/50 border-b border-border py-8">
+            <div className="max-w-[1800px] mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                    <div className="inline-flex items-center gap-2 bg-amber/10 border border-amber/20 rounded-full px-3 py-1 mb-3">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="font-mono-jet text-[10px] tracking-wider uppercase text-amber font-bold">
+                            Live Wholesale Rates {sharedOfferId ? `(Offer #${sharedOfferId})` : ''}
                         </span>
                     </div>
+                    <h1 className="font-display font-black text-3xl sm:text-5xl uppercase tracking-tight text-text-primary">
+                        Public <span className="text-amber italic">Offer</span> Catalog
+                    </h1>
+                </div>
 
-                    <h2 className="font-display font-black text-[clamp(42px,8vw,86px)] uppercase tracking-tight leading-[0.88] text-text-primary">
-                        Live <br />
-                        <span className="italic text-amber">Public</span> <br />
-                        Offers
-                    </h2>
-
-                    <p className="text-[13px] text-text-secondary mt-6 font-medium tracking-wide uppercase max-w-sm">
-                        Real-time market rates and group discounts synchronized across 12,000+ active items.
-                    </p>
-                </motion.div>
-
-                {/* Right: Controls */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-                    className="w-full lg:w-[380px] flex flex-col gap-3"
-                >
-                    <div className="relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-amber transition-colors" />
-                        <Input 
-                            placeholder="Instant item search..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full h-[48px] bg-surface-2 border-border rounded-2xl pl-11 pr-4 font-sans text-[14px] text-text-primary focus:border-amber focus:bg-surface-3 transition-all placeholder:text-text-muted"
-                        />
-                    </div>
-
-                    <div className="flex bg-surface-2 border border-border rounded-2xl p-1 gap-1">
-                        {[
-                            { id: 'category', label: 'Category', icon: LayoutList },
-                            { id: 'company', label: 'Brand', icon: Building2 },
-                            { id: 'alphabetical', label: 'A–Z', icon: ArrowDownAZ },
-                        ].map((btn) => (
-                            <button
-                                key={btn.id}
-                                onClick={() => setFilterType(btn.id)}
-                                className={cn(
-                                    "flex-1 h-[36px] rounded-xl flex items-center justify-center gap-1.5 font-display font-bold text-[11px] tracking-[0.08em] uppercase transition-all",
-                                    filterType === btn.id 
-                                        ? "bg-amber text-surface-0 shadow-lg shadow-amber/20" 
-                                        : "text-text-secondary hover:bg-surface-4 hover:text-text-primary"
-                                )}
-                            >
-                                <btn.icon className="w-3.5 h-3.5" />
-                                {btn.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="flex bg-surface-1 border border-border rounded-2xl p-1 gap-1 w-full lg:w-fit ml-auto">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={cn(
-                                "flex-1 lg:w-10 h-[36px] rounded-xl flex items-center justify-center transition-all",
-                                viewMode === 'grid' 
-                                    ? "bg-amber text-surface-0" 
-                                    : "text-text-muted hover:text-text-primary"
-                            )}
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={cn(
-                                "flex-1 lg:w-10 h-[36px] rounded-xl flex items-center justify-center transition-all",
-                                viewMode === 'list' 
-                                    ? "bg-amber text-surface-0" 
-                                    : "text-text-muted hover:text-text-primary"
-                            )}
-                        >
-                            <LayoutList className="w-4 h-4" />
-                        </button>
-                    </div>
-                </motion.div>
-            </div>
+                <div className="w-full md:w-96 relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                    <Input 
+                        placeholder="Search items by name, code or brand..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full h-11 bg-surface-2 border-border rounded-xl pl-10 pr-4 font-sans text-xs text-text-primary focus:border-amber"
+                    />
+                </div>
             </div>
         </section>
     );
 }
 
-
-function TierSection({ title, tier, items, variant, groupItems, viewMode }: {
-    title: string;
-    tier: string;
-    items: OfferItem[];
-    variant: 'group' | 'market';
-    groupItems: (it: OfferItem[]) => { name: string; items: OfferItem[] }[];
-    viewMode: 'grid' | 'list';
-}) {
-    const isGroup = variant === 'group';
-
-    return (
-        <div className="space-y-12">
-
-
-            {/* Groups */}
-            <div className="space-y-16">
-                {groupItems(items).map((group) => (
-                    <div key={group.name}>
-                        <div className="flex items-center gap-3 mb-6 px-1">
-                            <div className={cn(
-                                "w-[7px] h-[7px] rounded-full",
-                                isGroup 
-                                    ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" 
-                                    : "bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.5)]"
-                            )} />
-                            <h4 className="font-mono-jet text-[11px] tracking-[0.2em] uppercase text-text-muted font-bold">
-                                {group.name}
-                            </h4>
-                            <span className="font-mono-jet text-[10px] text-text-muted/60 ml-auto border border-border px-2 py-0.5 rounded-full">
-                                {group.items.length} items
-                            </span>
-                        </div>
-
-                        <div className={cn(
-                            viewMode === 'grid' 
-                                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" 
-                                : "flex flex-col gap-2"
-                        )}>
-                            {group.items.map((it) => (
-                                viewMode === 'grid' 
-                                    ? <OfferCard key={it.id} item={it} variant={variant} />
-                                    : <OfferRow key={it.id} item={it} variant={variant} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function OfferCard({ item, variant }: { item: OfferItem, variant: 'group' | 'market' }) {
-    const isGroup = variant === 'group';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-40px' }}
-            whileHover={{ y: -4 }}
-            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-            className="group"
-        >
-            <div className="bg-surface-1 border border-border rounded-2xl overflow-hidden hover:border-amber/25 hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_20px_40px_rgba(0,0,0,0.6)] transition-all duration-500 flex flex-col h-full">
-                {/* Top Accent */}
-                <div className={cn(
-                    "h-[3px] w-full shrink-0",
-                    isGroup 
-                        ? "bg-gradient-to-r from-emerald-500 via-emerald-500/50 to-emerald-500/10" 
-                        : "bg-gradient-to-r from-blue-500 via-blue-500/50 to-blue-500/10"
-                )} />
-
-                <div className="p-5 flex flex-col flex-1">
-                    {/* Section 1: Title & Badge */}
-                    <div className="flex justify-between items-start gap-4 mb-5">
-                        <div className="min-w-0">
-                            <h5 className="font-display font-black text-[17px] uppercase tracking-[0.02em] text-text-primary leading-tight group-hover:text-amber transition-colors">
-                                {item.items.title}
-                            </h5>
-                            <div className="flex items-center gap-1.5 mt-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                                <Building2 className="w-3 h-3 text-text-muted shrink-0" />
-                                <span className="font-mono-jet text-[9px] tracking-[0.15em] uppercase text-text-muted truncate">
-                                    {item.items.company_account?.title || "Harmain Direct"}
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    {/* Section 2: Price Grid */}
-                    <div className={cn("grid gap-2 mt-auto", isGroup ? "grid-cols-2" : "grid-cols-1")}>
-                        <div className="bg-surface-2/50 border border-border rounded-xl p-3 text-center group-hover:bg-surface-2 transition-colors">
-                            <span className="font-mono-jet text-[8px] tracking-[0.2em] uppercase text-text-muted block mb-1.5 font-bold">
-                                {isGroup ? "Ctn Price" : "Rate"}
-                            </span>
-                            <div className="font-mono-jet font-bold text-text-primary leading-none flex items-center justify-center">
-                                <span className="text-[10px] text-text-muted font-normal mr-1">Rs.</span>
-                                <span className="text-[18px]">{(isGroup ? item.pack_ctn : (item.price ?? item.pack_ctn ?? 0)).toLocaleString()}</span>
-                            </div>
-                        </div>
-                        {isGroup && (
-                            <div className="bg-surface-2/50 border border-border rounded-xl p-3 text-center group-hover:bg-surface-2 transition-colors">
-                                <span className="font-mono-jet text-[8px] tracking-[0.2em] uppercase text-text-muted block mb-1.5 font-bold">
-                                    Loose Rate
-                                </span>
-                                <div className="font-mono-jet font-bold text-text-primary leading-none flex items-center justify-center">
-                                    <span className="text-[10px] text-text-muted font-normal mr-1">Rs.</span>
-                                    <span className="text-[18px]">{item.loos_ctn.toLocaleString()}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Section 3: MRP & Scheme */}
-                    <div className="mt-4 pt-4  space-y-3">
-                        <div className="flex justify-between items-center">
-                            <span className="font-mono-jet text-[9px] tracking-[0.2em] uppercase text-text-muted font-bold">
-                                M.R.P
-                            </span>
-                            <span className="font-mono-jet font-bold text-text-primary text-[15px]">
-                                Rs.{item.mrp.toLocaleString()}
-                            </span>
-                        </div>
-
-                        {item.scheme && (
-                            <div className="bg-amber/7 border border-amber/15 rounded-xl p-2.5 flex items-center gap-2 group-hover:bg-amber/10 transition-colors">
-                                <Sparkles className="w-3.5 h-3.5 text-amber animate-pulse shrink-0" />
-                                <p className="font-display font-bold italic text-[12px] text-amber tracking-[0.01em] leading-tight truncate">
-                                    {item.scheme}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </motion.div>
-    );
-}
-
-function OfferRow({ item, variant }: { item: OfferItem, variant: 'group' | 'market' }) {
-    const isGroup = variant === 'group';
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="group"
-        >
-            <div className="bg-surface-1 border border-border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:border-amber/25 transition-all shadow-sm hover:shadow-md dark:shadow-none transition-all">
-                <div className={cn(
-                    "w-1 h-10 rounded-full shrink-0 hidden sm:block",
-                    isGroup ? "bg-emerald-500" : "bg-blue-500"
-                )} />
-                
-                <div className="flex-1 min-w-0">
-                    <h5 className="font-display font-black text-[15px] uppercase tracking-[0.02em] text-text-primary truncate">
-                        {item.items.title}
-                    </h5>
-                    <p className="font-mono-jet text-[9px] tracking-[0.1em] uppercase text-text-muted mt-0.5">
-                        {item.items.company_account?.title || "Harmain Direct"}
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-6 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-                   <div className="flex items-center gap-3">
-                        {item.scheme && (
-                            <Badge className="bg-amber/10 text-amber border-amber/20 h-7 hidden md:flex items-center">
-                                <Sparkles className="w-3 h-3 mr-1.5" />
-                                <span className="text-[10px] font-bold">{item.scheme}</span>
-                            </Badge>
-                        )}
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className="font-mono-jet text-[8px] tracking-[0.1em] uppercase text-text-muted font-bold">
-                            {isGroup ? "Ctn Rate" : "Rate"}
-                        </span>
-                        <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{(isGroup ? item.pack_ctn : (item.price ?? item.pack_ctn ?? 0)).toLocaleString()}</span>
-                    </div>
-                    {isGroup && (
-                        <div className="flex flex-col items-end">
-                            <span className="font-mono-jet text-[8px] tracking-[0.1em] uppercase text-text-muted font-bold">Loose Rate</span>
-                            <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{item.loos_ctn.toLocaleString()}</span>
-                        </div>
-                    )}
-                    <div className="flex flex-col items-end">
-                        <span className="font-mono-jet text-[8px] tracking-[0.1em] uppercase text-text-muted font-bold">M.R.P</span>
-                        <span className="font-mono-jet font-bold text-text-primary text-[15px]">Rs.{item.mrp.toLocaleString()}</span>
-                    </div>
-                    
-                    
-                </div>
-            </div>
-        </motion.div>
-    );
-}
-
 function EmptyState() {
     return (
-        <div className="py-24 flex flex-col items-center gap-5 text-center">
-            <div className="w-20 h-20 bg-surface-2 border border-border rounded-3xl flex items-center justify-center shadow-inner group">
-                <Search className="w-8 h-8 text-text-muted animate-pulse" />
+        <div className="py-20 flex flex-col items-center gap-4 text-center">
+            <div className="w-16 h-16 bg-surface-2 border border-border rounded-2xl flex items-center justify-center">
+                <Search className="w-8 h-8 text-text-muted" />
             </div>
             <div>
-                <h3 className="font-display font-black text-[22px] uppercase tracking-[0.1em] text-text-secondary">
-                    No Offers Match
-                </h3>
-                <p className="text-[13px] text-text-muted mt-2 max-w-xs mx-auto font-medium">
-                    Try adjusting your search criteria or explore other categories.
-                </p>
+                <h3 className="font-display font-black text-lg uppercase text-text-secondary">No Offers Found</h3>
+                <p className="text-xs text-text-muted mt-1">Try clearing your filters or searching for another keyword.</p>
             </div>
         </div>
     );
@@ -649,127 +895,12 @@ function EmptyState() {
 
 function SiteFooter() {
     return (
-        <footer className="bg-surface-1 border-t border-border pt-16 pb-8 px-5 relative overflow-hidden">
-            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber/[0.03] rounded-full blur-[120px] -z-10" />
-            
-            <div className="max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-                    {/* Brand Section */}
-                    <div className="space-y-6">
-                        <div className="flex gap-2 items-center">
-                            <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-surface-2 border border-border">
-                                <img src="/storage/img/favicon.png" className="size-6 object-contain" alt="Favicon" />
-                            </div>
-                            <div className="grid flex-1 text-left leading-tight">
-                                <div className="flex items-center gap-1.5">
-                                    <span className="font-display font-black text-xl tracking-tight">Harmain</span> 
-                                    <span className="font-display font-black text-amber text-xl tracking-tight">Traders</span>
-                                </div>
-                                <span className="text-[10px] font-mono-jet uppercase tracking-[0.2em] text-text-muted leading-none">Wholesale & Supply Chain</span>
-                            </div>
-                        </div>
-                        <p className="text-[13px] text-text-muted leading-relaxed max-w-xs font-medium">
-                            Premium procurement engine for retail giants and independent traders across Pakistan.
-                        </p>
-                        <div className="flex items-center gap-3">
-                            {[
-                                { icon: Facebook, href: "#" },
-                                { icon: Instagram, href: "#" },
-                                { icon: Twitter, href: "#" },
-                                { icon: Linkedin, href: "#" }
-                            ].map((social, i) => (
-                                <a 
-                                    key={i} 
-                                    href={social.href} 
-                                    className="w-9 h-9 rounded-xl bg-surface-2 border border-border flex items-center justify-center text-text-muted hover:text-amber hover:border-amber/30 hover:scale-110 transition-all duration-300"
-                                >
-                                    <social.icon className="w-4.5 h-4.5" />
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Reach Us Section */}
-                    <div>
-                        <h5 className="font-display font-black text-[12px] uppercase tracking-[0.15em] text-text-primary mb-7 flex items-center gap-2">
-                            <Phone className="w-3.5 h-3.5 text-amber" /> Reach Us
-                        </h5>
-                        <div className="space-y-5">
-                            <div className="group cursor-pointer">
-                                <p className="text-[10px] font-mono-jet uppercase text-text-muted mb-1 tracking-wider">Mobile Support</p>
-                                <span className="text-sm font-bold text-text-secondary group-hover:text-amber transition-colors">0332 3218684</span>
-                            </div>
-                            <div className="group cursor-pointer">
-                                <p className="text-[10px] font-mono-jet uppercase text-text-muted mb-1 tracking-wider">Head Office</p>
-                                <span className="text-sm font-bold text-text-secondary group-hover:text-amber transition-colors">021 32401607</span>
-                            </div>
-                            <div className="group cursor-pointer">
-                                <p className="text-[10px] font-mono-jet uppercase text-text-muted mb-1 tracking-wider">Email Support</p>
-                                <span className="text-sm font-bold text-text-secondary group-hover:text-amber transition-colors flex items-center gap-2">
-                                    <Mail className="w-3.5 h-3.5" /> info@harmaintraders.com
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Logistics Section */}
-                    <div>
-                        <h5 className="font-display font-black text-[12px] uppercase tracking-[0.15em] text-text-primary mb-7 flex items-center gap-2">
-                            <MapPin className="w-3.5 h-3.5 text-amber" /> Logistics
-                        </h5>
-                        <div className="space-y-4">
-                            <p className="text-[13px] text-text-muted leading-relaxed font-medium bg-surface-2/50 border border-border/50 p-4 rounded-2xl italic">
-                                1st Floor, Marvi Market, <br />
-                                Katchi Gali No.1 Denso Hall, <br />
-                                Karachi, Pakistan
-                            </p>
-                            <div className="flex items-center gap-3 text-[11px] font-bold text-amber/80 uppercase tracking-widest">
-                                <div className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
-                                Hub Center Karachi
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Navigation Section */}
-                    <div>
-                        <h5 className="font-display font-black text-[12px] uppercase tracking-[0.15em] text-text-primary mb-7 flex items-center gap-2">
-                            <Zap className="w-3.5 h-3.5 text-amber" /> System
-                        </h5>
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-6">
-                            {['Offers', 'Catalog', 'Logistics', 'Support', 'Firms', 'Taxes'].map((link) => (
-                                <a key={link} href="#" className="text-[13px] text-text-muted hover:text-amber transition-colors font-medium flex items-center gap-1.5 group">
-                                    <div className="w-1.5 h-[1px] bg-border group-hover:bg-amber group-hover:w-3 transition-all" />
-                                    {link}
-                                </a>
-                            ))}
-                        </div>
-                        <div className="mt-8 p-3 rounded-xl bg-surface-2 border border-dashed border-border flex items-center justify-center gap-3">
-                             <div className="text-right">
-                                <p className="text-[10px] font-mono-jet uppercase font-black text-text-primary">Server Status</p>
-                                <p className="text-[8px] font-mono-jet uppercase text-emerald-500 font-bold">Systems Operational</p>
-                             </div>
-                             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-                        <p className="font-mono-jet text-[10px] text-text-muted tracking-[0.1em] font-black uppercase">
-                            © 2026 HARMAIN TRADERS <span className="mx-2 opacity-20 hidden md:inline">·</span> ALL RIGHTS RESERVED
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-2 border border-border">
-                            <Heart className="w-3 h-3 text-red-500 fill-red-500" />
-                            <p className="font-mono-jet text-[9px] text-text-secondary tracking-[0.1em] font-black uppercase flex items-center gap-1.5">
-                                Hand crafted with 
-                                <img src="/images/favicon.png" className="w-3.5 h-3.5 object-contain grayscale hover:grayscale-0 transition-all cursor-pointer" alt="Aishtycoons" />
-                                <span className="text-amber">Aishtycoons</span>
-                            </p>
-                        </div>
-                    </div>
+        <footer className="bg-surface-1 border-t border-border py-8 px-5 mt-auto">
+            <div className="max-w-[1800px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono-jet text-text-muted">
+                <p>© 2026 HARMAIN TRADERS · WHOLESALE & SUPPLY CHAIN</p>
+                <div className="flex items-center gap-2">
+                    <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                    <span>Powered by Aishtycoons</span>
                 </div>
             </div>
         </footer>

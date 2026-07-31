@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, RotateCcw } from "lucide-react";
+import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, RotateCcw, CheckSquare, Building2 } from "lucide-react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { useAppearance } from "@/hooks/use-appearance";
@@ -35,6 +35,7 @@ interface OrderItem {
   id: number;
   code: string;
   title: string;
+  company_id?: number;
   packing_qty: number;
   stock_1: number;
   stock_2: number;
@@ -76,6 +77,82 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
   const [companySearch, setCompanySearch] = useState("");
+
+  const [isItemManualDialogOpen, setIsItemManualDialogOpen] = useState(false);
+  const [allItemsList, setAllItemsList] = useState<OrderItem[]>([]);
+  const [itemSearchQuery, setItemSearchQuery] = useState("");
+  const [itemDialogCompanyId, setItemDialogCompanyId] = useState<string>("all");
+  const [isLoadingAllItems, setIsLoadingAllItems] = useState(false);
+
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+  const [filterMode, setFilterMode] = useState<'reorder' | 'sales'>('reorder');
+
+  // Fetch all items when the dialog opens
+  useEffect(() => {
+    if (isItemManualDialogOpen) {
+      if (selectionMode === 'company' && selectedCompany) {
+        setItemDialogCompanyId(String(selectedCompany.id));
+      } else {
+        setItemDialogCompanyId("all");
+      }
+      setIsLoadingAllItems(true);
+      axios.get('/admin/api/supplier-order/all-items')
+        .then(response => {
+          setAllItemsList(response.data.items);
+        })
+        .catch(err => {
+          console.error("Failed to load all items", err);
+        })
+        .finally(() => {
+          setIsLoadingAllItems(false);
+        });
+    }
+  }, [isItemManualDialogOpen]);
+
+  const manualDialogFilteredItems = useMemo(() => {
+    return allItemsList.filter(item => {
+      const title = (item.title || "").toLowerCase();
+      const code = (item.code || "").toLowerCase();
+      const q = itemSearchQuery.toLowerCase();
+      const matchesSearch = title.includes(q) || code.includes(q);
+
+      const matchesCompany = itemDialogCompanyId === "all" || String(item.company_id) === String(itemDialogCompanyId);
+
+      return matchesSearch && matchesCompany;
+    });
+  }, [allItemsList, itemSearchQuery, itemDialogCompanyId]);
+
+  const unaddedFilteredItems = useMemo(() => {
+    return manualDialogFilteredItems.filter(item => !orderItems.some(oi => oi.id === item.id));
+  }, [manualDialogFilteredItems, orderItems]);
+
+  const selectAllFilteredItems = () => {
+    if (unaddedFilteredItems.length === 0) return;
+
+    const newItems: OrderItem[] = unaddedFilteredItems.map(item => {
+      const reorderLevel = Number(item.reorder_level || 0);
+      const stockFull = Number(item.stock_1 || 0);
+      const shortageFull = Math.max(0, reorderLevel - stockFull);
+      return {
+        ...item,
+        input_full: shortageFull,
+        input_pcs: 0,
+        input_b_full: 0,
+        input_b_pcs: 0,
+        disc_percent: 0,
+      };
+    });
+
+    setOrderItems(prev => [...prev, ...newItems]);
+    if (newItems.length > 0) {
+      setSelectedRowId(newItems[newItems.length - 1].id);
+    }
+  };  
   
   const getFifteenDaysAgo = () => {
     const d = new Date();
@@ -108,36 +185,6 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return isFuture ? 0 : diffDays;
   }, [salesStartDate]);
-
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-  const [isLoadingItems, setIsLoadingItems] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
-  const [filterMode, setFilterMode] = useState<'reorder' | 'sales'>('reorder');
-
-  const [isItemManualDialogOpen, setIsItemManualDialogOpen] = useState(false);
-  const [allItemsList, setAllItemsList] = useState<OrderItem[]>([]);
-  const [itemSearchQuery, setItemSearchQuery] = useState("");
-  const [isLoadingAllItems, setIsLoadingAllItems] = useState(false);
-
-  // Fetch all items when the dialog opens
-  useEffect(() => {
-    if (isItemManualDialogOpen) {
-      setIsLoadingAllItems(true);
-      axios.get('/admin/api/supplier-order/all-items')
-        .then(response => {
-          setAllItemsList(response.data.items);
-        })
-        .catch(err => {
-          console.error("Failed to load all items", err);
-        })
-        .finally(() => {
-          setIsLoadingAllItems(false);
-        });
-    }
-  }, [isItemManualDialogOpen]);
 
   // F2 keybind
   useEffect(() => {
@@ -815,16 +862,48 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
               </DialogHeader>
               
               <div className="py-4 flex flex-col gap-4 flex-1 min-h-0">
-                {/* Search Bar */}
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700" />
-                  <Input 
-                    placeholder="Search by product name or code..." 
-                    value={itemSearchQuery}
-                    onChange={e => setItemSearchQuery(e.target.value)}
-                    className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 pl-10 text-sm h-11 focus-visible:ring-orange-500/50 text-zinc-900 dark:text-zinc-100 font-medium"
-                    autoFocus
-                  />
+                {/* Search Bar & Company Filter & Select All Bar */}
+                <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+                  {/* Search Bar */}
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <Input 
+                      placeholder="Search by product name or code..." 
+                      value={itemSearchQuery}
+                      onChange={e => setItemSearchQuery(e.target.value)}
+                      className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 pl-10 text-sm h-11 focus-visible:ring-orange-500/50 text-zinc-900 dark:text-zinc-100 font-medium"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Company Filter Dropdown */}
+                  <div className="w-full md:w-64 shrink-0">
+                    <div className="relative">
+                      <select
+                        value={itemDialogCompanyId}
+                        onChange={e => setItemDialogCompanyId(e.target.value)}
+                        className="w-full h-11 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 pr-8 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-orange-500/50 appearance-none cursor-pointer"
+                      >
+                        <option value="all">All Companies ({companies.length})</option>
+                        {companies.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.title} ({c.items_count || 0})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Select All Button */}
+                  <Button
+                    onClick={selectAllFilteredItems}
+                    disabled={unaddedFilteredItems.length === 0}
+                    className="h-11 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest px-4 shrink-0 gap-2 shadow-sm"
+                  >
+                    <CheckSquare size={14} />
+                    Select All ({unaddedFilteredItems.length})
+                  </Button>
                 </div>
 
                 {/* Table Container */}
@@ -846,25 +925,14 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                             <span className="animate-pulse">Loading items catalog...</span>
                           </td>
                         </tr>
-                      ) : (() => {
-                        const filtered = allItemsList.filter(item => {
-                          const title = (item.title || "").toLowerCase();
-                          const code = (item.code || "").toLowerCase();
-                          const q = itemSearchQuery.toLowerCase();
-                          return title.includes(q) || code.includes(q);
-                        });
-
-                        if (filtered.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={5} className="px-4 py-12 text-center text-zinc-700 text-xs font-bold uppercase tracking-widest">
-                                No items match your search
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return filtered.map(item => {
+                      ) : manualDialogFilteredItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-12 text-center text-zinc-700 text-xs font-bold uppercase tracking-widest">
+                            No items match your company or search criteria
+                          </td>
+                        </tr>
+                      ) : (
+                        manualDialogFilteredItems.map(item => {
                           const isAlreadyAdded = orderItems.some(oi => oi.id === item.id);
                           return (
                             <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
@@ -902,8 +970,8 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                               </td>
                             </tr>
                           );
-                        });
-                      })()}
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

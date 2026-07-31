@@ -260,6 +260,7 @@ class SupplierOrderController extends Controller implements HasMiddleware
                 'id' => $item->id,
                 'code' => $item->code,
                 'title' => $item->title,
+                'company_id' => (int) $item->company,
                 'packing_qty' => $packing,
                 'stock_1' => $stock1, 
                 'stock_2' => $stock2, 
