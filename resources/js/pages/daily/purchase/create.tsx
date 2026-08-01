@@ -1618,11 +1618,56 @@ console.log(lastPurchaseInfo);
                     {/* Laptop Sticky Footer (Visible on md and lg, hidden on mobile and 2xl desktop) */}
                     <div className="hidden md:flex 2xl:hidden sticky bottom-0 -mx-6 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-t border-border p-3 px-8 z-40 items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.1)] transition-all duration-300">
                         <div className="flex gap-6 items-center flex-wrap">
+                            {/* 1. Previous Balance / Advance */}
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Gross Billing</span>
-                                <div className="text-base font-bold text-foreground">Rs {totals.gross.toLocaleString()}</div>
+                                <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1 text-zinc-400">
+                                    {advanceAvailable < 0 ? "Advance" : "Prev Balance"}
+                                </span>
+                                <div className={cn(
+                                    "text-sm font-bold font-mono leading-none",
+                                    totals.previousBalance > 0 ? "text-rose-600 dark:text-rose-400" : advanceAvailable < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-700 dark:text-zinc-300"
+                                )}>
+                                    Rs {(advanceAvailable < 0 ? Math.abs(advanceAvailable) : totals.previousBalance).toLocaleString()}
+                                </div>
                             </div>
 
+                            {/* Advance checkbox toggle if applicable */}
+                            {advanceAvailable < 0 && (
+                                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">
+                                    <Checkbox 
+                                        id="use-advance-sticky" 
+                                        checked={useAdvance} 
+                                        onCheckedChange={(v) => setUseAdvance(!!v)}
+                                        className="w-3.5 h-3.5 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
+                                    />
+                                    <label htmlFor="use-advance-sticky" className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 cursor-pointer whitespace-nowrap">
+                                        Apply (-Rs {totals.appliedAdvance.toLocaleString()})
+                                    </label>
+                                </div>
+                            )}
+
+                            <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+
+                            {/* 2. Net Payable */}
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Net Payable</span>
+                                <div className="text-sm font-bold text-foreground font-mono leading-none">Rs {totals.gross.toLocaleString()}</div>
+                            </div>
+
+                            <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+
+                            {/* 3. Final Net Payable / Net Settlement */}
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Final Net Payable</span>
+                                <div className="text-2xl font-black text-orange-600 dark:text-orange-400 italic tracking-tight leading-none">
+                                    <span className="text-xs font-bold mr-0.5 not-italic">Rs</span>
+                                    {totals.netSettlement.toLocaleString()}
+                                </div>
+                            </div>
+
+                            <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+
+                            {/* Courier Input */}
                             <div className="flex flex-col w-28">
                                 <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 leading-none">Courier</span>
                                 <Input
@@ -1632,6 +1677,7 @@ console.log(lastPurchaseInfo);
                                 />
                             </div>
 
+                            {/* Extra Discount Input */}
                             <div className="flex flex-col w-28">
                                 <span className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1 leading-none">Extra Disc</span>
                                 <Input
@@ -1640,44 +1686,33 @@ console.log(lastPurchaseInfo);
                                     onChange={(e) => setExtraDiscount(toNumber(e.target.value))}
                                 />
                             </div>
-
-                            {totals.previousBalance > 0 && (
-                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4">
-                                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Prev Balance</span>
-                                    <div className="text-base font-bold text-foreground">Rs {totals.previousBalance.toLocaleString()}</div>
-                                </div>
-                            )}
-
-                            {/* Advance Information in Laptop Sticky */}
-                            {advanceAvailable < 0 && (
-                                <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4 bg-emerald-500/10 px-3 py-1 rounded-md border border-emerald-500/20">
-                                    <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest leading-none mb-1 flex items-center gap-1">
-                                        <TrendingDown size={11} /> Advance: Rs {Math.abs(advanceAvailable).toLocaleString()}
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                        <Checkbox 
-                                            id="use-advance-sticky" 
-                                            checked={useAdvance} 
-                                            onCheckedChange={(v) => setUseAdvance(!!v)}
-                                            className="w-3.5 h-3.5 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
-                                        />
-                                        <label htmlFor="use-advance-sticky" className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap">
-                                            Apply (-Rs {totals.appliedAdvance.toLocaleString()})
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex flex-col border-l border-zinc-200 dark:border-zinc-800 pl-4">
-                                <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Net Settlement</span>
-                                <div className="text-2xl font-black text-orange-600 dark:text-orange-400 leading-none">
-                                    <span className="text-sm font-bold mr-1 italic">Rs</span>
-                                    {totals.netSettlement.toLocaleString()}
-                                </div>
-                            </div>
                         </div>
 
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            {/* Instant Checkout / Pay Now Button */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const next = !isPayNow;
+                                    setIsPayNow(next);
+                                    if (next) {
+                                        if (paymentSplits.length === 0) {
+                                            addPaymentSplit();
+                                        }
+                                        setShowPaymentDialog(true);
+                                    }
+                                }}
+                                className={cn(
+                                    "h-10 px-4 text-xs font-bold gap-2 transition-all rounded-xl",
+                                    isPayNow ? "bg-orange-500 text-white border-orange-500 shadow-md" : "text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-orange-500"
+                                )}
+                            >
+                                <Wallet size={16} />
+                                <span className="hidden sm:inline">{isPayNow ? "Checkout ON" : "Checkout"}</span>
+                            </Button>
+
                             <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2">
                                 <Save size={18} />
                                 Process Order

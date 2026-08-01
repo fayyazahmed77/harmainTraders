@@ -31,7 +31,7 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
     };
 
     return (
-        <div className="bg-surface-1 border-y border-border shadow-sm relative overflow-hidden group">
+        <div className="sticky top-[68px] z-30 bg-surface-0/95 backdrop-blur-md border-y border-border shadow-md relative overflow-hidden group transition-all">
             <div className="max-w-[1800px] mx-auto relative px-12 py-4">
                 {/* Navigation Buttons */}
                 <button 

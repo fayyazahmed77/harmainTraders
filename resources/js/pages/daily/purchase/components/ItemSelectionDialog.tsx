@@ -67,6 +67,13 @@ const toNumber = (v: any) => {
     return Number.isNaN(n) ? 0 : n;
 };
 
+const formatDate = (dateStr?: string | null): string => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600";
 
 export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
@@ -721,7 +728,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Calendar size={12} /> Date
                                             </span>
-                                            <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">{selectedItemForQty.last_purchase_date || 'N/A'}</span>
+                                            <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">{formatDate(selectedItemForQty.last_purchase_date)}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
                                             <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">

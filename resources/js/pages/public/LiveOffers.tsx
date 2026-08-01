@@ -300,7 +300,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* Sidebar: Shop By Brand */}
                         <aside className="w-full lg:w-72 shrink-0">
-                            <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden sticky top-24">
+                            <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden sticky top-[190px]">
                                 <div className="p-4 border-b border-border flex items-center justify-between bg-surface-2/50">
                                     <h3 className="text-[11px] font-mono-jet font-black uppercase tracking-wider text-text-muted">Shop by Brand</h3>
                                     <Badge className="bg-amber/15 text-amber border-none text-[9px] font-black">{companies.length}</Badge>

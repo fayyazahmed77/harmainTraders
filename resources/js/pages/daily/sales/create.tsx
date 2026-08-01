@@ -1251,24 +1251,37 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     
                     {/* 1. Left Section: Financial Summary & Inputs */}
                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                      {/* Final Net Payable */}
+                      {/* 1. Previous Balance */}
                       <div className="flex flex-col shrink-0">
-                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net Payable</span>
-                        <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
-                          <span className="text-xs font-semibold mr-0.5">Rs</span>
-                          {totals.finalAmount.toLocaleString()}
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                          {previousBalance < 0 ? "Advance" : "Prev Balance"}
+                        </span>
+                        <span className={cn(
+                          "text-sm font-bold font-mono leading-none",
+                          previousBalance > 0 ? "text-rose-600 dark:text-rose-400" : previousBalance < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-700 dark:text-zinc-300"
+                        )}>
+                          Rs {previousBalance.toLocaleString()}
                         </span>
                       </div>
 
                       <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden sm:block" />
 
-                      {/* Receivable / Net Settlement */}
+                      {/* 2. Net Payable */}
                       <div className="hidden sm:flex flex-col shrink-0">
-                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
-                          {previousBalance < 0 && useAdvance ? "Net Settlement" : "Receivable"}
-                        </span>
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Net Payable</span>
                         <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 font-mono leading-none">
-                          Rs {totals.receivable.toLocaleString()}
+                          Rs {totals.net.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden sm:block" />
+
+                      {/* 3. Final Net Payable */}
+                      <div className="flex flex-col shrink-0">
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net Payable</span>
+                        <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
+                          <span className="text-xs font-semibold mr-0.5">Rs</span>
+                          {totals.finalAmount.toLocaleString()}
                         </span>
                       </div>
 
@@ -1350,7 +1363,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         )}
                       >
                         <Banknote size={14} />
-                        <span className="hidden sm:inline">{isPayNow ? "Instant Checkout ON" : "Instant Checkout"}</span>
+                        <span className="hidden sm:inline">{isPayNow ? "Checkout ON" : "Checkout"}</span>
                       </Button>
 
                       {/* Finalize Invoice Main Action */}

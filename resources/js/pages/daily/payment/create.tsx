@@ -876,69 +876,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       <SidebarInset className="bg-zinc-50 dark:bg-zinc-950 overflow-hidden flex flex-col h-screen">
         <SiteHeader breadcrumbs={[{ title: "Payment Ledger", href: "/payment/create" }]} />
 
-        <main className="flex-1 overflow-auto md:overflow-hidden p-3 md:py-4 md:px-6 flex flex-col md:flex-row gap-5 scroll-smooth">
+        <main className="flex-1 overflow-auto md:overflow-hidden p-3 md:py-4 md:px-6 flex flex-col gap-4 scroll-smooth">
 
-          {/* ── WORKSPACE ── */}
-          <div className="flex-1 flex flex-col gap-4 md:gap-4 md:overflow-hidden">
-
-            {/* Success State handled via SuccessDialog component at bottom */}
-
-            {/* Mobile Header (Control Deck) */}
-            <div className="md:hidden space-y-3">
-              <Card className={`p-4 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} space-y-4 shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-3">
-                  <div className="space-y-0.5">
-                    <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Entry Date</div>
-                    <div className="text-sm font-black text-zinc-800 dark:text-zinc-100 flex items-center gap-1.5 leading-none">
-                      <CalendarIcon size={12} className="text-zinc-400" />
-                      {fmtDate(date)}
-                    </div>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <div className="text-[9px] uppercase font-black text-zinc-400 dark:text-zinc-500 tracking-widest">Ref Code</div>
-                    <div className={`text-sm font-black ${t.textDark} font-mono tracking-tighter uppercase`}>#{selectedAccountId || '---'}</div>
-                  </div>
-                </div>
-
-                <TechLabel label="Ledger Party" icon={UserIcon}>
-                  <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} shadow-sm`}>
-                        <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party..."}</span>
-                        <Search size={14} className="text-zinc-400 flex-shrink-0 ml-2" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[calc(100vw-48px)] p-0 shadow-2xl border-zinc-300 dark:border-zinc-700" align="center" sideOffset={8}>
-                      <div className="p-3 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                        <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                      </div>
-                      <div className="max-h-[60vh] overflow-auto py-1">
-                        {filteredAccounts.map(acc => (
-                          <button key={acc.id} className={`w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex items-center gap-3 group border-l-2 border-transparent ${t.borderHover}`}
-                            onClick={() => handleAccountSelect(acc.id)}>
-                            <div className={`w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg} flex-shrink-0`} />
-                            <span className="truncate">{acc.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </TechLabel>
-              </Card>
-            </div>
-
-            {/* Control Header (Desktop Only) */}
-            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-              <Card className={`p-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-4 items-end relative overflow-hidden`}>
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${t.gradient}`} />
-
-                <div className="col-span-3">
+          {/* Control Header (Desktop Only - Full Width - Single Line Guaranteed) */}
+          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block shrink-0">
+            <Card className={`p-3 md:py-3 md:px-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
+              <div className="flex items-end justify-between flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-0.5">
+                {/* 1. Entry Date */}
+                <div className="w-32 xl:w-36 shrink-0">
                   <TechLabel label="Entry Date" icon={CalendarIcon}>
                     <Popover open={calOpen} onOpenChange={setCalOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
-                          {fmtDate(date)}
-                          <CalendarIcon size={14} className="text-zinc-400" />
+                        <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                          <span className="truncate">{fmtDate(date)}</span>
+                          <CalendarIcon size={13} className="text-zinc-400 shrink-0" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -948,13 +899,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </TechLabel>
                 </div>
 
-                <div className="col-span-5">
+                {/* 2. Ledger Party */}
+                <div className="flex-1 min-w-[160px] max-w-[320px]">
                   <TechLabel label="Ledger Party" icon={UserIcon}>
-                    <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen} >
+                    <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
-                          {selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}
-                          <Search size={14} className="text-zinc-400" />
+                        <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                          <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
+                          <Search size={13} className="text-zinc-400 shrink-0 ml-1" />
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
@@ -1010,37 +962,98 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </TechLabel>
                 </div>
 
-                <div className="col-span-4 flex items-end gap-3">
-                  <div className="flex-1">
-                    <TechLabel label="Payout Routing" icon={Navigation}>
-                      <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
-                        <SelectTrigger className={cn(
-                          `h-10 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300`,
-                          paymentType === 'RECEIPT' 
-                            ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
-                            : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
-                        )}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
-                            {isBankAccountSelected ? "WITHDRAWAL (IN/CR)" : "RECEIPT (IN/CR)"}
-                          </SelectItem>
-                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
-                            {isBankAccountSelected ? "DEPOSIT (OUT/DR)" : "PAYMENT (OUT/DR)"}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TechLabel>
+                {/* 3. Payout Routing */}
+                <div className="w-36 xl:w-40 shrink-0">
+                  <TechLabel label="Payout Routing" icon={Navigation}>
+                    <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
+                      <SelectTrigger className={cn(
+                        `h-9 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300 px-2.5`,
+                        paymentType === 'RECEIPT' 
+                          ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                          : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
+                      )}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
+                          {isBankAccountSelected ? "WITHDRAWAL (IN)" : "RECEIPT (IN)"}
+                        </SelectItem>
+                        <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
+                          {isBankAccountSelected ? "DEPOSIT (OUT)" : "PAYMENT (OUT)"}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TechLabel>
+                </div>
+
+                {/* 4. Ref */}
+                <div className="w-14 shrink-0">
+                  <TechLabel label="Ref" icon={Hash}>
+                    <div className="h-9 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{selectedAccountId || '---'}</div>
+                  </TechLabel>
+                </div>
+
+                {/* Vertical Separator */}
+                <div className="w-px h-8 bg-zinc-200 dark:bg-zinc-800 shrink-0 self-end mb-1 mx-1" />
+
+                {/* 5. Total Sales / Purchases / In */}
+                <div className="shrink-0 text-right">
+                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
+                    {isBankAccountSelected ? "Total In" : (paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases")}
                   </div>
-                  <div className="w-20">
-                    <TechLabel label="Ref" icon={Hash}>
-                      <div className="h-10 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{selectedAccountId || '---'}</div>
-                    </TechLabel>
+                  <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-zinc-800 dark:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-800/70 rounded-md border border-zinc-200/60 dark:border-zinc-800/60 whitespace-nowrap">
+                    Rs {totalSalesPurchases.toLocaleString()}
                   </div>
                 </div>
-              </Card>
-            </motion.div>
+
+                {/* 6. Discount (Adj) */}
+                {((totalDiscountParty > 0) || (discount > 0)) && (
+                  <div className="shrink-0 text-right">
+                    <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">Discount (Adj)</div>
+                    <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md border border-amber-500/20 whitespace-nowrap">
+                      Rs {(totalDiscountParty + (discount || 0)).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Total Received / Paid / Out */}
+                <div className="shrink-0 text-right">
+                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
+                    {isBankAccountSelected ? "Total Out" : (paymentType === 'RECEIPT' ? "Total Received" : "Total Paid")}
+                  </div>
+                  <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-zinc-800 dark:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-800/70 rounded-md border border-zinc-200/60 dark:border-zinc-800/60 whitespace-nowrap">
+                    Rs {totalReceivedPaid.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* 8. Total Balance / Available */}
+                <div className="shrink-0 text-right">
+                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
+                    {isBankAccountSelected ? "Total Available" : "Total Balance"}
+                  </div>
+                  <div className={cn("h-9 px-3 flex items-center justify-end font-mono text-xs font-black rounded-md border whitespace-nowrap", isBankAccountSelected ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20")}>
+                    Rs {totalBalance.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* 9. Advance Paid */}
+                {!isBankAccountSelected && advancePaid > 0 && (
+                  <div className="shrink-0 text-right">
+                    <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">Advance Paid</div>
+                    <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-md border border-emerald-500/20 whitespace-nowrap">
+                      Rs {advancePaid.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Main Layout Split: Workspace & Right Sidebar */}
+          <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-5 md:overflow-hidden">
+
+            {/* ── WORKSPACE ── */}
+            <div className="flex-1 flex flex-col gap-4 md:gap-4 md:overflow-hidden">
 
             {/* Ledger Manifest OR Inline Multi-Method Payment Details */}
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1 min-h-0 flex flex-col md:overflow-hidden">
@@ -1225,39 +1238,39 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <motion.div key="multi-method-details" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }} className="flex-1 min-h-0 flex flex-col">
                     <Card className={`flex-1 flex flex-col border border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none overflow-hidden ${PREMIUM_ROUNDING} py-0`}>
                       {/* Table Header/Toolbar */}
-                      <div className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800 px-4 h-12 flex items-center justify-between flex-shrink-0">
+                      <div className="bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800 px-3.5 h-10 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-2">
-                          <ClipboardList size={16} className={`${t.textDark}`} />
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Multi-Method Payment Details</span>
-                          <span className={`text-[10px] font-black ${t.text} uppercase tracking-widest px-2 py-0.5 bg-orange-500/10 rounded-md ml-2`}>
+                          <ClipboardList size={15} className={`${t.textDark}`} />
+                          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500">Multi-Method Payment Details</span>
+                          <span className={`text-[9px] font-black ${t.text} uppercase tracking-widest px-2 py-0.5 bg-orange-500/10 rounded-md ml-1.5`}>
                             {selectedAccountId ? `${accounts.find(a => a.id.toString() === selectedAccountId)?.title} (${accounts.find(a => a.id.toString() === selectedAccountId)?.account_type?.name})` : "No Party Selected"}
                           </span>
                         </div>
-                        <Button onClick={addSplitRow} size="sm" className={`${t.gradient} text-white font-bold text-[10px] uppercase h-8 px-3`}>
-                          <Plus size={14} className="mr-1.5" /> Add Split Method
+                        <Button onClick={addSplitRow} size="sm" className={`${t.gradient} text-white font-bold text-[10px] uppercase h-7.5 px-2.5`}>
+                          <Plus size={13} className="mr-1" /> Add Split Method
                         </Button>
                       </div>
 
                       {/* Split Rows Content */}
-                      <div className="flex-1 overflow-auto custom-scrollbar p-3">
-                        <table className="w-full border-separate border-spacing-y-2">
+                      <div className="flex-1 overflow-auto custom-scrollbar p-2">
+                        <table className="w-full border-separate border-spacing-y-1">
                           <thead>
-                            <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                              <th className="px-3 text-left w-1/4">Ledger Account</th>
-                              <th className="px-3 text-left w-40">Method</th>
-                              <th className="px-3 text-left w-40">Cheque #</th>
-                              <th className="px-3 text-left w-40">Chq Date</th>
-                              <th className="px-3 text-left w-40">Clear Date</th>
-                              <th className="px-3 text-right w-40">Amount</th>
-                              <th className="px-3 text-center w-12"></th>
+                            <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-400">
+                              <th className="px-2 text-left w-1/4">Ledger Account</th>
+                              <th className="px-2 text-left w-36">Method</th>
+                              <th className="px-2 text-left w-36">Cheque #</th>
+                              <th className="px-2 text-left w-32">Chq Date</th>
+                              <th className="px-2 text-left w-32">Clear Date</th>
+                              <th className="px-2 text-right w-36">Amount</th>
+                              <th className="px-2 text-center w-10"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {splitPayments.map((row) => (
-                              <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-lg group shadow-sm">
-                                <td className={`p-2 border-l-4 border-orange-500/20 group-${t.borderHover} transition-all rounded-l-xl bg-white dark:bg-zinc-900 shadow-sm`}>
+                              <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-md group">
+                                <td className={`p-1 border-l-4 border-orange-500/20 group-${t.borderHover} transition-all rounded-l-md bg-white dark:bg-zinc-900 shadow-sm`}>
                                   <Select value={row.payment_account_id} onValueChange={v => updateSplitRow(row.id, 'payment_account_id', v)}>
-                                    <SelectTrigger className="h-10 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono uppercase">
+                                    <SelectTrigger className="h-8.5 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono uppercase px-2">
                                       <SelectValue placeholder="Account..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1273,9 +1286,9 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                     </SelectContent>
                                   </Select>
                                 </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   <Select value={row.payment_method} onValueChange={v => updateSplitRow(row.id, 'payment_method', v)}>
-                                    <SelectTrigger className="h-10 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase">
+                                    <SelectTrigger className="h-8.5 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase px-2">
                                       <SelectValue placeholder="Method..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1300,7 +1313,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                     </SelectContent>
                                   </Select>
                                 </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   {paymentType === 'PAYMENT' && row.payment_method === 'Cheque' ? (
                                     paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
                                       <Button
@@ -1309,14 +1322,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                           setChequeSelectorTarget(row.id);
                                           setChequeSelectorOpen(true);
                                         }}
-                                        className={`h-10 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.original_cheque_id && t.border}`}
+                                        className={`h-8.5 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono px-2 ${!row.original_cheque_id && t.border}`}
                                       >
                                         <span className="truncate">{row.original_cheque_id ? customerCheques.find(c => c.id.toString() === row.original_cheque_id)?.cheque_no : "Select In Hand..."}</span>
                                         <Search size={12} className="text-zinc-400 ml-1" />
                                       </Button>
                                     ) : (
                                       <Select value={row.cheque_no} onValueChange={v => updateSplitRow(row.id, 'cheque_no', v)}>
-                                        <SelectTrigger disabled={!row.payment_account_id} className={`h-10 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.cheque_no && t.border}`}>
+                                        <SelectTrigger disabled={!row.payment_account_id} className={`h-8.5 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono px-2 ${!row.cheque_no && t.border}`}>
                                           <SelectValue placeholder="Select Cheque..." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1331,13 +1344,13 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       </Select>
                                     )
                                   ) : (
-                                    <Input value={row.cheque_no} onChange={e => updateSplitRow(row.id, 'cheque_no', e.target.value)} disabled={row.payment_method !== 'Cheque'} className="h-10 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono tracking-widest" placeholder="CHQ#" />
+                                    <Input value={row.cheque_no} onChange={e => updateSplitRow(row.id, 'cheque_no', e.target.value)} disabled={row.payment_method !== 'Cheque'} className="h-8.5 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono tracking-widest px-2" placeholder="CHQ#" />
                                   )}
                                 </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <Button variant="outline" className="h-10 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs">
+                                      <Button variant="outline" className="h-8.5 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs px-2">
                                         {row.cheque_date ? fmtDate(row.cheque_date) : <span className="text-zinc-400 font-normal text-[10px]">Pick date...</span>}
                                         <CalendarIcon size={12} className="text-zinc-400" />
                                       </Button>
@@ -1347,10 +1360,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                     </PopoverContent>
                                   </Popover>
                                 </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <Button variant="outline" className="h-10 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs">
+                                      <Button variant="outline" className="h-8.5 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs px-2">
                                         {row.clear_date ? fmtDate(row.clear_date) : <span className="text-zinc-400 font-normal text-[10px]">Pick date...</span>}
                                         <CalendarIcon size={12} className="text-zinc-400" />
                                       </Button>
@@ -1360,12 +1373,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                     </PopoverContent>
                                   </Popover>
                                 </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                                  <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className={`h-10 bg-zinc-50 dark:bg-zinc-800/50 ${t.borderAlpha} text-right font-mono text-xs font-black`} placeholder="0.00" />
+                                <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                  <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className={`h-8.5 bg-zinc-50 dark:bg-zinc-800/50 ${t.borderAlpha} text-right font-mono text-xs font-black px-2`} placeholder="0.00" />
                                 </td>
-                                <td className="p-2 text-center rounded-r-xl bg-white dark:bg-zinc-900 shadow-sm">
-                                  <Button variant="ghost" size="icon" onClick={() => removeSplitRow(row.id)} className="h-8 w-8 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">
-                                    <Trash2 size={16} />
+                                <td className="p-1 text-center rounded-r-md bg-white dark:bg-zinc-900 shadow-sm">
+                                  <Button variant="ghost" size="icon" onClick={() => removeSplitRow(row.id)} className="h-7 w-7 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                                    <Trash2 size={15} />
                                   </Button>
                                 </td>
                               </tr>
@@ -1375,23 +1388,23 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       </div>
 
                       {/* Table Footer / Summary Bar */}
-                      <div className="bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-4 flex-shrink-0">
-                        <div className="flex gap-6 items-center">
+                      <div className="bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800 px-3 py-2 flex flex-wrap justify-between items-center gap-3 flex-shrink-0">
+                        <div className="flex gap-4 items-center">
                           <div className="space-y-0.5">
                             <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Base Payout Required</div>
                             <div className="text-xs font-mono font-black text-zinc-500">Rs {basePayoutRequired.toLocaleString()}</div>
                           </div>
-                          <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
+                          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 self-center" />
                           <div className="space-y-0.5">
                             <div className={`text-[9px] font-black ${t.textLight} uppercase tracking-widest`}>Aggregate Split Total</div>
-                            <div className={`text-sm font-black font-mono tracking-tighter ${Math.abs(splitPayments.reduce((s, p) => s + Number(p.amount), 0) - basePayoutRequired) < 1 ? 'text-emerald-600' : 'text-zinc-700 dark:text-zinc-200'}`}>
+                            <div className={`text-xs font-black font-mono tracking-tighter ${Math.abs(splitPayments.reduce((s, p) => s + Number(p.amount), 0) - basePayoutRequired) < 1 ? 'text-emerald-600' : 'text-zinc-700 dark:text-zinc-200'}`}>
                               Rs {splitPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}
                             </div>
                           </div>
-                          <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
+                          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 self-center" />
                           <div className="space-y-0.5">
                             <div className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Balance Required</div>
-                            <div className={`text-sm font-black font-mono tracking-tighter ${Math.abs(balanceRequired) < 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            <div className={`text-xs font-black font-mono tracking-tighter ${Math.abs(balanceRequired) < 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
                               Rs {balanceRequired.toLocaleString()}
                             </div>
                           </div>
@@ -1405,66 +1418,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           </div>
 
           {/* ── FINANCIAL HUD (Right Sidebar) ── */}
-          <div className="w-full md:w-[380px] space-y-4 md:space-y-4 flex flex-col md:overflow-hidden">
-
-            {/* Account Insight Card */}
-            {selectedAccountId && (
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex-shrink-0">
-                <Card className={`${CARD_BASE} p-5 ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                  <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <div className={`w-2 h-2 rounded-full bg-blue-500`} />
-                    <h4 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest leading-none pt-0.5">Financial Auditor</h4>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total In" : (paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases")}
-                      </span>
-                      <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
-                        Rs {totalSalesPurchases.toLocaleString()}
-                      </span>
-                    </div>
-                    {((totalDiscountParty > 0) || (discount > 0)) && (
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-500 font-bold">Discount (Adj)</span>
-                        <span className="font-black font-mono text-amber-600 dark:text-amber-400">
-                          Rs {(totalDiscountParty + (discount || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total Out" : (paymentType === 'RECEIPT' ? "Total Received" : "Total Paid")}
-                      </span>
-                      <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
-                        Rs {totalReceivedPaid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total Available" : "Total Balance"}
-                      </span>
-                      <span className={cn("font-black font-mono", isBankAccountSelected ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
-                        Rs {totalBalance.toLocaleString()}
-                      </span>
-                    </div>
-                    {!isBankAccountSelected && advancePaid > 0 && (
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-500 font-bold">Advance Paid</span>
-                        <span className="font-black font-mono text-emerald-600">
-                          Rs {advancePaid.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            )}
+          <div className="w-full md:w-[350px] space-y-1 md:space-y-1 flex flex-col md:overflow-hidden">
 
             {/* Executive Summary Card */}
             <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1 min-h-0 flex flex-col">
-              <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none flex-1 flex flex-col min-h-0`}>
+              <Card className={`p-3 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none flex-1 flex flex-col min-h-0`}>
                 <div className={`absolute top-0 right-0 w-32 h-32 ${t.blob} rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none`} />
 
                 <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-1 relative z-10 flex-shrink-0">
@@ -1476,7 +1434,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi-Method</span>
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi Pay</span>
                       <Switch checked={isMultiPayment} onCheckedChange={setIsMultiPayment} className="scale-75" />
                     </div>
                     <SignalBadge text={isBankAccountSelected ? (paymentType === 'RECEIPT' ? 'WITHDRAWAL' : 'DEPOSIT') : paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
@@ -1517,27 +1475,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                     </TechLabel>
                   </div>
 
-                  <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="space-y-1.5 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-900/50 shadow-sm">
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-                        <span>Gross Invoice Settlement</span>
-                        <span className="text-lg font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          Rs {(toNum(amount) + toNum(discount)).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] font-mono text-zinc-500 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
-                        <span>Cash: Rs {toNum(amount).toLocaleString()}</span>
-                        <span className="font-bold">+</span>
-                        <span>Discount: Rs {toNum(discount).toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {selectedAccountId && (toNum(amount) > Object.values(allocations).reduce((sum, val) => sum + toNum(val), 0)) && (
-                      <div className="flex items-center gap-2 p-2.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl text-[10px] text-blue-700 dark:text-blue-300 font-semibold animate-in fade-in-50">
-                        <Info size={14} className="flex-shrink-0 text-blue-500" />
-                        <span>Surplus Cash (Rs {(toNum(amount) - Object.values(allocations).reduce((sum, val) => sum + toNum(val), 0)).toLocaleString()}) will be registered as Customer Advance.</span>
-                      </div>
-                    )}
+                  <div className="space-y-1">
+              
 
                     <div className="space-y-2">
                       <TechLabel label="Payout Source" icon={CreditCard}>
@@ -1674,8 +1613,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex-shrink-0">
-                  <Button className={`w-full h-14 ${t.gradient} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg ${t.gradientShadow} transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
+                <div className="pt-1 border-t border-zinc-100 dark:border-zinc-800 flex-shrink-0">
+                  <Button className={`w-full h-11 ${t.gradient} hover:opacity-90 text-white font-black text-lg uppercase tracking-[0.2em] shadow-lg ${t.gradientShadow} transition-all active:scale-[0.98] ${PREMIUM_ROUNDING}`}
                     onClick={handleSave} disabled={loading}>
                     <motion.div className="flex items-center justify-center gap-2 relative z-10" animate={loading ? { opacity: 0.5 } : {}}>
                       {loading ? <RotateCcw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
@@ -1691,7 +1630,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
               </Card>
             </motion.div>
           </div>
-        </main>
+        </div>
+      </main>
 
         {/* Mobile Sticky Footer */}
         <div className="md:hidden sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 p-4 z-50 shadow-[0_-8px_30px_rgb(0,0,0,0.1)] transition-transform duration-300">

@@ -66,6 +66,13 @@ const toNumber = (v: any) => {
     return Number.isNaN(n) ? 0 : n;
 };
 
+const formatDate = (dateStr?: string | null): string => {
+    if (!dateStr) return 'INITIAL_STOCK';
+    const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600";
 
 export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
@@ -99,15 +106,50 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const filteredItems = useMemo(() => {
-        const q = itemSearch.toLowerCase();
-        const filtered = items.filter((it) =>
-            it.title.toLowerCase().includes(q) ||
-            (it.short_name?.toLowerCase().includes(q)) ||
-            (it.category?.toLowerCase().includes(q)) ||
-            (it.code?.toLowerCase().includes(q)) ||
-            String(it.id).includes(q)
-        );
-        return filtered.sort((a, b) => a.title.localeCompare(b.title));
+        const q = itemSearch.trim().toLowerCase();
+        if (!q) {
+            return [...items].sort((a, b) => a.title.localeCompare(b.title));
+        }
+
+        const filtered = items.filter((it) => {
+            const title = (it.title || "").toLowerCase();
+            const shortName = (it.short_name || "").toLowerCase();
+            const category = (it.category || "").toLowerCase();
+            const code = (it.code || "").toLowerCase();
+            const idStr = String(it.id);
+
+            return (
+                title.includes(q) ||
+                shortName.includes(q) ||
+                category.includes(q) ||
+                code.includes(q) ||
+                idStr.includes(q)
+            );
+        });
+
+        const getRank = (it: Item) => {
+            const title = (it.title || "").toLowerCase();
+            const code = (it.code || "").toLowerCase();
+            const idStr = String(it.id);
+
+            // Tier 0: Title starts with search query
+            if (title.startsWith(q)) return 0;
+            // Tier 1: Any word in title starts with search query
+            if (title.split(/\s+/).some(word => word.startsWith(q))) return 1;
+            // Tier 2: Code or ID starts with search query
+            if (code.startsWith(q) || idStr.startsWith(q)) return 2;
+            // Tier 3: Title contains search query anywhere
+            if (title.includes(q)) return 3;
+            // Tier 4: Other fields match
+            return 4;
+        };
+
+        return filtered.sort((a, b) => {
+            const rankA = getRank(a);
+            const rankB = getRank(b);
+            if (rankA !== rankB) return rankA - rankB;
+            return a.title.localeCompare(b.title);
+        });
     }, [items, itemSearch]);
 
     // Active item for telemetry display (either quantity tray item or keyboard focused item)
@@ -662,26 +704,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                             <div className="hidden lg:flex w-96 shrink-0 flex-col bg-white dark:bg-zinc-900 overflow-y-auto custom-scrollbar border-l border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-right-2 duration-200">
                                 <div className="flex flex-col h-full divide-y divide-zinc-100 dark:divide-zinc-800">
                                     {/* 1. Header Identity */}
-                                    <div className="p-4 bg-zinc-50/50 dark:bg-zinc-900/60 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="p-2 bg-orange-500 rounded-xl text-white shadow-md">
-                                                <Box className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-[10px] font-mono font-bold text-orange-500 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
-                                                #{String(selectedItemForQty.id).padStart(5, '0')}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight leading-snug">
-                                                {selectedItemForQty.title}
-                                            </h3>
-                                            <div className="flex items-center gap-2 mt-1 text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
-                                                <span>{selectedItemForQty.short_name || 'GENERIC SKU'}</span>
-                                                <span>•</span>
-                                                <span>{selectedItemForQty.company || 'DIRECT OEM'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                               
 
                                     {/* 2. Inventory Status */}
                                     <div className="p-4 space-y-3">
@@ -696,16 +719,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             const loosePcs = totalStock % packing;
 
                                             return (
-                                                <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2">
-                                                    <div className="flex items-baseline justify-between">
-                                                        <span className="text-[9px] font-bold uppercase text-zinc-400">Available Stock</span>
-                                                        <span className={cn("text-xl font-black font-mono", totalStock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
-                                                            {totalStock.toLocaleString()} Pcs
-                                                        </span>
-                                                    </div>
+                                                <div className="bg-zinc-50 dark:bg-zinc-950  rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2">
+
                                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-800">
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{fullCtn} CTN</span>
+                                                            <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{fullCtn} Full</span>
                                                             <span className="text-[8px] font-bold text-zinc-400 uppercase">Full Cartons</span>
                                                         </div>
                                                         <div className="flex flex-col">
@@ -721,7 +739,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     {/* 3. Pricing Tiers Matrix */}
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Pricing Tier Matrix</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Pricing T.P Matrix</span>
                                             {customerCategory && (
                                                 <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded uppercase">
                                                     Cat: Tier {customerCategory}
@@ -733,7 +751,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                 const tradePrice = toNumber(selectedItemForQty.trade_price);
                                                 let percentage = 0;
                                                 let calculatedPrice = tradePrice;
-                                                let label = num === 1 ? "Base TP" : `Tier ${num}`;
+                                                let label = num === 1 ? "Base TP" : `T.P ${num}`;
 
                                                 if (num !== 1) {
                                                     const priceKey = `pt${num}` as keyof Item;
@@ -803,12 +821,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     Rs {((toNumber(selectedItemForQty.trade_price) + toNumber(selectedItemForQty.retail)) / 2).toLocaleString()}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400 flex items-center gap-1">
-                                                    <MapPin className="w-3 h-3 text-orange-500" /> Shelf Location
-                                                </span>
-                                                <span className="font-bold text-zinc-700 dark:text-zinc-300 uppercase">{selectedItemForQty.shelf || 'LEDGER'}</span>
-                                            </div>
+                                           
                                         </div>
                                     </div>
 
@@ -821,7 +834,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2.5">
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className="text-[9px] font-bold uppercase text-zinc-400">Purchase Date</span>
-                                                <span className="font-bold text-zinc-800 dark:text-zinc-200">{selectedItemForQty.last_purchase_date || 'INITIAL_STOCK'}</span>
+                                                <span className="font-bold text-zinc-800 dark:text-zinc-200">{formatDate(selectedItemForQty.last_purchase_date)}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
                                                 <span className="text-[9px] font-bold uppercase text-zinc-400">Last Rate</span>
