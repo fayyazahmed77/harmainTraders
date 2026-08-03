@@ -253,33 +253,7 @@
 
         <!-- Totals -->
         <div class="totals-section border-top">
-            <div class="total-row clearfix bold">
-                <span class="total-label text-left">Items Dispatched :</span>
-                <span class="total-value">{{ $purchaseReturn->items->count() }}</span>
-            </div>
-
-            <div class="total-row clearfix">
-                <span class="total-label">Gross Reversal :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->gross_total, 2) }}</span>
-            </div>
-
-            <div class="total-row clearfix">
-                <span class="total-label">Discount Reclaim :-</span>
-                <span class="total-value">- {{ number_format($purchaseReturn->discount_total, 2) }}</span>
-            </div>
-
-            <div class="dashed-bottom" style="margin: 2px 0;"></div>
-
-            <div class="total-row clearfix bold">
-                <span class="total-label">Net Debit :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->net_total, 2) }}</span>
-            </div>
-
-            <div class="total-row clearfix">
-                <span class="total-label">Extra Discount :-</span>
-                <span class="total-value">- {{ number_format($purchaseReturn->extra_discount, 2) }}</span>
-            </div>
-
+          
             <div class="total-row clearfix bold">
                 <span class="total-label">Net Return Amount :-</span>
                 <span class="total-value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 2) }}</span>

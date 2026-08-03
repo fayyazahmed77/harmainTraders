@@ -630,6 +630,33 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     return totals.net > creditLimit;
   }, [creditLimit, totals]);
 
+  // Global Keyboard Shortcuts (F4 / Alt+C -> Checkout Dialog, F9 / Ctrl+Enter -> Finalize Invoice)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F4 or Alt+C: Toggle Checkout / Open Financial Payment Dialog
+      if (e.key === "F4" || (e.altKey && (e.key === "c" || e.key === "C"))) {
+        e.preventDefault();
+        const next = !isPayNow;
+        setIsPayNow(next);
+        if (next) {
+          setCheckoutDialogOpen(true);
+          setCashReceived(Math.round(totals.finalAmount));
+        }
+        return;
+      }
+
+      // F9 or Ctrl+Enter (when dialog not open): Finalize Invoice
+      if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !checkoutDialogOpen) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isPayNow, totals.finalAmount, checkoutDialogOpen]);
+
 
   // ───────────────────────────────────────────
   // Simple renderer / layout
@@ -1363,16 +1390,20 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                         )}
                       >
                         <Banknote size={14} />
-                        <span className="hidden sm:inline">{isPayNow ? "Checkout ON" : "Checkout"}</span>
+                        <span className="hidden sm:inline-flex items-center gap-1.5">
+                          <span>{isPayNow ? "Checkout ON" : "Checkout"}</span>
+                          <kbd className="px-1 py-0.2 text-[8px] font-mono bg-zinc-200/60 dark:bg-zinc-700/60 rounded">F4</kbd>
+                        </span>
                       </Button>
 
                       {/* Finalize Invoice Main Action */}
                       <Button
                         onClick={handleSave}
                         disabled={processing}
-                        className={`h-9 px-6 ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all`}
+                        className={`h-9 px-6 ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5`}
                       >
-                        {processing ? "Syncing..." : "Finalize Invoice"}
+                        <span>{processing ? "Syncing..." : "Finalize Invoice"}</span>
+                        <kbd className="px-1 py-0.2 text-[8px] font-mono bg-white/20 rounded border border-white/30">F9</kbd>
                       </Button>
 
                       {/* Toggle Sidebar Button */}

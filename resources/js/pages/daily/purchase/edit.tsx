@@ -635,6 +635,33 @@ export default function PurchaseEdit({
         return totals.net > creditLimit;
     }, [creditLimit, totals]);
 
+    // Global Keyboard Shortcuts (F4 / Alt+C -> Payment Settlement Dialog, F9 / Ctrl+Enter -> Update Purchase)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // F4 or Alt+C: Toggle / Open Payment Settlement Dialog
+            if (e.key === "F4" || (e.altKey && (e.key === "c" || e.key === "C"))) {
+                e.preventDefault();
+                const next = !isPayNow;
+                setIsPayNow(next);
+                if (next && paymentSplits.length === 0) {
+                    addPaymentSplit();
+                }
+                setShowPaymentDialog(true);
+                return;
+            }
+
+            // F9 or Ctrl+Enter (when dialog not open): Update Purchase
+            if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !showPaymentDialog) {
+                e.preventDefault();
+                handleSave();
+                return;
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isPayNow, paymentSplits.length, showPaymentDialog]);
+
     // ───────────────────────────────────────────
     // Simple renderer / layout
     // ───────────────────────────────────────────
@@ -1572,9 +1599,10 @@ export default function PurchaseEdit({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => setShowPaymentDialog(true)}
-                                                    className="h-8 w-full text-[9px] font-black uppercase tracking-widest text-orange-600 hover:text-orange-700 bg-orange-50/50 border-orange-200 dark:bg-orange-500/10 dark:border-orange-500/20"
+                                                    className="h-8 w-full text-[9px] font-black uppercase tracking-widest text-orange-600 hover:text-orange-700 bg-orange-50/50 border-orange-200 dark:bg-orange-500/10 dark:border-orange-500/20 flex items-center justify-center gap-1.5"
                                                 >
-                                                    Edit Payment Details
+                                                    <span>Edit Payment Details</span>
+                                                    <kbd className="px-1 py-0.2 text-[8px] font-mono bg-zinc-200/60 dark:bg-zinc-800 rounded">F4</kbd>
                                                 </Button>
                                             )}
                                         </div>

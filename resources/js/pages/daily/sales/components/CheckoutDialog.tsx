@@ -99,6 +99,49 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
 
+  // Auto fill remaining balance into last split row
+  const fillRemainingBalance = () => {
+    if (splits.length > 0 && remaining > 0) {
+      const lastRow = splits[splits.length - 1];
+      const currentVal = toNumber(lastRow.amount);
+      updateSplitRow(lastRow.id, 'amount', Number((currentVal + remaining).toFixed(2)));
+    }
+  };
+
+  // Keyboard Shortcuts inside Checkout Dialog
+  React.useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + Enter or Alt + S: Save & Finalize Invoice
+      if ((e.ctrlKey && e.key === "Enter") || (e.altKey && (e.key === "s" || e.key === "S"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        onCommit();
+        return;
+      }
+
+      // F2 or Alt + A: Add Split Payment Row
+      if (e.key === "F2" || (e.altKey && (e.key === "a" || e.key === "A"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        addSplitRow();
+        return;
+      }
+
+      // F7 or Alt + R: Fill Remaining Balance into active/last row
+      if (e.key === "F7" || (e.altKey && (e.key === "r" || e.key === "R"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        fillRemainingBalance();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, splits, remaining, onCommit, addSplitRow]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] md:max-w-[65vw] lg:max-w-[55vw] w-full bg-background border border-border shadow-2xl p-0 overflow-hidden rounded-2xl transition-all duration-300">
@@ -307,7 +350,10 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
             className="w-full h-12 rounded-xl border-dashed border-2 border-border bg-muted/20 text-muted-foreground hover:text-orange-500 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all flex items-center justify-center gap-2 group"
           >
             <Plus size={14} className="group-hover:scale-110 transition-transform" />
-            <span className="font-extrabold uppercase tracking-wider text-[9px]">Add Payment Method</span>
+            <span className="font-extrabold uppercase tracking-wider text-[9px] flex items-center gap-1.5">
+              <span>Add Payment Method</span>
+              <kbd className="px-1 py-0.2 text-[8px] font-mono bg-muted/60 rounded border border-border">F2</kbd>
+            </span>
           </Button>
         </div>
 
@@ -316,15 +362,17 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
-            className="h-11 flex-1 rounded-xl font-bold uppercase text-[9px] tracking-wider border-border bg-transparent text-muted-foreground hover:bg-muted"
+            className="h-11 flex-1 rounded-xl font-bold uppercase text-[9px] tracking-wider border-border bg-transparent text-muted-foreground hover:bg-muted flex items-center justify-center gap-1.5"
           >
-            Cancel
+            <span>Cancel</span>
+            <kbd className="px-1 py-0.2 text-[8px] font-mono bg-muted/60 rounded border border-border">Esc</kbd>
           </Button>
           <Button 
             onClick={onCommit}
-            className="h-11 flex-[2] rounded-xl font-extrabold uppercase text-[9px] tracking-wider bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md shadow-orange-500/10 active:scale-[0.98] transition-all"
+            className="h-11 flex-[2] rounded-xl font-extrabold uppercase text-[9px] tracking-wider bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-md shadow-orange-500/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            Save & Finalize Invoice
+            <span>Save & Finalize Invoice</span>
+            <kbd className="px-1.5 py-0.5 text-[8px] font-mono bg-white/20 rounded border border-white/30">Ctrl+Enter</kbd>
           </Button>
         </DialogFooter>
 

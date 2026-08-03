@@ -58,6 +58,25 @@ export const getItemBrandImage = (item: any) => {
     return item.companyAccount?.image_url || item.company_account?.image_url || (item.company_account?.image ? `/storage/${item.company_account.image}` : null);
 };
 
+export const toNum = (val: any): number => {
+    const n = Number(val);
+    return Number.isNaN(n) ? 0 : n;
+};
+
+export const getOfferItemRates = (offerItem: any) => {
+    if (!offerItem) return { cartonRate: 0, looseRate: 0, singleRate: 0 };
+    const packCtn = toNum(offerItem.pack_ctn);
+    const loosCtn = toNum(offerItem.loos_ctn);
+    const price = toNum(offerItem.price);
+    const packingQty = toNum(offerItem.items?.packing_qty || 1);
+
+    const cartonRate = packCtn > 0 ? packCtn : (price > 0 ? price : 0);
+    const looseRate = loosCtn > 0 ? loosCtn : (price > 0 && packingQty > 0 ? price / packingQty : 0);
+    const singleRate = price > 0 ? price : cartonRate;
+
+    return { cartonRate, looseRate, singleRate };
+};
+
 // --- Interfaces ---
 
 interface ItemImage {
@@ -87,6 +106,7 @@ interface OfferItem {
     price: number;
     scheme: string;
     items: Item;
+    offertype?: string;
 }
 
 interface Offer {
@@ -128,7 +148,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
 
     const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
     const [checkoutOpen, setCheckoutOpen] = useState(false);
-    const [successData, setSuccessData] = useState<{ invoice: string; customerCode: string; guestToken: string } | null>(null);
+    const [successData, setSuccessData] = useState<{ invoice: string; customerCode: string; guestToken: string; amount?: number } | null>(null);
 
     // Item Quantity Modal state
     const [selectedOfferItem, setSelectedOfferItem] = useState<OfferItem | null>(null);
@@ -192,9 +212,60 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
         });
     }, [allOfferItems, searchQuery, selectedCategory, selectedCompany]);
 
-    // Cart Helper Actions
-    const updateCartQty = (offerItem: OfferItem, field: 'qty_carton' | 'qty_pcs', value: number) => {
+    // Auto-fix cart prices from localStorage if old zero-price items were stored
+    useEffect(() => {
+        if (allOfferItems.length === 0) return;
         setCart(prev => {
+            let modified = false;
+            const updatedCart: Record<number, any> = {};
+
+            Object.entries(prev).forEach(([key, item]: [string, any]) => {
+                const numericKey = Number(key);
+                const offerItem = allOfferItems.find(it => it.id === numericKey);
+                if (offerItem) {
+                    const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
+                    const isGroupOffer = String(offerItem.offertype) === '1';
+                    const priceCarton = isGroupOffer ? cartonRate : singleRate;
+                    const pricePiece = isGroupOffer ? looseRate : (singleRate && offerItem.items?.packing_qty ? singleRate / offerItem.items.packing_qty : looseRate);
+                    
+                    const qtyCarton = toNum(item.qty_carton);
+                    const qtyPcs = toNum(item.qty_pcs);
+                    const subtotal = (qtyCarton * priceCarton) + (qtyPcs * pricePiece);
+
+                    if (item.price_carton !== priceCarton || item.subtotal !== subtotal) {
+                        modified = true;
+                    }
+
+                    updatedCart[numericKey] = {
+                        ...item,
+                        price_carton: priceCarton,
+                        price_piece: pricePiece,
+                        subtotal: subtotal
+                    };
+                } else {
+                    updatedCart[numericKey] = item;
+                }
+            });
+
+            return modified ? updatedCart : prev;
+        });
+    }, [allOfferItems]);
+
+    // Cart Helper Actions
+    const removeFromCart = (offerItemId: number | string) => {
+        setCart(prev => {
+            const next = { ...prev };
+            delete next[Number(offerItemId)];
+            return next;
+        });
+    };
+
+    const updateCartQty = (offerItem: OfferItem, field: 'qty_carton' | 'qty_pcs' | 'total_pcs', value: number) => {
+        setCart(prev => {
+            const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
+            const isGroupOffer = String(offerItem.offertype) === '1';
+            const packing = toNum(offerItem.items?.packing_qty || 1);
+
             const existing = prev[offerItem.id] || {
                 item_id: offerItem.item_id,
                 title: offerItem.items?.title,
@@ -202,25 +273,61 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 company: offerItem.items?.companyAccount?.title,
                 qty_carton: 0,
                 qty_pcs: 0,
-                price_carton: offerItem.pack_ctn || offerItem.price || 0,
-                price_piece: offerItem.loos_ctn || (offerItem.price && offerItem.items?.packing_qty ? offerItem.price / offerItem.items.packing_qty : 0),
+                price_carton: 0,
+                price_piece: 0,
                 scheme: offerItem.scheme,
                 image: offerItem.items?.primary_image_url || DEFAULT_IMAGE,
             };
 
-            const updated = { ...existing, [field]: Math.max(0, value) };
+            let qtyCarton = existing.qty_carton || 0;
+            let qtyPcs = existing.qty_pcs || 0;
 
-            // Packing normalization for loose items
-            const packing = offerItem.items?.packing_qty || 1;
-            if (packing > 1 && updated.qty_pcs >= packing) {
-                const extraCartons = Math.floor(updated.qty_pcs / packing);
-                updated.qty_carton = (updated.qty_carton || 0) + extraCartons;
-                updated.qty_pcs = updated.qty_pcs % packing;
+            if (field === 'total_pcs') {
+                const totalPcs = Math.max(0, value);
+                if (isGroupOffer && packing > 1) {
+                    qtyCarton = Math.floor(totalPcs / packing);
+                    qtyPcs = totalPcs % packing;
+                } else {
+                    qtyCarton = totalPcs;
+                    qtyPcs = 0;
+                }
+            } else if (field === 'qty_carton') {
+                qtyCarton = Math.max(0, value);
+            } else if (field === 'qty_pcs') {
+                qtyPcs = Math.max(0, value);
+                if (packing > 1 && qtyPcs >= packing) {
+                    qtyCarton += Math.floor(qtyPcs / packing);
+                    qtyPcs = qtyPcs % packing;
+                }
             }
 
-            const priceCarton = updated.price_carton || 0;
-            const pricePiece = updated.price_piece || 0;
-            updated.subtotal = (updated.qty_carton * priceCarton) + (updated.qty_pcs * pricePiece);
+            let priceCarton = 0;
+            let pricePiece = 0;
+            let subtotal = 0;
+
+            if (isGroupOffer && packing > 1) {
+                const ctnRatePerPc = cartonRate > 0 ? cartonRate : (singleRate > 0 ? singleRate : 0);
+                const looseRatePerPc = looseRate > 0 ? looseRate : (singleRate > 0 ? singleRate : 0);
+
+                priceCarton = ctnRatePerPc * packing;
+                pricePiece = looseRatePerPc;
+
+                subtotal = (qtyCarton * priceCarton) + (qtyPcs * pricePiece);
+            } else {
+                priceCarton = singleRate > 0 ? singleRate : cartonRate;
+                pricePiece = singleRate && packing > 1 ? singleRate / packing : priceCarton;
+
+                subtotal = (qtyCarton * priceCarton) + (qtyPcs * pricePiece);
+            }
+
+            const updated = {
+                ...existing,
+                qty_carton: qtyCarton,
+                qty_pcs: qtyPcs,
+                price_carton: priceCarton,
+                price_piece: pricePiece,
+                subtotal: subtotal,
+            };
 
             const newCart = { ...prev };
             if (updated.qty_carton === 0 && updated.qty_pcs === 0) {
@@ -246,10 +353,11 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
     };
 
     const handleSuccess = (invoice: string, customerCode: string, token: string) => {
-        setCart({});
+        const finalAmount = cartTotal;
         setCheckoutOpen(false);
         setCartDrawerOpen(false);
-        setSuccessData({ invoice, customerCode, guestToken: token });
+        setCart({});
+        setSuccessData({ invoice, customerCode, guestToken: token, amount: finalAmount });
     };
 
     const handleOpenItemModal = (offerItem: OfferItem) => {
@@ -500,9 +608,9 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                                         <p className="font-mono-jet text-xs uppercase font-bold">Your cart is empty</p>
                                     </div>
                                 ) : (
-                                    cartList.map(item => (
-                                        <div key={item.item_id} className="bg-surface-2 border border-border p-4 rounded-xl flex items-center gap-4">
-                                            <img src={item.image || DEFAULT_IMAGE} alt={item.title} className="w-14 h-14 object-cover rounded-lg bg-surface-1 border" />
+                                    Object.entries(cart).map(([offerItemId, item]) => (
+                                        <div key={offerItemId} className="bg-surface-2 border border-border p-4 rounded-xl flex items-center gap-4 relative group">
+                                            <img src={item.image || DEFAULT_IMAGE} alt={item.title} className="w-14 h-14 object-cover rounded-lg bg-surface-1 border shrink-0" />
                                             <div className="flex-1 min-w-0">
                                                 <h5 className="font-bold text-sm text-text-primary truncate">{item.title}</h5>
                                                 <p className="text-[10px] font-mono-jet text-text-muted uppercase">{item.company}</p>
@@ -510,9 +618,18 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                                                     {formatCurrency(item.subtotal)}
                                                 </div>
                                             </div>
-                                            <div className="text-right text-xs font-mono-jet space-y-1">
-                                                {item.qty_carton > 0 && <span className="block font-bold">{item.qty_carton} Ctn</span>}
-                                                {item.qty_pcs > 0 && <span className="block text-text-muted">{item.qty_pcs} Loose</span>}
+                                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                                <button
+                                                    onClick={() => removeFromCart(offerItemId)}
+                                                    title="Remove item"
+                                                    className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-500 transition-all flex items-center justify-center border border-rose-500/20 active:scale-95"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                                <div className="text-right text-xs font-mono-jet space-y-0.5">
+                                                    {item.qty_carton > 0 && <span className="block font-bold">{item.qty_carton} Ctn</span>}
+                                                    {item.qty_pcs > 0 && <span className="block text-text-muted">{item.qty_pcs} Loose</span>}
+                                                </div>
                                             </div>
                                         </div>
                                     ))
@@ -571,6 +688,8 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 invoice={successData?.invoice || null}
                 customerCode={successData?.customerCode || null}
                 guestToken={successData?.guestToken || null}
+                amount={successData?.amount}
+                formatCurrency={formatCurrency}
             />
 
             {/* Site Footer */}
@@ -590,13 +709,11 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
     const item = offerItem.items;
     const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
 
-    const cartonRate = offerItem.pack_ctn || offerItem.price || 0;
-    const looseRate = offerItem.loos_ctn || (offerItem.price && item?.packing_qty ? offerItem.price / item.packing_qty : 0);
+    const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
+    const qtyCtn = toNum(cartItem?.qty_carton);
+    const qtyPcs = toNum(cartItem?.qty_pcs);
 
-    const qtyCtn = cartItem?.qty_carton || 0;
-    const qtyPcs = cartItem?.qty_pcs || 0;
-
-    const isGroupOffer = (offerItem as any).offertype === '1';
+    const isGroupOffer = String((offerItem as any).offertype) === '1';
 
     return (
         <div 
@@ -677,9 +794,8 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
 }) {
     const item = offerItem.items;
     const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
-    const cartonRate = offerItem.pack_ctn || offerItem.price || 0;
-    const looseRate = offerItem.loos_ctn || (offerItem.price && item?.packing_qty ? offerItem.price / item.packing_qty : 0);
-    const isGroupOffer = (offerItem as any).offertype === '1';
+    const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
+    const isGroupOffer = String((offerItem as any).offertype) === '1';
 
     return (
         <div 

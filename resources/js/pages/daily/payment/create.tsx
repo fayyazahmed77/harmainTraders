@@ -38,7 +38,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
 // ───────────────────────────────────────────
@@ -168,6 +168,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, [selectedAccount]);
 
   const [accountSearch, setAccountSearch] = useState("");
+  const [selectedPartyIndex, setSelectedPartyIndex] = useState<number>(0);
+  const partyListRef = useRef<HTMLDivElement | null>(null);
   const [mobileAccOpen, setMobileAccOpen] = useState(false);
   const [desktopAccOpen, setDesktopAccOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
@@ -442,6 +444,59 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     setDesktopAccOpen(false);
   };
 
+  // Reset party selection index when search or modal state changes
+  useEffect(() => {
+    setSelectedPartyIndex(0);
+  }, [accountSearch, desktopAccOpen]);
+
+  // Global Keyboard Shortcuts (F2 -> Party Dialog, F4 / Alt+M -> Multi Pay, Arrows -> Dialog Nav)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F2: Open Party Dialog
+      if (e.key === "F2") {
+        e.preventDefault();
+        setDesktopAccOpen(true);
+        return;
+      }
+
+      // F4 or Alt+M: Toggle Multi Pay Switch
+      if (e.key === "F4" || (e.altKey && (e.key === "m" || e.key === "M"))) {
+        e.preventDefault();
+        setIsMultiPayment(prev => !prev);
+        return;
+      }
+
+      // Party Dialog Keyboard Navigation
+      if (desktopAccOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedPartyIndex(prev => (prev < filteredAccounts.length - 1 ? prev + 1 : prev));
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSelectedPartyIndex(prev => (prev > 0 ? prev - 1 : 0));
+        } else if (e.key === "Enter") {
+          if (filteredAccounts.length > 0 && selectedPartyIndex >= 0 && selectedPartyIndex < filteredAccounts.length) {
+            e.preventDefault();
+            handleAccountSelect(filteredAccounts[selectedPartyIndex].id);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [desktopAccOpen, filteredAccounts, selectedPartyIndex]);
+
+  // Auto-scroll highlighted party item into view
+  useEffect(() => {
+    if (desktopAccOpen && partyListRef.current) {
+      const activeEl = partyListRef.current.children[selectedPartyIndex] as HTMLElement;
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [selectedPartyIndex, desktopAccOpen]);
+
   const fetchBillDetail = (bill: Bill) => {
     setSelectedBillForDetail(bill);
     setDetailDialogOpen(true);
@@ -674,29 +729,36 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       let isValid = true;
       const cleanedSplits = splitPayments.map((p, idx) => {
         if (!p.payment_account_id) {
-          toast.error(`Row ${idx + 1}: Missing Ledger Account.`);
+          toast.error(`Row ${idx + 1}: Please select a Ledger Account.`);
           isValid = false;
-        }
-        if (p.amount <= 0) {
-          toast.error(`Row ${idx + 1}: Amount must be greater than 0.`);
-          isValid = false;
+          return p;
         }
 
-        const isCashAccount = paymentAccounts.find(a => a.id.toString() === p.payment_account_id)?.account_type?.name === 'Cash';
+        const account = paymentAccounts.find(a => a.id.toString() === p.payment_account_id.toString())
+                     || accounts.find(a => a.id.toString() === p.payment_account_id.toString());
+        const accTitle = account?.title || `Row ${idx + 1}`;
+        const accTypeName = (account?.account_type?.name || (account as any)?.type || "").toLowerCase();
+        const isCashAccount = accTypeName.includes('cash') && !accTypeName.includes('cheque');
         let method = p.payment_method;
 
         if (isCashAccount) {
           method = 'Cash';
-        } else {
-          if (!method || method === 'Cash') {
-            toast.error(`Row ${idx + 1}: Please select a valid Bank Method (e.g. Cheque, Online Transfer).`);
-            isValid = false;
-          }
+        } else if (!method || (method === 'Cash' && accTypeName.includes('bank'))) {
+          toast.error(`Row ${idx + 1} (${accTitle}): Please select a Payment Method.`);
+          isValid = false;
+          return p;
         }
 
-        if (method === 'Cheque' && !p.cheque_no && paymentType === 'PAYMENT') {
-          toast.error(`Row ${idx + 1}: Missing Cheque Number.`);
+        if (method === 'Cheque' && !p.cheque_no && !p.original_cheque_id) {
+          toast.error(`Row ${idx + 1} (${accTitle}): Please select or enter a Cheque Number.`);
           isValid = false;
+          return p;
+        }
+
+        if (toNum(p.amount) <= 0) {
+          toast.error(`Row ${idx + 1} (${accTitle}): Amount must be greater than 0.`);
+          isValid = false;
+          return p;
         }
 
         return { ...p, payment_method: method };
@@ -844,11 +906,12 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
       if (field === 'payment_account_id' && value) {
         const account = paymentAccounts.find(a => a.id.toString() === value);
-        if (account?.account_type?.name === 'Cheque in hand') {
+        const accTypeName = (account?.account_type?.name || "").toLowerCase();
+        if (accTypeName.includes('cheque in hand')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cheque', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
-        } else if (account?.account_type?.name === 'Bank') {
+        } else if (accTypeName.includes('bank')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: '', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
-        } else if (account?.account_type?.name === 'Cash') {
+        } else if (accTypeName.includes('cash')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cash', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         }
       }
@@ -906,20 +969,26 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <DialogTrigger asChild>
                         <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
                           <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
-                          <Search size={13} className="text-zinc-400 shrink-0 ml-1" />
+                          <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
+                            <Search size={13} className="text-zinc-400 shrink-0" />
+                          </div>
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
                         <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
-                          <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100">Select Party Account</DialogTitle>
+                          <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-between">
+                            <span>Select Party Account</span>
+                            <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
+                          </DialogTitle>
                           <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
                           <div className="pt-2">
-                            <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                            <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                           </div>
                         </DialogHeader>
-                        <div className="max-h-[50vh] overflow-auto py-2 px-2">
-                          {filteredAccounts.map(acc => (
-                            <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
+                        <div ref={partyListRef} className="max-h-[50vh] overflow-auto py-2 px-2">
+                          {filteredAccounts.map((acc, idx) => (
+                            <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${idx === selectedPartyIndex ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40 dark:bg-emerald-500/20' : t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
                               onClick={() => handleAccountSelect(acc.id)}>
                               <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
                                 <div className="flex items-center gap-2">
@@ -1278,6 +1347,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                         .filter(acc => {
                                           if (acc.id.toString() === selectedAccountId) return false;
                                           if (acc.id.toString() === row.payment_account_id) return true;
+                                          const isChequeInHand = acc.account_type?.name?.toLowerCase() === 'cheque in hand';
+                                          if (isChequeInHand) return true;
                                           return !splitPayments.some(p => p.id !== row.id && p.payment_account_id === acc.id.toString());
                                         })
                                         .map(acc => (
@@ -1292,16 +1363,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       <SelectValue placeholder="Method..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cash' ? (
+                                      {paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cash') ? (
                                         <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
-                                      ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Bank' ? (
+                                      ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('bank') ? (
                                         <>
                                           <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
-                                          {paymentType === 'PAYMENT' && (
-                                            <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
-                                          )}
+                                          <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                         </>
-                                      ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name === 'Cheque in hand' ? (
+                                      ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cheque in hand') ? (
                                         <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                       ) : (
                                         <>
@@ -1435,6 +1504,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi Pay</span>
+                      <kbd className="hidden sm:inline-block px-1 py-0.5 text-[8px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F4</kbd>
                       <Switch checked={isMultiPayment} onCheckedChange={setIsMultiPayment} className="scale-75" />
                     </div>
                     <SignalBadge text={isBankAccountSelected ? (paymentType === 'RECEIPT' ? 'WITHDRAWAL' : 'DEPOSIT') : paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
@@ -1945,6 +2015,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: ${t.scrollbarHover}; }
         `}</style>
+        <Toaster position="top-right" reverseOrder={false} containerStyle={{ zIndex: 99999 }} />
       </SidebarInset>
     </SidebarProvider>
   );

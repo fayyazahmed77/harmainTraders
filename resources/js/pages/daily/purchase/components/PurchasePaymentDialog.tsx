@@ -102,6 +102,49 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
     ? { label: "Overpaid", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-50 dark:bg-sky-500/10", border: "border-sky-200 dark:border-sky-500/20", dot: "bg-sky-500" }
     : { label: "Pending", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-200 dark:border-amber-500/20", dot: "bg-amber-500" };
 
+  // Auto fill remaining balance into last split row
+  const fillRemainingBalance = () => {
+    if (splits.length > 0 && remaining > 0) {
+      const lastRow = splits[splits.length - 1];
+      const currentVal = toNumber(lastRow.amount);
+      updateSplitRow(lastRow.id, 'amount', Number((currentVal + remaining).toFixed(2)));
+    }
+  };
+
+  // Keyboard Shortcuts inside Purchase Payment Dialog
+  React.useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + Enter or Alt + S: Process Disbursement
+      if ((e.ctrlKey && e.key === "Enter") || (e.altKey && (e.key === "s" || e.key === "S"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        onCommit();
+        return;
+      }
+
+      // F2 or Alt + A: Add Payment Source Row
+      if (e.key === "F2" || (e.altKey && (e.key === "a" || e.key === "A"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        addSplitRow();
+        return;
+      }
+
+      // F7 or Alt + R: Fill Remaining Balance into active/last row
+      if (e.key === "F7" || (e.altKey && (e.key === "r" || e.key === "R"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        fillRemainingBalance();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, splits, remaining, onCommit, addSplitRow]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[98vw] md:max-w-[80vw] lg:max-w-[70vw] w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-0 overflow-hidden rounded-xl">
@@ -368,7 +411,10 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
             <div className="w-4 h-4 rounded-full border border-current flex items-center justify-center group-hover:scale-110 transition-transform">
               <Plus size={9} strokeWidth={2.5} />
             </div>
-            <span className="text-[9px] font-black uppercase tracking-widest">Add Payment Source</span>
+            <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+              <span>Add Payment Source</span>
+              <kbd className="px-1 py-0.2 text-[8px] font-mono bg-zinc-200/60 dark:bg-zinc-800 rounded">F2</kbd>
+            </span>
           </button>
         </div>
 
@@ -384,23 +430,37 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
           )}>
             {isFullyPaid
               ? <><CheckCircle2 size={11} /><span>Rs {totalPaid.toLocaleString()} · All settled</span></>
-              : <><AlertCircle size={11} /><span>Remaining: Rs {remaining.toLocaleString()}</span></>
+              : (
+                <>
+                  <AlertCircle size={11} />
+                  <span>Remaining: Rs {remaining.toLocaleString()}</span>
+                  <button 
+                    type="button"
+                    onClick={fillRemainingBalance}
+                    className="ml-1 px-1.5 py-0.2 text-[8px] font-mono font-bold bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded border border-orange-500/30 hover:bg-orange-500/30 transition-all"
+                  >
+                    F7 Fill
+                  </button>
+                </>
+              )
             }
           </div>
 
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="h-9 px-5 text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+            className="h-9 px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5"
           >
-            Cancel
+            <span>Cancel</span>
+            <kbd className="px-1 py-0.2 text-[8px] font-mono bg-zinc-200/60 dark:bg-zinc-800 rounded">Esc</kbd>
           </Button>
 
           <Button
             onClick={onCommit}
             className="h-9 px-6 text-[10px] font-black uppercase tracking-wider bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow-md shadow-orange-500/20 active:scale-[0.97] transition-all flex items-center gap-2 border-none"
           >
-            Process Disbursement
+            <span>Process Disbursement</span>
+            <kbd className="px-1.5 py-0.5 text-[8px] font-mono bg-white/20 rounded border border-white/30">Ctrl+Enter</kbd>
             <ArrowRight size={13} strokeWidth={2.5} />
           </Button>
         </div>
