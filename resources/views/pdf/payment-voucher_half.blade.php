@@ -131,6 +131,7 @@
             padding: 2px 0;
             font-size: 8px;
             vertical-align: top;
+            border-bottom: 1px solid #000;
         }
 
         .remarks-section {
@@ -294,24 +295,24 @@
 <!-- Amount & Ledger Summary Band (Redesigned) -->
         <div class="amount-section" style="margin: 6px 0;  padding: 5px;">
             <div style="display: table; width: 100%; font-size: 8.5px; line-height: 1.4;">
+                <div style="display: table-row; color: #000000; font-size: 9px; font-weight: bold;">
+                    <div style="display: table-cell; text-align: left;">Total Amount:</div>
+                    <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum($totalActualPaid) }}</div>
+                </div>
                 <div style="display: table-row;">
                     <div style="display: table-cell; text-align: left; color: #000000;">Previous Balance:</div>
                     <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum(abs($previous_balance)) }} {{ $previous_balance < 0 ? '' : $orientation }}</div>
                 </div>
-                <div style="display: table-row;">
+                <!-- <div style="display: table-row;">
                     <div style="display: table-cell; text-align: left; color: #000000;">Gross Settlement:</div>
                     <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum($totalAmount) }}</div>
-                </div>
+                </div> -->
                 @if($totalDiscount > 0)
                     <div style="display: table-row; color: #000000;">
                         <div style="display: table-cell; text-align: left;">Discount (Adj):</div>
                         <div style="display: table-cell; text-align: right; font-weight: bold;">PKR {{ $fmtNum($totalDiscount) }}</div>
                     </div>
                 @endif
-                <div style="display: table-row; color: #000000; font-size: 9px; font-weight: bold;">
-                    <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1px dashed #aaaaaa;">Amount Received/Paid:</div>
-                    <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1px dashed #aaaaaa;">PKR {{ $fmtNum($totalActualPaid) }}</div>
-                </div>
                 <div style="display: table-row; font-size: 9px;">
                     <div style="display: table-cell; text-align: left; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">Net Balance:</div>
                     <div style="display: table-cell; text-align: right; padding-top: 2px; border-top: 1.5px solid #000000; font-weight: bold;">PKR {{ $fmtNum(abs($net_balance)) }} {{ $net_balance < 0 ? '' : $orientation }}</div>
@@ -344,18 +345,36 @@
 
         <!-- Signature Section -->
         <div class="signatures">
-            <div class="sig-row">
+            <div class="sig-row" style="margin-bottom: 6px;">
                 <div class="sig-col">
-                    <div style="height: 30px; font-weight: bold; font-size: 7.5px; text-align: center; width: 100%; margin-bottom: 3px; display: flex; align-items: flex-end; justify-content: center;">
+                    <div style="height: 18px; font-weight: bold; font-size: 7.5px; text-align: center; width: 100%; margin-bottom: 3px; display: flex; align-items: flex-end; justify-content: center;">
                         {{ $payment->created_by_user->name ?? 'Fayyaz Ahmed' }}
                     </div>
                     <div class="sig-line"></div>
                     <div>Prepared By</div>
                 </div>
                 <div class="sig-col">
-                    <div style="height: 30px; margin-bottom: 3px;">&nbsp;</div>
+                    &nbsp;
+                </div>
+            </div>
+            <div class="sig-row" style="margin-bottom: 6px;">
+                <div class="sig-col">
+                    &nbsp;
+                </div>
+                <div class="sig-col">
+                    <div style="height: 18px; margin-bottom: 3px;">&nbsp;</div>
                     <div class="sig-line"></div>
-                    <div>Authorised / Receiver</div>
+                    <div>Approved By</div>
+                </div>
+            </div>
+            <div class="sig-row">
+                <div class="sig-col">
+                    <div style="height: 18px; margin-bottom: 3px;">&nbsp;</div>
+                    <div class="sig-line"></div>
+                    <div>Received By</div>
+                </div>
+                <div class="sig-col">
+                    &nbsp;
                 </div>
             </div>
         </div>

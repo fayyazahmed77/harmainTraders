@@ -449,9 +449,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     setSelectedPartyIndex(0);
   }, [accountSearch, desktopAccOpen]);
 
-  // Global Keyboard Shortcuts (F2 -> Party Dialog, F4 / Alt+M -> Multi Pay, Arrows -> Dialog Nav)
+  // Global Keyboard Shortcuts (F1 -> Add Split Method, F2 -> Party Dialog, F4 / Alt+M -> Multi Pay, Arrows -> Dialog Nav)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // F1: Add Split Method
+      if (e.key === "F1") {
+        e.preventDefault();
+        setIsMultiPayment(true);
+        addSplitRow();
+        return;
+      }
+
       // F2: Open Party Dialog
       if (e.key === "F2") {
         e.preventDefault();
@@ -860,7 +868,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 };
 
   const addSplitRow = () => {
-    setSplitPayments([...splitPayments, { id: Date.now(), payment_account_id: "", amount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
+    setSplitPayments(prev => [...prev, { id: Date.now(), payment_account_id: "", amount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
   };
 
   const removeSplitRow = (id: number) => {
@@ -1315,8 +1323,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                             {selectedAccountId ? `${accounts.find(a => a.id.toString() === selectedAccountId)?.title} (${accounts.find(a => a.id.toString() === selectedAccountId)?.account_type?.name})` : "No Party Selected"}
                           </span>
                         </div>
-                        <Button onClick={addSplitRow} size="sm" className={`${t.gradient} text-white font-bold text-[10px] uppercase h-7.5 px-2.5`}>
-                          <Plus size={13} className="mr-1" /> Add Split Method
+                        <Button onClick={addSplitRow} size="sm" className={`${t.gradient} text-white font-bold text-[10px] uppercase h-7.5 px-2.5 flex items-center gap-1.5`}>
+                          <Plus size={13} />
+                          <span>Add Split Method</span>
+                          <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold text-white/90 bg-black/20 rounded border border-white/20">F1</kbd>
                         </Button>
                       </div>
 
