@@ -949,188 +949,135 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
         <main className="flex-1 overflow-auto md:overflow-hidden p-3 md:py-4 md:px-6 flex flex-col gap-4 scroll-smooth">
 
-          {/* Control Header (Desktop Only - Full Width - Single Line Guaranteed) */}
-          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block shrink-0">
-            <Card className={`p-3 md:py-3 md:px-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
-              <div className="flex items-end justify-between flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-0.5">
-                {/* 1. Entry Date */}
-                <div className="w-32 xl:w-36 shrink-0">
-                  <TechLabel label="Entry Date" icon={CalendarIcon}>
-                    <Popover open={calOpen} onOpenChange={setCalOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
-                          <span className="truncate">{fmtDate(date)}</span>
-                          <CalendarIcon size={13} className="text-zinc-400 shrink-0" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                        <Calendar mode="single" selected={parseLocalDate(date)} onSelect={(d) => { if (d) { setDate(formatLocalDate(d)); setCalOpen(false); } }} />
-                      </PopoverContent>
-                    </Popover>
-                  </TechLabel>
-                </div>
-
-                {/* 2. Ledger Party */}
-                <div className="flex-1 min-w-[160px] max-w-[320px]">
-                  <TechLabel label="Ledger Party" icon={UserIcon}>
-                    <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
-                          <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
-                          <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
-                            <Search size={13} className="text-zinc-400 shrink-0" />
-                          </div>
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
-                        <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
-                          <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-between">
-                            <span>Select Party Account</span>
-                            <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
-                          </DialogTitle>
-                          <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
-                          <div className="pt-2">
-                            <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                          </div>
-                        </DialogHeader>
-                        <div ref={partyListRef} className="max-h-[50vh] overflow-auto py-2 px-2">
-                          {filteredAccounts.map((acc, idx) => (
-                            <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${idx === selectedPartyIndex ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40 dark:bg-emerald-500/20' : t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
-                              onClick={() => handleAccountSelect(acc.id)}>
-                              <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
-                                  <span className="text-zinc-800 dark:text-zinc-200 truncate">{acc.title}</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 block tracking-tighter">Balance</span>
-                                  <span className={`text-xs font-black tracking-tighter ${typeof (acc as any).current_balance !== 'undefined' ? ((acc as any).current_balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-zinc-500'}`}>
-                                    {typeof (acc as any).current_balance !== 'undefined' ? Math.abs((acc as any).current_balance).toLocaleString('en-US', {minimumFractionDigits: 2}) + ((acc as any).current_balance < 0 ? ' CR' : ' DR') : "---"}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex justify-start pl-3.5">
-                                <div
-                                  className={cn(
-                                    "text-[9px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
-                                    (() => {
-                                      const name = acc.account_type?.name?.toLowerCase() || "";
-                                      if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-                                      if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
-                                      if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
-                                      return "text-zinc-400 dark:text-zinc-500 opacity-40";
-                                    })()
-                                  )}
-                                >
-                                  {acc.account_type?.name || "---"}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                          {filteredAccounts.length === 0 && (
-                            <div className="p-8 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
-                              No accounts found matching "{accountSearch}"
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TechLabel>
-                </div>
-
-                {/* 3. Payout Routing */}
-                <div className="w-36 xl:w-40 shrink-0">
-                  <TechLabel label="Payout Routing" icon={Navigation}>
-                    <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
-                      <SelectTrigger className={cn(
-                        `h-9 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300 px-2.5`,
-                        paymentType === 'RECEIPT' 
-                          ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
-                          : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
-                      )}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
-                          {isBankAccountSelected ? "WITHDRAWAL (IN)" : "RECEIPT (IN)"}
-                        </SelectItem>
-                        <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
-                          {isBankAccountSelected ? "DEPOSIT (OUT)" : "PAYMENT (OUT)"}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TechLabel>
-                </div>
-
-                {/* 4. Ref */}
-                <div className="w-14 shrink-0">
-                  <TechLabel label="Ref" icon={Hash}>
-                    <div className="h-9 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{selectedAccountId || '---'}</div>
-                  </TechLabel>
-                </div>
-
-                {/* Vertical Separator */}
-                <div className="w-px h-8 bg-zinc-200 dark:bg-zinc-800 shrink-0 self-end mb-1 mx-1" />
-
-                {/* 5. Total Sales / Purchases / In */}
-                <div className="shrink-0 text-right">
-                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
-                    {isBankAccountSelected ? "Total In" : (paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases")}
-                  </div>
-                  <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-zinc-800 dark:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-800/70 rounded-md border border-zinc-200/60 dark:border-zinc-800/60 whitespace-nowrap">
-                    Rs {totalSalesPurchases.toLocaleString()}
-                  </div>
-                </div>
-
-                {/* 6. Discount (Adj) */}
-                {((totalDiscountParty > 0) || (discount > 0)) && (
-                  <div className="shrink-0 text-right">
-                    <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">Discount (Adj)</div>
-                    <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md border border-amber-500/20 whitespace-nowrap">
-                      Rs {(totalDiscountParty + (discount || 0)).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-
-                {/* 7. Total Received / Paid / Out */}
-                <div className="shrink-0 text-right">
-                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
-                    {isBankAccountSelected ? "Total Out" : (paymentType === 'RECEIPT' ? "Total Received" : "Total Paid")}
-                  </div>
-                  <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-zinc-800 dark:text-zinc-200 bg-zinc-100/70 dark:bg-zinc-800/70 rounded-md border border-zinc-200/60 dark:border-zinc-800/60 whitespace-nowrap">
-                    Rs {totalReceivedPaid.toLocaleString()}
-                  </div>
-                </div>
-
-                {/* 8. Total Balance / Available */}
-                <div className="shrink-0 text-right">
-                  <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">
-                    {isBankAccountSelected ? "Total Available" : "Total Balance"}
-                  </div>
-                  <div className={cn("h-9 px-3 flex items-center justify-end font-mono text-xs font-black rounded-md border whitespace-nowrap", isBankAccountSelected ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20")}>
-                    Rs {totalBalance.toLocaleString()}
-                  </div>
-                </div>
-
-                {/* 9. Advance Paid */}
-                {!isBankAccountSelected && advancePaid > 0 && (
-                  <div className="shrink-0 text-right">
-                    <div className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 dark:text-zinc-500 mb-0.5">Advance Paid</div>
-                    <div className="h-9 px-3 flex items-center justify-end font-mono text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-md border border-emerald-500/20 whitespace-nowrap">
-                      Rs {advancePaid.toLocaleString()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </motion.div>
-
           {/* Main Layout Split: Workspace & Right Sidebar */}
           <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-5 md:overflow-hidden">
 
             {/* ── WORKSPACE ── */}
             <div className="flex-1 flex flex-col gap-4 md:gap-4 md:overflow-hidden">
+
+              {/* Control Header (Desktop Only - Width till Ledger Manifest) */}
+              <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block shrink-0">
+                <Card className={`p-3 md:py-3 md:px-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
+                  <div className="flex items-end justify-start flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-0.5">
+                    {/* 1. Entry Date */}
+                    <div className="w-32 xl:w-36 shrink-0">
+                      <TechLabel label="Entry Date" icon={CalendarIcon}>
+                        <Popover open={calOpen} onOpenChange={setCalOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                              <span className="truncate">{fmtDate(date)}</span>
+                              <CalendarIcon size={13} className="text-zinc-400 shrink-0" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                            <Calendar mode="single" selected={parseLocalDate(date)} onSelect={(d) => { if (d) { setDate(formatLocalDate(d)); setCalOpen(false); } }} />
+                          </PopoverContent>
+                        </Popover>
+                      </TechLabel>
+                    </div>
+
+                    {/* 2. Ledger Party */}
+                    <div className="flex-1 min-w-[160px] max-w-[320px]">
+                      <TechLabel label="Ledger Party" icon={UserIcon}>
+                        <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                              <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
+                                <Search size={13} className="text-zinc-400 shrink-0" />
+                              </div>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
+                            <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
+                              <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-between">
+                                <span>Select Party Account</span>
+                                <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
+                              </DialogTitle>
+                              <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
+                              <div className="pt-2">
+                                <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                              </div>
+                            </DialogHeader>
+                            <div ref={partyListRef} className="max-h-[50vh] overflow-auto py-2 px-2">
+                              {filteredAccounts.map((acc, idx) => (
+                                <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${idx === selectedPartyIndex ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40 dark:bg-emerald-500/20' : t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
+                                  onClick={() => handleAccountSelect(acc.id)}>
+                                  <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
+                                      <span className="text-zinc-800 dark:text-zinc-200 truncate">{acc.title}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 block tracking-tighter">Balance</span>
+                                      <span className={`text-xs font-black tracking-tighter ${typeof (acc as any).current_balance !== 'undefined' ? ((acc as any).current_balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-zinc-500'}`}>
+                                        {typeof (acc as any).current_balance !== 'undefined' ? Math.abs((acc as any).current_balance).toLocaleString('en-US', {minimumFractionDigits: 2}) + ((acc as any).current_balance < 0 ? ' CR' : ' DR') : "---"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-start pl-3.5">
+                                    <div
+                                      className={cn(
+                                        "text-[9px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
+                                        (() => {
+                                          const name = acc.account_type?.name?.toLowerCase() || "";
+                                          if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+                                          if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+                                          if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
+                                          return "text-zinc-400 dark:text-zinc-500 opacity-40";
+                                        })()
+                                      )}
+                                    >
+                                      {acc.account_type?.name || "---"}
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                              {filteredAccounts.length === 0 && (
+                                <div className="p-8 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                                  No accounts found matching "{accountSearch}"
+                                </div>
+                              )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </TechLabel>
+                    </div>
+
+                    {/* 3. Payout Routing */}
+                    <div className="w-36 xl:w-40 shrink-0">
+                      <TechLabel label="Payout Routing" icon={Navigation}>
+                        <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
+                          <SelectTrigger className={cn(
+                            `h-9 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300 px-2.5`,
+                            paymentType === 'RECEIPT' 
+                              ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                              : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
+                              {isBankAccountSelected ? "WITHDRAWAL (IN)" : "RECEIPT (IN)"}
+                            </SelectItem>
+                            <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
+                              {isBankAccountSelected ? "DEPOSIT (OUT)" : "PAYMENT (OUT)"}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TechLabel>
+                    </div>
+
+                    {/* 4. Ref */}
+                    <div className="w-14 shrink-0">
+                      <TechLabel label="Ref" icon={Hash}>
+                        <div className="h-9 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{selectedAccountId || '---'}</div>
+                      </TechLabel>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
 
             {/* Ledger Manifest OR Inline Multi-Method Payment Details */}
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="flex-1 min-h-0 flex flex-col md:overflow-hidden">
@@ -1267,13 +1214,13 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <div className="bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-4 flex-shrink-0">
                         <div className="flex gap-4">
                           <div className="space-y-0.5">
-                            <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Selected Entries</div>
+                            <div className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Selected Entries</div>
                             <div className="text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">{selectedBillIds.size} / {unpaidBills.length}</div>
                           </div>
                           <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
                           <div className="space-y-0.5">
-                            <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Billed Outstanding</div>
-                            <div className="text-xs font-mono font-black text-zinc-500">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
+                            <div className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Billed Outstanding</div>
+                            <div className="text-xs font-mono font-black text-zinc-700">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
                           </div>
                         </div>
 

@@ -11,7 +11,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, FileText, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface OrderItem {
@@ -91,12 +91,21 @@ export default function SupplierOrderShow({ order }: ShowProps) {
                   <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-0.5">Created on {order.order_date}</p>
                 </div>
               </div>
-              <Button 
-                onClick={() => window.open(`/admin/supplier-order/${order.id}/print`, '_blank')}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold tracking-widest uppercase text-xs gap-2"
-              >
-                <Printer size={14} /> Print Order
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => window.open(`/admin/supplier-order/${order.id}/print?format=big`, '_blank')}
+                  variant="outline"
+                  className="border-emerald-600/40 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-bold tracking-widest uppercase text-xs gap-2"
+                >
+                  <FileText size={14} /> A4 Print
+                </Button>
+                <Button 
+                  onClick={() => window.open(`/admin/supplier-order/${order.id}/print?format=small`, '_blank')}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold tracking-widest uppercase text-xs gap-2 shadow-sm"
+                >
+                  <Printer size={14} /> Thermal Print
+                </Button>
+              </div>
             </div>
 
             {/* Meta Info */}

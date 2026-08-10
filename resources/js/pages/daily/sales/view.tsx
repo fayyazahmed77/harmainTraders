@@ -479,15 +479,14 @@ export default function View({ sale }: Props) {
                                                         <td className="px-3 py-3.5">
                                                             <div className="min-w-0">
                                                                 <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[320px]">{it.item?.title}</p>
-                                                                <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_carton}</td>
-                                                        <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
+                                                        <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">{it.qty_carton}</td>
+                                                        <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">{it.qty_pcs}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
                                                             {it.item?.retail ? formatCurrency(it.item.retail).replace('PKR', '').trim() : "0.00"}
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">
+                                                        <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
                                                             {formatCurrency(it.trade_price).replace('PKR', '').trim()}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right font-mono text-rose-500">

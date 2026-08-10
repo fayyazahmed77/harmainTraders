@@ -66,7 +66,7 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
 
     const isGroupOffer = String(offerItem.offertype) === '1';
     const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
-    const packingQty = toNum(item?.packing_qty || 1);
+    const packingQty = toNum(item?.packing_size || item?.packing_qty || 1);
 
     const qtyCtn = toNum(cartItem?.qty_carton);
     const qtyPcs = toNum(cartItem?.qty_pcs);
@@ -144,7 +144,7 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
                     {/* Content Section */}
                     <div className="p-3 sm:p-4 space-y-3 sm:space-y-3.5">
                         {/* Price Cards */}
-                        {isGroupOffer ? (
+                        {isGroupOffer && packingQty > 1 ? (
                             <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                                 <div className={`p-2 sm:p-2.5 rounded-xl border transition-all ${totalPcs >= packingQty ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface-2/60 border-border'}`}>
                                     <span className="text-[8px] sm:text-[9px] font-mono-jet font-bold text-text-muted uppercase">
@@ -173,13 +173,13 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
                         ) : (
                             <div className="p-2.5 sm:p-3 bg-surface-2/60 rounded-xl border border-border text-center">
                                 <span className="text-[8px] sm:text-[9px] font-mono-jet font-bold text-amber uppercase">
-                                    Special Offer Rate
+                                    Single Piece Rate
                                 </span>
                                 <div className="text-lg sm:text-xl font-display font-black text-text-primary mt-0.5">
-                                    {formatCurrency(singleRate)}
+                                    {formatCurrency(looseRate || singleRate || cartonRate)} <span className="text-xs font-normal text-text-muted">/ pc</span>
                                 </div>
                                 <span className="text-[8px] sm:text-[9px] font-mono-jet font-bold text-text-muted uppercase mt-0.5">
-                                    Offer Price per Unit
+                                    Price Per Piece
                                 </span>
                             </div>
                         )}
@@ -222,7 +222,7 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
                                         Order Quantity
                                     </span>
                                     <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary truncate">
-                                        {unitMode === 'ctn' ? `Full Cartons (${packingQty} pcs/ctn)` : `Total Pieces (${packingQty} pcs/ctn)`}
+                                        {packingQty > 1 ? (unitMode === 'ctn' ? `Full Cartons (${packingQty} pcs/ctn)` : `Total Pieces (${packingQty} pcs/ctn)`) : `Total Pieces`}
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-[36px_1fr_36px] sm:grid-cols-[40px_1fr_40px] gap-2 items-center w-full">

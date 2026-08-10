@@ -259,12 +259,11 @@ export default function View({ returnData }: Props) {
                                                     <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
                                                     <td className="px-3 py-3.5">
                                                         <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[300px]">{it.item?.title}</p>
-                                                        <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-mono mt-0.5 font-bold">Code: {it.item?.code || "N/A"} • Pk: {it.item?.packing_qty || 1}</p>
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400 border-r border-zinc-100 dark:border-zinc-800/40">{it.qty_carton}</td>
-                                                    <td className="px-3 py-3.5 text-center font-mono text-zinc-500 dark:text-zinc-400">{it.qty_pcs}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">{it.item?.retail ? fmt(it.item.retail) : "0.00"}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-zinc-700 dark:text-zinc-300">{fmt(it.trade_price)}</td>
+                                                    <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold border-r border-zinc-100 dark:border-zinc-800/40">{it.qty_carton}</td>
+                                                    <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">{it.qty_pcs}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{it.item?.retail ? fmt(it.item.retail) : "0.00"}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{fmt(it.trade_price)}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-rose-500">{dp > 0 ? dp.toFixed(2) : "0.00"}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
                                                     <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>

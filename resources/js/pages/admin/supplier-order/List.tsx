@@ -11,7 +11,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
-import { Eye, Printer, PackageSearch } from "lucide-react";
+import { Eye, Printer, FileText, PackageSearch } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -134,21 +135,48 @@ export default function SupplierOrdersList({ orders }: ListProps) {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex gap-2 justify-end">
-                              <Link href={`/admin/supplier-order/${order.id}/show`}>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
-                                  <Eye size={16} />
-                                </Button>
-                              </Link>
-                              <Button 
-                                onClick={() => window.open(`/admin/supplier-order/${order.id}/print`, '_blank')}
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8 text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                              >
-                                <Printer size={16} />
-                              </Button>
-                            </div>
+                            <TooltipProvider>
+                              <div className="flex gap-1 justify-end">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Link href={`/admin/supplier-order/${order.id}/show`}>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40">
+                                        <Eye size={16} />
+                                      </Button>
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top"><p className="text-[11px] font-bold">View Order</p></TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      onClick={() => window.open(`/admin/supplier-order/${order.id}/print?format=big`, '_blank')}
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                    >
+                                      <FileText size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top"><p className="text-[11px] font-bold">A4 Print</p></TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      onClick={() => window.open(`/admin/supplier-order/${order.id}/print?format=small`, '_blank')}
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                                    >
+                                      <Printer size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top"><p className="text-[11px] font-bold">Thermal Print</p></TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))

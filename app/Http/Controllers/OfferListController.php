@@ -137,10 +137,17 @@ class OfferListController extends Controller implements HasMiddleware
 
     public function destroy($id)
     {
-        $offer = PriceOfferTo::findOrFail($id);
-        $offer->items()->delete();
-        $offer->delete();
-        return redirect()->back()->with('success', 'Offer deleted successfully');
+        DB::beginTransaction();
+        try {
+            $offer = PriceOfferTo::findOrFail($id);
+            $offer->items()->delete();
+            $offer->delete();
+            DB::commit();
+            return redirect()->back()->with('success', 'Offer deleted successfully');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Failed to delete offer: ' . $e->getMessage());
+        }
     }
 
     public function toggleLive($id)

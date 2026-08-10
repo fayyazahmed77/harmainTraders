@@ -967,120 +967,121 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
               </Card>
             </div>
 
-            {/* Control Header (Desktop Only) */}
-            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block">
-              <Card className={`p-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-12 gap-4 items-end relative overflow-hidden`}>
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${t.gradient}`} />
+            {/* Control Header (Desktop Only - Width till Ledger Manifest) */}
+            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block shrink-0">
+              <Card className={`p-3 md:py-3 md:px-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
+                <div className="flex items-end justify-start flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-0.5">
+                  {/* 1. Entry Date */}
+                  <div className="w-32 xl:w-36 shrink-0">
+                    <TechLabel label="Entry Date" icon={CalendarIcon}>
+                      <Popover open={calOpen} onOpenChange={setCalOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                            <span className="truncate">{fmtDate(date)}</span>
+                            <CalendarIcon size={13} className="text-zinc-400 shrink-0" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
+                          <Calendar mode="single" selected={parseLocalDate(date)} onSelect={(d) => { if (d) { setDate(formatLocalDate(d)); setCalOpen(false); } }} />
+                        </PopoverContent>
+                      </Popover>
+                    </TechLabel>
+                  </div>
 
-                <div className="col-span-3">
-                  <TechLabel label="Entry Date" icon={CalendarIcon}>
-                    <Popover open={calOpen} onOpenChange={setCalOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
-                          {fmtDate(date)}
-                          <CalendarIcon size={14} className="text-zinc-400" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                        <Calendar mode="single" selected={parseLocalDate(date)} onSelect={(d) => { if (d) { setDate(formatLocalDate(d)); setCalOpen(false); } }} />
-                      </PopoverContent>
-                    </Popover>
-                  </TechLabel>
-                </div>
-
-                <div className="col-span-5">
-                  <TechLabel label="Ledger Party" icon={UserIcon}>
-                    <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen} >
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-black text-sm text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
-                          <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
-                          <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
-                            <Search size={14} className="text-zinc-400" />
-                          </div>
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
-                        <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
-                          <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-between">
-                            <span>Select Party Account</span>
-                            <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
-                          </DialogTitle>
-                          <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
-                          
-                          {/* Category Filter Pills */}
-                          <div className="flex items-center gap-1.5 pt-3 pb-1 overflow-x-auto custom-scrollbar">
-                            {["ALL", "CUSTOMERS", "SUPPLIERS", "BANKS", "OTHERS"].map((cat) => (
-                              <button
-                                key={cat}
-                                onClick={() => setSelectedCategory(cat)}
-                                className={cn(
-                                  "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all border",
-                                  selectedCategory === cat
-                                    ? `${t.btnBg} text-white shadow-sm border-transparent`
-                                    : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                                )}
-                              >
-                                {cat}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="pt-2">
-                            <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                          </div>
-                        </DialogHeader>
-                        <div ref={partyListRef} className="max-h-[50vh] overflow-auto py-2 px-2">
-                          {filteredAccounts.map((acc, idx) => (
-                            <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${idx === selectedPartyIndex ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40 dark:bg-emerald-500/20' : t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
-                              onClick={() => handleAccountSelect(acc.id)}>
-                              <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
-                                  <span className="text-zinc-800 dark:text-zinc-200 truncate">{acc.title}</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 block tracking-tighter">Balance</span>
-                                  <span className={`text-xs font-black tracking-tighter ${typeof (acc as any).current_balance !== 'undefined' ? ((acc as any).current_balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-zinc-500'}`}>
-                                    {typeof (acc as any).current_balance !== 'undefined' ? Math.abs((acc as any).current_balance).toLocaleString('en-US', {minimumFractionDigits: 2}) + ((acc as any).current_balance < 0 ? ' CR' : ' DR') : "---"}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex justify-start pl-3.5">
-                                <div
+                  {/* 2. Ledger Party */}
+                  <div className="flex-1 min-w-[160px] max-w-[320px]">
+                    <TechLabel label="Ledger Party" icon={UserIcon}>
+                      <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen} >
+                        <DialogTrigger asChild>
+                          <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                            <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
+                              <Search size={13} className="text-zinc-400 shrink-0" />
+                            </div>
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-xl p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl">
+                          <DialogHeader className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 rounded-t-lg">
+                            <DialogTitle className="text-sm font-bold uppercase tracking-widest text-zinc-800 dark:text-zinc-100 flex items-center justify-between">
+                              <span>Select Party Account</span>
+                              <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
+                            </DialogTitle>
+                            <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
+                            
+                            {/* Category Filter Pills */}
+                            <div className="flex items-center gap-1.5 pt-3 pb-1 overflow-x-auto custom-scrollbar">
+                              {["ALL", "CUSTOMERS", "SUPPLIERS", "BANKS", "OTHERS"].map((cat) => (
+                                <button
+                                  key={cat}
+                                  onClick={() => setSelectedCategory(cat)}
                                   className={cn(
-                                    "text-[9px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
-                                    (() => {
-                                      const name = acc.account_type?.name?.toLowerCase() || "";
-                                      if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-                                      if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
-                                      if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
-                                      return "text-zinc-400 dark:text-zinc-500 opacity-40";
-                                    })()
+                                    "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all border",
+                                    selectedCategory === cat
+                                      ? `${t.btnBg} text-white shadow-sm border-transparent`
+                                      : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
                                   )}
                                 >
-                                  {acc.account_type?.name || "---"}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                          {filteredAccounts.length === 0 && (
-                            <div className="p-8 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
-                              No accounts found matching "{accountSearch}"
+                                  {cat}
+                                </button>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TechLabel>
-                </div>
 
-                <div className="col-span-4 flex items-end gap-3">
-                  <div className="flex-1">
+                            <div className="pt-2">
+                              <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
+                            </div>
+                          </DialogHeader>
+                          <div ref={partyListRef} className="max-h-[50vh] overflow-auto py-2 px-2">
+                            {filteredAccounts.map((acc, idx) => (
+                              <button key={acc.id} className={`w-full text-left px-3 py-2 rounded-md mb-1 text-xs font-bold uppercase tracking-widest ${idx === selectedPartyIndex ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40 dark:bg-emerald-500/20' : t.bgHover} transition-colors flex flex-col group border border-transparent ${t.borderHoverAlpha}`}
+                                onClick={() => handleAccountSelect(acc.id)}>
+                                <div className="flex justify-between items-center w-full mb-1 border-b border-zinc-100 dark:border-zinc-800/50 pb-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ${t.groupHoverBg}`} />
+                                    <span className="text-zinc-800 dark:text-zinc-200 truncate">{acc.title}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[9px] font-mono text-zinc-500 dark:text-zinc-400 block tracking-tighter">Balance</span>
+                                    <span className={`text-xs font-black tracking-tighter ${typeof (acc as any).current_balance !== 'undefined' ? ((acc as any).current_balance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400') : 'text-zinc-500'}`}>
+                                      {typeof (acc as any).current_balance !== 'undefined' ? Math.abs((acc as any).current_balance).toLocaleString('en-US', {minimumFractionDigits: 2}) + ((acc as any).current_balance < 0 ? ' CR' : ' DR') : "---"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex justify-start pl-3.5">
+                                  <div
+                                    className={cn(
+                                      "text-[9px] lowercase font-bold tracking-tight px-1.5 py-0.5 rounded-sm transition-colors",
+                                      (() => {
+                                        const name = acc.account_type?.name?.toLowerCase() || "";
+                                        if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+                                        if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+                                        if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
+                                        return "text-zinc-400 dark:text-zinc-500 opacity-40";
+                                      })()
+                                    )}
+                                  >
+                                    {acc.account_type?.name || "---"}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                            {filteredAccounts.length === 0 && (
+                              <div className="p-8 text-center text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                                No accounts found matching "{accountSearch}"
+                              </div>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TechLabel>
+                  </div>
+
+                  {/* 3. Payout Routing */}
+                  <div className="w-36 xl:w-40 shrink-0">
                     <TechLabel label="Payout Routing" icon={Navigation}>
                       <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
                         <SelectTrigger className={cn(
-                          `h-10 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300`,
+                          `h-9 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300 px-2.5`,
                           paymentType === 'RECEIPT' 
                             ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
                             : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
@@ -1088,15 +1089,21 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">RECEIPT (IN/CR)</SelectItem>
-                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">PAYMENT (OUT/DR)</SelectItem>
+                          <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
+                            {isBankAccountSelected ? "WITHDRAWAL (IN)" : "RECEIPT (IN)"}
+                          </SelectItem>
+                          <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
+                            {isBankAccountSelected ? "DEPOSIT (OUT)" : "PAYMENT (OUT)"}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </TechLabel>
                   </div>
-                  <div className="w-24">
+
+                  {/* 4. Voucher No */}
+                  <div className="w-28 shrink-0">
                     <TechLabel label="Voucher No" icon={Hash}>
-                      <div className="h-10 flex items-center justify-center font-mono text-[10px] font-black bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md uppercase border border-zinc-200 dark:border-zinc-700">{payment.voucher_no}</div>
+                      <div className="h-9 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{payment.voucher_no}</div>
                     </TechLabel>
                   </div>
                 </div>
@@ -1133,13 +1140,13 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                               <th className="p-4 text-left border-b border-zinc-100 dark:border-zinc-800 w-10">
                                 <Checkbox checked={unpaidBills.length > 0 && selectedBillIds.size === unpaidBills.length} onCheckedChange={toggleAll} className="border-zinc-300 dark:border-zinc-700" />
                               </th>
-                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Invoice No</th>
-                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Type</th>
-                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Date</th>
-                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Discount</th>
-                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 text-rose-500">Returns</th>
-                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400">Remaining</th>
-                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 w-40">Allocation</th>
+                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700">Invoice No</th>
+                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700">Type</th>
+                              <th className="px-4 py-3 text-left border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700">Date</th>
+                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700 text-rose-500">Discount</th>
+                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700 text-rose-500">Returns</th>
+                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700">Remaining</th>
+                              <th className="px-4 py-3 text-right border-b border-zinc-100 dark:border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-700 w-40">Allocation</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
@@ -1211,13 +1218,13 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                       <div className="bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-4 flex-shrink-0">
                         <div className="flex gap-4">
                           <div className="space-y-0.5">
-                            <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Selected Entries</div>
-                            <div className="text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">{selectedBillIds.size} / {unpaidBills.length}</div>
+                            <div className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Selected Entries</div>
+                            <div className="text-xs font-mono font-black text-zinc-700">{selectedBillIds.size} / {unpaidBills.length}</div>
                           </div>
                           <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
                           <div className="space-y-0.5">
-                            <div className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Billed Outstanding</div>
-                            <div className="text-xs font-mono font-black text-zinc-500">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
+                            <div className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Billed Outstanding</div>
+                            <div className="text-xs font-mono font-black text-zinc-700">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
                           </div>
                         </div>
 
@@ -1276,7 +1283,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                       <div className="flex-1 overflow-auto custom-scrollbar p-3">
                         <table className="w-full border-separate border-spacing-y-2">
                           <thead>
-                            <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
+                            <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-700">
                               <th className="px-3 text-left w-1/4">Ledger Account</th>
                               <th className="px-3 text-left w-40">Method</th>
                               <th className="px-3 text-left w-40">Cheque #</th>
@@ -1439,62 +1446,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
           </div>
 
           {/* ── FINANCIAL HUD (Right Sidebar) ── */}
-          <div className="w-full md:w-[380px] space-y-4 md:space-y-4 flex flex-col md:overflow-hidden">
-
-            {/* Account Insight Card */}
-            {selectedAccountId && (
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex-shrink-0">
-                <Card className={`${CARD_BASE} p-5 ${PREMIUM_ROUNDING_MD} overflow-hidden shadow-lg shadow-zinc-200/50 dark:shadow-none`}>
-                  <div className="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
-                    <div className={`w-2 h-2 rounded-full bg-blue-500`} />
-                    <h4 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-widest leading-none pt-0.5">Financial Auditor</h4>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total In" : (paymentType === 'RECEIPT' ? "Total Sales" : "Total Purchases")}
-                      </span>
-                      <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
-                        Rs {totalSalesPurchases.toLocaleString()}
-                      </span>
-                    </div>
-                    {((totalDiscountParty > 0) || (discount > 0)) && (
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-500 font-bold">Discount (Adj)</span>
-                        <span className="font-black font-mono text-amber-600 dark:text-amber-400">
-                          Rs {(totalDiscountParty + (discount || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total Out" : (paymentType === 'RECEIPT' ? "Total Received" : "Total Paid")}
-                      </span>
-                      <span className="font-black font-mono text-zinc-800 dark:text-zinc-200">
-                        Rs {totalReceivedPaid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-zinc-500 font-bold">
-                        {isBankAccountSelected ? "Total Available" : "Total Balance"}
-                      </span>
-                      <span className={cn("font-black font-mono", isBankAccountSelected ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
-                        Rs {totalBalance.toLocaleString()}
-                      </span>
-                    </div>
-                    {!isBankAccountSelected && advancePaid > 0 && (
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-zinc-500 font-bold">Advance Paid</span>
-                        <span className="font-black font-mono text-emerald-600">
-                          Rs {advancePaid.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            )}
+          <div className="w-full md:w-[350px] space-y-1 md:space-y-1 flex flex-col md:overflow-hidden">
 
             {/* Executive Summary Card */}
             <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1 min-h-0 flex flex-col">
@@ -1505,7 +1457,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${t.gradient}`} />
                     <h3 className="text-[10px] font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-[0.2em]">
-                      {isBankAccountSelected ? "BANK TRANSACTION" : "EDIT PAYMENT"}
+                      {isBankAccountSelected ? "BANK " : "PAYMENT"}
                     </h3>
                   </div>
                   <div className="flex items-center gap-3">

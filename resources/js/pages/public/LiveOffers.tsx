@@ -64,6 +64,11 @@ export const getItemBrandImage = (item: any) => {
 };
 
 export const toNum = (val: any): number => {
+    if (typeof val === 'number') return Number.isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+        const parsed = parseFloat(val);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
     const n = Number(val);
     return Number.isNaN(n) ? 0 : n;
 };
@@ -73,7 +78,7 @@ export const getOfferItemRates = (offerItem: any) => {
     const packCtn = toNum(offerItem.pack_ctn);
     const loosCtn = toNum(offerItem.loos_ctn);
     const price = toNum(offerItem.price);
-    const packingQty = toNum(offerItem.items?.packing_qty || 1);
+    const packingQty = toNum(offerItem.items?.packing_size || offerItem.items?.packing_qty || 1);
 
     const cartonRate = packCtn > 0 ? packCtn : (price > 0 ? price : 0);
     const looseRate = loosCtn > 0 ? loosCtn : (price > 0 && packingQty > 0 ? price / packingQty : 0);
@@ -235,8 +240,9 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 if (offerItem) {
                     const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
                     const isGroupOffer = String(offerItem.offertype) === '1';
-                    const priceCarton = isGroupOffer ? cartonRate : singleRate;
-                    const pricePiece = isGroupOffer ? looseRate : (singleRate && offerItem.items?.packing_qty ? singleRate / offerItem.items.packing_qty : looseRate);
+                    const packingQty = toNum(offerItem.items?.packing_size || offerItem.items?.packing_qty || 1);
+                    const priceCarton = isGroupOffer && packingQty > 1 ? cartonRate : singleRate;
+                    const pricePiece = isGroupOffer && packingQty > 1 ? looseRate : (singleRate && packingQty > 1 ? singleRate / packingQty : looseRate);
                     
                     const qtyCarton = toNum(item.qty_carton);
                     const qtyPcs = toNum(item.qty_pcs);
@@ -274,7 +280,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
         setCart(prev => {
             const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
             const isGroupOffer = String(offerItem.offertype) === '1';
-            const packing = toNum(offerItem.items?.packing_qty || 1);
+            const packing = toNum(offerItem.items?.packing_size || offerItem.items?.packing_qty || 1);
 
             const existing = prev[offerItem.id] || {
                 item_id: offerItem.item_id,
@@ -1361,6 +1367,8 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
     const hasCartQty = qtyCtn > 0 || qtyPcs > 0;
 
     const isGroupOffer = String((offerItem as any).offertype) === '1';
+    const packingQty = toNum(item?.packing_size || item?.packing_qty || 1);
+    const showCartonAndLoose = isGroupOffer && packingQty > 1;
     const brandName = getItemBrandName(item) || 'Harmain Direct';
 
     return (
@@ -1420,7 +1428,7 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
 
                 {/* Pricing & CTA Section */}
                 <div className="mt-2 pt-2 border-t border-border/60">
-                    {isGroupOffer ? (
+                    {showCartonAndLoose ? (
                         <div className="grid grid-cols-2 gap-1 mb-2 bg-surface-2/70 p-1.5 rounded-lg border border-border/50 text-center">
                             <div>
                                 <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block leading-none">Carton</span>
@@ -1433,8 +1441,8 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
                         </div>
                     ) : (
                         <div className="mb-2 bg-surface-2/70 p-1.5 rounded-lg border border-border/50 flex justify-between items-center px-2">
-                            <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold">Rate</span>
-                            <span className="font-mono-jet font-black text-xs sm:text-sm text-amber">{formatCurrency(offerItem.price || cartonRate)}</span>
+                            <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold">Pcs Rate</span>
+                            <span className="font-mono-jet font-black text-xs sm:text-sm text-amber">{formatCurrency(looseRate || singleRate || cartonRate)}</span>
                         </div>
                     )}
 
@@ -1477,6 +1485,8 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
     const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
     const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
     const isGroupOffer = String((offerItem as any).offertype) === '1';
+    const packingQty = toNum(item?.packing_size || item?.packing_qty || 1);
+    const showCartonAndLoose = isGroupOffer && packingQty > 1;
 
     const qtyCtn = toNum(cartItem?.qty_carton);
     const qtyPcs = toNum(cartItem?.qty_pcs);
@@ -1508,15 +1518,15 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-6 text-right shrink-0">
-                {isGroupOffer ? (
+                {showCartonAndLoose ? (
                     <div className="text-[10px] sm:text-xs font-mono-jet space-y-0.5">
                         <div className="text-text-primary font-bold"><span className="text-text-muted font-normal text-[8px] uppercase mr-1">Ctn:</span>{formatCurrency(cartonRate)}</div>
                         <div className="text-text-primary"><span className="text-text-muted font-normal text-[8px] uppercase mr-1">Loose:</span>{formatCurrency(looseRate)}</div>
                     </div>
                 ) : (
                     <div>
-                        <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block">Rate</span>
-                        <span className="font-mono-jet font-black text-xs sm:text-base text-amber">{formatCurrency(offerItem.price || cartonRate)}</span>
+                        <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block">Pcs Rate</span>
+                        <span className="font-mono-jet font-black text-xs sm:text-base text-amber">{formatCurrency(looseRate || singleRate || cartonRate)}</span>
                     </div>
                 )}
 

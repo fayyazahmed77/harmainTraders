@@ -98,9 +98,13 @@ export default function DataTable({ data }: DataTableProps) {
     const confirmDelete = () => {
         if (offerToDelete) {
             router.delete(`/offer-list/${offerToDelete.id}`, {
+                preserveScroll: true,
                 onSuccess: () => {
                     setIsDeleteDialogOpen(false);
                     setOfferToDelete(null);
+                },
+                onError: (err) => {
+                    console.error("Failed to delete offer:", err);
                 }
             });
         }
@@ -311,7 +315,10 @@ export default function DataTable({ data }: DataTableProps) {
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
 
                                 <DropdownMenuItem
-                                    onClick={() => handleDeleteClick(offer)}
+                                    onSelect={(e) => {
+                                        e.preventDefault();
+                                        handleDeleteClick(offer);
+                                    }}
                                     className="rounded-lg text-xs font-bold gap-2 cursor-pointer text-rose-500 focus:bg-rose-500 focus:text-white group"
                                 >
                                     <Trash2 className="h-3.5 w-3.5 opacity-70 group-focus:opacity-100" />

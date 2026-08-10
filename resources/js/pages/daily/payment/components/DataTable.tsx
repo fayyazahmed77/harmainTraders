@@ -24,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, FileText, Printer } from "lucide-react";
 import {
     ChevronLeft as IconChevronLeft,
     ChevronRight as IconChevronRight,
@@ -37,6 +37,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { router } from "@inertiajs/react";
 import { route } from 'ziggy-js';
 
@@ -157,37 +158,77 @@ export default function DataTable({ data }: DataTableProps) {
                 const payment = row.original;
 
                 return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
+                    <TooltipProvider>
+                        <div className="flex items-center gap-1">
+                            {/* View Option */}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+                                        onClick={() => router.visit(`/payments/${payment.id}/view`)}
+                                    >
+                                        <Eye className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-[11px] font-bold">View</p>
+                                </TooltipContent>
+                            </Tooltip>
 
-                                onClick={() => {
-                                    router.visit(`/payments/${payment.id}/view`);
-                                }}
-                            >
-                                View
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    router.visit(`/payments/${payment.id}/edit`);
-                                }}
-                            >
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    window.open(`/payments/${payment.id}/pdf`, '_blank');
-                                }}
-                            >
-                                {payment.group_id ? "Print Combined Slip" : "Print Voucher"}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            {/* Edit Option */}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                                        onClick={() => router.visit(`/payments/${payment.id}/edit`)}
+                                    >
+                                        <Edit className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-[11px] font-bold">Edit</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            {/* A4 Print Option */}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+                                        onClick={() => window.open(`/payments/${payment.id}/pdf?format=big`, '_blank')}
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-[11px] font-bold">A4 Print</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            {/* Thermal Print Option */}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg transition-colors"
+                                        onClick={() => window.open(`/payments/${payment.id}/pdf?format=small`, '_blank')}
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-[11px] font-bold">Thermal Print</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                    </TooltipProvider>
                 );
             },
         },

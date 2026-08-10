@@ -293,9 +293,15 @@ class SupplierOrderController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function print($id)
+    public function print(Request $request, $id)
     {
         $order = SupplierOrder::with(['supplier', 'items.item'])->findOrFail($id);
+        $format = $request->get('format', 'big');
+
+        if ($format === 'small' || $format === 'thermal') {
+            return view('admin.supplier-order.thermal', compact('order'));
+        }
+
         return view('admin.supplier-order.print', compact('order'));
     }
 }

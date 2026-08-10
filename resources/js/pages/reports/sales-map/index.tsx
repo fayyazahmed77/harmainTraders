@@ -21,8 +21,7 @@ import {
     Database
 } from "lucide-react"
 
-// Dynamic import for the Map component to avoid SSR/Lifecycle issues
-const SalesMap = React.lazy(() => import('./SalesMap'));
+import SalesMap from './SalesMap';
 
 interface LocationData {
     id: number;
@@ -211,16 +210,14 @@ export default function SalesMapReport({ provinces, cities }: PageProps) {
                         {/* Right Content - Map */}
                         <div className="flex-1 relative z-0">
                             {isClient ? (
-                                <React.Suspense fallback={<div className="h-full w-full bg-gray-100 animate-pulse flex items-center justify-center font-bold text-gray-400">Initializing Core Map...</div>}>
-                                    <SalesMap
-                                        data={data}
-                                        center={center}
-                                        zoom={zoom}
-                                        level={level}
-                                        formatCurrency={formatCurrency}
-                                        onLocationClick={handleLocationClick}
-                                    />
-                                </React.Suspense>
+                                <SalesMap
+                                    data={data}
+                                    center={center}
+                                    zoom={zoom}
+                                    level={level}
+                                    formatCurrency={formatCurrency}
+                                    onLocationClick={handleLocationClick}
+                                />
                             ) : (
                                 <div className="h-full w-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">Loading Geospatial Engine...</div>
                             )}
