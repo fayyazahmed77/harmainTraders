@@ -323,7 +323,7 @@ export default function PurchaseEdit({
     const [cashCredit, setCashCredit] = useState<string>(purchase?.cash_credit ?? "CREDIT");
     const [accountType, setAccountType] = useState<Option | null>(() => {
         if (purchase?.supplier_id && accounts) {
-            const acc = accounts.find(a => a.id === purchase.supplier_id);
+            const acc = accounts.find(a => Number(a.id) === Number(purchase.supplier_id));
             if (acc) return { value: String(acc.id), label: `${acc.title}${acc.code ? ` (${acc.code})` : ""}` };
         }
         return null;
@@ -340,7 +340,7 @@ export default function PurchaseEdit({
 
     const [advanceAvailable, setAdvanceAvailable] = useState<number>(() => {
         if (purchase?.supplier_id && accounts) {
-            const acc = accounts.find(a => a.id === purchase.supplier_id);
+            const acc = accounts.find(a => Number(a.id) === Number(purchase.supplier_id));
             if (acc) return toNumber(acc.current_balance);
         }
         return 0;
@@ -418,7 +418,7 @@ export default function PurchaseEdit({
     const [rows, setRows] = useState<RowData[]>(() => {
         if (purchase && purchase.items && purchase.items.length > 0) {
             return purchase.items.map((pi: any) => {
-                const item = items.find(it => it.id === pi.item_id);
+                const item = items.find(it => Number(it.id) === Number(pi.item_id));
                 // Recover discount percentage from absolute discount value
                 let discPercent = 0;
                 if (toNumber(pi.subtotal) > 0 && toNumber(pi.discount) > 0) {
@@ -513,7 +513,7 @@ export default function PurchaseEdit({
 
     // When an item selected, auto-fill its rate, trade_price, tax, disc
     const handleSelectItem = async (rowId: number, itemId: number) => {
-        const selected = items.find((it) => it.id === itemId);
+        const selected = items.find((it) => Number(it.id) === Number(itemId));
         if (!selected) return;
 
         const baseRate = toNumber(selected.trade_price ?? selected.retail ?? 0);
@@ -564,13 +564,13 @@ export default function PurchaseEdit({
     // Get the currently selected item details
     const selectedItem = useMemo(() => {
         if (!selectedItemId) return null;
-        return items.find((it) => it.id === selectedItemId) ?? null;
+        return items.find((it) => Number(it.id) === Number(selectedItemId)) ?? null;
     }, [selectedItemId, items]);
 
     // update amounts when rows change
     const rowsWithComputed = useMemo(() => {
         return rows.map((r) => {
-            const item = items.find((it) => it.id === r.item_id) ?? undefined;
+            const item = items.find((it) => Number(it.id) === Number(r.item_id)) ?? undefined;
             const amount = recalcRowAmount(r, item);
             return { ...r, amount };
         });
@@ -693,7 +693,7 @@ export default function PurchaseEdit({
             splits: isPayNow ? paymentSplits : [],
 
             items: rowsWithComputed.filter(r => r.item_id !== null).map((r) => {
-                const item = items.find(i => i.id === r.item_id);
+                const item = items.find(i => Number(i.id) === Number(r.item_id));
                 const packing = toNumber(item?.packing_full || item?.packing_qty || 1);
 
                 const totalPCS = ((toNumber(r.full) + toNumber(r.bonus_full || 0)) * packing) + toNumber(r.pcs) + toNumber(r.bonus_pcs || 0);
@@ -716,7 +716,7 @@ export default function PurchaseEdit({
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
-                    supplierName: accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A",
+                    supplierName: accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A",
                     totalItems: totals.totalItems,
                     totalFull: totals.totalFull,
                     totalPcs: totals.totalPcs,
@@ -741,7 +741,7 @@ export default function PurchaseEdit({
 
         rowsWithComputed.forEach(r => {
             if (!r.item_id) return;
-            const item = items.find(it => it.id === r.item_id);
+            const item = items.find(it => Number(it.id) === Number(r.item_id));
             if (!item) return;
 
             const mPercent = toNumber(markupPercentage);
@@ -822,7 +822,7 @@ export default function PurchaseEdit({
                                     value={accountType?.value?.toString() ?? ""}
                                     onValueChange={(value) => {
                                         const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => a.id === id) ?? null;
+                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
                                         const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
 
@@ -925,7 +925,7 @@ export default function PurchaseEdit({
                                     value={accountType?.value || ""}
                                     onChange={(value) => {
                                         const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => a.id === id) ?? null;
+                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
 
                                         const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
                                         setAccountType(selectedOption);
@@ -1117,7 +1117,7 @@ export default function PurchaseEdit({
                                             {rowsWithComputed.map((row) => (
                                                 <React.Fragment key={row.id}>
                                                     {(() => {
-                                                        const rowItem = items.find(it => it.id === row.item_id);
+                                                        const rowItem = items.find(it => Number(it.id) === Number(row.item_id));
                                                         const showLoose = !row.item_id || toNumber(rowItem?.packing_qty || 1) > 1;
                                                         
                                                         return (
@@ -1794,8 +1794,8 @@ export default function PurchaseEdit({
                         submitPurchase(updatePricesAfterPayment);
                     }}
                     invoiceNo={invoiceNo}
-                    supplierName={accounts.find(a => a.id === Number(accountType?.value))?.title || "N/A"}
-                    previousBalance={toNumber(accounts.find(a => a.id === Number(accountType?.value))?.current_balance)}
+                    supplierName={accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A"}
+                    previousBalance={toNumber(accounts.find(a => Number(a.id) === Number(accountType?.value))?.current_balance)}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
                     extraDiscount={extraDiscount}

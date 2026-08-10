@@ -276,6 +276,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [MessageLineController::class, 'index'])->name('message_lines.index');
         Route::post('/', [MessageLineController::class, 'store'])->name('message_lines.store');
         Route::put('/{messageLine}', [MessageLineController::class, 'update'])->name('message_lines.update');
+        Route::patch('/{id}/toggle-status', [MessageLineController::class, 'toggleStatus'])->name('message_lines.toggle_status');
         Route::delete('/{id}', [MessageLineController::class, 'destroy'])->name('message_lines.destroy');
     });
     //---------------------Banks------------------------------------------------------------------
@@ -292,6 +293,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [ChequebookController::class, 'index'])->name('cheque.index');
         Route::get('/create', [ChequebookController::class, 'create'])->name('cheque.create');
         Route::post('/', [ChequebookController::class, 'store'])->name('cheque.store');
+        Route::post('/check-duplicates', [ChequebookController::class, 'checkDuplicates'])->name('cheque.check-duplicates');
         Route::get('/{cheque}/edit', [ChequebookController::class, 'edit'])->name('cheque.edit');
         Route::put('/{cheque}', [ChequebookController::class, 'update'])->name('cheque.update');
         Route::get('/{cheque}/view', [ChequebookController::class, 'show'])->name('cheque.show');

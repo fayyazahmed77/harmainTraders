@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import axios from "axios";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -8,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, Plus, Building2, Hash, Layers, FileText, CheckCircle2, AlertCircle, Sparkles, Wand2, Terminal } from "lucide-react";
+import { CalendarIcon, Plus, Building2, Hash, Layers, FileText, CheckCircle2, AlertCircle, Sparkles, Wand2, Terminal, AlertTriangle, Loader2 } from "lucide-react";
 import {
   Popover,
   PopoverTrigger,
@@ -46,6 +47,9 @@ export default function ChequeGenerationPage() {
 
   const [open, setOpen] = useState(false);
   const [generatedCheques, setGeneratedCheques] = useState<string[]>([]);
+  const [duplicateCheques, setDuplicateCheques] = useState<string[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState<boolean>(false);
+  const [duplicateMessage, setDuplicateMessage] = useState<string>("");
 
   const { data: form, setData: setForm, post, processing: isSubmitting, errors, isDirty } = useForm({
     entry_date: new Date() as Date | undefined,
@@ -60,8 +64,36 @@ export default function ChequeGenerationPage() {
 
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
+  // ✅ Check duplicate cheques on bank or prefix change if generated
+  const checkDuplicateNumbers = async (bankId: string, cheques: string[], prefixVal: string) => {
+    if (!bankId || cheques.length === 0) return;
+    setCheckingDuplicates(true);
+    try {
+      const res = await axios.post('/cheque/check-duplicates', {
+        bank_id: bankId,
+        cheques: cheques,
+        prefix: prefixVal,
+      });
+      const existing = res.data.existing_cheques || [];
+      setDuplicateCheques(existing);
+      setDuplicateMessage(res.data.message || "");
+
+      if (res.data.exists) {
+        toast.error("Cheque Numbers Already Exist!", {
+          description: res.data.message,
+          duration: 7000,
+        });
+      }
+      return res.data;
+    } catch (err) {
+      console.error("Duplicate check failed", err);
+    } finally {
+      setCheckingDuplicates(false);
+    }
+  };
+
   // ✅ Generate cheque numbers
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!form.cheque_from || !form.cheque_to)
       return toast.error("Missing Numbers", { description: "Please enter both start and end numbers." });
 
@@ -82,7 +114,23 @@ export default function ChequeGenerationPage() {
     }
     setGeneratedCheques(cheques);
     setForm("cheques", cheques);
-    toast.success(`${cheques.length} Cheques Previewed`, { icon: <Sparkles className="h-4 w-4" /> });
+
+    if (form.bank_id) {
+      const res = await checkDuplicateNumbers(form.bank_id, cheques, form.prefix);
+      if (res && !res.exists) {
+        toast.success(`${cheques.length} Cheques Previewed — All Available`, { icon: <Sparkles className="h-4 w-4" /> });
+      }
+    } else {
+      toast.success(`${cheques.length} Cheques Previewed`, { icon: <Sparkles className="h-4 w-4" /> });
+    }
+  };
+
+  // ✅ Handle Bank Selection Change
+  const handleBankChange = (bankId: string) => {
+    setForm("bank_id", bankId);
+    if (generatedCheques.length > 0) {
+      checkDuplicateNumbers(bankId, generatedCheques, form.prefix);
+    }
   };
 
   // ✅ Submit data to backend
@@ -90,10 +138,22 @@ export default function ChequeGenerationPage() {
     e.preventDefault();
     if (!form.bank_id) return toast.error("Please Select a Bank");
     if (generatedCheques.length === 0) return toast.error("No Cheques to Add");
+    if (duplicateCheques.length > 0) {
+      return toast.error("Cannot Add Cheque Book", {
+        description: duplicateMessage || "Cheque book numbers already exist for this bank. Please use a different sequence.",
+        duration: 7000,
+      });
+    }
 
     post("/cheque", {
       onSuccess: () => toast.success("Cheque Book Added Successfully"),
-      onError: () => toast.error("Failed to Add Cheque Book"),
+      onError: (errs) => {
+        const firstErr = Object.values(errs)[0];
+        toast.error("Failed to Add Cheque Book", {
+          description: typeof firstErr === 'string' ? firstErr : "Validation failed.",
+          duration: 7000,
+        });
+      },
     });
   };
 
@@ -183,8 +243,8 @@ export default function ChequeGenerationPage() {
                       {/* Bank Identity */}
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">Bank</Label>
-                        <Select value={form.bank_id} onValueChange={(v) => setForm("bank_id", v)}>
-                          <SelectTrigger className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all w-full">
+                        <Select value={form.bank_id} onValueChange={handleBankChange}>
+                          <SelectTrigger className={cn("h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-bold focus:ring-orange-500/20 transition-all w-full", errors.bank_id && "border-rose-500 ring-2 ring-rose-500/20")}>
                             <SelectValue placeholder="Select Bank..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
@@ -195,7 +255,7 @@ export default function ChequeGenerationPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {errors.bank_id && <p className="text-[10px] font-bold text-rose-500 uppercase">{errors.bank_id}</p>}
+                        {errors.bank_id && <p className="text-[10px] font-bold text-rose-500 uppercase mt-1">{errors.bank_id}</p>}
                       </div>
 
                       {/* Voucher No */}
@@ -234,8 +294,9 @@ export default function ChequeGenerationPage() {
                             value={form.cheque_from}
                             onChange={(e) => setForm("cheque_from", e.target.value)}
                             placeholder="001"
-                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all"
+                            className={cn("h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all", errors.cheque_from && "border-rose-500 ring-2 ring-rose-500/20")}
                           />
+                          {errors.cheque_from && <p className="text-[9px] font-bold text-rose-500 uppercase mt-1 leading-tight">{errors.cheque_from}</p>}
                         </div>
                         <div className="space-y-2">
                           <Label className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">End No</Label>
@@ -243,8 +304,9 @@ export default function ChequeGenerationPage() {
                             value={form.cheque_to}
                             onChange={(e) => setForm("cheque_to", e.target.value)}
                             placeholder="050"
-                            className="h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all"
+                            className={cn("h-12 rounded-xl border-zinc-200 dark:border-zinc-800 font-mono text-sm focus:ring-orange-500/20 transition-all", errors.cheque_to && "border-rose-500 ring-2 ring-rose-500/20")}
                           />
+                          {errors.cheque_to && <p className="text-[9px] font-bold text-rose-500 uppercase mt-1 leading-tight">{errors.cheque_to}</p>}
                         </div>
                       </div>
 
@@ -270,16 +332,31 @@ export default function ChequeGenerationPage() {
                         type="button"
                         variant="outline"
                         onClick={handleGenerate}
+                        disabled={checkingDuplicates}
                         className="w-full md:w-auto px-8 rounded-xl h-12 border-zinc-200 dark:border-zinc-800 font-bold uppercase tracking-widest text-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800 group transition-all"
                       >
-                        <Wand2 className="mr-2 h-4 w-4 text-orange-500 group-hover:rotate-12 transition-transform" />
-                        Preview Cheques
+                        {checkingDuplicates ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                            Checking...
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Wand2 className="h-4 w-4 text-orange-500 group-hover:rotate-12 transition-transform" />
+                            Preview Cheques
+                          </div>
+                        )}
                       </Button>
 
                       <Button
                         type="submit"
-                        disabled={isSubmitting}
-                        className="w-full md:w-auto px-12 rounded-xl h-12 bg-zinc-900 border-orange-500/20 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold uppercase tracking-widest text-[10px] hover:shadow-xl hover:shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50"
+                        disabled={isSubmitting || duplicateCheques.length > 0}
+                        className={cn(
+                          "w-full md:w-auto px-12 rounded-xl h-12 text-white font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95 disabled:opacity-50",
+                          duplicateCheques.length > 0
+                            ? "bg-rose-600 hover:bg-rose-700 cursor-not-allowed"
+                            : "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:shadow-xl hover:shadow-orange-500/20"
+                        )}
                       >
                         {isSubmitting ? (
                           <div className="flex items-center gap-2">
@@ -304,34 +381,147 @@ export default function ChequeGenerationPage() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
+                      className="overflow-hidden space-y-4"
                     >
-                      <Card className={cn(PREMIUM_ROUNDING, "border-dashed border-zinc-200 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xl")}>
-                        <CardHeader className="pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                              Cheque Preview ({generatedCheques.length} cheques)
-                            </CardTitle>
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">
-                              <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
-                              Validated
+                      {/* Duplicate Alert Banner */}
+                      {duplicateCheques.length > 0 && (
+                        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center justify-between gap-3 shadow-lg shadow-rose-500/5 animate-shake">
+                          <div className="flex items-center gap-3">
+                            <AlertTriangle className="h-5 w-5 shrink-0 text-rose-500" />
+                            <div>
+                              <div className="text-[11px] font-black uppercase tracking-wider">Duplicate Cheques Detected</div>
+                              <div className="text-[11px] font-medium opacity-90">{duplicateMessage}</div>
                             </div>
                           </div>
+                          <span className="px-3 py-1 rounded-full bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest shrink-0">
+                            {duplicateCheques.length} DUPLICATE(S)
+                          </span>
+                        </div>
+                      )}
+
+                      <Card className={cn(PREMIUM_ROUNDING, "border-dashed bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl overflow-hidden", duplicateCheques.length > 0 ? "border-rose-500/50" : "border-zinc-200 dark:border-zinc-800")}>
+                        <CardHeader className="pb-4 border-b border-zinc-100 dark:border-zinc-800 flex flex-row items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-orange-500" />
+                              Cheque Preview ({generatedCheques.length} leaf instruments)
+                            </CardTitle>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {duplicateCheques.length > 0 ? (
+                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[9px] font-black uppercase tracking-widest">
+                                <div className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                                Sequence Conflict Found
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest">
+                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                All Instruments Validated
+                              </div>
+                            )}
+                          </div>
                         </CardHeader>
-                        <CardContent className="pt-6">
-                          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2">
-                            {generatedCheques.map((num, i) => (
-                              <motion.div
-                                key={num}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: Math.min(i * 0.01, 0.5) }}
-                                className="aspect-video flex items-center justify-center rounded-lg bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 text-[10px] font-mono font-black text-zinc-400 hover:border-orange-500/30 hover:text-orange-500 transition-all cursor-crosshair group shadow-sm"
-                              >
-                                <span className="opacity-40 group-hover:opacity-100">{form.prefix}</span>
-                                <span className="text-zinc-900 dark:text-zinc-100 group-hover:text-orange-500">{num}</span>
-                              </motion.div>
-                            ))}
+                        <CardContent className="pt-6 space-y-6">
+                          {/* Realistic Cheque Leaf Display Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {generatedCheques.map((num, i) => {
+                              const fullNum = (form.prefix || '') + num;
+                              const isDup = duplicateCheques.includes(num) || duplicateCheques.includes(fullNum);
+                              return (
+                                <motion.div
+                                  key={num}
+                                  initial={{ opacity: 0, y: 15 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: Math.min(i * 0.02, 0.4) }}
+                                  className={cn(
+                                    "p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden group shadow-md hover:shadow-xl",
+                                    isDup
+                                      ? "bg-gradient-to-br from-rose-50/90 via-white to-rose-100/50 dark:from-rose-950/40 dark:to-zinc-900 border-rose-500 ring-2 ring-rose-500/20"
+                                      : "bg-gradient-to-br from-amber-500/[0.03] via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 border-zinc-200/80 dark:border-zinc-800 hover:border-orange-500/40"
+                                  )}
+                                >
+                                  {/* Gold Security Line Top Bar */}
+                                  <div className={cn("absolute top-0 left-0 right-0 h-1", isDup ? "bg-rose-500" : "bg-gradient-to-r from-orange-400 via-amber-500 to-orange-400")} />
+
+                                  {/* Cheque Header: Bank Logo + Title + Date */}
+                                  <div className="flex justify-between items-start gap-2 mb-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-2.5">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="h-8 w-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400 font-black text-xs">
+                                        {selectedBankName.slice(0, 2).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div className="text-xs font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
+                                          {selectedBankName}
+                                        </div>
+                                        <div className="text-[9px] font-mono font-semibold text-zinc-400 mt-0.5">
+                                          PARKWAY BRANCH · MAIN ACCOUNT
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Date Stamp Field */}
+                                    <div className="text-right border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1 bg-white/80 dark:bg-zinc-950/80">
+                                      <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 block leading-tight">DATE</span>
+                                      <span className="text-[10px] font-mono font-bold text-zinc-700 dark:text-zinc-300">
+                                        {form.entry_date ? form.entry_date.toLocaleDateString("en-GB") : "DD/MM/YYYY"}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Cheque Body: Pay Line & PKR Amount Box */}
+                                  <div className="space-y-2.5 my-3">
+                                    <div className="flex items-center gap-2 text-[10px] font-mono">
+                                      <span className="font-bold text-zinc-400 uppercase tracking-widest text-[9px]">PAY</span>
+                                      <div className="flex-1 border-b border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 italic text-[10px] px-2">
+                                        ________________________ OR ORDER
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                                        <span className="font-bold uppercase tracking-widest text-[9px]">RUPEES</span>
+                                        <span className="italic text-[10px]">________________________</span>
+                                      </div>
+
+                                      {/* Amount Box */}
+                                      <div className={cn(
+                                        "px-3 py-1.5 rounded-lg border font-mono font-black text-xs shadow-inner flex items-center gap-1 min-w-[120px] justify-center",
+                                        isDup
+                                          ? "bg-rose-100/50 dark:bg-rose-950/60 border-rose-300 text-rose-600"
+                                          : "bg-amber-500/[0.08] dark:bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+                                      )}>
+                                        <span className="text-[9px] opacity-70">PKR</span>
+                                        <span>*** {form.prefix || ''}{num} ***</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Cheque Footer: Signature & Status Stamp */}
+                                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-end justify-between">
+                                    {/* Status Stamp */}
+                                    {isDup ? (
+                                      <div className="px-2.5 py-1 rounded-md bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest border border-rose-600 shadow-sm transform -rotate-2">
+                                        ❌ DUPLICATE - EXISTS
+                                      </div>
+                                    ) : (
+                                      <div className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
+                                        ✓ UNUSED / AVAILABLE
+                                      </div>
+                                    )}
+
+                                    <div className="text-right">
+                                      <div className="w-28 border-b border-zinc-300 dark:border-zinc-700 mb-1" />
+                                      <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 block">AUTHORIZED SIGNATORY</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Bottom MICR Strip */}
+                                  <div className="mt-3 pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-800 text-center font-mono text-[11px] font-black tracking-[0.25em] text-zinc-500 dark:text-zinc-400 select-none bg-zinc-100/50 dark:bg-zinc-900/50 -mx-5 -mb-5 py-1.5">
+                                    ⑈ {form.prefix || ''}{num} ⑈ {form.bank_id ? form.bank_id.padStart(3, '0') : '000'} ⑈ HARMAIN-ERP ⑈
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
                           </div>
                         </CardContent>
                       </Card>

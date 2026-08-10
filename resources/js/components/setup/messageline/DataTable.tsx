@@ -166,6 +166,56 @@ export function DataTable({ messagesline }: DataTableProps) {
     </span>
   );
 
+  // ── Status toggle cell ─────────────────────────────────────────
+  const StatusToggleCell = ({ msg }: { msg: MessageLine }) => {
+    const [loading, setLoading] = useState(false);
+    const isActive = msg.status === "active";
+
+    const handleToggle = (checked: boolean) => {
+      setLoading(true);
+      router.patch(
+        `/message-lines/${msg.id}/toggle-status`,
+        {},
+        {
+          preserveScroll: true,
+          onSuccess: () => {
+            setLoading(false);
+            toast.success(`Status updated to ${checked ? "active" : "inactive"}.`);
+          },
+          onError: () => {
+            setLoading(false);
+            toast.error("Failed to update status.");
+          },
+        }
+      );
+    };
+
+    return (
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <Switch
+          checked={isActive}
+          disabled={loading || !canEdit}
+          onCheckedChange={handleToggle}
+          aria-label="Toggle status"
+        />
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+            isActive
+              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              : "bg-muted text-muted-foreground border border-border"
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isActive ? "bg-emerald-500" : "bg-muted-foreground"
+            }`}
+          />
+          {isActive ? "Active" : "Inactive"}
+        </span>
+      </div>
+    );
+  };
+
   // ── Table columns ─────────────────────────────────────────────
   const columns: ColumnDef<MessageLine>[] = [
     {
@@ -220,7 +270,7 @@ export function DataTable({ messagesline }: DataTableProps) {
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => <StatusToggleCell msg={row.original} />,
     },
     {
       accessorKey: "created_by_name",

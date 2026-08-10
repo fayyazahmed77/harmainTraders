@@ -430,7 +430,7 @@ export default function ChequeBookPage() {
                         <TableHeader>
                           <TableRow className="border-b border-zinc-200 dark:border-zinc-800 hover:bg-transparent">
                             <TableHead className="px-6 py-4 font-black uppercase tracking-[0.2em] text-[10px] text-zinc-400">
-                              Bank
+                              Bank Institution
                             </TableHead>
                             <TableHead className="px-6 py-4 font-black uppercase tracking-[0.2em] text-[10px] text-zinc-400 text-center">
                               Total Cheques
@@ -440,6 +440,9 @@ export default function ChequeBookPage() {
                             </TableHead>
                             <TableHead className="px-6 py-4 font-black uppercase tracking-[0.2em] text-[10px] text-zinc-400 text-center">
                               Available / Unused
+                            </TableHead>
+                            <TableHead className="px-6 py-4 font-black uppercase tracking-[0.2em] text-[10px] text-zinc-400 min-w-[200px]">
+                              Utilization Status
                             </TableHead>
                             <TableHead className="px-6 py-4 font-black uppercase tracking-[0.2em] text-[10px] text-zinc-400">
                               Added By
@@ -454,79 +457,94 @@ export default function ChequeBookPage() {
                         </TableHeader>
                         <TableBody>
                           {filteredBankGroups.length > 0 ? (
-                            filteredBankGroups.map((group, index) => (
-                              <TableRow
-                                key={group.bank_id}
-                                className="group border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-orange-500/[0.02] transition-colors cursor-pointer"
-                                onClick={() => setSelectedBankId(group.bank_id)}
-                              >
-                                <TableCell className="px-6 py-4">
-                                  <div className="flex items-center gap-4">
-                                    <Avatar className="h-10 w-10 border border-zinc-200 dark:border-zinc-800 shadow-sm transition-transform group-hover:scale-105">
-                                      <AvatarImage src={group.logo_url} />
-                                      <AvatarFallback className="bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                                        <Building2 className="h-5 w-5" />
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter hover:text-orange-500 transition-colors">
-                                        {group.bank_name}
-                                      </span>
-                                      <span className="text-[10px] text-zinc-400 font-mono tracking-widest uppercase">
-                                        Bank ID: {group.bank_id.toString().padStart(3, "0")}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-6 py-4 text-center">
-                                  <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 min-w-[40px]">
-                                    {group.total_cheques}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="px-6 py-4 text-center">
-                                  <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 min-w-[40px]">
-                                    {group.used_count}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="px-6 py-4 text-center">
-                                  <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 min-w-[40px]">
-                                    {group.available_count}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="px-6 py-4">
-                                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-                                    <UserIcon className="h-3 w-3" />
-                                    <span>{group.created_by_name}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-6 py-4">
-                                  <div className="flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                                    <CalendarIcon className="h-3 w-3 text-zinc-400" />
-                                    {new Date(group.entry_date).toLocaleDateString("en-GB", {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
-                                  </div>
-                                </TableCell>
-                                <TableCell
-                                  className="px-6 py-4 text-right"
-                                  onClick={(e) => e.stopPropagation()}
+                            filteredBankGroups.map((group, index) => {
+                              const availRatio = group.total_cheques > 0 ? ((group.available_count / group.total_cheques) * 100).toFixed(1) : '0';
+                              return (
+                                <TableRow
+                                  key={group.bank_id}
+                                  className="group border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-orange-500/[0.02] transition-colors cursor-pointer"
+                                  onClick={() => setSelectedBankId(group.bank_id)}
                                 >
-                                  <Button
-                                    variant="ghost"
-                                    className="text-orange-500 hover:text-orange-600 font-bold text-xs uppercase"
-                                    onClick={() => setSelectedBankId(group.bank_id)}
+                                  <TableCell className="px-6 py-4">
+                                    <div className="flex items-center gap-4">
+                                      <Avatar className="h-10 w-10 border border-zinc-200 dark:border-zinc-800 shadow-sm transition-transform group-hover:scale-105">
+                                        <AvatarImage src={group.logo_url} />
+                                        <AvatarFallback className="bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-xs">
+                                          {group.bank_name.slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter hover:text-orange-500 transition-colors">
+                                          {group.bank_name}
+                                        </span>
+                                        <span className="text-[10px] text-zinc-400 font-mono tracking-widest uppercase">
+                                          Bank ID: {group.bank_id.toString().padStart(3, "0")}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4 text-center">
+                                    <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 min-w-[44px]">
+                                      {group.total_cheques}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4 text-center">
+                                    <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 min-w-[44px]">
+                                      {group.used_count}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4 text-center">
+                                    <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 min-w-[44px]">
+                                      {group.available_count}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4">
+                                    <div className="space-y-1 max-w-[180px]">
+                                      <div className="flex justify-between items-center text-[10px] font-bold">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-mono">{availRatio}% Available</span>
+                                        <span className="text-zinc-400 font-mono">{group.available_count}/{group.total_cheques}</span>
+                                      </div>
+                                      <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                                        <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${availRatio}%` }} />
+                                        <div className="bg-blue-500 h-full transition-all duration-500" style={{ width: `${100 - Number(availRatio)}%` }} />
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4">
+                                    <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+                                      <UserIcon className="h-3 w-3" />
+                                      <span>{group.created_by_name}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-6 py-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                                      <CalendarIcon className="h-3 w-3 text-zinc-400" />
+                                      {new Date(group.entry_date).toLocaleDateString("en-GB", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell
+                                    className="px-6 py-4 text-right"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    View Cheques
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                                    <Button
+                                      variant="ghost"
+                                      className="text-orange-500 hover:text-orange-600 font-bold text-xs uppercase hover:bg-orange-500/10 rounded-xl"
+                                      onClick={() => setSelectedBankId(group.bank_id)}
+                                    >
+                                      View Cheques
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
                           ) : (
                             <TableRow>
                               <TableCell
-                                colSpan={7}
+                                colSpan={8}
                                 className="text-center py-20 text-zinc-400 font-mono text-xs uppercase tracking-[0.3em]"
                               >
                                 No banks match search

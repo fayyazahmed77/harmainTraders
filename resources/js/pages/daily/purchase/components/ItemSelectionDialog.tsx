@@ -139,7 +139,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
     const handleItemClick = (item: Item) => {
         setSelectedItemForQty(item);
 
-        const existing = rows.find(r => r.item_id === item.id);
+        const existing = rows.find(r => Number(r.item_id) === Number(item.id));
         if (existing) {
             setDialogFull(toNumber(existing.full));
             setDialogPcs(toNumber(existing.pcs));
@@ -165,7 +165,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         if (!selectedItemForQty) return;
 
         const itemId = selectedItemForQty.id;
-        const existingRow = rows.find(r => r.item_id === itemId);
+        const existingRow = rows.find(r => Number(r.item_id) === Number(itemId));
 
         const effectiveLastRate = toNumber(selectedItemForQty.last_purchase_rate) > 0
             ? toNumber(selectedItemForQty.last_purchase_rate)
@@ -421,7 +421,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const tradePrice = toNumber(item.trade_price);
                                     const avgPrice = (toNumber(item.trade_price) + toNumber(item.retail)) / 2;
-                                    const isSelected = rows.some(r => r.item_id === item.id);
+                                    const isSelected = rows.some(r => Number(r.item_id) === Number(item.id));
                                     const isFocused = idx === selectedIndex;
 
                                     return (

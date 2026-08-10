@@ -89,6 +89,47 @@ class ChequebookController extends Controller implements HasMiddleware
 
         ]);
     }
+    public function checkDuplicates(Request $request)
+    {
+        $request->validate([
+            'bank_id' => 'required|exists:accounts,id',
+            'cheques' => 'required|array|min:1',
+            'prefix' => 'nullable|string',
+        ]);
+
+        $bank = Account::find($request->bank_id);
+        $bankName = $bank ? $bank->title : 'Selected Bank';
+        $prefix = $request->prefix ?? '';
+
+        // Fetch existing cheque numbers for this bank
+        $existingNumbers = Chequebook::where('bank_id', $request->bank_id)
+            ->where(function ($q) use ($request, $prefix) {
+                $q->whereIn('cheque_no', $request->cheques);
+                if (!empty($prefix)) {
+                    $prefixed = array_map(fn($c) => $prefix . $c, $request->cheques);
+                    $q->orWhereIn('cheque_no', $prefixed);
+                }
+            })
+            ->pluck('cheque_no')
+            ->map(fn($num) => (string)$num)
+            ->toArray();
+
+        $isDuplicate = !empty($existingNumbers);
+        $sampleList = implode(', ', array_slice($existingNumbers, 0, 5));
+        if (count($existingNumbers) > 5) {
+            $sampleList .= '... (+ ' . (count($existingNumbers) - 5) . ' more)';
+        }
+
+        return response()->json([
+            'exists' => $isDuplicate,
+            'existing_cheques' => array_values(array_unique($existingNumbers)),
+            'bank_name' => $bankName,
+            'message' => $isDuplicate
+                ? "Cheque book / number(s) [{$sampleList}] already exist for {$bankName}."
+                : "All cheques are available for {$bankName}.",
+        ]);
+    }
+
     public function store(Request $request)
     {
         // ✅ Validate according to the actual structure of your data
@@ -102,44 +143,67 @@ class ChequebookController extends Controller implements HasMiddleware
             'cheques.*' => 'string|max:10', // each cheque number
         ]);
 
-        // ✅ Convert date safely (handles ISO string from JS)
-        $entryDate = Carbon::parse($request->entry_date)->format('Y-m-d');
+        $bank = Account::find($request->bank_id);
+        $bankName = $bank ? $bank->title : 'Selected Bank';
+        $prefix = $request->prefix ?? '';
 
-        // ✅ Fetch existing cheque numbers for this bank
+        // ✅ Check if ANY of the submitted cheque numbers already exist for this bank
         $existingNumbers = Chequebook::where('bank_id', $request->bank_id)
-            ->whereIn('cheque_no', $request->cheques)
+            ->where(function ($q) use ($request, $prefix) {
+                $q->whereIn('cheque_no', $request->cheques);
+                if (!empty($prefix)) {
+                    $prefixed = array_map(fn($c) => $prefix . $c, $request->cheques);
+                    $q->orWhereIn('cheque_no', $prefixed);
+                }
+            })
             ->pluck('cheque_no')
             ->map(fn($num) => (string)$num)
             ->toArray();
+
+        if (!empty($existingNumbers)) {
+            $uniqueExisting = array_values(array_unique($existingNumbers));
+            $sampleList = implode(', ', array_slice($uniqueExisting, 0, 5));
+            if (count($uniqueExisting) > 5) {
+                $sampleList .= '... (+ ' . (count($uniqueExisting) - 5) . ' more)';
+            }
+            $errorMsg = "Cheque book / number(s) [{$sampleList}] already exist for {$bankName}. Please use a different start/end sequence.";
+
+            return back()->withErrors([
+                'bank_id' => "Cheque number(s) already exist for {$bankName}.",
+                'cheque_from' => $errorMsg,
+                'cheque_to' => $errorMsg,
+            ])->with('error', $errorMsg);
+        }
+
+        // ✅ Convert date safely (handles ISO string from JS)
+        $entryDate = Carbon::parse($request->entry_date)->format('Y-m-d');
 
         $newCheques = [];
 
         // ✅ Prepare new cheque rows
         foreach ($request->cheques as $num) {
-            if (!in_array($num, $existingNumbers)) {
-                $newCheques[] = [
-                    'bank_id' => $request->bank_id,
-                    'cheque_no' => $num,
-                    'entry_date' => $entryDate,
-                    'voucher_code' => $request->voucher_code ?? null,
-                    'prefix' => $request->prefix,
-                    'remarks' => $request->remarks,
-                    'status' => 'unused',
-                    'created_by' => Auth::id(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
+            $newCheques[] = [
+                'bank_id' => $request->bank_id,
+                'cheque_no' => $num,
+                'entry_date' => $entryDate,
+                'voucher_code' => $request->voucher_code ?? null,
+                'prefix' => $request->prefix,
+                'remarks' => $request->remarks,
+                'status' => 'unused',
+                'created_by' => Auth::id(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
 
         // ✅ Insert all new cheques (each cheque = 1 row)
         if (count($newCheques) > 0) {
             Chequebook::insert($newCheques);
 
-            return redirect()->route('cheque.index')->with('success', count($newCheques) . ' cheques generated successfully!');
+            return redirect()->route('cheque.index')->with('success', count($newCheques) . " cheques for {$bankName} generated successfully!");
         }
 
-        return back()->with('warning', 'No new cheques were created — all already exist.');
+        return back()->with('warning', 'No new cheques were created.');
     }
     //update
     public function update(Request $request, Chequebook $cheque) 

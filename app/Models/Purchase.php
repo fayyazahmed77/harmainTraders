@@ -32,6 +32,23 @@ class Purchase extends Model
         'message_line_id',
     ];
 
+    protected $casts = [
+        'id' => 'integer',
+        'supplier_id' => 'integer',
+        'salesman_id' => 'integer',
+        'firm_id' => 'integer',
+        'message_line_id' => 'integer',
+        'no_of_items' => 'integer',
+        'gross_total' => 'float',
+        'discount_total' => 'float',
+        'extra_discount' => 'float',
+        'tax_total' => 'float',
+        'courier_charges' => 'float',
+        'net_total' => 'float',
+        'paid_amount' => 'float',
+        'remaining_amount' => 'float',
+    ];
+
     public function messageLine()
     {
         return $this->belongsTo(MessageLine::class);

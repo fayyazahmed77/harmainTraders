@@ -82,6 +82,18 @@ class MessageLineController extends Controller implements HasMiddleware
     }
 
     /**
+     * Toggle the status of the specified message line.
+     */
+    public function toggleStatus($id)
+    {
+        $messageLine = MessageLine::findOrFail($id);
+        $messageLine->status = ($messageLine->status === 'active') ? 'inactive' : 'active';
+        $messageLine->save();
+
+        return back()->with('success', 'Message line status updated successfully.');
+    }
+
+    /**
      * Remove the specified message line.
      */
     public function destroy($id)
