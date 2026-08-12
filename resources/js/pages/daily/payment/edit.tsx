@@ -1475,9 +1475,20 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                           </div>
                           <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
                           <div className="space-y-0.5">
-                            <div className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Billed Outstanding</div>
-                            <div className="text-xs font-mono font-black text-zinc-700">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString()}</div>
+                            <div className="text-[9px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">Billed Outstanding</div>
+                            <div className="text-xs font-mono font-black text-zinc-700 dark:text-zinc-300">Rs {unpaidBills.reduce((s, b) => s + toNum(b.remaining_amount), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           </div>
+                          {selectedAccountId && (
+                            <>
+                              <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
+                              <div className="space-y-0.5">
+                                <div className="text-[9px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">Account Balance</div>
+                                <div className={`text-xs font-mono font-black ${currentBalance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  Rs {Math.abs(currentBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {balanceOrientation.toUpperCase()}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-6">
@@ -1664,6 +1675,17 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                               Rs {balanceRequired.toLocaleString()}
                             </div>
                           </div>
+                          {selectedAccountId && (
+                            <>
+                              <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 self-center" />
+                              <div className="space-y-0.5">
+                                <div className="text-[9px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-widest">Account Balance</div>
+                                <div className={`text-xs font-mono font-black ${currentBalance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  Rs {Math.abs(currentBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {balanceOrientation.toUpperCase()}
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </Card>

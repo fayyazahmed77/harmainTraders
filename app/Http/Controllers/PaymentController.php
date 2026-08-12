@@ -511,7 +511,15 @@ class PaymentController extends Controller implements HasMiddleware
             }
 
             DB::commit();
-            return redirect()->route('payments.index')->with('success', 'Payment updated successfully.');
+            return redirect()->route('payments.index')
+                ->with('success', 'Payment updated successfully.')
+                ->with('print_id', $payment->group_id ?? $payment->id)
+                ->with('party_name', $account->title ?? 'General Party')
+                ->with('amount', $payment->amount)
+                ->with('discount', $payment->discount)
+                ->with('invoices_count', count($payment->allocations ?? []))
+                ->with('method', $payment->payment_method ?? 'Cash')
+                ->with('payment_type', $payment->type);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Payment Update Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -1642,10 +1650,16 @@ class PaymentController extends Controller implements HasMiddleware
             DB::commit();
             optional($lock)->release();
 
-            return redirect()->route('payment.create')
+            return redirect()->route('payments.index')
                 ->with('success', 'Payment saved successfully.')
                 ->with('print_id', $groupId)
-                ->with('saved_payments', $savedPaymentsDetails);
+                ->with('saved_payments', $savedPaymentsDetails)
+                ->with('party_name', $account->title ?? 'General Party')
+                ->with('amount', $totalAmount)
+                ->with('discount', $totalDiscount)
+                ->with('invoices_count', count($request->allocations ?? []))
+                ->with('method', $isMulti ? 'Multi' : ($request->payment_method ?? 'Cash'))
+                ->with('payment_type', $request->type);
         } catch (\Exception $e) {
             DB::rollBack();
             optional($lock)->release();

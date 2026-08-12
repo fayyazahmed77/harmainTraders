@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Plus, ShieldCheck, LayoutDashboard } from "lucide-react";
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { motion } from "framer-motion";
 import DashboardStats from './components/DashboardStats';
 import UnifiedPerformanceLog from './components/UnifiedPerformanceLog';
@@ -12,6 +12,7 @@ import AnalyticsCharts from './components/AnalyticsCharts';
 import PaymentFilters from './PaymentFilters';
 import DataTable from './components/DataTable';
 import { route } from 'ziggy-js';
+import { PaymentSuccessDialog } from './components/PaymentSuccessDialog';
 
 interface Props {
     payments: {
@@ -35,6 +36,25 @@ export default function PaymentIndex({
     filters,
     accounts
 }: Props) {
+    const { flash } = usePage().props as any;
+    const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
+    const [successData, setSuccessData] = React.useState<any>(null);
+
+    React.useEffect(() => {
+        if (flash?.success) {
+            setSuccessData({
+                partyName: flash?.party_name || flash?.saved_payments?.[0]?.account || "General Party",
+                amount: flash?.amount || (flash?.saved_payments ? flash.saved_payments.reduce((sum: number, p: any) => sum + p.amount, 0) : 0),
+                invoicesCount: flash?.invoices_count || 0,
+                method: flash?.method || "Cash",
+                discount: flash?.discount || 0,
+                voucherNo: flash?.print_id || flash?.saved_payments?.[0]?.voucher_no || '---',
+                printId: flash?.print_id || flash?.saved_payments?.[0]?.id,
+                paymentType: flash?.payment_type || 'RECEIPT',
+            });
+            setSuccessDialogOpen(true);
+        }
+    }, [flash]);
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
@@ -107,6 +127,12 @@ export default function PaymentIndex({
                         <p className="text-[8px] font-bold font-mono tracking-widest mt-2 sm:mt-0 uppercase">GATEWAY_VERIFIED // 2026-HB-SYS</p>
                     </div>
                 </div>
+
+                <PaymentSuccessDialog 
+                    open={successDialogOpen} 
+                    onOpenChange={setSuccessDialogOpen} 
+                    data={successData} 
+                />
             </SidebarInset>
         </SidebarProvider>
     );
