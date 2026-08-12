@@ -137,8 +137,8 @@ interface IndexProps {
 // Reusable TechLabel component matching items/create
 const TechLabel = ({ children, icon: Icon, label, required, error, className }: { children: React.ReactNode, icon?: any, label: string, required?: boolean, error?: string, className?: string }) => (
   <div className={cn("space-y-1.5", className)}>
-    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
-      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-700 dark:text-zinc-700 mb-0.5">
+      {Icon && <Icon size={10} className="text-zinc-700 dark:text-zinc-500" />}
       {label}
       {required && <span className="text-rose-500 ml-0.5">*</span>}
     </div>
@@ -749,7 +749,7 @@ export default function Create({
                 <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD && 'rounded-l-md'}`} />
 
                 <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
-                  <div className="text-[10px] uppercase font-black tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Status</div>
+                  <div className="text-[10px] uppercase font-black tracking-widest text-zinc-700 dark:text-zinc-500 mb-2">Status</div>
                   <div className="flex flex-col gap-2">
                     {data.status && <SignalBadge text="ACTIVE" type="green" />}
                     {!data.status && <SignalBadge text="INACTIVE" type="red" />}
@@ -768,14 +768,14 @@ export default function Create({
                             variant="outline"
                             className={cn(
                               `w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`,
-                              !openingDate && "text-zinc-400",
+                              !openingDate && "text-zinc-700",
                               errors.opening_date && "border-rose-500"
                             )}
                           >
                             {openingDate
                               ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                               : "Select date"}
-                            <CalendarDays size={14} className="text-zinc-400" />
+                            <CalendarDays size={14} className="text-zinc-700" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -858,7 +858,7 @@ export default function Create({
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
                           {availabilityStatus === "loading" && (
-                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
+                            <span className="text-[10px] text-zinc-700 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
                               <span className="h-2.5 w-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
                               Checking...
                             </span>
@@ -894,7 +894,7 @@ export default function Create({
                                   <div className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-tight">
                                     <HighlightText text={suggestion.title} highlight={data.title} />
                                   </div>
-                                  <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                                  <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-700 uppercase tracking-wider flex items-center gap-1">
                                     {suggestion.account_type || "No Type"}
                                     {suggestion.city && (
                                       <>
@@ -905,7 +905,7 @@ export default function Create({
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-[10px] font-mono font-black text-zinc-400 dark:text-zinc-600 tracking-wider">
+                                  <div className="text-[10px] font-mono font-black text-zinc-700 dark:text-zinc-600 tracking-wider">
                                     {suggestion.code}
                                   </div>
                                   <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 hover:underline">
@@ -955,7 +955,7 @@ export default function Create({
                     {/* Permissions / Options */}
                     <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-4">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-zinc-400">
+                        <div className="flex items-center gap-2 text-[10px] uppercase font-black tracking-widest text-zinc-700">
                           <ShieldCheck size={12} />
                           Account Permissions
                         </div>
@@ -1115,7 +1115,7 @@ export default function Create({
                         </div>
                       ) : (
                         <div
-                          className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
+                          className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-700 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
                           onClick={() => document.getElementById('image-upload')?.click()}
                         >
                           <Plus className="h-8 w-8" />
@@ -1140,7 +1140,7 @@ export default function Create({
                           }
                         }}
                       />
-                      <p className="text-[10px] text-zinc-400 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
+                      <p className="text-[10px] text-zinc-700 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
                       {errors.image && <p className="text-[10px] text-rose-500 font-bold uppercase">{errors.image}</p>}
                     </div>
                   </Card>

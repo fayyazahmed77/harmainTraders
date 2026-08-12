@@ -73,7 +73,7 @@ if (file_exists($logo_path)) {
 
         .brand-tagline {
             font-size: 8px;
-            color: #888;
+            color: #555;
             letter-spacing: 1px;
             text-transform: uppercase;
             margin-top: 2px;
@@ -307,19 +307,23 @@ if (file_exists($logo_path)) {
         <img src="{{ $logo_base64 }}" alt="watermark">
     </div>
 
+@php
+    $firm = $firm ?? (isset($purchase->firm) ? $purchase->firm : null) ?? (isset($purchase->firm_id) ? \App\Models\Firm::find($purchase->firm_id) : null) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+@endphp
+
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
             <div class="logo-section">
                 <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"> </div>
                 <div class="brand-text">
-                    <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
-                    <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
+                    <div class="brand-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
+                    <div class="brand-tagline">{{ $firm->business ?? 'Wholesale & Supply Chain' }}</div>
                 </div>
             </div>
         </div>
         <div class="header-contact" style="width: 40%;">
-            <div class="contact-item">Phone : 0317-2288084</div>
-            <div class="contact-item">Fix no : 0343-8772357</div>
+            @if(!empty($firm->phone))<div class="contact-item">Phone : {{ $firm->phone }}</div>@endif
+            @if(!empty($firm->fax))<div class="contact-item">Fix no : {{ $firm->fax }}</div>@endif
         </div>
     </div>
 
@@ -402,11 +406,11 @@ if (file_exists($logo_path)) {
                         <td>{{ (int)$item->qty_carton }}</td>
                         <td>{{ (int)$item->qty_pcs }}</td>
                         <td class="text-left">{{ $item->item->title }}</td>
-                        <td>{{ number_format($item->item->retail ?? 0, 2) }}</td>
-                        <td>{{ number_format($item->trade_price, 2) }}</td>
-                        <td>{{ number_format($disc_percent, 2) }}</td>
-                        <td>{{ number_format($after_disc_rate, 2) }}</td>
-                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 2) }}</td>
+                        <td>{{ number_format($item->item->retail ?? 0, 0) }}</td>
+                        <td>{{ number_format($item->trade_price, 0) }}</td>
+                        <td>{{ number_format($disc_percent, 0) }}</td>
+                        <td>{{ number_format($after_disc_rate, 0) }}</td>
+                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -428,7 +432,7 @@ if (file_exists($logo_path)) {
 
             <div class="footer-center">
                 <div style="font-weight: bold; margin-top: 0px;">
-                    Discount Amount : &nbsp; {{ number_format($purchase->discount_total, 2) }}
+                    Discount Amount : &nbsp; {{ number_format($purchase->discount_total, 0) }}
                 </div>
             </div>
 
@@ -439,14 +443,14 @@ if (file_exists($logo_path)) {
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>
-                            <td class="value">{{ number_format($purchase->courier_charges ?? 0, 2) }}</td>
+                            <td class="value">{{ number_format($purchase->courier_charges ?? 0, 0) }}</td>
                         </tr>
                        
                         <!-- Extra Discount -->
                         @if(($purchase->extra_discount ?? 0) > 0)
                         <tr>
                             <td class="label">Extra Discount :-</td>
-                            <td class="value">{{ number_format($purchase->extra_discount, 2) }}</td>
+                            <td class="value">{{ number_format($purchase->extra_discount, 0) }}</td>
                         </tr>
                         @endif
                          <!-- Total Rs. (Net of current invoice) -->
@@ -455,7 +459,7 @@ if (file_exists($logo_path)) {
                         @endphp
                         <tr>
                             <td class="label">Total Bill  :-</td>
-                            <td class="value">{{ number_format($invoice_total, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total, 0) }}</td>
                         </tr>
                         <!-- Previous Balance -->
                         @php
@@ -465,7 +469,7 @@ if (file_exists($logo_path)) {
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
-                            <td class="value">{{ number_format($prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format($prev_balance, 0) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -475,12 +479,12 @@ if (file_exists($logo_path)) {
                         <!-- Total Balance -->
                         <tr>
                             <td class="label">Total Balance :-</td>
-                            <td class="value">{{ number_format($invoice_total + $prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total + $prev_balance, 0) }}</td>
                         </tr>
                         <!-- Cash Received -->
                         <tr>
                             <td class="label">Paid Amount :-</td>
-                            <td class="value">{{ number_format($paid, 2) }}</td>
+                            <td class="value">{{ number_format($paid, 0) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -490,12 +494,25 @@ if (file_exists($logo_path)) {
                         <!-- Total Payable -->
                         <tr>
                             <td class="label">Net Payable :</td>
-                            <td class="value">{{ number_format($invoice_total + $prev_balance - $paid, 2) }}</td>
+                            <td class="value">{{ number_format($invoice_total + $prev_balance - $paid, 0) }}</td>
                         </tr>
                     </table>
                 </div>
             </div>
 
+        </div>
+
+        <!-- Branded Footer -->
+        <div style="margin-top: 18px; padding-top: 8px; border-top: 1px dashed #000; text-align: center; font-family: Arial, sans-serif;">
+            <div style="font-size: 9px; color: #000; margin-bottom: 3px;">
+                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+            </div>
+            <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
+                Thank you for choosing Haramain Traders.
+            </div>
+            <div style="font-size: 8px; color: #999; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
         </div>
     </div>
 </body>

@@ -53,8 +53,8 @@ const PREMIUM_GRADIENT = "bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-z
 // Standardized TechLabel component
 const TechLabel = ({ children, icon: Icon, label, required, error, className }: { children: React.ReactNode, icon?: any, label: string, required?: boolean, error?: string, className?: string }) => (
   <div className={cn("space-y-1.5", className)}>
-    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400 mb-0.5">
-      {Icon && <Icon size={10} className="text-zinc-400 dark:text-zinc-500" />}
+    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-700 mb-0.5">
+      {Icon && <Icon size={10} className="text-zinc-700 dark:text-zinc-500" />}
       {label}
       {required && <span className="text-rose-500 ml-0.5">*</span>}
     </div>
@@ -664,7 +664,7 @@ export default function Edit({
                 <h1 className={`text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'} mb-2`}>
                   EDIT <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">ACCOUNT</span>
                 </h1>
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Modify existing account parameters and preferences</p>
+                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-700">Modify existing account parameters and preferences</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -674,7 +674,7 @@ export default function Edit({
                   <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD && 'rounded-l-md'}`} />
 
                   <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
-                    <div className="text-[10px] uppercase font-black tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">Status</div>
+                    <div className="text-[10px] uppercase font-black tracking-widest text-zinc-700 dark:text-zinc-500 mb-2">Status</div>
                     <div className="flex flex-col gap-2">
                       <SignalBadge text={data.status ? "ACTIVE" : "INACTIVE"} type={data.status ? "green" : "red"} />
                       {accountType && (
@@ -696,7 +696,7 @@ export default function Edit({
                             )}
                           >
                             {openingDate ? openingDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "Select date"}
-                            <CalendarDays className="h-4 w-4 text-zinc-400" />
+                            <CalendarDays className="h-4 w-4 text-zinc-700" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -768,7 +768,7 @@ export default function Edit({
                           />
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
                             {availabilityStatus === "loading" && (
-                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
+                              <span className="text-[10px] text-zinc-700 dark:text-zinc-500 font-bold flex items-center gap-1 animate-pulse">
                                 <span className="h-2.5 w-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
                                 Checking...
                               </span>
@@ -804,7 +804,7 @@ export default function Edit({
                                     <div className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-tight">
                                       <HighlightText text={suggestion.title} highlight={data.title} />
                                     </div>
-                                    <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                                    <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-700 uppercase tracking-wider flex items-center gap-1">
                                       {suggestion.account_type || "No Type"}
                                       {suggestion.city && (
                                         <>
@@ -815,7 +815,7 @@ export default function Edit({
                                     </div>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-[10px] font-mono font-black text-zinc-400 dark:text-zinc-600 tracking-wider">
+                                    <div className="text-[10px] font-mono font-black text-zinc-700 dark:text-zinc-600 tracking-wider">
                                       {suggestion.code}
                                     </div>
                                     <span className="text-[9px] font-bold uppercase tracking-widest text-orange-500 hover:underline">
@@ -881,7 +881,7 @@ export default function Edit({
                               placeholder="0"
                               className={`h-10 pl-8 font-mono font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
                             />
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">PKR</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700 font-bold text-xs">PKR</span>
                           </div>
                         </TechLabel>
                         <TechLabel label="Credit Limit" icon={ShieldCheck} required={isCustomer} error={errors.credit_limit}>
@@ -969,7 +969,7 @@ export default function Edit({
                           </div>
                         ) : (
                           <div
-                            className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
+                            className="w-32 h-32 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-2 text-zinc-700 hover:border-orange-500 hover:text-orange-500 transition-all cursor-pointer bg-zinc-50/50 dark:bg-zinc-900/50"
                             onClick={() => document.getElementById('image-upload')?.click()}
                           >
                             <Plus className="h-8 w-8" />
@@ -994,7 +994,7 @@ export default function Edit({
                             }
                           }}
                         />
-                        <p className="text-[10px] text-zinc-400 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
+                        <p className="text-[10px] text-zinc-700 font-medium">JPEG, PNG or SVG. Max 2MB.</p>
                         {errors.image && <p className="text-[10px] text-rose-500 font-bold uppercase">{errors.image}</p>}
                       </div>
                     </Card>
@@ -1210,7 +1210,7 @@ export default function Edit({
                                 )}
                               >
                                 {fbrDate ? fbrDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "Select date"}
-                                <CalendarDays className="h-4 w-4 text-zinc-400" />
+                                <CalendarDays className="h-4 w-4 text-zinc-700" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
@@ -1266,7 +1266,7 @@ export default function Edit({
                           onCheckedChange={(v) => onInputChange("status", !!v)}
                           className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                         />
-                        <label htmlFor="status" className="text-xs font-bold text-zinc-600 dark:text-zinc-400 cursor-pointer uppercase tracking-widest">Active Account</label>
+                        <label htmlFor="status" className="text-xs font-bold text-zinc-600 dark:text-zinc-700 cursor-pointer uppercase tracking-widest">Active Account</label>
                       </div>
                     </Card>
                   </div>
@@ -1276,7 +1276,7 @@ export default function Edit({
                 <div className="fixed bottom-0 right-0 left-0 md:left-[244px] bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 p-4 px-8 z-40 flex items-center justify-between animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="flex items-center gap-4">
                     <div className="hidden md:flex flex-col">
-                      <span className="text-[10px] uppercase font-black tracking-widest text-zinc-400">Current Scope</span>
+                      <span className="text-[10px] uppercase font-black tracking-widest text-zinc-700">Current Scope</span>
                       <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-tight">{account.title}</span>
                     </div>
                   </div>

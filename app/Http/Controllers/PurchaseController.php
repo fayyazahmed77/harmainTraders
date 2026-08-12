@@ -863,7 +863,9 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $purchase = Purchase::with('supplier', 'salesman', 'items.item')->findOrFail($id);
 
-        $pdf = Pdf::loadView('pdf.purchase', compact('purchase'))
+        $firm = \App\Models\Firm::find($purchase->firm_id) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+
+        $pdf = Pdf::loadView('pdf.purchase', compact('purchase', 'firm'))
             ->setPaper('A4', 'portrait');
 
         return $pdf->download("Purchase-Invoice-$id.pdf");

@@ -172,11 +172,15 @@
 <body>
 
     <div class="receipt-wrapper">
+@php
+    $firm = $firm ?? (isset($purchaseReturn->firm) ? $purchaseReturn->firm : null) ?? (isset($purchaseReturn->firm_id) ? \App\Models\Firm::find($purchaseReturn->firm_id) : null) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+@endphp
+
         <!-- Header -->
         <div class="header text-center">
-            <div class="brand-name">HARMAIN TRADERS</div>
+            <div class="brand-name">{{ strtoupper($firm->name ?? 'HARMAIN TRADERS') }}</div>
             <div class="contact-info">
-                Phone No. : 0332-3228684 &nbsp; Fax No. : 0343-8772357
+                Phone No. : {{ $firm->phone ?? '' }} @if(!empty($firm->fax)) &nbsp; Fax No. : {{ $firm->fax }} @endif
             </div>
         </div>
 
@@ -256,12 +260,12 @@
           
             <div class="total-row clearfix bold">
                 <span class="total-label">Net Return Amount :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 2) }}</span>
+                <span class="total-value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 0) }}</span>
             </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->previous_balance, 2) }}</span>
+                <span class="total-value">{{ number_format($purchaseReturn->previous_balance, 0) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
@@ -273,7 +277,7 @@
 
             <div class="total-row clearfix">
                 <span class="total-label">Cash Received :-</span>
-                <span class="total-value">{{ number_format($purchaseReturn->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format($purchaseReturn->paid_amount, 0) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
@@ -293,7 +297,19 @@
 
         <!-- Footer -->
         <div class="footer-text text-center">
-            Purchase Return Debit Note
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="font-size: 9px; color: #000; margin-bottom: 2px;">
+                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+            </div>
+            <div style="font-size: 9px; font-weight: bold; color: #000; margin-bottom: 2px;">
+                This is a computer-generated receipt.
+            </div>
+            <div style="font-size: 9px; font-weight: bold; color: #000;">
+                Thank you for choosing Haramain Traders.
+            </div>
+            <div style="font-size: 7.5px; color: #555; margin-top: 4px; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
         </div>
     </div>
 </body>

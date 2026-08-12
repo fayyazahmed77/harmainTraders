@@ -67,7 +67,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
 
         .brand-tagline {
             font-size: 7px;
-            color: #888;
+            color: #555;
             letter-spacing: 1px;
             text-transform: uppercase;
             margin-top: 1px;
@@ -292,19 +292,23 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         <img src="{{ $logo_base64 }}" alt="watermark">
     </div>
 
+@php
+    $firm = $firm ?? (isset($purchaseReturn->firm) ? $purchaseReturn->firm : null) ?? (isset($purchaseReturn->firm_id) ? \App\Models\Firm::find($purchaseReturn->firm_id) : null) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+@endphp
+
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
             <div class="logo-section">
                 <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"> </div>
                 <div class="brand-text">
-                    <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
-                    <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
+                    <div class="brand-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
+                    <div class="brand-tagline">{{ $firm->business ?? 'Wholesale & Supply Chain' }}</div>
                 </div>
             </div>
         </div>
         <div class="header-contact" style="width: 40%;">
-            <div class="contact-item">Phone : 0332-3228684</div>
-            <div class="contact-item">Fix no : 0343-8772357</div>
+            @if(!empty($firm->phone))<div class="contact-item">Phone : {{ $firm->phone }}</div>@endif
+            @if(!empty($firm->fax))<div class="contact-item">Fix no : {{ $firm->fax }}</div>@endif
         </div>
     </div>
 
@@ -372,13 +376,13 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td>{{ $item->qty_carton }}</td>
                         <td>{{ $item->qty_pcs }}</td>
                         <td class="text-left">{{ $item->item->title }}</td>
-                        <td>{{ number_format($item->trade_price, 2) }}</td>
+                        <td>{{ number_format($item->trade_price, 0) }}</td>
                         @php
                         $base = $item->trade_price * $item->total_pcs;
                         $discPer = ($base > 0) ? ($item->discount / $base) * 100 : 0;
                         @endphp
-                        <td>{{ number_format($discPer, 2) }}</td>
-                        <td class="text-right" style="border-right: none;">{{ number_format($item->subtotal, 2) }}</td>
+                        <td>{{ number_format($discPer, 0) }}</td>
+                        <td class="text-right" style="border-right: none;">{{ number_format($item->subtotal, 0) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -405,31 +409,31 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                 <table class="footer-totals-table" align="right">
                     <tr>
                         <td class="label">Gross Reversal :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->gross_total, 2) }}</td>
+                        <td class="value">{{ number_format($purchaseReturn->gross_total, 0) }}</td>
                     </tr>
 
                     <tr>
                         <td class="label">Discount Reclaim :-</td>
-                        <td class="value">- {{ number_format($purchaseReturn->discount_total, 2) }}</td>
+                        <td class="value">- {{ number_format($purchaseReturn->discount_total, 0) }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
                     </tr>
                     <tr style="font-size: 12px;">
                         <td class="label">NET DEBIT :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->net_total, 2) }}</td>
+                        <td class="value">{{ number_format($purchaseReturn->net_total, 0) }}</td>
                     </tr>
                     <tr>
                         <td class="label">Extra Discount :-</td>
-                        <td class="value">- {{ number_format($purchaseReturn->extra_discount, 2) }}</td>
+                        <td class="value">- {{ number_format($purchaseReturn->extra_discount, 0) }}</td>
                     </tr>
                     <tr style="font-size: 12px;">
                         <td class="label">NET RETURN AMOUNT :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 2) }}</td>
+                        <td class="value">{{ number_format($purchaseReturn->net_total - $purchaseReturn->extra_discount, 0) }}</td>
                     </tr>
                     <tr>
                         <td class="label">Previous Balance :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->previous_balance, 2) }}</td>
+                        <td class="value">{{ number_format($purchaseReturn->previous_balance, 0) }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
@@ -440,7 +444,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                     </tr>
                     <tr>
                         <td class="label">Cash Received :-</td>
-                        <td class="value">{{ number_format($purchaseReturn->paid_amount, 2) }}</td>
+                        <td class="value">{{ number_format($purchaseReturn->paid_amount, 0) }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
@@ -450,6 +454,19 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
                         <td class="value">{{ number_format($purchaseReturn->previous_balance - ($purchaseReturn->net_total - $purchaseReturn->extra_discount) + $purchaseReturn->paid_amount, 2) }}</td>
                     </tr>
                 </table>
+            </div>
+        </div>
+
+        <!-- Branded Footer -->
+        <div style="margin-top: 18px; padding-top: 8px; border-top: 1px dashed #000; text-align: center; font-family: Arial, sans-serif;">
+            <div style="font-size: 9px; color: #000; margin-bottom: 3px;">
+                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+            </div>
+            <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
+                Thank you for choosing Haramain Traders.
+            </div>
+            <div style="font-size: 8px; color: #999; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
             </div>
         </div>
     </div>

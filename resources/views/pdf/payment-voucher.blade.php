@@ -320,7 +320,7 @@
             vertical-align: middle;
             width: 65%;
             font-size: 8px;
-            color: #555555;
+            color: #0c0c0cff;
         }
 
         .footer-right {
@@ -329,7 +329,7 @@
             text-align: right;
             width: 35%;
             font-size: 8px;
-            color: #555555;
+            color: #0f0e0eff;
         }
 
         /* ── STATUS BADGE (B&W friendly) ── */
@@ -570,10 +570,14 @@
         <div class="voucher-footer">
             <div class="footer-left">
                 Phone: {{ $f_phone }} &nbsp;·&nbsp; Email: {{ $f_email }} &nbsp;·&nbsp; Address: {{ $f_addr }}
+                <div style="font-size: 8px; color: #0e0d0dff; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> (with Love) <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
             </div>
             <div class="footer-right">
                 Computer-generated · {{ $payment->voucher_no }} · {{ \Carbon\Carbon::parse($payment->date)->format('d M Y') }}
             </div>
+            
         </div>
 
     </div>

@@ -117,12 +117,12 @@ export default function AccountView({ account, financial_summary }: Props) {
 
     const InfoRow = ({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: any }) => (
         <div className="flex flex-col space-y-1.5 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-medium text-zinc-700 uppercase tracking-wider">
                 {Icon && <Icon className="h-3 w-3" />}
                 {label}
             </div>
             <div className="text-sm font-semibold text-foreground">
-                {value || <span className="text-muted-foreground font-normal italic">Not specified</span>}
+                {value || <span className="text-zinc-700 font-normal italic">Not specified</span>}
             </div>
         </div>
     );
@@ -145,28 +145,28 @@ export default function AccountView({ account, financial_summary }: Props) {
                     <CardContent className="space-y-3">
                         {/* Gross sales line */}
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Total Sales (Net)</span>
+                            <span className="text-zinc-700">Total Sales (Net)</span>
                             <span className="font-bold">{formatCurrency(financial_summary.total_sales)}</span>
                         </div>
 
                         {/* Discount line */}
                         {Number(financial_summary.total_extra_discount) > 0 && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Total Discount</span>
+                                <span className="text-zinc-700">Total Discount</span>
                                 <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_extra_discount)}</span>
                             </div>
                         )}
 
                         {/* Returns line */}
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Returns</span>
+                            <span className="text-zinc-700">Returns</span>
                             <span className="font-bold text-orange-600">-{formatCurrency(financial_summary.total_returns)}</span>
                         </div>
 
                         {/* Net effective after returns + discount */}
                         {(Number(financial_summary.total_extra_discount) > 0 || Number(financial_summary.total_returns) > 0) && (
                             <div className="flex items-center justify-between text-sm border-t pt-2">
-                                <span className="text-muted-foreground font-medium">Net Effective</span>
+                                <span className="text-zinc-700 font-medium">Net Effective</span>
                                 <span className="font-bold text-blue-600">
                                     {formatCurrency(
                                         Number(financial_summary.total_sales) - Number(financial_summary.total_returns)
@@ -179,20 +179,20 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                         {Number(financial_summary.total_receipts_discount) > 0 && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Payment Discount</span>
+                                <span className="text-zinc-700">Payment Discount</span>
                                 <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_receipts_discount)}</span>
                             </div>
                         )}
 
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Amount Received</span>
+                            <span className="text-zinc-700">Amount Received</span>
                             <span className="font-bold text-green-600">
                                 {formatCurrency(financial_summary.total_receipts_cash !== undefined ? financial_summary.total_receipts_cash : financial_summary.total_receipts)}
                             </span>
                         </div>
                         <Separator />
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Unpaid Invoices</span>
+                            <span className="text-zinc-700">Unpaid Invoices</span>
                             <Badge variant="outline" className="font-bold text-red-600">
                                 {financial_summary.unpaid_invoices} Pending
                             </Badge>
@@ -200,19 +200,19 @@ export default function AccountView({ account, financial_summary }: Props) {
                         
                         {financial_summary.outstanding !== undefined && (
                             <div className="flex items-center justify-between text-sm border-t pt-2">
-                                <span className="text-muted-foreground">Outstanding (Receivable)</span>
+                                <span className="text-zinc-700">Outstanding (Receivable)</span>
                                 <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding)}</span>
                             </div>
                         )}
                         {financial_summary.credit_balance !== undefined && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Credit Balance</span>
+                                <span className="text-zinc-700">Credit Balance</span>
                                 <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
                             </div>
                         )}
                         {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Advance Payment (Advance)</span>
+                                <span className="text-zinc-700">Advance Payment (Advance)</span>
                                 <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
                             </div>
                         )}
@@ -232,28 +232,28 @@ export default function AccountView({ account, financial_summary }: Props) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Total Purchases</span>
+                            <span className="text-zinc-700">Total Purchases</span>
                             <span className="font-bold">{formatCurrency(financial_summary.total_purchases)}</span>
                         </div>
                         {Number(financial_summary.total_payments_discount) > 0 && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Payment Discount</span>
+                                <span className="text-zinc-700">Payment Discount</span>
                                 <span className="font-semibold text-amber-600">-{formatCurrency(financial_summary.total_payments_discount)}</span>
                             </div>
                         )}
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Amount Paid</span>
+                            <span className="text-zinc-700">Amount Paid</span>
                             <span className="font-bold text-blue-600">
                                 {formatCurrency(financial_summary.total_payments_cash !== undefined ? financial_summary.total_payments_cash : financial_summary.total_payments)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Returns</span>
+                            <span className="text-zinc-700">Returns</span>
                             <span className="font-bold text-orange-600">{formatCurrency(financial_summary.total_returns)}</span>
                         </div>
                         <Separator />
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Unpaid Bills</span>
+                            <span className="text-zinc-700">Unpaid Bills</span>
                             <Badge variant="outline" className="font-bold text-red-600">
                                 {financial_summary.unpaid_bills} Pending
                             </Badge>
@@ -261,19 +261,19 @@ export default function AccountView({ account, financial_summary }: Props) {
                         
                         {financial_summary.outstanding !== undefined && (
                             <div className="flex items-center justify-between text-sm border-t pt-2">
-                                <span className="text-muted-foreground">Outstanding (Payable)</span>
+                                <span className="text-zinc-700">Outstanding (Payable)</span>
                                 <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding)}</span>
                             </div>
                         )}
                         {financial_summary.credit_balance !== undefined && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Credit Balance</span>
+                                <span className="text-zinc-700">Credit Balance</span>
                                 <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
                             </div>
                         )}
                         {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Advance Payment (Advance)</span>
+                                <span className="text-zinc-700">Advance Payment (Advance)</span>
                                 <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
                             </div>
                         )}
@@ -299,11 +299,11 @@ export default function AccountView({ account, financial_summary }: Props) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">{typeLower === 'cheque in hand' ? 'Total IN Amount' : 'Total In'}</span>
+                            <span className="text-zinc-700">{typeLower === 'cheque in hand' ? 'Total IN Amount' : 'Total In'}</span>
                             <span className="font-bold text-green-600">{formatCurrency(financial_summary.total_in)}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">{typeLower === 'cheque in hand' ? 'Total OUT Amount' : 'Total Out'}</span>
+                            <span className="text-zinc-700">{typeLower === 'cheque in hand' ? 'Total OUT Amount' : 'Total Out'}</span>
                             <span className="font-bold text-red-600">{formatCurrency(financial_summary.total_out)}</span>
                         </div>
                         <div className="pt-2 border-t font-bold flex items-center justify-between">
@@ -313,18 +313,18 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                         {typeLower === 'bank' && (
                             <div className="space-y-3 mt-4 pt-4 border-t">
-                                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Chequebook Usage</p>
+                                <p className="text-[10px] font-bold uppercase text-zinc-700 tracking-widest">Chequebook Usage</p>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="p-2 bg-muted rounded text-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase">Total</div>
+                                        <div className="text-[10px] text-zinc-700 uppercase">Total</div>
                                         <div className="text-sm font-bold">{financial_summary.total_cheques}</div>
                                     </div>
                                     <div className="p-2 bg-muted rounded text-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase">Used</div>
+                                        <div className="text-[10px] text-zinc-700 uppercase">Used</div>
                                         <div className="text-sm font-bold text-blue-600">{financial_summary.issued_cheques}</div>
                                     </div>
                                     <div className="p-2 bg-muted rounded text-center">
-                                        <div className="text-[10px] text-muted-foreground uppercase">Avail.</div>
+                                        <div className="text-[10px] text-zinc-700 uppercase">Avail.</div>
                                         <div className="text-sm font-bold text-green-600">{financial_summary.available_cheques}</div>
                                     </div>
                                 </div>
@@ -361,7 +361,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                     {account.status ? "Active" : "Inactive"}
                                 </Badge>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-4 text-sm text-zinc-700">
                                 <div className="flex items-center gap-1.5 font-medium">
                                     <Hash className="h-4 w-4" />
                                     Code: <span className="text-foreground">{account.code}</span>
@@ -427,7 +427,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div>
-                                        <div className="text-xs text-muted-foreground uppercase mb-1">Opening Balance</div>
+                                        <div className="text-xs text-zinc-700 uppercase mb-1">Opening Balance</div>
                                         <div className="text-2xl font-bold text-primary">
                                             {formatCurrency(account.opening_balance)}
                                         </div>
@@ -468,7 +468,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                         }
 
                                         const textColor = balance === 0
-                                            ? "text-zinc-400"
+                                            ? "text-zinc-700"
                                             : isSupplierAdvance
                                                 ? "text-sky-600"
                                                 : isRed
@@ -477,7 +477,7 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                                         return (
                                             <div className="pt-2">
-                                                <div className="text-xs text-muted-foreground uppercase mb-1">
+                                                <div className="text-xs text-zinc-700 uppercase mb-1">
                                                     {typeLower === 'cheque in hand'
                                                         ? 'Available Amount of Check'
                                                         : isSupplierAdvance
@@ -502,11 +502,11 @@ export default function AccountView({ account, financial_summary }: Props) {
                                     })()}
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-primary/10">
                                         <div>
-                                            <div className="text-[10px] text-muted-foreground uppercase mb-1">Credit Limit</div>
+                                            <div className="text-[10px] text-zinc-700 uppercase mb-1">Credit Limit</div>
                                             <div className="text-sm font-bold">{formatCurrency(account.credit_limit)}</div>
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-muted-foreground uppercase mb-1">Aging Days</div>
+                                            <div className="text-[10px] text-zinc-700 uppercase mb-1">Aging Days</div>
                                             <div className="text-sm font-bold">{account.aging_days} Days</div>
                                         </div>
                                     </div>
@@ -525,19 +525,19 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Purchase</span>
+                                        <span className="text-zinc-700">Purchase</span>
                                         <Badge variant={account.purchase ? "secondary" : "outline"} className="text-[10px]">
                                             {account.purchase ? "Enabled" : "Disabled"}
                                         </Badge>
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Cash / Bank</span>
+                                        <span className="text-zinc-700">Cash / Bank</span>
                                         <Badge variant={account.cashbank ? "secondary" : "outline"} className="text-[10px]">
                                             {account.cashbank ? "Enabled" : "Disabled"}
                                         </Badge>
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Sale</span>
+                                        <span className="text-zinc-700">Sale</span>
                                         <Badge variant={account.sale ? "secondary" : "outline"} className="text-[10px]">
                                             {account.sale ? "Enabled" : "Disabled"}
                                         </Badge>
@@ -554,12 +554,12 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase mb-1 font-semibold">Salesman</div>
+                                        <div className="text-[10px] text-zinc-700 uppercase mb-1 font-semibold">Salesman</div>
                                         <div className="text-sm font-medium">{account.saleman?.name || "Not assigned"}</div>
                                     </div>
                                     <Separator />
                                     <div>
-                                        <div className="text-[10px] text-muted-foreground uppercase mb-1 font-semibold">Booker</div>
+                                        <div className="text-[10px] text-zinc-700 uppercase mb-1 font-semibold">Booker</div>
                                         <div className="text-sm font-medium">{account.booker?.name || "Not assigned"}</div>
                                     </div>
                                 </CardContent>
@@ -573,17 +573,17 @@ export default function AccountView({ account, financial_summary }: Props) {
                                     <TabsList className="flex w-full justify-start overflow-x-auto bg-transparent p-0 rounded-none h-auto">
                                         <TabsTrigger 
                                             value="overview" 
-                                            className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                                            className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent"
                                         >
                                             Identity & Detail
                                         </TabsTrigger>
                                         
                                         {typeLower === 'customers' && (
                                             <>
-                                                <TabsTrigger value="sales" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                <TabsTrigger value="sales" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                     Sales History
                                                 </TabsTrigger>
-                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                     Payments & Outstanding
                                                 </TabsTrigger>
                                             </>
@@ -591,10 +591,10 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                                         {typeLower === 'supplier' && (
                                             <>
-                                                <TabsTrigger value="purchases" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                <TabsTrigger value="purchases" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                     Purchase History
                                                 </TabsTrigger>
-                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                     Payments & Outstanding
                                                 </TabsTrigger>
                                             </>
@@ -602,11 +602,11 @@ export default function AccountView({ account, financial_summary }: Props) {
 
                                         {['bank', 'cash', 'cheque in hand'].includes(typeLower) && (
                                             <>
-                                                <TabsTrigger value="statement" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                <TabsTrigger value="statement" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                     {typeLower === 'cheque in hand' ? 'Cheque IN/OUT Ledger' : 'Bank Statement'}
                                                 </TabsTrigger>
                                                 {typeLower === 'bank' && (
-                                                    <TabsTrigger value="cheques" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                    <TabsTrigger value="cheques" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
                                                         Issued Cheques
                                                     </TabsTrigger>
                                                 )}
@@ -634,7 +634,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                             </div>
 
                                             <div className="mt-4 space-y-1 px-3">
-                                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                                <div className="text-xs font-medium text-zinc-700 uppercase tracking-wider flex items-center gap-2">
                                                     <MapPin className="h-3 w-3" />
                                                     Postal Address
                                                 </div>
@@ -693,7 +693,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                                 <CardTitle className="text-sm font-medium">Remarks</CardTitle>
                                             </CardHeader>
                                             <CardContent>
-                                                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                                                <p className="text-sm text-zinc-700 italic leading-relaxed">
                                                     {account.remarks || "No supplementary remarks found for this account."}
                                                 </p>
                                             </CardContent>
@@ -703,7 +703,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                                 <CardTitle className="text-sm font-medium">Regards / Additional Info</CardTitle>
                                             </CardHeader>
                                             <CardContent>
-                                                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                                                <p className="text-sm text-zinc-700 italic leading-relaxed">
                                                     {account.regards || "No complementary details available."}
                                                 </p>
                                             </CardContent>

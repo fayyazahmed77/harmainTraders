@@ -461,7 +461,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     setItemSearch(e.target.value);
                                     setSelectedIndex(0);
                                 }}
-                                className="pl-9 pr-8 h-9 bg-white/15 border-white/30 text-white placeholder:text-white/50 focus:ring-0 focus:bg-white/25 transition-all rounded-xl border font-bold text-xs"
+                                className="pl-9 pr-8 h-9 bg-white/10 border-white/30 text-white placeholder:text-white/70 focus:ring-0 focus:bg-white/25 transition-all rounded-xl border font-bold text-xs"
                                 autoFocus
                             />
                             {itemSearch && (
@@ -481,7 +481,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                         {/* Left Column: Items Table */}
                         <div className="flex-1 min-w-0 flex flex-col relative border-r border-zinc-200 dark:border-zinc-800">
                             {/* Table Header */}
-                            <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-2.5 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 shadow-xs text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                            <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-2.5 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 shadow-xs text-[9px] font-black uppercase tracking-wider text-zinc-700">
                                 <div className="col-span-1">Code</div>
                                 <div className="col-span-4">Registry Title</div>
                                 <div className="col-span-2 text-center">Trade Price</div>
@@ -522,7 +522,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         >
                                             <div className="hidden md:grid grid-cols-12 items-center py-0.5">
                                                 <div className="col-span-1 pl-1">
-                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-400'}`}>
+                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
                                                         #{String(item.id).padStart(4, '0')}
                                                     </span>
                                                 </div>
@@ -533,9 +533,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         }`}>
                                                             {item.title}
                                                         </span>
-                                                        <span className="text-[9px] text-zinc-400 font-mono italic truncate">
-                                                            {item.short_name || item.category || 'SKU'}
-                                                        </span>
+                                                        
                                                     </div>
                                                     {isSelected && (
                                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[8px] font-black uppercase tracking-wider shrink-0">
@@ -545,8 +543,8 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     )}
                                                 </div>
                                                 <div className="col-span-2 text-center">
-                                                    <div className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
-                                                        <span className="text-[9px] text-zinc-400 mr-1">Rs</span>
+                                                    <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                                        <span className="text-[9px] text-zinc-700 mr-1">Rs</span>
                                                         {toNumber(item.trade_price).toFixed(2)}
                                                     </div>
                                                 </div>
@@ -555,14 +553,14 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         <span className="text-[9px] opacity-70 not-italic mr-0.5">Rs</span>{tpVal.toFixed(2)}
                                                     </div>
                                                 </div>
-                                                <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                                <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
                                                     {toNumber(item.retail).toFixed(0)}
                                                 </div>
                                                 <div className="col-span-2 text-right pr-2">
                                                     <div className={cn("font-mono text-xs font-black", stock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
                                                         {full}F / {pcs}P
                                                     </div>
-                                                    <div className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">Total: {stock} Pcs</div>
+                                                    
                                                 </div>
                                             </div>
 
@@ -610,7 +608,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
                                         <div className="flex gap-2.5 p-1 items-end shrink-0">
                                             <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Full Units</span>
+                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Full Units</span>
                                                 <Input
                                                     ref={fullInputRef}
                                                     type="number"
@@ -623,7 +621,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
                                             {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                                                 <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                                                    <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Loose Pcs</span>
+                                                    <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Loose Pcs</span>
                                                     <Input
                                                         ref={pcsInputRef}
                                                         type="number"
@@ -636,7 +634,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             )}
 
                                             <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">B. Full</span>
+                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">B. Full</span>
                                                 <Input
                                                     ref={bFullInputRef}
                                                     type="number"
@@ -649,7 +647,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
                                             {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                                                 <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                                                    <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">B. PCS</span>
+                                                    <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">B. PCS</span>
                                                     <Input
                                                         ref={bPcsInputRef}
                                                         type="number"
@@ -662,7 +660,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             )}
 
                                             <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Rate (Rs)</span>
+                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Rate (Rs)</span>
                                                 <Input
                                                     ref={rateInputRef}
                                                     type="number"
@@ -674,7 +672,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             </div>
 
                                             <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-wider">Disc (%)</span>
+                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Disc (%)</span>
                                                 <Input
                                                     ref={discountInputRef}
                                                     type="number"
@@ -708,10 +706,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
                                     {/* 2. Inventory Status */}
                                     <div className="p-4 space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <Layers className="w-4 h-4 text-emerald-500" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Inventory Status</span>
-                                        </div>
+                                       
                                         {(() => {
                                             const packing = toNumber(selectedItemForQty.packing_qty) || 1;
                                             const totalStock = toNumber(selectedItemForQty.total_stock_pcs);
@@ -724,11 +719,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-800">
                                                         <div className="flex flex-col">
                                                             <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{fullCtn} Full</span>
-                                                            <span className="text-[8px] font-bold text-zinc-400 uppercase">Full Cartons</span>
+                                                            <span className="text-[8px] font-bold text-zinc-700 uppercase">Full Cartons</span>
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{loosePcs} PCS</span>
-                                                            <span className="text-[8px] font-bold text-zinc-400 uppercase">Loose Pieces</span>
+                                                            <span className="text-[8px] font-bold text-zinc-700 uppercase">Loose Pieces</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -739,7 +734,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     {/* 3. Pricing Tiers Matrix */}
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Pricing T.P Matrix</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-700">Pricing T.P Matrix</span>
                                             {customerCategory && (
                                                 <span className="text-[9px] font-bold text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded uppercase">
                                                     Cat: Tier {customerCategory}
@@ -767,17 +762,16 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     <div
                                                         key={num}
                                                         className={cn(
-                                                            "p-2 rounded-lg border text-left flex flex-col justify-between transition-all",
+                                                            "p-2.5 rounded-lg border flex items-center justify-between transition-all",
                                                             isActive
                                                                 ? "bg-orange-500 text-white border-orange-500 shadow-md font-bold"
                                                                 : "bg-zinc-50 dark:bg-zinc-950 border-zinc-200/60 dark:border-zinc-800"
                                                         )}
                                                     >
-                                                        <div className="flex items-center justify-between text-[8px] uppercase tracking-wider opacity-80">
-                                                            <span>{label}</span>
-                                                            <span>{num === 1 ? "BASE" : `${percentage}%`}</span>
-                                                        </div>
-                                                        <div className="text-xs font-black font-mono mt-1">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                                                            {label}
+                                                        </span>
+                                                        <div className="text-xs font-black font-mono">
                                                             <span className="text-[9px] opacity-70 mr-0.5">Rs</span>
                                                             {calculatedPrice.toLocaleString()}
                                                         </div>
@@ -804,19 +798,19 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <Banknote className="w-4 h-4 text-purple-500" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Pricing & Cost Breakdown</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-700">Pricing & Cost Breakdown</span>
                                         </div>
                                         <div className="space-y-2 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80">
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Trade Price</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Trade Price</span>
                                                 <span className="font-mono font-bold text-purple-600 dark:text-purple-400">Rs {toNumber(selectedItemForQty.trade_price).toLocaleString()}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Retail MSRP</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Retail MSRP</span>
                                                 <span className="font-mono font-bold text-orange-600 dark:text-orange-400">Rs {toNumber(selectedItemForQty.retail).toLocaleString()}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Average Rate</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Average Rate</span>
                                                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                                                     Rs {((toNumber(selectedItemForQty.trade_price) + toNumber(selectedItemForQty.retail)) / 2).toLocaleString()}
                                                 </span>
@@ -829,27 +823,27 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <CalendarDays className="w-4 h-4 text-orange-500" />
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Last Purchase History</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-700">Last Purchase History</span>
                                         </div>
                                         <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2.5">
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Purchase Date</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Purchase Date</span>
                                                 <span className="font-bold text-zinc-800 dark:text-zinc-200">{formatDate(selectedItemForQty.last_purchase_date)}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Last Rate</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Last Rate</span>
                                                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                                                     Rs {toNumber(selectedItemForQty.last_purchase_rate).toLocaleString()}
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Batch Qty</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Batch Qty</span>
                                                 <span className="font-bold text-zinc-700 dark:text-zinc-300">
                                                     {selectedItemForQty.last_purchase_full || 0} CTN / {selectedItemForQty.last_purchase_pcs || 0} PCS
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-400">Last Supplier</span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Last Supplier</span>
                                                 <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase truncate max-w-[140px]">{selectedItemForQty.last_supplier || 'MARKET_DIRECT'}</span>
                                             </div>
                                         </div>

@@ -79,6 +79,226 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
   );
 };
 
+const SearchableChequeSelector = ({
+  bankId,
+  value,
+  onChange,
+  availableCheques,
+  allowUnlink = false,
+  disabled = false,
+  className = "",
+}: {
+  bankId: string;
+  value: any;
+  onChange: (val: string) => void;
+  availableCheques: Record<string, any[]>;
+  allowUnlink?: boolean;
+  disabled?: boolean;
+  className?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const list = availableCheques[bankId] || [];
+
+  const normalizedList = useMemo(() => {
+    return list.map((item: any) => {
+      if (typeof item === "string") {
+        return { value: item, label: item, cheque_no: item };
+      }
+      return item;
+    });
+  }, [list]);
+
+  const stringValue = typeof value === "string" ? value : String(value?.value || value?.cheque_no || "");
+
+  const filtered = useMemo(() => {
+    if (!search) return normalizedList;
+    const q = search.toLowerCase();
+    return normalizedList.filter((item: any) =>
+      (item.label && item.label.toLowerCase().includes(q)) ||
+      (item.value && item.value.toLowerCase().includes(q)) ||
+      (item.cheque_no && item.cheque_no.toLowerCase().includes(q)) ||
+      (item.bank_name && item.bank_name.toLowerCase().includes(q)) ||
+      (item.prefix && item.prefix.toLowerCase().includes(q))
+    );
+  }, [normalizedList, search]);
+
+  const selectedItem = normalizedList.find((item: any) => item.value === stringValue || item.cheque_no === stringValue);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled || !bankId}
+          className={cn(
+            "w-full justify-between font-mono text-xs uppercase bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 h-9",
+            className
+          )}
+        >
+          <span className="truncate">
+            {selectedItem ? (selectedItem.label || selectedItem.value) : (stringValue ? stringValue : "Select Cheque...")}
+          </span>
+          <Search size={12} className="text-zinc-400 shrink-0 ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-2 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl rounded-xl z-[100]" align="start">
+        <div className="space-y-2">
+          <Input
+            placeholder="Search cheque no, bank..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+            autoFocus
+          />
+          <div className="max-h-52 overflow-y-auto space-y-1 no-scrollbar">
+            {allowUnlink && stringValue && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("");
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-all flex items-center justify-between"
+              >
+                <span>❌ Unlink / Remove Cheque</span>
+              </button>
+            )}
+            {filtered.length > 0 ? (
+              filtered.map((item: any) => (
+                <button
+                  key={item.value || item.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(item.value);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className={cn(
+                    "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center justify-between",
+                    (item.value === stringValue || item.cheque_no === stringValue)
+                      ? "bg-orange-500 text-white font-bold"
+                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200"
+                  )}
+                >
+                  <span className="truncate">{item.label || item.value}</span>
+                  {item.status && item.status !== 'unused' && (
+                    <span className="text-[9px] px-1 bg-amber-500/20 text-amber-500 rounded uppercase font-sans ml-1">
+                      {item.status}
+                    </span>
+                  )}
+                </button>
+              ))
+            ) : (
+              <div className="p-3 text-center text-xs text-rose-500 font-bold italic">
+                No cheque found. Generate cheque book first.
+              </div>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+const SearchableAccountSelector = ({
+  accounts,
+  value,
+  onChange,
+  disabled = false,
+  placeholder = "Select Cash/Bank...",
+  className = "",
+}: {
+  accounts: any[];
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const selectedAccount = useMemo(() => {
+    return accounts.find(a => a.id.toString() === value?.toString());
+  }, [accounts, value]);
+
+  const filteredAccounts = useMemo(() => {
+    if (!search.trim()) return accounts;
+    const q = search.toLowerCase().trim();
+    return accounts.filter(a =>
+      a.title?.toLowerCase().includes(q) ||
+      a.code?.toLowerCase().includes(q) ||
+      a.account_type?.name?.toLowerCase().includes(q)
+    );
+  }, [accounts, search]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          className={cn(
+            "w-full justify-between font-bold text-xs uppercase bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 h-10 px-3",
+            disabled && "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/80",
+            className
+          )}
+        >
+          <span className="truncate">
+            {selectedAccount ? selectedAccount.title : placeholder}
+          </span>
+          <Search size={12} className="text-zinc-400 shrink-0 ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-2 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl rounded-xl z-[100]" align="start">
+        <div className="space-y-2">
+          <Input
+            placeholder="Search account..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+            autoFocus
+          />
+          <div className="max-h-56 overflow-y-auto space-y-1 custom-scrollbar">
+            {filteredAccounts.map(acc => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => {
+                  onChange(acc.id.toString());
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={cn(
+                  "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-between uppercase",
+                  value?.toString() === acc.id.toString()
+                    ? "bg-orange-500 text-white font-bold"
+                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200"
+                )}
+              >
+                <span className="truncate">{acc.title}</span>
+                {acc.account_type?.name && (
+                  <span className={cn("text-[9px] font-mono lowercase ml-1 shrink-0", value?.toString() === acc.id.toString() ? "text-orange-100" : "text-zinc-400")}>
+                    {acc.account_type.name}
+                  </span>
+                )}
+              </button>
+            ))}
+            {filteredAccounts.length === 0 && (
+              <div className="p-3 text-center text-xs text-zinc-400 font-mono">
+                No matching accounts
+              </div>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 interface Account {
   id: number;
   title: string;
@@ -415,12 +635,15 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
   const [selectedBillForDetail, setSelectedBillForDetail] = useState<Bill | null>(null);
   const [billItems, setBillItems] = useState<any[]>([]);
   const [billDetailLoading, setBillDetailLoading] = useState(false);
-  const [availableCheques, setAvailableCheques] = useState<Record<string, string[]>>({});
+  const [availableCheques, setAvailableCheques] = useState<Record<string, any[]>>({});
 
   const fetchAvailableCheques = async (bankId: string) => {
-    if (!bankId || availableCheques[bankId]) return;
+    if (!bankId) return;
     try {
-      const res = await axios.get(`/payment/available-cheques?account_id=${bankId}`);
+      let url = `/payment/available-cheques?account_id=${bankId}`;
+      if (payment.cheque_id) url += `&current_cheque_id=${payment.cheque_id}`;
+      if (payment.cheque_no) url += `&current_cheque_no=${encodeURIComponent(payment.cheque_no)}`;
+      const res = await axios.get(url);
       setAvailableCheques(prev => ({ ...prev, [bankId]: res.data }));
     } catch (err) {
       console.error(err);
@@ -641,7 +864,9 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
         setChequeNo('');
       } else {
         if (availableCheques[paymentAccountId] && availableCheques[paymentAccountId].length > 0 && !chequeNo) {
-          setChequeNo(availableCheques[paymentAccountId][0]);
+          const firstChq = availableCheques[paymentAccountId][0];
+          const firstVal = typeof firstChq === "string" ? firstChq : ((firstChq as any)?.value || (firstChq as any)?.cheque_no || "");
+          setChequeNo(firstVal);
         }
       }
     } else {
@@ -969,16 +1194,16 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
 
             {/* Control Header (Desktop Only - Width till Ledger Manifest) */}
             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.4 }} className="hidden md:block shrink-0">
-              <Card className={`p-3 md:py-3 md:px-4 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
-                <div className="flex items-end justify-start flex-nowrap gap-3 overflow-x-auto custom-scrollbar pb-0.5">
+              <Card className={`p-2.5 md:py-2.5 md:px-3 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} relative overflow-hidden`}>
+                <div className="flex items-end justify-start flex-nowrap gap-2 lg:gap-3 2xl:gap-4 w-full overflow-x-auto custom-scrollbar pb-0.5">
                   {/* 1. Entry Date */}
-                  <div className="w-32 xl:w-36 shrink-0">
+                  <div className="w-[115px] lg:w-[130px] shrink-0">
                     <TechLabel label="Entry Date" icon={CalendarIcon}>
                       <Popover open={calOpen} onOpenChange={setCalOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-xs bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                          <Button variant="outline" className={`w-full justify-between h-8.5 ${PREMIUM_ROUNDING_MD} font-bold text-[11px] bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2`}>
                             <span className="truncate">{fmtDate(date)}</span>
-                            <CalendarIcon size={13} className="text-zinc-400 shrink-0" />
+                            <CalendarIcon size={12} className="text-zinc-400 shrink-0 ml-0.5" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
@@ -989,15 +1214,15 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                   </div>
 
                   {/* 2. Ledger Party */}
-                  <div className="flex-1 min-w-[160px] max-w-[320px]">
+                  <div className="flex-1 min-w-[130px] max-w-[280px]">
                     <TechLabel label="Ledger Party" icon={UserIcon}>
                       <Dialog open={desktopAccOpen} onOpenChange={setDesktopAccOpen} >
                         <DialogTrigger asChild>
-                          <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2.5`}>
+                          <Button variant="outline" className={`w-full justify-between h-8.5 ${PREMIUM_ROUNDING_MD} font-black text-[11px] text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover} px-2`}>
                             <span className="truncate">{selectedAccountId ? accounts.find(a => a.id.toString() === selectedAccountId)?.title : "Select Party Account..."}</span>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
-                              <Search size={13} className="text-zinc-400 shrink-0" />
+                            <div className="flex items-center gap-1 shrink-0 ml-0.5">
+                              <kbd className="hidden lg:inline-block px-1 py-0.2 text-[8px] font-mono font-bold text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/60 rounded border border-zinc-300/50 dark:border-zinc-600/50">F2</kbd>
+                              <Search size={12} className="text-zinc-400 shrink-0" />
                             </div>
                           </Button>
                         </DialogTrigger>
@@ -1077,11 +1302,11 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                   </div>
 
                   {/* 3. Payout Routing */}
-                  <div className="w-36 xl:w-40 shrink-0">
+                  <div className="w-[125px] lg:w-[140px] shrink-0">
                     <TechLabel label="Payout Routing" icon={Navigation}>
                       <Select value={paymentType} onValueChange={(v: any) => setPaymentType(v)}>
                         <SelectTrigger className={cn(
-                          `h-9 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-xs border-2 transition-all duration-300 px-2.5`,
+                          `h-8.5 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 w-full font-bold text-[11px] border-2 transition-all duration-300 px-2`,
                           paymentType === 'RECEIPT' 
                             ? "border-emerald-500/50 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
                             : "border-rose-500/50 dark:border-rose-500/30 text-rose-600 dark:text-rose-400"
@@ -1090,20 +1315,47 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value="RECEIPT" className="text-emerald-600 font-bold">
-                            {isBankAccountSelected ? "WITHDRAWAL (IN)" : "RECEIPT (IN)"}
+                            {isBankAccountSelected ? "WITHDRAWAL" : "RECEIPT (IN)"}
                           </SelectItem>
                           <SelectItem value="PAYMENT" className="text-rose-600 font-bold">
-                            {isBankAccountSelected ? "DEPOSIT (OUT)" : "PAYMENT (OUT)"}
+                            {isBankAccountSelected ? "DEPOSIT" : "PAYMENT (OUT)"}
                           </SelectItem>
                         </SelectContent>
                       </Select>
                     </TechLabel>
                   </div>
 
-                  {/* 4. Voucher No */}
-                  <div className="w-28 shrink-0">
-                    <TechLabel label="Voucher No" icon={Hash}>
-                      <div className="h-9 flex items-center justify-center font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md">#{payment.voucher_no}</div>
+                  {/* 4. Firm / Entity */}
+                  <div className="w-[125px] lg:w-[155px] shrink-0">
+                    <TechLabel label="Firm / Entity" icon={Layout}>
+                      <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                        <SelectTrigger className={`h-8.5 w-full bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[11px] ${PREMIUM_ROUNDING_MD} px-2`}>
+                          <SelectValue placeholder="Firm..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="0">--- No Firm ---</SelectItem>
+                          {firms?.map(firm => (
+                            <SelectItem key={firm.id} value={firm.id.toString()} className="text-xs">{firm.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TechLabel>
+                  </div>
+
+                  {/* 5. Communication */}
+                  <div className="w-[135px] lg:w-[170px] shrink-0">
+                    <TechLabel label="Communication" icon={Info}>
+                      <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                        <SelectTrigger className={`h-8.5 w-full bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[11px] ${PREMIUM_ROUNDING_MD} px-2`}>
+                          <SelectValue placeholder="Standard Remark..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="0">--- No Remark ---</SelectItem>
+                          {messageLines?.map(msg => (
+                            <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs">{msg.messageline}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TechLabel>
                   </div>
                 </div>
@@ -1283,38 +1535,32 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                       <div className="flex-1 overflow-auto custom-scrollbar p-3">
                         <table className="w-full border-separate border-spacing-y-2">
                           <thead>
-                            <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-700">
-                              <th className="px-3 text-left w-1/4">Ledger Account</th>
-                              <th className="px-3 text-left w-40">Method</th>
-                              <th className="px-3 text-left w-40">Cheque #</th>
-                              <th className="px-3 text-left w-40">Chq Date</th>
-                              <th className="px-3 text-left w-40">Clear Date</th>
-                              <th className="px-3 text-right w-40">Amount</th>
-                              <th className="px-3 text-center w-12"></th>
+                            <tr className="text-[9px] font-black uppercase tracking-[0.15em] text-zinc-700">
+                              <th className="px-1.5 text-left flex-1 min-w-[150px]">Ledger Account</th>
+                              <th className="px-1.5 text-left w-24 lg:w-28">Method</th>
+                              <th className="px-1.5 text-left w-36 lg:w-44">Cheque #</th>
+                              <th className="px-1.5 text-left w-26 lg:w-28">Chq Date</th>
+                              <th className="px-1.5 text-right w-24 lg:w-28">Amount</th>
+                              <th className="px-1.5 text-center w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {splitPayments.map((row) => (
                               <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-lg group shadow-sm">
-                                <td className={`p-2 border-l-4 border-orange-500/20 group-${t.borderHover} transition-all rounded-l-xl bg-white dark:bg-zinc-900 shadow-sm`}>
-                                  <Select value={row.payment_account_id ? row.payment_account_id.toString() : ""} onValueChange={v => updateSplitRow(row.id, 'payment_account_id', v)}>
-                                    <SelectTrigger className="h-10 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono uppercase">
-                                      <SelectValue placeholder="Account..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {paymentAccounts
-                                        .filter(acc => {
-                                          if (acc.id.toString() === selectedAccountId?.toString()) return false;
-                                          if (acc.id.toString() === row.payment_account_id?.toString()) return true;
-                                          const isChequeInHand = acc.account_type?.name?.toLowerCase() === 'cheque in hand';
-                                          if (isChequeInHand) return true;
-                                          return !splitPayments.some(p => p.id !== row.id && p.payment_account_id?.toString() === acc.id.toString());
-                                        })
-                                        .map(acc => (
-                                          <SelectItem key={acc.id} value={acc.id.toString()} className="text-xs font-bold uppercase">{acc.title}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                <td className={`p-1 group-${t.borderHover} transition-all rounded-l-md bg-white dark:bg-zinc-900 shadow-sm`}>
+                                  <SearchableAccountSelector
+                                    accounts={paymentAccounts.filter(acc => {
+                                      if (acc.id.toString() === selectedAccountId?.toString()) return false;
+                                      if (acc.id.toString() === row.payment_account_id?.toString()) return true;
+                                      const isChequeInHand = acc.account_type?.name?.toLowerCase() === 'cheque in hand';
+                                      if (isChequeInHand) return true;
+                                      return !splitPayments.some(p => p.id !== row.id && p.payment_account_id?.toString() === acc.id.toString());
+                                    })}
+                                    value={row.payment_account_id ? row.payment_account_id.toString() : ""}
+                                    onChange={v => updateSplitRow(row.id, 'payment_account_id', v)}
+                                    placeholder="Account..."
+                                    className="h-10 text-xs font-mono px-2 bg-zinc-50 dark:bg-zinc-800/50"
+                                  />
                                 </td>
                                 <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   <Select value={row.payment_method} onValueChange={v => updateSplitRow(row.id, 'payment_method', v)}>
@@ -1326,7 +1572,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                         <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('bank') ? (
                                         <>
-                                          <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
+                                          <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
                                           <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                         </>
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cheque in hand') ? (
@@ -1334,7 +1580,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                       ) : (
                                         <>
                                           <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
-                                          <SelectItem value="Online Transfer" className="text-xs font-bold">Online Transfer</SelectItem>
+                                          <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
                                           <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                         </>
                                       )}
@@ -1356,20 +1602,15 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                         <Search size={12} className="text-zinc-400 ml-1" />
                                       </Button>
                                     ) : (
-                                      <Select value={row.cheque_no} onValueChange={v => updateSplitRow(row.id, 'cheque_no', v)}>
-                                        <SelectTrigger disabled={!row.payment_account_id} className={`h-10 w-full bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono ${!row.cheque_no && t.border}`}>
-                                          <SelectValue placeholder="Select Cheque..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {availableCheques[row.payment_account_id] && availableCheques[row.payment_account_id].length > 0 ? (
-                                            availableCheques[row.payment_account_id].map((chq: string) => (
-                                              <SelectItem key={chq} value={chq} className="text-xs font-mono">{chq}</SelectItem>
-                                            ))
-                                          ) : (
-                                            <SelectItem value="none" disabled className="text-xs italic text-rose-500 py-1">no cheque found generate cheque book first</SelectItem>
-                                          )}
-                                        </SelectContent>
-                                      </Select>
+                                      <SearchableChequeSelector
+                                        bankId={row.payment_account_id}
+                                        value={row.cheque_no}
+                                        onChange={v => updateSplitRow(row.id, 'cheque_no', v)}
+                                        availableCheques={availableCheques}
+                                        allowUnlink={true}
+                                        disabled={!row.payment_account_id}
+                                        className="h-10"
+                                      />
                                     )
                                   ) : (
                                     <Input value={row.cheque_no} onChange={e => updateSplitRow(row.id, 'cheque_no', e.target.value)} disabled={row.payment_method !== 'Cheque'} className="h-10 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 text-xs uppercase font-mono tracking-widest" placeholder="CHQ#" />
@@ -1385,19 +1626,6 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
                                       <Calendar mode="single" selected={row.cheque_date ? parseLocalDate(row.cheque_date) : undefined} onSelect={(d) => { if (d) updateSplitRow(row.id, 'cheque_date', formatLocalDate(d)); }} />
-                                    </PopoverContent>
-                                  </Popover>
-                                </td>
-                                <td className="p-2 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" className="h-10 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs">
-                                        {row.clear_date ? fmtDate(row.clear_date) : <span className="text-zinc-400 font-normal text-[10px]">Pick date...</span>}
-                                        <CalendarIcon size={12} className="text-zinc-400" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                      <Calendar mode="single" selected={row.clear_date ? parseLocalDate(row.clear_date) : undefined} onSelect={(d) => { if (d) updateSplitRow(row.id, 'clear_date', formatLocalDate(d)); }} />
                                     </PopoverContent>
                                   </Popover>
                                 </td>
@@ -1485,22 +1713,9 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <TechLabel label="Early Settlement Discount" icon={BadgePercent}>
                         <Input value={discount || ""} onChange={e => setDiscount(toNum(e.target.value))} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 font-mono text-xs font-bold ${PREMIUM_ROUNDING_MD}`} placeholder="0.00" />
-                      </TechLabel>
-                      <TechLabel label="Clear Date" icon={Clock}>
-                        <Popover open={clearDateOpen} onOpenChange={setClearDateOpen}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className={`w-full justify-between h-10 ${PREMIUM_ROUNDING_MD} font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}>
-                              {clearDate ? fmtDate(clearDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
-                              <CalendarIcon size={14} className="text-zinc-400" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                            <Calendar mode="single" selected={clearDate ? parseLocalDate(clearDate) : undefined} onSelect={(d) => { if (d) { setClearDate(formatLocalDate(d)); setClearDateOpen(false); } }} />
-                          </PopoverContent>
-                        </Popover>
                       </TechLabel>
                     </div>
 
@@ -1528,43 +1743,113 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
 
                       <div className="space-y-2">
                         <TechLabel label="Payout Source" icon={CreditCard}>
-                          <Select value={paymentAccountId} onValueChange={setPaymentAccountId} disabled={isMultiPayment}>
-                            <SelectTrigger disabled={isMultiPayment} className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-xs ${PREMIUM_ROUNDING_MD} ${isMultiPayment ? 'opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/80' : ''}`}>
-                              <SelectValue placeholder="Select Cash/Bank..." />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              {paymentAccounts
-                                .filter(acc => acc.id.toString() !== selectedAccountId)
-                                .map(acc => (
-                                  <SelectItem key={acc.id} value={acc.id.toString()}>{acc.title}</SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableAccountSelector
+                            accounts={paymentAccounts.filter(acc => acc.id.toString() !== selectedAccountId)}
+                            value={paymentAccountId}
+                            onChange={setPaymentAccountId}
+                            disabled={isMultiPayment}
+                            placeholder="Select Cash/Bank..."
+                            className={`h-10 ${PREMIUM_ROUNDING_MD}`}
+                          />
                         </TechLabel>
 
                         {paymentAccountId && ['Bank', 'Cheque in hand'].includes(paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name || "") && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-2 pt-2">
-                            {paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name !== 'Cheque in hand' && (
-                              <TechLabel label="Bank Method" icon={Navigation}>
-                                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                  <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 ${t.borderLight} font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                                    <SelectValue placeholder="Select Method..." />
-                                  </SelectTrigger>
-                                  <SelectContent className="rounded-xl text-xs">
-                                    {paymentType === 'RECEIPT' ? (
-                                      <SelectItem value="Online Transfer">Online Transfer</SelectItem>
-                                    ) : (
-                                      <>
-                                        <SelectItem value="Online Transfer">Online Transfer</SelectItem>
-                                        <SelectItem value="Cheque">Cheque Release</SelectItem>
-                                      </>
-                                    )}
-                                  </SelectContent>
-                                </Select>
+                            {paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name !== 'Cheque in hand' ? (
+                              paymentMethod === 'Cheque' ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                  <TechLabel label="Bank Method" icon={Navigation}>
+                                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                      <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 ${t.borderLight} font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
+                                        <SelectValue placeholder="Select Method..." />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl text-xs">
+                                        {paymentType === 'RECEIPT' ? (
+                                          <SelectItem value="Online">Online</SelectItem>
+                                        ) : (
+                                          <>
+                                            <SelectItem value="Online">Online</SelectItem>
+                                            <SelectItem value="Cheque">Cheque Release</SelectItem>
+                                          </>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </TechLabel>
+                                  <TechLabel label="Chq Date" icon={CalendarIcon}>
+                                    <Popover open={chequeDateOpen} onOpenChange={setChequeDateOpen}>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}
+                                        >
+                                          {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
+                                          <CalendarIcon size={12} className="text-zinc-400" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl z-[100]" align="start">
+                                        <Calendar
+                                          mode="single"
+                                          selected={chequeDate ? parseLocalDate(chequeDate) : undefined}
+                                          onSelect={(d) => {
+                                            if (d) {
+                                              setChequeDate(formatLocalDate(d));
+                                              setChequeDateOpen(false);
+                                            }
+                                          }}
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </TechLabel>
+                                </div>
+                              ) : (
+                                <TechLabel label="Bank Method" icon={Navigation}>
+                                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                    <SelectTrigger className={`h-9 w-full bg-white dark:bg-zinc-800 ${t.borderLight} font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
+                                      <SelectValue placeholder="Select Method..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl text-xs">
+                                      {paymentType === 'RECEIPT' ? (
+                                        <SelectItem value="Online">Online</SelectItem>
+                                      ) : (
+                                        <>
+                                          <SelectItem value="Online">Online</SelectItem>
+                                          <SelectItem value="Cheque">Cheque Release</SelectItem>
+                                        </>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                </TechLabel>
+                              )
+                            ) : (
+                              <TechLabel label="Chq Date" icon={CalendarIcon}>
+                                <Popover open={chequeDateOpen} onOpenChange={setChequeDateOpen}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      disabled={true}
+                                      className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}
+                                    >
+                                      {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
+                                      <CalendarIcon size={12} className="text-zinc-400" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl z-[100]" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={chequeDate ? parseLocalDate(chequeDate) : undefined}
+                                      onSelect={(d) => {
+                                        if (d) {
+                                          setChequeDate(formatLocalDate(d));
+                                          setChequeDateOpen(false);
+                                        }
+                                      }}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
                               </TechLabel>
                             )}
                             {paymentMethod === 'Cheque' && (
-                              <div className="grid grid-cols-2 gap-2 pt-1 animate-in slide-in-from-top-2">
+                              <div className="pt-1 animate-in slide-in-from-top-2">
                                 <TechLabel label="Cheque No">
                                   {paymentType === 'PAYMENT' ? (
                                     paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand' ? (
@@ -1580,50 +1865,19 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                         <Search size={12} className="text-zinc-400 ml-2" />
                                       </Button>
                                     ) : (
-                                      <Select value={chequeNo} onValueChange={setChequeNo}>
-                                        <SelectTrigger className={`h-9 font-mono text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD} ${!chequeNo && t.border}`}>
-                                          <SelectValue placeholder="Select Cheque..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {availableCheques[paymentAccountId] && availableCheques[paymentAccountId].length > 0 ? (
-                                            availableCheques[paymentAccountId].map((chq: string) => (
-                                              <SelectItem key={chq} value={chq} className="text-xs font-mono">{chq}</SelectItem>
-                                            ))
-                                          ) : (
-                                            <SelectItem value="none" disabled className="text-xs italic text-rose-500">no cheque found generate cheque book first</SelectItem>
-                                          )}
-                                        </SelectContent>
-                                      </Select>
+                                      <SearchableChequeSelector
+                                        bankId={paymentAccountId}
+                                        value={chequeNo}
+                                        onChange={setChequeNo}
+                                        availableCheques={availableCheques}
+                                        allowUnlink={true}
+                                        disabled={!paymentAccountId}
+                                        className="h-9"
+                                      />
                                     )
                                   ) : (
                                     <Input value={chequeNo} onChange={e => setChequeNo(e.target.value)} className={`h-9 font-mono text-xs ${PREMIUM_ROUNDING_MD}`} placeholder="CHQ#" />
                                   )}
-                                </TechLabel>
-                                <TechLabel label="Chq Date">
-                                  <Popover open={chequeDateOpen} onOpenChange={setChequeDateOpen}>
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        disabled={paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'CHEQUE IN HAND'}
-                                        className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}
-                                      >
-                                        {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
-                                        <CalendarIcon size={12} className="text-zinc-400" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl z-[100]" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={chequeDate ? parseLocalDate(chequeDate) : undefined}
-                                        onSelect={(d) => {
-                                          if (d) {
-                                            setChequeDate(formatLocalDate(d));
-                                            setChequeDateOpen(false);
-                                          }
-                                        }}
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
                                 </TechLabel>
                               </div>
                             )}
@@ -1631,38 +1885,14 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                         )}
                       </div>
 
-                      <TechLabel label="Firm / Entity" icon={Layout}>
-                        <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                          <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                            <SelectValue placeholder="Select Firm..." />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="0">--- No Firm ---</SelectItem>
-                            {firms?.map(firm => (
-                              <SelectItem key={firm.id} value={firm.id.toString()} className="text-xs">{firm.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TechLabel>
-
-                      <TechLabel label="Communication" icon={Info}>
-                        <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
-                          <SelectTrigger className={`h-10 w-full bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                            <SelectValue placeholder="Standard Remark..." />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="0">--- No Remark ---</SelectItem>
-                            {messageLines?.map(msg => (
-                              <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs">{msg.messageline}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TechLabel>
-                    </div>
-
-                    <div className="pt-2">
-                      <TechLabel label="Remarks / Narration">
-                        <Input value={remarks} onChange={e => setRemarks(e.target.value)} className={`h-10 bg-white dark:bg-white/5 border-zinc-200 dark:border-zinc-700 text-xs ${PREMIUM_ROUNDING_MD}`} placeholder="Optional details..." />
+                      <TechLabel label="Remarks / Notes" icon={FileText}>
+                        <textarea
+                          value={remarks}
+                          onChange={e => setRemarks(e.target.value)}
+                          rows={4}
+                          className={`w-full p-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-mono text-zinc-800 dark:text-zinc-200 ${PREMIUM_ROUNDING_MD} focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none transition-all placeholder:text-zinc-400`}
+                          placeholder="Enter voucher remarks or transaction notes..."
+                        />
                       </TechLabel>
                     </div>
                   </div>

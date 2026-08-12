@@ -13,35 +13,38 @@ interface AuthPremiumLayoutProps {
 
 export default function AuthPremiumLayout({ children, title, description }: PropsWithChildren<AuthPremiumLayoutProps>) {
     return (
-        <div className="h-screen w-full text-zinc-900 lg:grid lg:grid-cols-2 overflow-hidden bg-white">
-            {/* Left Column - Login Form */}
-            <div className="relative flex h-full flex-col justify-between px-6 py-8 sm:px-12 sm:py-12 lg:px-16 lg:py-12 xl:px-20 overflow-y-auto custom-scrollbar">
-                <div className="flex flex-1 flex-col justify-center py-8">
-                    <div className="mx-auto w-full max-w-md space-y-8">
+        <div className="h-screen w-full text-zinc-900 lg:grid lg:grid-cols-[40%_60%] overflow-hidden bg-white">
+            {/* Left Column - Login Form 40% */} 
+            <div className="relative flex h-full flex-col justify-between px-5 py-5 sm:px-10 sm:py-6 lg:px-12 lg:py-8 xl:px-16 overflow-y-auto custom-scrollbar">
+                <div className="flex flex-1 flex-col justify-center py-2 sm:py-4 lg:py-6">
+                    <div className="mx-auto w-full max-w-md space-y-4 sm:space-y-6">
                         {/* Form Container */}
                         {children}
                     </div>
                 </div>
 
                 {/* Footer Logo partner with sperton */}
-                <div className="mx-auto flex w-full max-w-md justify-center items-center gap-4 pt-8 border-t border-slate-100">
+                <div className="mx-auto flex w-full max-w-md justify-center items-center gap-3 sm:gap-4 pt-3 sm:pt-5 border-t border-slate-100 shrink-0">
                     <AppLogo />
-                    <div className="h-10 w-px bg-slate-200"></div>
+                    <div className="h-8 w-px bg-slate-200"></div>
                     <img
                         src="/images/aishtycoon.png"
                         alt="Aishtycoon Logo"
-                        className="h-10 w-auto object-contain"
+                        className="h-8 w-auto object-contain"
                     />
                 </div>
             </div>
 
-            {/* Right Column - Promo / Feature Card */}
+            {/* Right Column - Promo / Feature Card 60% */}
             <div className="hidden lg:block relative h-full overflow-hidden bg-black border-l border-white/5">
-                {/* Background Image - Full Cover */}
+                {/* Background Video - Full Cover */}
                 <div className="absolute inset-0 z-0">
-                    <img
-                        src={IMAGES[0]}
-                        alt="Professional Background"
+                    <video
+                        src="/images/logo1.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
                         className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
                     />
                     {/* Multi-layered High-end Overlay */}
@@ -86,12 +89,12 @@ export default function AuthPremiumLayout({ children, title, description }: Prop
                     ))}
                 </div>
 
-                <div className="relative z-10 h-full flex flex-col items-center justify-center p-8 xl:p-12">
+                <div className="relative z-10 h-full flex flex-col items-center justify-center p-6 xl:p-12">
                     {/* Header with High-end Typography */}
-                    <div className="mb-12 text-center space-y-6 mt-auto max-w-lg">
-                        <div className="space-y-4">
-                            <h2 className="text-3xl xl:text-4xl font-extrabold leading-[1.1] text-white tracking-tight drop-shadow-2xl">
-                                <span className="bg-gradient-to-r from-orange-300 via-orange-100 to-orange-300 bg-clip-text text-transparent text-[2rem]">
+                    <div className="mb-6 lg:mb-8 xl:mb-12 text-center space-y-3 mt-auto max-w-lg">
+                        <div className="space-y-2 lg:space-y-4">
+                            <h2 className="text-2xl lg:text-3xl xl:text-4xl font-extrabold leading-[1.1] text-white tracking-tight drop-shadow-2xl">
+                                <span className="bg-gradient-to-r from-orange-300 via-orange-100 to-orange-300 bg-clip-text text-transparent text-xl lg:text-2xl xl:text-[2rem]">
                                     Harmain Traders Wholesale & Supply Chain.
                                 </span>
                             </h2>
@@ -99,7 +102,7 @@ export default function AuthPremiumLayout({ children, title, description }: Prop
                     </div>
 
                     {/* Pro Feature Cards - Message Bubbles Style (Final Static & Staggered) */}
-                    <div className="relative w-full h-[450px] max-w-[620px] mx-auto mt-4 z-20">
+                    {/* <div className="relative w-full h-[360px] lg:h-[400px] xl:h-[450px] max-w-[620px] mx-auto mt-2 z-20">
 
                         <div className="absolute top-[5%] right-[5%] xl:right-0 bg-indigo-50/90 backdrop-blur-2xl p-5 rounded-[2rem] rounded-tr-none shadow-[0_20px_50px_rgba(79,70,229,0.2)] border border-indigo-200/50 z-[1001] max-w-[210px] transition-all hover:scale-[1.05] hover:bg-indigo-50 duration-500 animate-[pop-in_0.6s_ease-out_2s_forwards] origin-top-right opacity-0">
                             <div className="flex items-start gap-4">
@@ -159,7 +162,7 @@ export default function AuthPremiumLayout({ children, title, description }: Prop
 
                             <div className="absolute bottom-[-1px] right-[-11px] w-6 h-6 bg-amber-50/90 backdrop-blur-2xl [clip-path:polygon(100%_100%,0_100%,0_0)] border-b border-r border-amber-200/50" />
                         </div>
-                    </div>
+                    </div> */}
                 </div>
 
 

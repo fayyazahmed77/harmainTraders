@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bell, ShieldAlert, FileText, AlertTriangle, CheckCheck, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, usePage, router } from '@inertiajs/react';
+import axios from 'axios';
 import { type SharedData } from '@/types';
 
 interface NotificationItem {
@@ -29,10 +30,9 @@ export function NotificationBell() {
     useEffect(() => {
         const fetchInitial = async () => {
             try {
-                const res = await fetch('/api/v1/notifications?unread=true');
-                const json = await res.json();
-                if (json && json.data) {
-                    setNotifications(json.data);
+                const res = await axios.get('/api/v1/notifications?unread=true');
+                if (res.data && res.data.data) {
+                    setNotifications(res.data.data);
                 }
             } catch (error) {
                 console.error('Failed fetching initial notifications', error);
@@ -57,9 +57,9 @@ export function NotificationBell() {
                         priority: notification.priority,
                         title: notification.title,
                         message: notification.message,
-                        actionUrl: notification.actionUrl,
+                        actionUrl: notification.actionUrl || notification.action_url || notification.url,
                         read: false,
-                        createdAt: notification.createdAt,
+                        createdAt: notification.createdAt || 'Just now',
                     },
                     ...prev
                 ]);
@@ -89,7 +89,7 @@ export function NotificationBell() {
         setNotifications(prev => prev.filter(n => n.id !== item.id));
 
         try {
-            await fetch(`/api/v1/notifications/${item.id}/read`, { method: 'PATCH' });
+            await axios.patch(`/api/v1/notifications/${item.id}/read`);
         } catch (error) {
             console.error('Failed to mark notification as read', error);
         }
@@ -104,7 +104,7 @@ export function NotificationBell() {
     const markAllAsRead = async () => {
         setNotifications([]);
         try {
-            await fetch('/api/v1/notifications/read-all', { method: 'POST' });
+            await axios.post('/api/v1/notifications/read-all');
         } catch (error) {
             console.error('Failed syncing read state', error);
         }

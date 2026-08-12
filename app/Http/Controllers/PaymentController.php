@@ -372,18 +372,70 @@ class PaymentController extends Controller implements HasMiddleware
 
             // 5. Check/issue new cheque if applicable
             $chequeId = null;
-            if ($request->payment_method === 'Cheque' && $request->payment_account_id) {
-                $chequeNoParts = explode('-', $request->cheque_no);
-                if (count($chequeNoParts) >= 2) {
-                    $cPrefix = $chequeNoParts[0];
-                    $cNum = implode('-', array_slice($chequeNoParts, 1));
+            if ($request->type === 'PAYMENT' && $request->payment_method === 'Cheque' && $request->payment_account_id) {
+                $bankAccount = Account::with('accountType')->find($request->payment_account_id);
+                $isBankAcc = $bankAccount && $bankAccount->accountType && strtolower($bankAccount->accountType->name) === 'bank';
+
+                if ($isBankAcc) {
+                    $chequeNoInput = trim($request->cheque_no ?? '');
+                    if (empty($chequeNoInput)) {
+                        DB::rollBack();
+                        return back()->withErrors(['cheque_no' => 'Cheque Number is required for Bank Cheque payments.']);
+                    }
+
+                    // 1. Check if used in ANY OTHER active payment voucher
+                    $alreadyUsedInPayment = Payment::where('payment_account_id', $request->payment_account_id)
+                        ->where('type', 'PAYMENT')
+                        ->where('cheque_no', $chequeNoInput)
+                        ->where('id', '!=', $payment->id)
+                        ->where(function ($q) {
+                            $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                        })
+                        ->exists();
+
+                    if ($alreadyUsedInPayment) {
+                        DB::rollBack();
+                        return back()->withErrors([
+                            'cheque_no' => "Cheque #{$chequeNoInput} is already assigned to another active payment voucher/invoice."
+                        ])->with('error', "Cheque #{$chequeNoInput} is already assigned to another active payment voucher.");
+                    }
+
+                    // 2. Locate leaf in Chequebook
+                    $chequeNoParts = explode('-', $chequeNoInput);
+                    $cPrefix = '';
+                    $cNum = $chequeNoInput;
+                    if (count($chequeNoParts) >= 2) {
+                        $cPrefix = $chequeNoParts[0];
+                        $cNum = implode('-', array_slice($chequeNoParts, 1));
+                    }
+
                     $cheque = \App\Models\Chequebook::where('bank_id', $request->payment_account_id)
-                        ->where('prefix', $cPrefix)->where('cheque_no', $cNum)->where('status', 'unused')->first();
-                } else {
-                    $cheque = \App\Models\Chequebook::where('bank_id', $request->payment_account_id)
-                        ->where('cheque_no', $request->cheque_no)->where('status', 'unused')->first();
-                }
-                if ($cheque) {
+                        ->where(function ($q) use ($chequeNoInput, $cNum, $cPrefix) {
+                            $q->where('cheque_no', $chequeNoInput)
+                              ->orWhere(function ($sub) use ($cNum, $cPrefix) {
+                                  $sub->where('cheque_no', $cNum);
+                                  if (!empty($cPrefix)) {
+                                      $sub->where('prefix', $cPrefix);
+                                  }
+                              });
+                        })
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$cheque) {
+                        DB::rollBack();
+                        return back()->withErrors([
+                            'cheque_no' => "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account. Duplicate or unregistered cheque numbers are blocked."
+                        ])->with('error', "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account.");
+                    }
+
+                    if ($cheque->status !== 'unused' && $cheque->id !== $payment->cheque_id) {
+                        DB::rollBack();
+                        return back()->withErrors([
+                            'cheque_no' => "Cheque #{$chequeNoInput} is currently marked as '{$cheque->status}'. Re-using an issued or cancelled cheque is strictly blocked."
+                        ])->with('error', "Cheque #{$chequeNoInput} has already been {$cheque->status}.");
+                    }
+
                     $chequeId = $cheque->id;
                     $cheque->update(['status' => 'issued']);
                 }
@@ -1063,18 +1115,46 @@ class PaymentController extends Controller implements HasMiddleware
         return response()->json(null);
     }
 
-    // Get all unused cheques for a bank account
+    // Get all unused cheques for a bank account (plus current cheque if editing)
     public function getAvailableCheques(Request $request)
     {
         $accountId = $request->input('account_id');
+        $currentChequeNo = $request->input('current_cheque_no');
+        $currentChequeId = $request->input('current_cheque_id');
 
-        $cheques = \App\Models\Chequebook::where('bank_id', $accountId)
-            ->where('status', 'unused')
-            ->orderBy('id', 'asc')
-            ->get();
+        $bank = Account::find($accountId);
+        $bankTitle = $bank ? $bank->title : 'Bank';
 
-        $formatted = $cheques->map(function ($cheque) {
-            return $cheque->prefix ? $cheque->prefix . '-' . $cheque->cheque_no : $cheque->cheque_no;
+        $query = \App\Models\Chequebook::with('bank')
+            ->where('bank_id', $accountId)
+            ->where(function ($q) use ($currentChequeId, $currentChequeNo) {
+                $q->where('status', 'unused');
+                if ($currentChequeId) {
+                    $q->orWhere('id', $currentChequeId);
+                }
+                if ($currentChequeNo) {
+                    $q->orWhere('cheque_no', $currentChequeNo);
+                }
+            });
+
+        $cheques = $query->orderBy('cheque_no', 'asc')->get();
+
+        $formatted = $cheques->map(function ($cheque) use ($bankTitle) {
+            $prefix = $cheque->prefix ? trim($cheque->prefix) : '';
+            $fullNo = $prefix ? $prefix . '-' . $cheque->cheque_no : $cheque->cheque_no;
+            $label = $prefix 
+                ? "{$bankTitle} | {$prefix}-{$cheque->cheque_no}" 
+                : "{$bankTitle} | {$cheque->cheque_no}";
+
+            return [
+                'id' => $cheque->id,
+                'cheque_no' => $cheque->cheque_no,
+                'prefix' => $cheque->prefix,
+                'bank_name' => $bankTitle,
+                'value' => $fullNo,
+                'label' => $label,
+                'status' => $cheque->status,
+            ];
         });
 
         return response()->json($formatted);
@@ -1244,19 +1324,69 @@ class PaymentController extends Controller implements HasMiddleware
 
                 // Handle Cheque for this split
                 $chequeId = null;
-                if (($split['payment_method'] ?? null) === 'Cheque' && ($split['payment_account_id'] ?? null)) {
-                    $chequeNoParts = explode('-', $split['cheque_no']);
-                    $cheque = null;
-                    if (count($chequeNoParts) >= 2) {
-                        $cPrefix = $chequeNoParts[0];
-                        $cNum = implode('-', array_slice($chequeNoParts, 1));
+                if ($request->type === 'PAYMENT' && ($split['payment_method'] ?? null) === 'Cheque' && ($split['payment_account_id'] ?? null)) {
+                    $bankAccount = Account::with('accountType')->find($split['payment_account_id']);
+                    $isBankAcc = $bankAccount && $bankAccount->accountType && strtolower($bankAccount->accountType->name) === 'bank';
+
+                    if ($isBankAcc) {
+                        $chequeNoInput = trim($split['cheque_no'] ?? '');
+                        if (empty($chequeNoInput)) {
+                            DB::rollBack();
+                            return back()->withErrors(['cheque_no' => 'Cheque Number is required for Bank Cheque payments.']);
+                        }
+
+                        // 1. Check if already used in another active PAYMENT voucher
+                        $alreadyUsedInPayment = Payment::where('payment_account_id', $split['payment_account_id'])
+                            ->where('type', 'PAYMENT')
+                            ->where('cheque_no', $chequeNoInput)
+                            ->where(function ($q) {
+                                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                            })
+                            ->exists();
+
+                        if ($alreadyUsedInPayment) {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} is already assigned to another active payment voucher/invoice."
+                            ])->with('error', "Cheque #{$chequeNoInput} is already assigned to another active payment voucher.");
+                        }
+
+                        // 2. Locate leaf in Chequebook
+                        $chequeNoParts = explode('-', $chequeNoInput);
+                        $cPrefix = '';
+                        $cNum = $chequeNoInput;
+                        if (count($chequeNoParts) >= 2) {
+                            $cPrefix = $chequeNoParts[0];
+                            $cNum = implode('-', array_slice($chequeNoParts, 1));
+                        }
+
                         $cheque = \App\Models\Chequebook::where('bank_id', $split['payment_account_id'])
-                            ->where('prefix', $cPrefix)->where('cheque_no', $cNum)->where('status', 'unused')->first();
-                    } else {
-                        $cheque = \App\Models\Chequebook::where('bank_id', $split['payment_account_id'])
-                            ->where('cheque_no', $split['cheque_no'])->where('status', 'unused')->first();
-                    }
-                    if ($cheque) {
+                            ->where(function ($q) use ($chequeNoInput, $cNum, $cPrefix) {
+                                $q->where('cheque_no', $chequeNoInput)
+                                  ->orWhere(function ($sub) use ($cNum, $cPrefix) {
+                                      $sub->where('cheque_no', $cNum);
+                                      if (!empty($cPrefix)) {
+                                          $sub->where('prefix', $cPrefix);
+                                      }
+                                  });
+                            })
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (!$cheque) {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account. Duplicate or unregistered cheque numbers are blocked."
+                            ])->with('error', "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account.");
+                        }
+
+                        if ($cheque->status !== 'unused') {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} is currently marked as '{$cheque->status}'. Re-using an issued or cancelled cheque is strictly blocked."
+                            ])->with('error', "Cheque #{$chequeNoInput} has already been {$cheque->status}.");
+                        }
+
                         $chequeId = $cheque->id;
                         $cheque->update(['status' => 'issued']);
                     }

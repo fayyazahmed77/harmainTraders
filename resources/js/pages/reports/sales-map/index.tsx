@@ -4,7 +4,7 @@ import {
     SidebarInset,
     SidebarProvider,
 } from "@/components/ui/sidebar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import * as React from "react"
@@ -21,7 +21,9 @@ import {
     Database
 } from "lucide-react"
 
-import SalesMap from './SalesMap';
+// Lazy-load SalesMap so Leaflet (which accesses window/document at import
+// time) is never evaluated during SSR — preventing the reload loop on live.
+const SalesMap = React.lazy(() => import('./SalesMap'));
 
 interface LocationData {
     id: number;
@@ -210,14 +212,18 @@ export default function SalesMapReport({ provinces, cities }: PageProps) {
                         {/* Right Content - Map */}
                         <div className="flex-1 relative z-0">
                             {isClient ? (
-                                <SalesMap
-                                    data={data}
-                                    center={center}
-                                    zoom={zoom}
-                                    level={level}
-                                    formatCurrency={formatCurrency}
-                                    onLocationClick={handleLocationClick}
-                                />
+                                <React.Suspense fallback={
+                                    <div className="h-full w-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">Loading Geospatial Engine...</div>
+                                }>
+                                    <SalesMap
+                                        data={data}
+                                        center={center}
+                                        zoom={zoom}
+                                        level={level}
+                                        formatCurrency={formatCurrency}
+                                        onLocationClick={handleLocationClick}
+                                    />
+                                </React.Suspense>
                             ) : (
                                 <div className="h-full w-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">Loading Geospatial Engine...</div>
                             )}

@@ -165,11 +165,15 @@
 <body>
 
     <div class="receipt-wrapper">
+@php
+    $firm = $firm ?? (isset($purchase->firm) ? $purchase->firm : null) ?? (isset($purchase->firm_id) ? \App\Models\Firm::find($purchase->firm_id) : null) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+@endphp
+
         <!-- Header -->
         <div class="header text-center">
-            <div class="brand-name">HARMAIN TRADERS</div>
+            <div class="brand-name">{{ strtoupper($firm->name ?? 'HARMAIN TRADERS') }}</div>
             <div class="contact-info">
-                Phone No. : 0332 3218684 &nbsp; Fax No. : 0332 3218684
+                Phone No. : {{ $firm->phone ?? '' }} @if(!empty($firm->fax)) &nbsp; Fax No. : {{ $firm->fax }} @endif
             </div>
         </div>
 
@@ -213,7 +217,7 @@
                     <td class="text-center">{{ (int)$item->qty_carton }}</td>
                     <td class="text-center" style="border-left: 1px solid #000;">{{ (int)$item->qty_pcs }}</td>
                     <td>{{ $item->item->title }}</td>
-                    <td class="text-right">{{ number_format($item->trade_price, 2) }}</td>
+                    <td class="text-right">{{ number_format($item->trade_price, 0) }}</td>
                     <td class="text-right" style="padding-right: 1mm;">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
                 </tr>
                 @endforeach
@@ -231,20 +235,20 @@
 
             <div class="total-row clearfix">
                 <span class="total-label">Courier Charges :-</span>
-                <span class="total-value">{{ number_format($purchase->courier_charges ?? 0, 2) }}</span>
+                <span class="total-value">{{ number_format($purchase->courier_charges ?? 0, 0) }}</span>
             </div>
 
             @if($purchase->discount_total > 0)
             <div class="total-row clearfix">
                 <span class="total-label">Discount :-</span>
-                <span class="total-value">{{ number_format($purchase->discount_total, 2) }}</span>
+                <span class="total-value">{{ number_format($purchase->discount_total, 0) }}</span>
             </div>
             @endif
 
             @if(($purchase->extra_discount ?? 0) > 0)
             <div class="total-row clearfix">
                 <span class="total-label">Extra Discount :-</span>
-                <span class="total-value">{{ number_format($purchase->extra_discount, 2) }}</span>
+                <span class="total-value">{{ number_format($purchase->extra_discount, 0) }}</span>
             </div>
             @endif
 
@@ -257,37 +261,49 @@
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Bill :-</span>
-                <span class="total-value">{{ number_format($invoice_total, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total, 0) }}</span>
             </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
-                <span class="total-value">{{ number_format($prev_balance, 2) }}</span>
+                <span class="total-value">{{ number_format($prev_balance, 0) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format($invoice_total + $prev_balance, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total + $prev_balance, 0) }}</span>
             </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Paid Amount :-</span>
-                <span class="total-value">{{ number_format($paid, 2) }}</span>
+                <span class="total-value">{{ number_format($paid, 0) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Net Payable :</span>
-                <span class="total-value">{{ number_format($invoice_total + $prev_balance - $paid, 2) }}</span>
+                <span class="total-value">{{ number_format($invoice_total + $prev_balance - $paid, 0) }}</span>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="footer-text text-center">
-            Thank You for coming to Harnain Traders
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="font-size: 9px; color: #000; margin-bottom: 2px;">
+                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+            </div>
+            <div style="font-size: 9px; font-weight: bold; color: #000; margin-bottom: 2px;">
+                This is a computer-generated receipt.
+            </div>
+            <div style="font-size: 9px; font-weight: bold; color: #000;">
+                Thank you for choosing Haramain Traders.
+            </div>
+            <div style="font-size: 7.5px; color: #555; margin-top: 4px; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
         </div>
     </div>
 </body>

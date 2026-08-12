@@ -999,7 +999,9 @@ class SalesController extends Controller implements HasMiddleware
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.saleshalf' : 'pdf.sale';
 
-        $pdf = Pdf::loadView($view, compact('sale'));
+        $firm = \App\Models\Firm::find($sale->firm_id) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+
+        $pdf = Pdf::loadView($view, compact('sale', 'firm'));
 
         if ($format === 'small') {
             $itemCount = count($sale->items);

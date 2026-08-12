@@ -41,35 +41,35 @@ export default function Login({ status }: { status?: string }) {
             <Head title="Log in" />
 
             {/* Header Section */}
-            <div className="flex flex-col items-center space-y-6 text-center animate-in fade-in slide-in-from-top-4 duration-1000">
+            <div className="flex flex-col items-center space-y-3 sm:space-y-4 text-center animate-in fade-in slide-in-from-top-4 duration-1000">
                 <div className="relative group">
                     <img
                         src="storage/img/favicon.png"
                         alt="Decorative circles"
-                        className="w-25 h-auto opacity-80 group-hover:opacity-100 transition-opacity duration-700"
+                        className="h-14 sm:h-16 lg:h-20 w-auto opacity-90 group-hover:opacity-100 transition-opacity duration-700 object-contain"
                     />
                 </div>
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-extrabold tracking-tight text-orange-400 sm:text-3xl">
+                <div className="space-y-1 sm:space-y-1.5">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-orange-400">
                         Welcome to Harmain Traders
                     </h1>
-                    <p className="text-base text-slate-500 font-medium">
+                    <p className="text-xs sm:text-sm lg:text-base text-slate-500 font-medium">
                         Harmain Traders Wholesale & Supply Chain.
                     </p>
                 </div>
             </div>
 
             {/* Form Section */}
-            <div className="mt-8 sm:mt-10">
+            <div className="mt-4 sm:mt-6 lg:mt-8">
                 <form
-                    className="space-y-5 sm:space-y-6"
+                    className="space-y-4 sm:space-y-5"
                     onSubmit={submit}
                 >
                     {/* Email Input */}
-                    <div className="space-y-2 group">
-                        <Label htmlFor="email" className="text-sm font-semibold text-slate-700 ml-1">Email Address</Label>
+                    <div className="space-y-1.5 group">
+                        <Label htmlFor="email" className="text-xs sm:text-sm font-semibold text-slate-700 ml-1">Email Address</Label>
                         <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-orange-400 transition-colors" />
+                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-slate-400 group-focus-within:text-orange-400 transition-colors" />
                             <Input
                                 id="email"
                                 type="email"
@@ -79,19 +79,19 @@ export default function Login({ status }: { status?: string }) {
                                 autoFocus
                                 autoComplete="username"
                                 placeholder="email@example.com"
-                                className="h-14 w-full rounded-md border-slate-200 pl-12 pr-4 text-lg transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
+                                className="h-11 sm:h-12 w-full rounded-md border-slate-200 pl-11 pr-4 text-sm sm:text-base transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
                             />
                         </div>
                         <InputError message={errors.email} />
                     </div>
 
                     {/* Password Input */}
-                    <div className="space-y-2 group">
+                    <div className="space-y-1.5 group">
                         <div className="flex justify-between items-center ml-1">
-                            <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Password</Label>
+                            <Label htmlFor="password" className="text-xs sm:text-sm font-semibold text-slate-700">Password</Label>
                             <a
                                 href={route('password.request')}
-                                className="text-sm font-medium text-orange-400 transition-colors hover:text-orange-700 hover:underline"
+                                className="text-xs sm:text-sm font-medium text-orange-400 transition-colors hover:text-orange-700 hover:underline"
                             >
                                 Forgot password?
                             </a>
@@ -105,17 +105,17 @@ export default function Login({ status }: { status?: string }) {
                                 required
                                 autoComplete="current-password"
                                 placeholder="Password"
-                                className="h-14 w-full rounded-md border-slate-200 pl-4 pr-12 text-lg transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
+                                className="h-11 sm:h-12 w-full rounded-md border-slate-200 pl-4 pr-11 text-sm sm:text-base transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-400/10 shadow-sm hover:border-slate-300"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-orange-400 hover:text-orange-600 transition-colors"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-orange-400 hover:text-orange-600 transition-colors"
                             >
                                 {showPassword ? (
-                                    <EyeOff className="h-6 w-6" strokeWidth={2.5} />
+                                    <EyeOff className="h-5 w-5" strokeWidth={2.2} />
                                 ) : (
-                                    <Eye className="h-6 w-6" strokeWidth={2.5} />
+                                    <Eye className="h-5 w-5" strokeWidth={2.2} />
                                 )}
                             </button>
                         </div>
@@ -124,18 +124,18 @@ export default function Login({ status }: { status?: string }) {
 
                     <Button
                         type="submit"
-                        className="h-14 w-full rounded-md bg-orange-400 text-lg font-bold text-white shadow-xl shadow-orange-400/20 transition-all hover:bg-orange-500 hover:shadow-orange-400/30 active:scale-[0.98]"
+                        className="h-11 sm:h-12 w-full rounded-md bg-orange-400 text-sm sm:text-base font-bold text-white shadow-lg shadow-orange-400/20 transition-all hover:bg-orange-500 hover:shadow-orange-400/30 active:scale-[0.98]"
                         disabled={processing}
                     >
                         {processing ? (
                             <>
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                <Loader2 className="mr-2 h-4 sm:h-5 w-4 sm:w-5 animate-spin" />
                                 Logging in...
                             </>
                         ) : (
                             <>
                                 Log in
-                                <ArrowRight className="ml-2 h-5 w-5" />
+                                <ArrowRight className="ml-2 h-4 sm:h-5 w-4 sm:w-5" />
                             </>
                         )}
                     </Button>
@@ -143,10 +143,10 @@ export default function Login({ status }: { status?: string }) {
             </div>
 
             {/* Contact Link */}
-            <div className="mt-8 text-center sm:mt-10">
+            <div className="mt-4 sm:mt-6 text-center">
                 <a
                     href="#"
-                    className="text-sm font-medium text-orange-400 transition-colors hover:text-orange-600 hover:underline sm:text-base"
+                    className="text-xs sm:text-sm font-medium text-orange-400 transition-colors hover:text-orange-600 hover:underline"
                 >
                     Contact Us
                 </a>

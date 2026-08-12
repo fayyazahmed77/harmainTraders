@@ -386,6 +386,9 @@
             Phone: {{ $f_phone }} &nbsp;·&nbsp; Email: {{ $f_email }}<br>
             This is a computer-generated receipt.<br>
             Thank you for choosing {{ $f_name }}.
+            <div style="font-size: 8px; color: #141414ff; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
         </div>
     </div>
 </body>

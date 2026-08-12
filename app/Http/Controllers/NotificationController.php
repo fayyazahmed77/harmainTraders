@@ -60,16 +60,17 @@ class NotificationController extends Controller
             'id'        => $n->id,
             'title'     => $n->data['title'] ?? 'Notification',
             'message'   => $n->data['message'] ?? '',
-            'category'  => $n->category,
-            'priority'  => $n->priority,
+            'category'  => $n->category ?? $n->data['category'] ?? 'system',
+            'priority'  => $n->priority ?? $n->data['priority'] ?? 'medium',
             'read'      => !is_null($n->read_at),
-            'actionUrl' => $n->data['action_url'] ?? null,
-            'createdAt' => $n->created_at->diffForHumans(),
+            'actionUrl' => $n->data['action_url'] ?? $n->data['actionUrl'] ?? $n->data['url'] ?? $n->data['link'] ?? null,
+            'createdAt' => $n->created_at ? $n->created_at->diffForHumans() : 'Just now',
         ]);
 
         return response()->json([
             'data'     => $mapped,
             'nextPage' => $notifications->hasMorePages() ? $notifications->currentPage() + 1 : null,
+            'unreadCount' => $request->user()->unreadNotifications()->count(),
         ]);
     }
 
@@ -82,11 +83,14 @@ class NotificationController extends Controller
      */
     public function markAsRead(Request $request, string $id)
     {
-        $notification = $request->user()->notifications()->findOrFail($id);
-        $notification->markAsRead();
+        $notification = $request->user()->notifications()->where('id', $id)->first();
+        if ($notification) {
+            $notification->markAsRead();
+        }
 
         return response()->json([
             'message' => 'Notification marked as read.',
+            'unreadCount' => $request->user()->unreadNotifications()->count(),
         ]);
     }
 
@@ -102,6 +106,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => 'All notifications marked as read.',
+            'unreadCount' => 0,
         ]);
     }
 }

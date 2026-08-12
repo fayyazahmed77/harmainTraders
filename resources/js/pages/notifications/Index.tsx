@@ -261,6 +261,9 @@ export default function NotificationCenter() {
                                         {item.actionUrl && (
                                             <Link
                                                 href={item.actionUrl}
+                                                onClick={() => {
+                                                    if (!item.read) handleMarkSingleRead(item.id);
+                                                }}
                                                 className="flex items-center gap-1 text-[10px] font-black text-primary hover:underline uppercase tracking-wider"
                                             >
                                                 Take Action

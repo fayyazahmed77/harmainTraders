@@ -674,7 +674,9 @@ class SalesReturnController extends Controller implements HasMiddleware
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.sales_return_half' : 'pdf.sales_return';
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('salesReturn'));
+        $firm = \App\Models\Firm::find($salesReturn->firm_id) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('salesReturn', 'firm'));
 
         if ($format === 'small') {
             $itemCount = count($salesReturn->items);

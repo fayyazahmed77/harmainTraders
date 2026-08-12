@@ -660,7 +660,9 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.purchase_return_half' : 'pdf.purchase_return';
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('purchaseReturn'));
+        $firm = \App\Models\Firm::find($purchaseReturn->firm_id) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, compact('purchaseReturn', 'firm'));
 
         if ($format === 'small') {
             $itemCount = count($purchaseReturn->items);

@@ -101,15 +101,10 @@ class ChequebookController extends Controller implements HasMiddleware
         $bankName = $bank ? $bank->title : 'Selected Bank';
         $prefix = $request->prefix ?? '';
 
-        // Fetch existing cheque numbers for this bank
+        // Fetch existing cheque numbers for this bank and prefix
         $existingNumbers = Chequebook::where('bank_id', $request->bank_id)
-            ->where(function ($q) use ($request, $prefix) {
-                $q->whereIn('cheque_no', $request->cheques);
-                if (!empty($prefix)) {
-                    $prefixed = array_map(fn($c) => $prefix . $c, $request->cheques);
-                    $q->orWhereIn('cheque_no', $prefixed);
-                }
-            })
+            ->where('prefix', $prefix)
+            ->whereIn('cheque_no', $request->cheques)
             ->pluck('cheque_no')
             ->map(fn($num) => (string)$num)
             ->toArray();
@@ -147,15 +142,10 @@ class ChequebookController extends Controller implements HasMiddleware
         $bankName = $bank ? $bank->title : 'Selected Bank';
         $prefix = $request->prefix ?? '';
 
-        // ✅ Check if ANY of the submitted cheque numbers already exist for this bank
+        // ✅ Check if ANY of the submitted cheque numbers already exist for this bank & prefix
         $existingNumbers = Chequebook::where('bank_id', $request->bank_id)
-            ->where(function ($q) use ($request, $prefix) {
-                $q->whereIn('cheque_no', $request->cheques);
-                if (!empty($prefix)) {
-                    $prefixed = array_map(fn($c) => $prefix . $c, $request->cheques);
-                    $q->orWhereIn('cheque_no', $prefixed);
-                }
-            })
+            ->where('prefix', $prefix)
+            ->whereIn('cheque_no', $request->cheques)
             ->pluck('cheque_no')
             ->map(fn($num) => (string)$num)
             ->toArray();
@@ -187,7 +177,7 @@ class ChequebookController extends Controller implements HasMiddleware
                 'cheque_no' => $num,
                 'entry_date' => $entryDate,
                 'voucher_code' => $request->voucher_code ?? null,
-                'prefix' => $request->prefix,
+                'prefix' => $prefix,
                 'remarks' => $request->remarks,
                 'status' => 'unused',
                 'created_by' => Auth::id(),
@@ -196,11 +186,19 @@ class ChequebookController extends Controller implements HasMiddleware
             ];
         }
 
-        // ✅ Insert all new cheques (each cheque = 1 row)
+        // ✅ Insert all new cheques safely inside DB transaction
         if (count($newCheques) > 0) {
-            Chequebook::insert($newCheques);
+            try {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($newCheques) {
+                    Chequebook::insert($newCheques);
+                });
 
-            return redirect()->route('cheque.index')->with('success', count($newCheques) . " cheques for {$bankName} generated successfully!");
+                return redirect()->route('cheque.index')->with('success', count($newCheques) . " cheques for {$bankName} generated successfully!");
+            } catch (\Illuminate\Database\QueryException $e) {
+                return back()->withErrors([
+                    'cheque_from' => "Duplicate cheque number conflict detected at database level. Duplicate creation blocked.",
+                ])->with('error', 'Duplicate cheque numbers detected for this bank. Please use a different sequence.');
+            }
         }
 
         return back()->with('warning', 'No new cheques were created.');

@@ -397,7 +397,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 setItemSearch(e.target.value);
                                 setSelectedIndex(0);
                             }}
-                            className="pl-9 h-9 bg-white/15 border-white/30 text-white placeholder:text-white/50 focus:ring-0 focus:bg-white/25 transition-all rounded-xl border font-bold text-xs"
+                            className="pl-9 h-9 bg-white/10 border-white/50 text-white placeholder:text-white/70 focus:ring-0 focus:bg-white/25 transition-all rounded-xl border font-bold text-xs"
                             autoFocus
                         />
                     </div>
@@ -410,11 +410,11 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                         {/* Table Header & Rows */}
                         <div className="flex-1 overflow-auto min-h-0 relative">
                             <div className="hidden md:grid grid-cols-12 bg-zinc-100 dark:bg-zinc-900 px-6 py-2.5 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 shadow-xs">
-                                <div className="col-span-1 text-[9px] font-black uppercase tracking-wider text-zinc-500">Code</div>
-                                <div className="col-span-5 text-[9px] font-black uppercase tracking-wider text-zinc-500">Registry Title</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-wider text-zinc-500">Trade Price</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-wider text-zinc-500">Avg Price</div>
-                                <div className="col-span-2 text-right text-[9px] font-black uppercase tracking-wider text-zinc-500">System Inventory</div>
+                                <div className="col-span-1 text-[9px] font-black uppercase tracking-wider text-zinc-700">Code</div>
+                                <div className="col-span-5 text-[9px] font-black uppercase tracking-wider text-zinc-700">Registry Title</div>
+                                <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-wider text-zinc-700">Trade Price</div>
+                                <div className="col-span-2 text-center text-[9px] font-black uppercase tracking-wider text-zinc-700">Avg Price</div>
+                                <div className="col-span-2 text-right text-[9px] font-black uppercase tracking-wider text-zinc-700">System Inventory</div>
                             </div>
 
                             <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -439,7 +439,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         >
                                             <div className="hidden md:grid grid-cols-12 items-center py-0.5">
                                                 <div className="col-span-1 pl-1">
-                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-400'}`}>
+                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
                                                         #{String(item.id).padStart(4, '0')}
                                                     </span>
                                                 </div>
@@ -458,11 +458,11 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                                 </div>
                                                 <div className="col-span-2 text-center">
                                                     <div className="text-xs font-black text-zinc-800 dark:text-zinc-200">
-                                                        <span className="text-[9px] text-zinc-400 mr-1 font-semibold">Rs</span>
+                                                        <span className="text-[9px] text-zinc-700 mr-1 font-semibold">Rs</span>
                                                         {tradePrice.toFixed(2)}
                                                     </div>
                                                 </div>
-                                                <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                                <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
                                                     {avgPrice.toFixed(0)}
                                                 </div>
                                                 <div className="col-span-2 text-right pr-2 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
@@ -513,80 +513,80 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                     </span>
                                 </div>
 
-                                <div className="flex gap-2 items-end overflow-x-auto no-scrollbar">
+                                 <div className="flex gap-2 items-end overflow-x-auto no-scrollbar">
                                     <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Full</span>
+                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Full</span>
                                         <Input
                                             ref={fullInputRef}
                                             type="number"
                                             value={dialogFull || ""}
                                             onChange={e => setDialogFull(toNumber(e.target.value))}
                                             onKeyDown={handleFullKeyDown}
-                                            className="w-16 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
+                                            className="w-24 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
                                         />
                                     </div>
 
                                     {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                                         <div className="flex flex-col gap-0.5 items-center">
-                                            <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Pcs</span>
+                                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Pcs</span>
                                             <Input
                                                 ref={pcsInputRef}
                                                 type="number"
                                                 value={dialogPcs || ""}
                                                 onChange={e => setDialogPcs(toNumber(e.target.value))}
                                                 onKeyDown={handlePcsKeyDown}
-                                                className="w-16 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
+                                                className="w-24 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
                                             />
                                         </div>
                                     )}
 
                                     <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">B.Full</span>
+                                        <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest">B.Full</span>
                                         <Input
                                             ref={bFullInputRef}
                                             type="number"
                                             value={dialogBonusFull || ""}
                                             onChange={e => setDialogBonusFull(toNumber(e.target.value))}
                                             onKeyDown={handleBFullKeyDown}
-                                            className="w-16 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
+                                            className="w-24 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
                                         />
                                     </div>
 
                                     {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
                                         <div className="flex flex-col gap-0.5 items-center">
-                                            <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">B.Pcs</span>
+                                            <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest">B.Pcs</span>
                                             <Input
                                                 ref={bPcsInputRef}
                                                 type="number"
                                                 value={dialogBonusPcs || ""}
                                                 onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
                                                 onKeyDown={handleBPcsKeyDown}
-                                                className="w-16 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
+                                                className="w-24 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
                                             />
                                         </div>
                                     )}
 
                                     <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Rate (Rs)</span>
+                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Rate (Rs)</span>
                                         <Input
                                             ref={rateInputRef}
                                             type="number"
                                             value={dialogRate || ""}
                                             onChange={e => setDialogRate(toNumber(e.target.value))}
                                             onKeyDown={handleRateKeyDown}
-                                            className="w-20 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
+                                            className="w-28 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
                                         />
                                     </div>
 
                                     <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Disc (%)</span>
+                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Disc (%)</span>
                                         <Input
                                             ref={discountInputRef}
                                             type="number"
                                             value={dialogDiscount || ""}
                                             onChange={e => setDialogDiscount(toNumber(e.target.value))}
                                             onKeyDown={handleDiscountKeyDown}
-                                            className="w-16 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
+                                            className="w-20 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
                                         />
                                     </div>
 
@@ -660,16 +660,16 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 {/* Stock & Pricing Details Section */}
                                 <div className="flex flex-col gap-2 bg-zinc-50 dark:bg-zinc-950/80 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="text-[10px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
                                             <Layers className="w-3.5 h-3.5 text-orange-500" /> Stock & Pricing Metrics
                                         </span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 mt-0.5">
                                         <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between shadow-2xs">
-                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">PACKING</span>
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-500 uppercase tracking-widest">PACKING</span>
                                             <div className="mt-1 flex items-baseline gap-1">
                                                 <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 font-mono">{selectedItemForQty.packing_qty || 1}</span>
-                                                <span className="text-[9px] text-zinc-400 font-bold">pc/box</span>
+                                                <span className="text-[9px] text-zinc-700 font-bold">pc/box</span>
                                             </div>
                                         </div>
 
@@ -677,7 +677,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             <span className="text-[8px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest">STOCK FULL</span>
                                             <div className="mt-1 flex items-baseline gap-1">
                                                 <span className="text-sm font-black text-orange-600 dark:text-orange-400 font-mono">{selectedItemForQty.stock_1 || 0}</span>
-                                                <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold">full</span>
+                                                <span className="text-[9px] text-zinc-700 dark:text-zinc-500 font-bold">full</span>
                                             </div>
                                         </div>
 
@@ -685,30 +685,30 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             <span className="text-[8px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest">STOCK PCS</span>
                                             <div className="mt-1 flex items-baseline gap-1">
                                                 <span className="text-sm font-black text-orange-600 dark:text-orange-400 font-mono">{selectedItemForQty.stock_2 || 0}</span>
-                                                <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold">pcs</span>
+                                                <span className="text-[9px] text-zinc-700 dark:text-zinc-500 font-bold">pcs</span>
                                             </div>
                                         </div>
 
                                         <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between shadow-2xs">
-                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">TRADE RATE</span>
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest">TRADE RATE</span>
                                             <div className="mt-1 flex items-baseline gap-0.5">
-                                                <span className="text-[9px] text-zinc-400 font-bold">Rs</span>
+                                                <span className="text-[9px] text-zinc-700 font-bold">Rs</span>
                                                 <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 font-mono">{toNumber(selectedItemForQty.trade_price).toFixed(2)}</span>
                                             </div>
                                         </div>
 
                                         <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between shadow-2xs">
-                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">RETAIL RATE</span>
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest">RETAIL RATE</span>
                                             <div className="mt-1 flex items-baseline gap-0.5">
-                                                <span className="text-[9px] text-zinc-400 font-bold">Rs</span>
+                                                <span className="text-[9px] text-zinc-700 font-bold">Rs</span>
                                                 <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 font-mono">{toNumber(selectedItemForQty.retail).toFixed(2)}</span>
                                             </div>
                                         </div>
 
                                         <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between shadow-2xs">
-                                            <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-400 uppercase tracking-widest">AVERAGE</span>
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest">AVERAGE</span>
                                             <div className="mt-1 flex items-baseline gap-0.5">
-                                                <span className="text-[9px] text-zinc-400 font-bold">Rs</span>
+                                                <span className="text-[9px] text-zinc-700 font-bold">Rs</span>
                                                 <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 font-mono">{((toNumber(selectedItemForQty.trade_price) + toNumber(selectedItemForQty.retail)) / 2).toFixed(2)}</span>
                                             </div>
                                         </div>
@@ -725,19 +725,19 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
 
                                     <div className="flex flex-col divide-y divide-zinc-200/80 dark:divide-zinc-800/80 bg-white dark:bg-zinc-900/90 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden text-xs">
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
+                                            <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Calendar size={12} /> Date
                                             </span>
                                             <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">{formatDate(selectedItemForQty.last_purchase_date)}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
+                                            <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Building2 size={12} /> Supplier
                                             </span>
                                             <span className="text-orange-600 dark:text-orange-400 font-black">{selectedItemForQty.last_supplier_name || selectedItemForQty.company || 'N/A'}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
-                                            <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
+                                            <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Layers size={12} /> Last Qty
                                             </span>
                                             <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">{selectedItemForQty.last_purchase_qty_full || 0} Full / {selectedItemForQty.last_purchase_qty_pcs || 0} Pcs</span>

@@ -85,7 +85,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 
         .brand-tagline {
             font-size: 7px;
-            color: #888;
+            color: #555;
             letter-spacing: 1px;
             text-transform: uppercase;
             margin-top: 1px;
@@ -390,6 +390,9 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 </head>
 
 <body>
+@php
+    $firm = $firm ?? (isset($sale->firm) ? $sale->firm : null) ?? (isset($sale->firm_id) ? \App\Models\Firm::find($sale->firm_id) : null) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
+@endphp
     @if($firm)
     @if($firm->name == 'Haramain Traders')
     <div class="watermark-container">
@@ -526,11 +529,11 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                             @endif
                         </td>
                         <td class="text-left">{{ $item->item->title }}</td>
-                        <td>{{ number_format($item->item->retail ?? 0, 2) }}</td>
-                        <td>{{ number_format($item->trade_price, 2) }}</td>
-                        <td>{{ number_format($disc_percent > 0 ? $disc_percent : 0, 2) }}</td>
-                        <td>{{ number_format($after_disc_rate, 2) }}</td>
-                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 2) }}</td>
+                        <td>{{ number_format($item->item->retail ?? 0, 0) }}</td>
+                        <td>{{ number_format($item->trade_price, 0) }}</td>
+                        <td>{{ number_format($disc_percent > 0 ? $disc_percent : 0, 0) }}</td>
+                        <td>{{ number_format($after_disc_rate, 0) }}</td>
+                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -552,7 +555,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 
             <div class="footer-center">
                 <div style="font-weight: bold; margin-top: 0px; font-size: 10px;">
-                    Discount Amount : &nbsp; {{ number_format($sale->discount_total, 2) }}
+                    Discount Amount : &nbsp; {{ number_format($sale->discount_total, 0) }}
                 </div>
             </div>
 
@@ -563,20 +566,20 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>
-                            <td class="value">{{ number_format($sale->courier_charges ?? 0, 2) }}</td>
+                            <td class="value">{{ number_format($sale->courier_charges ?? 0, 0) }}</td>
                         </tr>
                        
                         <!-- Extra Discount -->
                         @if($sale->extra_discount > 0)
                         <tr>
                             <td class="label">Extra Discount :-</td>
-                            <td class="value">{{ number_format($sale->extra_discount, 2) }}</td>
+                            <td class="value">{{ number_format($sale->extra_discount, 0) }}</td>
                         </tr>
                         @endif
                          <!-- Total Rs. (Net of current invoice) -->
                         <tr>
                             <td class="label">Total Rs. :-</td>
-                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</td>
+                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 0) }}</td>
                         </tr>
                         <!-- Previous Balance -->
                         @php
@@ -589,7 +592,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
-                            <td class="value">{{ number_format($prev_balance, 2) }}</td>
+                            <td class="value">{{ number_format($prev_balance, 0) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -604,7 +607,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Cash Received -->
                         <tr>
                             <td class="label">Cash Received :-</td>
-                            <td class="value">{{ number_format($sale->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format($sale->paid_amount, 0) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -620,6 +623,19 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                 </div>
             </div>
 
+        </div>
+
+        <!-- Branded Footer -->
+        <div style="margin-top: 18px; padding-top: 8px; border-top: 1px dashed #000; text-align: center; font-family: Arial, sans-serif;">
+            <div style="font-size: 9px; color: #000; margin-bottom: 3px;">
+                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+            </div>
+            <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
+                Thank you for choosing Haramain Traders.
+            </div>
+            <div style="font-size: 8px; color: #999; letter-spacing: 0.3px;">
+                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            </div>
         </div>
     </div>
 </body>
