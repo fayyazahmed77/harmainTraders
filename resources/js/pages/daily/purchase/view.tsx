@@ -108,10 +108,10 @@ export default function View({ purchase }: Props) {
     const remaining = Math.max(0, invoiceTotal - paid);
 
     const badge = remaining === 0
-        ? { label: "Fully Paid", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-300" }
+        ? { label: "Fully Paid", cls: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700" }
         : paid > 0
-            ? { label: "Partial Paid", cls: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300" }
-            : { label: "Unpaid", cls: "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-300" };
+            ? { label: "Partial Paid", cls: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700" }
+            : { label: "Unpaid", cls: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700" };
 
     return (
         <SidebarProvider>
@@ -134,7 +134,7 @@ export default function View({ purchase }: Props) {
                             </Button>
                             <div className="flex items-center gap-3 flex-wrap">
                                 <h1 className="text-xl md:text-2xl font-black tracking-tight text-black dark:text-white flex items-center gap-2">
-                                    Purchase Bill <span className="font-mono text-primary bg-primary/5 dark:bg-primary/10 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-primary/10">{purchase.invoice}</span>
+                                    Purchase Bill <span className="font-mono text-black dark:text-white bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-zinc-200 dark:border-zinc-700">{purchase.invoice}</span>
                                 </h1>
                                 <Badge className={cn("px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none", badge.cls)}>
                                     <CheckCircle className="h-3 w-3" /> {badge.label}
@@ -154,13 +154,13 @@ export default function View({ purchase }: Props) {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg">
                                         <DropdownMenuItem onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=small`, "_blank")} className="cursor-pointer gap-2.5 text-xs font-bold py-2.5">
-                                            <PrinterIcon className="h-4 w-4 text-orange-500" /> Print Small
+                                            <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print Small
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=big`, "_blank")} className="cursor-pointer gap-2.5 text-xs font-bold py-2.5">
-                                            <PrinterIcon className="h-4 w-4 text-blue-500" /> Print Large
+                                            <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print Large
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => (window.location.href = `/purchase/${purchase.id}/download`)} className="cursor-pointer gap-2.5 text-xs font-bold py-2.5">
-                                            <DownloadIcon className="h-4 w-4 text-emerald-500" /> Download PDF
+                                            <DownloadIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Download PDF
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -170,15 +170,15 @@ export default function View({ purchase }: Props) {
                             <div className="hidden md:flex lg:hidden items-center gap-1.5">
                                 <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=small`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5">
-                                    <PrinterIcon className="h-3.5 w-3.5 text-orange-500" /> Print Small
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" /> Print Small
                                 </Button>
                                 <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=big`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5">
-                                    <PrinterIcon className="h-3.5 w-3.5 text-blue-500" /> Print Large
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" /> Print Large
                                 </Button>
                                 <Button variant="outline" onClick={() => (window.location.href = `/purchase/${purchase.id}/download`)}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5">
-                                    <DownloadIcon className="h-3.5 w-3.5 text-emerald-500" /> Download PDF
+                                    <DownloadIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" /> Download PDF
                                 </Button>
                             </div>
 
@@ -186,15 +186,15 @@ export default function View({ purchase }: Props) {
                             <div className="hidden lg:flex items-center gap-2">
                                 <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=small`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2">
-                                    <PrinterIcon className="h-4 w-4 text-orange-500" /> Print Small
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print Small
                                 </Button>
                                 <Button variant="outline" onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=big`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2">
-                                    <PrinterIcon className="h-4 w-4 text-blue-500" /> Print Large
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print Large
                                 </Button>
                                 <Button variant="outline" onClick={() => (window.location.href = `/purchase/${purchase.id}/download`)}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2">
-                                    <DownloadIcon className="h-4 w-4 text-emerald-500" /> Download PDF
+                                    <DownloadIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Download PDF
                                 </Button>
                             </div>
                         </div>
@@ -212,7 +212,7 @@ export default function View({ purchase }: Props) {
                             <div className="flex items-center gap-2">
                                 <Receipt className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
                                 <span className="text-black dark:text-white font-extrabold min-w-[80px]">Invoice #:</span>
-                                <span className="text-orange-500 font-mono font-black">{purchase.invoice}</span>
+                                <span className="text-black dark:text-white font-mono font-black">{purchase.invoice}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
@@ -249,7 +249,7 @@ export default function View({ purchase }: Props) {
                             <CardHeader className="px-6 py-1 pt-3 pb-0 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2.5">
-                                        <Receipt className="h-5 w-5 text-primary" />
+                                        <Receipt className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                                         <div>
                                             <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">Purchase Items Manifest</CardTitle>
                                             <CardDescription className="text-[10px] text-zinc-500 font-mono">Detailed manifest of products and transaction row totals</CardDescription>
@@ -292,8 +292,8 @@ export default function View({ purchase }: Props) {
                                                     <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">{it.qty_pcs}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{it.item?.retail ? fmt(it.item.retail) : "0.00"}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{fmt(it.trade_price)}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-rose-500">{dp > 0 ? dp.toFixed(2) : "0.00"}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{dp > 0 ? dp.toFixed(2) : "0.00"}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{fmt(adr)}</td>
                                                     <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>
                                                 </tr>
                                             );
@@ -306,9 +306,9 @@ export default function View({ purchase }: Props) {
                                             <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{purchase.items.reduce((a, i) => a + Number(i.qty_pcs || 0), 0)}</td>
                                             <td></td>
                                             <td></td>
-                                            <td className="px-4 py-3.5 text-right text-rose-500 font-mono">-{fmt(purchase.items.reduce((a, i) => a + Number(i.discount || 0), 0))}</td>
+                                            <td className="px-4 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">-{fmt(purchase.items.reduce((a, i) => a + Number(i.discount || 0), 0))}</td>
                                             <td></td>
-                                            <td className="px-6 py-3.5 text-right text-orange-500 font-mono">{fmt(purchase.items.reduce((a, i) => a + (Number(i.subtotal || 0) - Number(i.discount || 0)), 0))}</td>
+                                            <td className="px-6 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">{fmt(purchase.items.reduce((a, i) => a + (Number(i.subtotal || 0) - Number(i.discount || 0)), 0))}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -335,7 +335,7 @@ export default function View({ purchase }: Props) {
                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(purchase.courier_charges ?? 0)}</span>
                                         </div>
                                         {extraDiscount > 0 && (
-                                            <div className="flex justify-between items-center text-rose-500">
+                                            <div className="flex justify-between items-center text-black dark:text-zinc-100">
                                                 <span>Extra Discount :-</span>
                                                 <span className="font-mono font-bold">-{fmt(extraDiscount)}</span>
                                             </div>
@@ -346,23 +346,23 @@ export default function View({ purchase }: Props) {
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span>Previous Balance :-</span>
-                                            <span className={cn("font-mono font-bold", prevBal > 0 ? "text-rose-500" : prevBal < 0 ? "text-emerald-500" : "text-zinc-500")}>
+                                            <span className="font-mono font-bold text-black dark:text-zinc-100">
                                                 {prevBal < 0 ? "-" : ""}{fmt(Math.abs(prevBal))}
                                             </span>
                                         </div>
                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
                                         <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
                                             <span>Total Balance :-</span>
-                                            <span className="font-mono text-orange-500">{fmt(invoiceTotal + prevBal)}</span>
+                                            <span className="font-mono text-black dark:text-zinc-100">{fmt(invoiceTotal + prevBal)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold">
+                                        <div className="flex justify-between items-center text-black dark:text-zinc-100 font-bold">
                                             <span>Cash Paid :-</span>
                                             <span className="font-mono font-black">{fmt(purchase.paid_amount)}</span>
                                         </div>
                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
                                         <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
                                             <span>Total Outstanding :</span>
-                                            <span className={cn("font-mono font-black text-base", netBal > 0 ? "text-rose-600" : "text-emerald-600")}>
+                                            <span className="font-mono font-black text-base text-black dark:text-zinc-100">
                                                 {fmt(netBal)}
                                             </span>
                                         </div>
@@ -372,8 +372,8 @@ export default function View({ purchase }: Props) {
                         </Card>
 
                         {purchase.message_line?.messageline && (
-                            <Card className="bg-orange-500/[0.02] border border-orange-500/10 shadow-sm rounded-xl p-5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 block mb-2 flex items-center gap-1.5">
+                            <Card className="bg-zinc-100/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300 block mb-2 flex items-center gap-1.5">
                                     <Info className="h-4 w-4" /> Message Line / Special Notice
                                 </span>
                                 <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 italic uppercase">"{purchase.message_line.messageline}"</p>

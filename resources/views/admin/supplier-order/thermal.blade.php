@@ -1,127 +1,180 @@
 @php
-$logo_path = storage_path('app/public/img/favicon.png');
-if (!file_exists($logo_path)) {
-    $logo_path = public_path('storage/img/favicon.png');
-}
+    $fmtNum = function($num) {
+        return fmod((float)$num, 1) == 0 ? number_format((float)$num, 0) : number_format((float)$num, 2);
+    };
 
-$logo_base64 = "";
-if (file_exists($logo_path)) {
-    $logo_data = file_get_contents($logo_path);
-    $logo_type = pathinfo($logo_path, PATHINFO_EXTENSION);
-    $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_data);
-}
+    $supplier_type_label = (isset($order->supplier) && $order->supplier->type == 5) ? 'Company:' : 'Supplier:';
 @endphp
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
     <title>Supplier Order #ORD-{{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }} (Thermal)</title>
     <style>
-        @page {
-            size: 80mm auto;
-            margin: 2mm;
-        }
         * {
             box-sizing: border-box;
-            font-family: 'Courier New', Courier, monospace, sans-serif;
         }
+
+        @page {
+            margin: 1mm;
+        }
+
         body {
-            font-size: 10px;
+            font-family: 'Helvetica', 'Arial', sans-serif;
             color: #000;
-            background: #fff;
+            font-size: 9px;
             margin: 0;
-            padding: 4px;
-            width: 76mm;
+            padding: 0;
+            line-height: 1.3;
+        }
+
+        .receipt-wrapper {
+            width: 64mm;
             margin: 0 auto;
-            line-height: 1.2;
-        }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .text-left { text-align: left; }
-        .bold { font-weight: bold; }
-        .uppercase { text-transform: uppercase; }
-
-        .brand-header {
-            text-align: center;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 6px;
-            margin-bottom: 6px;
-        }
-        .brand-title {
-            font-size: 14px;
-            font-weight: 900;
-            letter-spacing: 1px;
-        }
-        .brand-subtitle {
-            font-size: 9px;
-            margin-top: 2px;
+            padding-right: 2mm; /* Prevent side cut-off */
         }
 
-        .order-title-box {
-            border: 1px solid #000;
-            padding: 3px;
+        .text-center {
             text-align: center;
-            font-size: 11px;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .bold {
             font-weight: bold;
-            margin-bottom: 6px;
         }
 
-        .meta-info {
-            font-size: 9.5px;
-            margin-bottom: 6px;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 4px;
-        }
-        .meta-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 2px;
+        .header {
+            margin-bottom: 5px;
         }
 
-        table.items-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9px;
-            margin-bottom: 6px;
-        }
-        table.items-table th {
-            border-top: 1px solid #000;
-            border-bottom: 1px solid #000;
-            padding: 4px 1px;
-            font-size: 9px;
-        }
-        table.items-table td {
-            padding: 3px 1px;
-            border-bottom: 1px dotted #ccc;
-            vertical-align: top;
+        .brand-name {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .totals-section {
-            border-top: 1px dashed #000;
-            padding-top: 4px;
-            font-size: 10px;
-        }
-        .totals-row {
-            display: flex;
-            justify-content: space-between;
+        .contact-info {
+            font-size: 8px;
             margin-bottom: 3px;
         }
 
-        .footer {
-            margin-top: 10px;
+        .voucher-bar {
+            border: 1px dashed #000;
             text-align: center;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 0;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-section {
+            margin-bottom: 5px;
             font-size: 8.5px;
-            border-top: 1px dashed #000;
-            padding-top: 6px;
+        }
+
+        .info-row {
+            margin-bottom: 2px;
+        }
+
+        .info-label {
+            display: inline-block;
+            width: 65px;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .divider {
+            border-bottom: 1px dashed #000;
+            margin: 4px 0;
+        }
+
+        .alloc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+            margin-top: 3px;
+        }
+
+        .alloc-table th {
+            border-bottom: 1px solid #000;
+            padding: 2px 0;
+            font-size: 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .alloc-table td {
+            padding: 2px 0;
+            font-size: 8px;
+            vertical-align: top;
+            border-bottom: 1px solid #000;
+        }
+
+        .totals-section {
+            width: 100%;
+            font-size: 9px;
+            margin-top: 5px;
+        }
+
+        .total-row {
+            margin-bottom: 2px;
+        }
+
+        .total-label {
+            float: left;
+            width: 65%;
+            text-align: right;
+            padding-right: 5px;
+            font-weight: bold;
+        }
+
+        .total-value {
+            float: right;
+            width: 35%;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .footer-note {
+            font-size: 7.5px;
+            color: #000;
+            font-weight: bold;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
         }
 
         @media print {
-            body { width: 100%; padding: 0; }
-            .no-print { display: none !important; }
+            body {
+                width: 100%;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
         }
     </style>
 </head>
+
 <body onload="window.print()">
 
     <div class="no-print" style="margin-bottom: 10px; text-align: center;">
@@ -130,89 +183,103 @@ if (file_exists($logo_path)) {
         </button>
     </div>
 
-    <div class="brand-header">
-        @if($logo_base64)
-            <img src="{{ $logo_base64 }}" alt="Logo" style="height: 28px; width: auto; margin-bottom: 3px;">
-        @endif
-        <div class="brand-title">HARMAIN TRADERS</div>
-        <div class="brand-subtitle">Wholesale & Supply Chain</div>
-    </div>
-
-    <div class="order-title-box uppercase">
-        SUPPLIER ORDER
-    </div>
-
-    <div class="meta-info">
-        <div class="meta-row">
-            <span>Order #: <strong>ORD-{{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }}</strong></span>
-            <span>Date: <strong>{{ \Carbon\Carbon::parse($order->order_date)->format('d-m-Y') }}</strong></span>
+    <div class="receipt-wrapper">
+        <!-- Brand Header -->
+        <div class="header text-center">
+            <div class="brand-name">HARMAIN TRADERS</div>
+            <div class="contact-info">Wholesale & Supply Chain</div>
         </div>
-        <div class="meta-row" style="margin-top: 2px;">
-            <span>{{ (isset($order->supplier) && $order->supplier->type == 5) ? 'Company:' : 'Supplier:' }}</span>
-            <span class="bold">{{ $order->supplier->title ?? 'N/A' }}</span>
-        </div>
-        @if($order->supplier && $order->supplier->phone)
-        <div class="meta-row">
-            <span>Phone:</span>
-            <span>{{ $order->supplier->phone }}</span>
-        </div>
-        @endif
-    </div>
 
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th class="text-left" style="width: 45%;">Item</th>
-                <th class="text-center" style="width: 15%;">Qty</th>
-                <th class="text-right" style="width: 20%;">Rate</th>
-                <th class="text-right" style="width: 20%;">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($order->items as $item)
-            <tr>
-                <td class="text-left bold">
-                    {{ $item->item->title ?? 'Unknown Item' }}
-                </td>
-                <td class="text-center">
-                    {{ $item->qty_full > 0 ? $item->qty_full . 'F' : '' }}{{ $item->qty_full > 0 && $item->qty_pcs > 0 ? '+' : '' }}{{ $item->qty_pcs > 0 ? $item->qty_pcs . 'P' : '' }}
-                </td>
-                <td class="text-right">
-                    {{ number_format($item->net_rate, 1) }}
-                </td>
-                <td class="text-right bold">
-                    {{ number_format($item->subtotal, 1) }}
-                </td>
-            </tr>
-            @endforeach
-            @if($order->items->isEmpty())
-            <tr>
-                <td colspan="4" class="text-center">No items found.</td>
-            </tr>
+        <!-- Order Bar -->
+        <div class="voucher-bar">
+            SUPPLIER ORDER
+        </div>
+
+        <!-- Meta Info -->
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Order #:</span>
+                <span class="info-value">ORD-{{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span class="info-value">{{ \Carbon\Carbon::parse($order->order_date)->format('d M Y') }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">{{ $supplier_type_label }}</span>
+                <span class="info-value">{{ $order->supplier->title ?? 'N/A' }}</span>
+            </div>
+            @if($order->supplier && $order->supplier->phone)
+            <div class="info-row">
+                <span class="info-label">Phone:</span>
+                <span class="info-value">{{ $order->supplier->phone }}</span>
+            </div>
             @endif
-        </tbody>
-    </table>
+        </div>
 
-    <div class="totals-section">
-        <div class="totals-row">
-            <span>Total Items:</span>
-            <span class="bold">{{ $order->items->count() }}</span>
-        </div>
-        @if($order->total_discount > 0)
-        <div class="totals-row">
-            <span>Total Discount:</span>
-            <span>Rs {{ number_format($order->total_discount, 2) }}</span>
-        </div>
-        @endif
-        <div class="totals-row" style="font-size: 11px; margin-top: 3px; border-top: 1px solid #000; padding-top: 3px;">
-            <span class="bold">NET AMOUNT:</span>
-            <span class="bold">Rs {{ number_format($order->total_amount, 2) }}</span>
-        </div>
-    </div>
+        <div class="divider"></div>
 
-    <div class="footer">
-        <div>Software by AishTycoons (0300-2086828)</div>
-        <div style="margin-top: 2px;">Printed: {{ now()->format('d-m-Y h:i A') }}</div>
+        <!-- Items Table -->
+        <table class="alloc-table">
+            <thead>
+                <tr>
+                    <th style="width: 45%;">Item</th>
+                    <th class="text-center" style="width: 18%;">Qty</th>
+                    <th class="text-right" style="width: 18%;">Rate</th>
+                    <th class="text-right" style="width: 19%;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($order->items as $item)
+                <tr>
+                    <td class="bold">
+                        {{ $item->item->title ?? 'Unknown Item' }}
+                    </td>
+                    <td class="text-center">
+                        {{ $item->qty_full > 0 ? $item->qty_full . 'F' : '' }}{{ $item->qty_full > 0 && $item->qty_pcs > 0 ? '+' : '' }}{{ $item->qty_pcs > 0 ? $item->qty_pcs . 'P' : '' }}
+                    </td>
+                    <td class="text-right">
+                        {{ $fmtNum($item->net_rate) }}
+                    </td>
+                    <td class="text-right bold">
+                        {{ $fmtNum($item->subtotal) }}
+                    </td>
+                </tr>
+                @endforeach
+                @if($order->items->isEmpty())
+                <tr>
+                    <td colspan="4" class="text-center">No items found.</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="total-row clearfix">
+                <div class="total-label">Total Items:</div>
+                <div class="total-value">{{ $order->items->count() }}</div>
+            </div>
+            @if($order->total_discount > 0)
+            <div class="total-row clearfix">
+                <div class="total-label">Total Discount:</div>
+                <div class="total-value">Rs {{ $fmtNum($order->total_discount) }}</div>
+            </div>
+            @endif
+            <div class="divider"></div>
+            <div class="total-row clearfix" style="font-size: 11px;">
+                <div class="total-label">NET AMOUNT:</div>
+                <div class="total-value">Rs {{ $fmtNum($order->total_amount) }}</div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Footer -->
+        <div class="footer-note">
+            <div>Software by AishTycoons (0300-2086828)</div>
+            <div style="margin-top: 2px;">Printed: {{ now()->format('d-m-Y h:i A') }}</div>
+        </div>
     </div>
 
 </body>

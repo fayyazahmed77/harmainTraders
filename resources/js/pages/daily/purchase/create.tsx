@@ -566,31 +566,35 @@ export default function Purchase({
         const roundedGross = Math.round(gross);
         const roundedDisc = Math.round(discTotal);
 
-        const net = Math.round(roundedGross - roundedDisc + courier);
-        const netAfterExtraDiscount = Math.max(0, net - extraDiscount);
+        const billNet = Math.max(0, roundedGross - roundedDisc);
+        const netPayable = Math.max(0, billNet + courier - extraDiscount);
 
         // Advance Logic:
-        // In this system, a negative balance for a supplier means they owe us (Advance).
-        // e.g. -103,768 means we have 103,768 in advance.
         const absAdvance = Math.max(0, -advanceAvailable);
-        const appliedAdvance = useAdvance ? Math.min(netAfterExtraDiscount, absAdvance) : 0;
-        const netSettlement = Math.max(0, netAfterExtraDiscount - appliedAdvance);
+        const appliedAdvance = useAdvance ? Math.min(netPayable, absAdvance) : 0;
+        const netSettlement = Math.max(0, netPayable - appliedAdvance);
+
+        const finalNetPayable = prevBal + netSettlement;
 
         return {
             gross: roundedGross,
             discTotal: roundedDisc,
             courier: courier,
-            net: net,
+            extraDiscount: extraDiscount,
+            billNet: billNet,
+            netPayable: netPayable,
+            net: netPayable,
             appliedAdvance,
             netSettlement,
             previousBalance: prevBal,
+            finalNetPayable: finalNetPayable,
             cashReceived,
-            totalReceivable: Math.round(netSettlement + prevBal),
+            totalReceivable: finalNetPayable,
             totalFull,
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier, advanceAvailable, useAdvance, extraDiscount]);
+    }, [rowsWithComputed, items, courier, extraDiscount, advanceAvailable, useAdvance]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -1408,15 +1412,6 @@ console.log(lastPurchaseInfo);
                                                     </div>
                                                 </div>
 
-                                                <div className="flex flex-col items-end border-l border-zinc-200 dark:border-zinc-800 pl-8">
-                                                    <span className="text-[9px] font-black uppercase text-red-400 tracking-widest leading-none mb-1">Total Discount</span>
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-[10px] font-bold text-red-300">-Rs</span>
-                                                        <span className="text-lg font-black text-red-600 dark:text-red-400 leading-none">
-                                                            {totals.discTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                    </div>
-                                                </div>
 
                                                 <div className="flex flex-col items-end border-l border-orange-300 dark:border-orange-800 pl-8">
                                                     <span className="text-[9px] font-black uppercase text-orange-500 tracking-widest leading-none mb-1">Total of this Bill</span>
@@ -1682,7 +1677,7 @@ console.log(lastPurchaseInfo);
                             {/* 2. Net Payable */}
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-1">Net Payable</span>
-                                <div className="text-sm font-bold text-foreground font-mono leading-none">Rs {totals.gross.toLocaleString()}</div>
+                                <div className="text-sm font-bold text-foreground font-mono leading-none">Rs {totals.netPayable.toLocaleString()}</div>
                             </div>
 
                             <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0" />
@@ -1692,7 +1687,7 @@ console.log(lastPurchaseInfo);
                                 <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest leading-none mb-1">Final Net Payable</span>
                                 <div className="text-2xl font-black text-orange-600 dark:text-orange-400 italic tracking-tight leading-none">
                                     <span className="text-xs font-bold mr-0.5 not-italic">Rs</span>
-                                    {totals.netSettlement.toLocaleString()}
+                                    {totals.finalNetPayable.toLocaleString()}
                                 </div>
                             </div>
 

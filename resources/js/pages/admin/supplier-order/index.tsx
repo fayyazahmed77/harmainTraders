@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, RotateCcw, CheckSquare, Building2 } from "lucide-react";
+import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, RotateCcw, CheckSquare, Building2, FileText, Printer } from "lucide-react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { useAppearance } from "@/hooks/use-appearance";
@@ -826,7 +826,7 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                 <p className="text-center text-sm text-zinc-700">
                   Your supplier order has been securely recorded. What would you like to do next?
                 </p>
-                <div className="flex w-full gap-3 mt-2">
+                <div className="flex flex-col sm:flex-row w-full gap-2 mt-2">
                   <Button 
                     onClick={() => {
                       resetAll();
@@ -839,12 +839,22 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                   <Button 
                     onClick={() => {
                       if (createdOrderId) {
-                        window.open(`/admin/supplier-order/${createdOrderId}/print`, '_blank');
+                        window.open(`/admin/supplier-order/${createdOrderId}/print?format=big`, '_blank');
                       }
                     }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white uppercase font-black text-[10px] tracking-widest h-10"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white uppercase font-black text-[10px] tracking-widest h-10 flex items-center justify-center gap-1.5"
                   >
-                    Print Order
+                    <FileText size={14} /> A4 Print
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (createdOrderId) {
+                        window.open(`/admin/supplier-order/${createdOrderId}/print?format=small`, '_blank');
+                      }
+                    }}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white uppercase font-black text-[10px] tracking-widest h-10 flex items-center justify-center gap-1.5"
+                  >
+                    <Printer size={14} /> Thermal Print
                   </Button>
                 </div>
               </div>

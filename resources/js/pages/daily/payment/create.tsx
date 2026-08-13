@@ -741,10 +741,21 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       // Auto-select payment type based on account type
       const selectedAccount = accounts.find(acc => acc.id.toString() === selectedAccountId);
       if (selectedAccount) {
-        const accountTypeName = (selectedAccount as any).account_type?.name;
-        if (accountTypeName === 'Customers') {
+        const accountTypeName = (selectedAccount as any).account_type?.name || "";
+        const accTypeLower = accountTypeName.toLowerCase();
+        const rawTypeStr = String(selectedAccount.type || "").toLowerCase();
+
+        const isCustomer = accTypeLower === 'customers' || accTypeLower === 'customer' || rawTypeStr === '1';
+        const isSupplier = accTypeLower === 'supplier' || accTypeLower === 'suppliers' || rawTypeStr === '2';
+        const isExpense = 
+          accTypeLower.includes('expense') || 
+          accTypeLower.includes('expanc') || 
+          rawTypeStr === '4' || 
+          rawTypeStr.includes('expense');
+
+        if (isCustomer) {
           setPaymentType('RECEIPT');
-        } else if (accountTypeName === 'Supplier') {
+        } else if (isSupplier || isExpense) {
           setPaymentType('PAYMENT');
         }
       }

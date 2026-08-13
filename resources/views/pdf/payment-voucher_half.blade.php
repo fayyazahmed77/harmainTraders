@@ -258,7 +258,7 @@
         <div class="divider"></div>
 
         
-        <div class="bold" style="font-size: 8px; text-transform: uppercase; margin-bottom: 2px;">Payment Details:</div>
+       
         <table class="alloc-table">
             <thead>
                 <tr>

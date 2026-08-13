@@ -158,7 +158,7 @@ export default function View({ sale }: Props) {
 
     const formatDateLong = (dateStr: string | null | undefined): string => {
         if (!dateStr) return 'N/A';
-        const date = new Date(dateStr + 'T00:00:00'); // prevent timezone shift
+        const date = new Date(dateStr + 'T00:00:00');
         if (isNaN(date.getTime())) return dateStr;
         return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     };
@@ -172,7 +172,6 @@ export default function View({ sale }: Props) {
         return `${formattedDate} ${formattedTime}`;
     };
 
-    // Dynamic Financial Summary Calculations
     const netTotal = Number(sale.net_total || 0);
     const extraDiscount = Number(sale.extra_discount || 0);
     const totalReceivable = Number(sale.total_receivable || 0);
@@ -180,52 +179,46 @@ export default function View({ sale }: Props) {
     const currentInvoiceTotal = Math.max(0, netTotal - extraDiscount);
     const paidAmount = Number(sale.paid_amount || 0);
 
-
-
-    // Robust previous balance formula: total_receivable - (remaining_amount_stored + paid_amount_stored)
     const previousBalance = totalReceivable > 0 
         ? Math.max(0, Math.round(totalReceivable - (Number(sale.remaining_amount || 0) + Number(sale.paid_amount || 0)))) 
         : 0;
 
     const netBalance = currentInvoiceTotal + previousBalance - paidAmount;
 
-    // Status colors
     const statusConfig = {
         Completed: {
             label: "Completed",
-            color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-300",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <CheckCircle className="h-3 w-3" />,
         },
         "Partial Return": {
             label: "Partial Return",
-            color: "bg-amber-500/10 text-amber-500 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <RotateCw className="h-3 w-3" />,
         },
         Returned: {
             label: "Returned",
-            color: "bg-rose-500/10 text-rose-500 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-300",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <RefreshCcw className="h-3 w-3" />,
         },
         "Pending Order": {
             label: "Pending Order",
-            color: "bg-blue-500/10 text-blue-500 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-300 animate-pulse",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <Clock className="h-3 w-3" />,
         },
         Canceled: {
             label: "Canceled",
-            color: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20 dark:bg-zinc-500/20 dark:text-zinc-300",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <AlertCircle className="h-3 w-3" />,
         },
         Partial: {
             label: "Partial Settled",
-            color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-300",
+            color: "bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700",
             icon: <RotateCw className="h-3 w-3" />,
         },
     };
 
     const currentStatus = statusConfig[sale.status] || statusConfig.Completed;
-
-
 
     return (
         <SidebarProvider>
@@ -235,10 +228,7 @@ export default function View({ sale }: Props) {
 
                 <div className="mx-auto w-full max-w-[1600px] p-4 lg:p-6 space-y-4 print:p-0">
 
-
-                    {/* ──────────────────────────────────────────────────
-                        HEADER: Action Buttons & Navigation
-                        ────────────────────────────────────────────────── */}
+                    {/* HEADER */}
                     <div className="flex items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4 print:hidden">
                         <div className="flex items-center gap-3">
                             <Button
@@ -251,7 +241,7 @@ export default function View({ sale }: Props) {
                             </Button>
                             <div className="flex items-center gap-3 flex-wrap">
                                 <h1 className="text-xl md:text-2xl font-black tracking-tight text-black dark:text-white flex items-center gap-2">
-                                    Sales Invoice <span className="font-mono text-orange-500 bg-orange-500/5 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-orange-500/10">{sale.invoice}</span>
+                                    Sales Invoice <span className="font-mono text-black dark:text-white bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-zinc-200 dark:border-zinc-700">{sale.invoice}</span>
                                 </h1>
                                 <Badge className={cn("px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none", currentStatus.color)}>
                                     {currentStatus.icon}
@@ -260,13 +250,13 @@ export default function View({ sale }: Props) {
                             </div>
                         </div>
 
-                        {/* Action Buttons: Desktop, Laptop (compact), Mobile (3-dot menu) */}
+                        {/* Action Buttons */}
                         <div className="flex items-center gap-2">
                             {sale.status === "Pending Order" && (
                                 <>
                                     <Button
                                         onClick={() => setIsVerifyDialogOpen(true)}
-                                        className="h-9 md:h-10 px-3 md:px-5 text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 md:gap-2"
+                                        className="h-9 md:h-10 px-3 md:px-5 text-xs font-black uppercase tracking-widest bg-zinc-900 hover:bg-black text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 rounded-xl shadow-md transition-all flex items-center gap-1.5 md:gap-2"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
                                         <span className="hidden sm:inline">Verify & Process</span>
@@ -279,7 +269,7 @@ export default function View({ sale }: Props) {
                                                 router.post(`/sales/${sale.id}/cancel`);
                                             }
                                         }}
-                                        className="h-9 md:h-10 px-3 md:px-4 text-xs font-bold rounded-xl border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400 transition-all shadow-sm"
+                                        className="h-9 md:h-10 px-3 md:px-4 text-xs font-bold rounded-xl border-zinc-300 text-zinc-800 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200 transition-all shadow-sm"
                                     >
                                         <AlertCircle className="h-4 w-4 sm:mr-2" />
                                         <span className="hidden sm:inline">Cancel Order</span>
@@ -287,7 +277,7 @@ export default function View({ sale }: Props) {
                                 </>
                             )}
 
-                            {/* Mobile (3-dot More Menu) */}
+                            {/* Mobile */}
                             <div className="md:hidden">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -304,35 +294,35 @@ export default function View({ sale }: Props) {
                                             onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
                                             className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
                                         >
-                                            <PrinterIcon className="h-4 w-4 text-orange-500" />
+                                            <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                             Print Small
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
                                             className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
                                         >
-                                            <PrinterIcon className="h-4 w-4 text-blue-500" />
+                                            <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                             Print Large
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
                                             className="cursor-pointer gap-2.5 text-xs font-bold py-2.5"
                                         >
-                                            <DownloadIcon className="h-4 w-4 text-emerald-500" />
+                                            <DownloadIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                             Download PDF
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
 
-                            {/* Laptop (Compact Buttons: md to lg) */}
+                            {/* Laptop */}
                             <div className="hidden md:flex lg:hidden items-center gap-1.5">
                                 <Button
                                     variant="outline"
                                     onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
                                 >
-                                    <PrinterIcon className="h-3.5 w-3.5 text-orange-500" />
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
                                     Print Small
                                 </Button>
                                 <Button
@@ -340,7 +330,7 @@ export default function View({ sale }: Props) {
                                     onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
                                 >
-                                    <PrinterIcon className="h-3.5 w-3.5 text-blue-500" />
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
                                     Print Large
                                 </Button>
                                 <Button
@@ -348,19 +338,19 @@ export default function View({ sale }: Props) {
                                     onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5"
                                 >
-                                    <DownloadIcon className="h-3.5 w-3.5 text-emerald-500" />
+                                    <DownloadIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
                                     Download PDF
                                 </Button>
                             </div>
 
-                            {/* Desktop (Full Buttons: lg and up) */}
+                            {/* Desktop */}
                             <div className="hidden lg:flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     onClick={() => window.open(`/sales/${sale.id}/pdf?format=small`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                                 >
-                                    <PrinterIcon className="h-4 w-4 text-orange-500" />
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                     Print Small
                                 </Button>
                                 <Button
@@ -368,7 +358,7 @@ export default function View({ sale }: Props) {
                                     onClick={() => window.open(`/sales/${sale.id}/pdf?format=big`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                                 >
-                                    <PrinterIcon className="h-4 w-4 text-blue-500" />
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                     Print Large
                                 </Button>
                                 <Button
@@ -376,16 +366,14 @@ export default function View({ sale }: Props) {
                                     onClick={() => (window.location.href = `/sales/${sale.id}/download?format=big`)}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2"
                                 >
-                                    <DownloadIcon className="h-4 w-4 text-emerald-500" />
+                                    <DownloadIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                                     Download PDF
                                 </Button>
                             </div>
                         </div>
                     </div>
 
-                    {/* ──────────────────────────────────────────────────
-                        INFORMATION SECTION: Inline Two-Column
-                        ────────────────────────────────────────────────── */}
+                    {/* INFORMATION SECTION */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 px-1 py-3 border-b border-zinc-200 dark:border-zinc-800 text-xs print:hidden">
                         {/* Left Column */}
                         <div className="space-y-2">
@@ -397,7 +385,7 @@ export default function View({ sale }: Props) {
                             <div className="flex items-center gap-2">
                                 <Receipt className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
                                 <span className="text-black dark:text-white font-extrabold min-w-[80px]">Invoice #:</span>
-                                <span className="text-orange-500 font-mono font-black">{sale.invoice}</span>
+                                <span className="text-black dark:text-white font-mono font-black">{sale.invoice}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
@@ -430,12 +418,11 @@ export default function View({ sale }: Props) {
 
                     {/* MAIN CONTENT */}
                     <div className="space-y-1">
-                            {/* SECTION 2: Invoice Items Table */}
                             <Card className="bg-white dark:bg-zinc-900 border-zinc-200 py-0 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
                                 <CardHeader className="px-6 py-1 pt-3 pb-0 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2.5">
-                                            <Receipt className="h-5 w-5 text-primary" />
+                                            <Receipt className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                                             <div>
                                                 <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">Invoice Items Manifest</CardTitle>
                                                 <CardDescription className="text-[10px] text-zinc-500 font-mono">Detailed manifest of products and transaction row totals</CardDescription>
@@ -489,10 +476,10 @@ export default function View({ sale }: Props) {
                                                         <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
                                                             {formatCurrency(it.trade_price).replace('PKR', '').trim()}
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-rose-500">
+                                                        <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
                                                             {discPercent > 0 ? discPercent.toFixed(2) : "0.00"}
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                        <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
                                                             {formatCurrency(afterDiscRate).replace('PKR', '').trim()}
                                                         </td>
                                                         <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">
@@ -513,11 +500,11 @@ export default function View({ sale }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3.5"></td>
                                                 <td className="px-4 py-3.5"></td>
-                                                <td className="px-4 py-3.5 text-right text-rose-500 font-mono">
+                                                <td className="px-4 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">
                                                     -{formatCurrency(sale.items.reduce((acc, it) => acc + Number(it.discount || 0), 0)).replace('PKR', '').trim()}
                                                 </td>
                                                 <td className="px-4 py-3.5"></td>
-                                                <td className="px-6 py-3.5 text-right text-orange-500 font-mono">
+                                                <td className="px-6 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">
                                                     {formatCurrency(sale.items.reduce((acc, it) => acc + (Number(it.subtotal || 0) - Number(it.discount || 0)), 0)).replace('PKR', '').trim()}
                                                 </td>
                                             </tr>
@@ -525,11 +512,11 @@ export default function View({ sale }: Props) {
                                     </table>
                                 </div>
 
-                                {/* Summary section matching Image 1 */}
+                                {/* Summary section */}
                                 <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-950/20">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                                         
-                                        {/* Left Column: Total Items & Signature */}
+                                        {/* Left Column */}
                                         <div className="space-y-12">
                                             <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
                                                 <span>Total # Of Items:</span>
@@ -546,7 +533,7 @@ export default function View({ sale }: Props) {
                                             </div>
                                         </div>
                                         
-                                        {/* Right Column: Financial Figures */}
+                                        {/* Right Column */}
                                         <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
                                             <div className="flex justify-between items-center">
                                                 <span>Courier Charges :-</span>
@@ -554,7 +541,7 @@ export default function View({ sale }: Props) {
                                                     {formatCurrency(sale.courier_charges).replace('PKR', '').trim()}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between items-center text-rose-500">
+                                            <div className="flex justify-between items-center text-black dark:text-zinc-100">
                                                 <span>Extra Discount :-</span>
                                                 <span className="font-mono font-bold">
                                                     -{formatCurrency(extraDiscount).replace('PKR', '').trim()}
@@ -568,21 +555,18 @@ export default function View({ sale }: Props) {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span>Previous Balance :-</span>
-                                                <span className={cn(
-                                                    "font-mono font-bold",
-                                                    previousBalance > 0 ? "text-rose-500" : previousBalance < 0 ? "text-emerald-500" : "text-zinc-500"
-                                                )}>
+                                                <span className="font-mono font-bold text-black dark:text-zinc-100">
                                                     {previousBalance < 0 ? "-" : ""}{formatCurrency(Math.abs(previousBalance)).replace('PKR', '').trim()}
                                                 </span>
                                             </div>
                                             <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
                                             <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
                                                 <span>Total Balance :-</span>
-                                                <span className="font-mono text-orange-500">
+                                                <span className="font-mono text-black dark:text-zinc-100">
                                                     {formatCurrency(currentInvoiceTotal + previousBalance).replace('PKR', '').trim()}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold">
+                                            <div className="flex justify-between items-center text-black dark:text-zinc-100 font-bold">
                                                 <span>Cash Received :-</span>
                                                 <span className="font-mono font-black">
                                                     {formatCurrency(sale.paid_amount).replace('PKR', '').trim()}
@@ -591,10 +575,7 @@ export default function View({ sale }: Props) {
                                             <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
                                             <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
                                                 <span>Total Receivable :</span>
-                                                <span className={cn(
-                                                    "font-mono font-black text-base",
-                                                    netBalance > 0 ? "text-rose-600" : "text-emerald-600"
-                                                )}>
+                                                <span className="font-mono font-black text-base text-black dark:text-zinc-100">
                                                     {formatCurrency(netBalance).replace('PKR', '').trim()}
                                                 </span>
                                             </div>
@@ -607,12 +588,12 @@ export default function View({ sale }: Props) {
                             {/* SECTION 6: Returns History */}
                             {sale.returns && sale.returns.length > 0 && (
                                 <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
-                                    <CardHeader className="px-6 py-4 bg-rose-500/[0.02] border-b border-rose-500/10">
+                                    <CardHeader className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                         <div className="flex items-center gap-2.5">
-                                            <RefreshCcw className="h-5 w-5 text-rose-500 animate-spin-slow" />
+                                            <RefreshCcw className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                                             <div>
-                                                <CardTitle className="text-sm font-black uppercase tracking-widest text-rose-600 dark:text-rose-400">Return & Reverse History</CardTitle>
-                                                <CardDescription className="text-[10px] text-rose-400">Adjustment credit notes processed for this sale</CardDescription>
+                                                <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">Return & Reverse History</CardTitle>
+                                                <CardDescription className="text-[10px] text-zinc-500">Adjustment credit notes processed for this sale</CardDescription>
                                             </div>
                                         </div>
                                     </CardHeader>
@@ -620,7 +601,7 @@ export default function View({ sale }: Props) {
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left border-collapse">
                                             <thead>
-                                                <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-rose-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                                <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-700 dark:text-zinc-200 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                                                     <th className="px-6 py-3">Return Voucher</th>
                                                     <th className="px-4 py-3 text-center">Return Date</th>
                                                     <th className="px-4 py-3">Reason / Remarks</th>
@@ -633,20 +614,20 @@ export default function View({ sale }: Props) {
                                                     const retQty = returnItem.items.reduce((acc, curr) => acc + Number(curr.total_pcs), 0);
                                                     return (
                                                         <React.Fragment key={returnItem.id}>
-                                                            <tr className="hover:bg-rose-500/[0.01]">
+                                                            <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20">
                                                                 <td className="px-6 py-3.5 font-bold font-mono text-zinc-900 dark:text-zinc-200">{returnItem.invoice}</td>
                                                                 <td className="px-4 py-3.5 text-center text-zinc-500 font-mono">{formatDateLong(returnItem.date)}</td>
                                                                 <td className="px-4 py-3.5 text-zinc-600 dark:text-zinc-400 font-medium italic">{returnItem.remarks || "No remarks provided"}</td>
-                                                                <td className="px-4 py-3.5 text-center font-mono font-bold text-rose-600">{retQty} Pcs</td>
-                                                                <td className="px-6 py-3.5 text-right font-mono font-bold text-rose-600">
+                                                                <td className="px-4 py-3.5 text-center font-mono font-bold text-black dark:text-zinc-100">{retQty} Pcs</td>
+                                                                <td className="px-6 py-3.5 text-right font-mono font-bold text-black dark:text-zinc-100">
                                                                     -{formatCurrency(returnItem.net_total).replace('PKR', '').trim()}
                                                                 </td>
                                                             </tr>
                                                             {/* Nested item list for returns */}
                                                             <tr className="bg-zinc-50/20 dark:bg-zinc-950/10">
                                                                 <td colSpan={5} className="px-8 py-2">
-                                                                    <div className="border-l-2 border-rose-300 pl-4 py-1 text-[10px] space-y-1">
-                                                                        <span className="font-bold uppercase text-rose-500 block mb-1">Return Manifest:</span>
+                                                                    <div className="border-l-2 border-zinc-300 dark:border-zinc-700 pl-4 py-1 text-[10px] space-y-1">
+                                                                        <span className="font-bold uppercase text-zinc-700 dark:text-zinc-300 block mb-1">Return Manifest:</span>
                                                                         {returnItem.items.map(ri => (
                                                                             <div key={ri.id} className="flex justify-between max-w-md text-zinc-500">
                                                                                 <span>{ri.item?.title}</span>
@@ -665,10 +646,10 @@ export default function View({ sale }: Props) {
                                 </Card>
                             )}
 
-                            {/* Message Line notice at bottom if not null */}
+                            {/* Message Line notice */}
                             {sale.message_line?.messageline && (
-                                <Card className="bg-orange-500/[0.02] border border-orange-500/10 shadow-sm rounded-xl p-5">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 block mb-2 flex items-center gap-1.5">
+                                <Card className="bg-zinc-100/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300 block mb-2 flex items-center gap-1.5">
                                         <Info className="h-4 w-4" /> Message Line / Special Notice
                                     </span>
                                     <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 italic uppercase">
@@ -676,73 +657,15 @@ export default function View({ sale }: Props) {
                                     </p>
                                 </Card>
                             )}
+                    </div>
 
-                        </div>
-
-                    {/* print footer info */}
                     <div className="hidden print:flex flex-col items-center justify-center border-t border-zinc-200 pt-6 mt-12 text-center text-xs text-zinc-400 font-mono">
-                        <p className="font-bold uppercase tracking-wider">Harnain Traders Wholesale & Supply Chain</p>
+                        <p className="font-bold uppercase tracking-wider">Haramain Traders Wholesale & Supply Chain</p>
                         <p className="mt-1">Generated dynamically on {new Date().toLocaleString()}</p>
                     </div>
 
                 </div>
             </SidebarInset>
-
-            <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] rounded-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-black tracking-tight">Verify & Process Sale</DialogTitle>
-                        <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                            Finalize shipment details for invoice {sale.invoice}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="courier_charges" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                Courier / Logistics Charges (PKR)
-                            </Label>
-                            <Input
-                                id="courier_charges"
-                                type="number"
-                                value={courierCharges}
-                                onChange={(e) => setCourierCharges(Number(e.target.value))}
-                                className="h-12 rounded-xl font-black text-lg border-2 focus-visible:ring-emerald-500"
-                                autoFocus
-                            />
-                            <p className="text-[9px] font-bold text-muted-foreground italic">
-                                * This amount will be added to the final net total of the invoice.
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button 
-                            variant="ghost" 
-                            onClick={() => setIsVerifyDialogOpen(false)}
-                            className="h-12 rounded-xl font-bold text-xs uppercase tracking-widest"
-                        >
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => {
-                                setIsProcessing(true);
-                                router.post(`/sales/${sale.id}/confirm`, {
-                                    courier_charges: courierCharges
-                                }, {
-                                    onSuccess: () => {
-                                        setIsVerifyDialogOpen(false);
-                                        setIsProcessing(false);
-                                    },
-                                    onFinish: () => setIsProcessing(false)
-                                });
-                            }}
-                            disabled={isProcessing}
-                            className="h-12 px-8 rounded-xl font-black text-xs uppercase tracking-widest bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 border-none transition-all"
-                        >
-                            {isProcessing ? "PROCESSING..." : "CONFIRM & VERIFY"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </SidebarProvider>
     );
 }

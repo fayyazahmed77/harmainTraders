@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { JSX, useState } from "react";
 import {
     ColumnDef,
     SortingState,
@@ -11,12 +11,14 @@ import {
     useReactTable,
     flexRender,
 } from "@tanstack/react-table";
+
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import {
     Select,
     SelectContent,
@@ -24,61 +26,82 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+
 import {
-    MoreHorizontal,
-    ChevronLeft as IconChevronLeft,
-    ChevronRight as IconChevronRight,
-    ChevronsLeft as IconChevronsLeft,
-    ChevronsRight as IconChevronsRight,
-    ChevronUp,
-    ChevronDown,
-    CheckCircle,
-    RotateCw,
-    RefreshCcw,
-    Calendar,
-    Hash,
-    User,
-    Package,
-    Wallet,
-    Info,
-    History,
-    Trash2,
-    Edit,
-    Eye,
-    Receipt,
-    Plane
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from "@/components/ui/table";
+import { 
+    Eye, 
+    Edit2, 
+    Trash2, 
+    MoreHorizontal, 
+    CheckCircle, 
+    RotateCw, 
+    RefreshCcw, 
+    ChevronUp, 
+    ChevronDown, 
+    ChevronLeft as IconChevronLeft, 
+    ChevronRight as IconChevronRight, 
+    ChevronsLeft as IconChevronsLeft, 
+    ChevronsRight as IconChevronsRight, 
+    Clock, 
+    AlertCircle,
+    Printer
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { router } from "@inertiajs/react";
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { router } from "@inertiajs/react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+
+export type PurchaseStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled" | "Partial";
 
 interface Purchases {
-    supplier: any;
-    salesman: any;
     id: number;
     date: string;
+    created_at?: string;
     invoice: string;
-    code: string;
+    code?: string;
+    status: string;
     supplier_id: number;
     salesman_id: number;
     no_of_items: number;
     gross_total: number;
     discount_total: number;
-    tax_total: number;
+    extra_discount?: number;
+    courier_charges?: number;
+    tax_total?: number;
     net_total: number;
     paid_amount: number;
     remaining_amount: number;
-    status: string;
-    extra_discount?: number;
+    supplier?: {
+        id: number;
+        title: string;
+    };
+    salesman?: {
+        id: number;
+        name: string;
+    };
 }
 
 interface DataTableProps {
@@ -89,225 +112,249 @@ export default function DataTable({ data }: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [purchaseToDelete, setPurchaseToDelete] = useState<Purchases | null>(null);
 
-    type PurchaseStatus = "Completed" | "Partial Return" | "Returned";
-
-    const statusMap: Record<PurchaseStatus, { color: string; icon: any; label: string }> = {
+    const statusMap: Record<string, { color: string; icon: JSX.Element }> = {
         Completed: {
-            color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-            icon: CheckCircle,
-            label: "Completed"
+            color: "bg-green-100 text-green-800 border-green-200",
+            icon: <CheckCircle size={14} />,
         },
         "Partial Return": {
-            color: "text-orange-500 bg-orange-500/10 border-orange-500/20",
-            icon: RotateCw,
-            label: "Partial Return"
+            color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+            icon: <RotateCw size={14} />,
         },
         Returned: {
-            color: "text-rose-500 bg-rose-500/10 border-rose-500/20",
-            icon: RefreshCcw,
-            label: "Returned"
+            color: "bg-red-100 text-red-800 border-red-200",
+            icon: <RefreshCcw size={14} />,
         },
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-PK", {
-            minimumFractionDigits: 0,
-        }).format(amount);
+        "Pending Order": {
+            color: "bg-orange-100 text-orange-800 border-orange-200",
+            icon: <Clock size={14} />,
+        },
+        Canceled: {
+            color: "bg-gray-100 text-gray-800 border-gray-200",
+            icon: <AlertCircle size={14} />,
+        },
+        Partial: {
+            color: "bg-indigo-100 text-indigo-800 border-indigo-200",
+            icon: <RefreshCcw size={14} />,
+        },
     };
 
     const columns: ColumnDef<Purchases>[] = [
         {
             accessorKey: "date",
-            header: () => (
-                <div className="flex items-center gap-2">
-                    <Calendar className="h-3 w-3 text-orange-500" />
-                    <span>Date</span>
-                </div>
-            ),
+            header: "Date",
             cell: ({ row }) => {
                 const date = new Date(row.original.date);
+                const createdAt = row.original.created_at ? new Date(row.original.created_at) : null;
+
+                const dateStr = date.toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                });
+
+                const timeStr = createdAt
+                    ? createdAt.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : date.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      });
+
                 return (
-                    <div className="flex flex-col">
-                        <span className="font-black text-zinc-900 dark:text-zinc-100 tabular-nums text-xs">
-                            {date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                        </span>
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter tabular-nums">
-                            {date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                        </span>
+                    <div>
+                        <div>{dateStr}</div>
+                        <div className="text-xs text-muted-foreground font-medium">Time : {timeStr}</div>
                     </div>
                 );
             },
         },
         {
             accessorKey: "invoice",
-            header: () => (
-                <div className="flex items-center gap-2">
-                    <Hash className="h-3 w-3 text-orange-500" />
-                    <span>Bill No</span>
-                </div>
-            ),
+            header: "Invoice",
             cell: ({ row }) => (
-                <div className="flex flex-col">
-                    <span className="font-black text-zinc-900 dark:text-zinc-100 tabular-nums text-xs tracking-tight">
-                        {row.original.invoice}
-                    </span>
-
+                <div 
+                    className="flex flex-col cursor-pointer group w-fit"
+                    onClick={() => router.visit(`/purchase/${row.original.id}/view`)}
+                >
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold group-hover:text-orange-600 transition-colors underline-offset-4 group-hover:underline">{row.original.invoice}</span>
+                    </div>
+                    {row.original.code && (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            Code: {row.original.code}
+                        </div>
+                    )}
                 </div>
             )
         },
         {
             accessorKey: "supplier.title",
-            header: () => (
-                <div className="flex items-center gap-2">
-                    <User className="h-3 w-3 text-orange-500" />
-                    <span>Supplier</span>
-                </div>
-            ),
+            header: "Supplier",
             cell: ({ row }) => (
-                <div className="flex flex-col max-w-[200px]">
-                    <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
-                        {row.original.supplier?.title || "Unknown Entity"}
-                    </span>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
-                        via {row.original.salesman?.name || "System Proxy"}
-                    </span>
+                <div>
+                    <div>{row.original.supplier?.title || "Unknown Supplier"}</div>
+                    <div className="text-xs text-muted-foreground">Salesman: {row.original.salesman?.name || "N/A"}</div>
                 </div>
             )
         },
-        {
-            accessorKey: "no_of_items",
-            header: () => (
-                <div className="flex items-center gap-2">
-                    <Package className="h-3 w-3 text-orange-500" />
-                    <span>Items</span>
-                </div>
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-xs font-black text-zinc-600 dark:text-zinc-400 tabular-nums">
-                    {row.original.no_of_items.toString().padStart(2, '0')}
-                </span>
-            )
+        { accessorKey: "no_of_items", header: "Items" },
+        { 
+            accessorKey: "gross_total", 
+            header: "Gross Total",
+            cell: ({ row }) => {
+                const gross = Number(row.original.gross_total || 0);
+                const courier = Number(row.original.courier_charges || 0);
+                return <span className="font-mono">{(gross + courier).toLocaleString()}</span>;
+            }
         },
-        {
-            accessorKey: "net_total",
-            header: () => (
-                <div className="flex items-center justify-end gap-2 w-full">
-                    <Wallet className="h-3 w-3 text-orange-500" />
-                    <span>Total Amount</span>
-                </div>
-            ),
-            cell: ({ row }) => (
-                <div className="flex flex-col items-end min-w-[80px]">
-                    <span className="font-mono text-xs font-black text-zinc-900 dark:text-zinc-100 tabular-nums">
-                        {formatCurrency(row.original.net_total - (row.original.extra_discount || 0))}
-                    </span>
-                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">Gross: {formatCurrency(row.original.gross_total)}</span>
-                </div>
-            )
+        { 
+            accessorKey: "discount_total", 
+            header: "Discount",
+            cell: ({ row }) => {
+                const discTotal = Number(row.original.discount_total || 0);
+                const extraDisc = Number(row.original.extra_discount || 0);
+                return (
+                    <div>
+                        <div className="font-mono text-sm">{discTotal.toLocaleString()}</div>
+                        {extraDisc > 0 && (
+                            <div className="text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded border border-rose-100 dark:border-rose-900/30 w-fit font-mono mt-0.5">
+                                Extra: -{extraDisc.toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
         },
-        {
-            accessorKey: "paid_amount",
-            header: () => <div className="text-right w-full">Amount Paid</div>,
-            cell: ({ row }) => (
-                <div className="flex flex-col items-end min-w-[70px]">
-                    <span className="font-mono text-xs font-black text-emerald-500 tabular-nums">
-                        {formatCurrency(row.original.paid_amount)}
-                    </span>
-                </div>
-            )
+        { 
+            accessorKey: "net_total", 
+            header: "Net Total",
+            cell: ({ row }) => {
+                const net = Number(row.original.net_total || 0);
+                const extraDisc = Number(row.original.extra_discount || 0);
+                const finalNet = net - extraDisc;
+                return (
+                    <div className="font-mono text-sm font-semibold">
+                        {finalNet.toLocaleString()}
+                        {extraDisc > 0 && (
+                            <div className="text-[9px] text-muted-foreground line-through opacity-70">
+                                {net.toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
         },
-        {
-            accessorKey: "remaining_amount",
-            header: () => <div className="text-right w-full">Balance</div>,
-            cell: ({ row }) => (
-                <div className="flex flex-col items-end min-w-[70px] text-right">
-                    <span className={cn(
-                        "font-mono text-xs font-black tabular-nums",
-                        row.original.remaining_amount > 0 ? "text-rose-500 animate-pulse" : "text-zinc-300 dark:text-zinc-700 font-normal"
-                    )}>
-                        {row.original.remaining_amount > 0 ? formatCurrency(row.original.remaining_amount) : "0"}
+        { 
+            accessorKey: "paid_amount", 
+            header: "Paid",
+            cell: ({ row }) => <span className="font-mono text-emerald-600 font-semibold">{Number(row.original.paid_amount || 0).toLocaleString()}</span>
+        },
+        { 
+            accessorKey: "remaining_amount", 
+            header: "Remaining",
+            cell: ({ row }) => {
+                const rem = Number(row.original.remaining_amount || 0);
+                return (
+                    <span className={`font-mono font-semibold ${rem > 0 ? 'text-rose-600' : 'text-zinc-500'}`}>
+                        {rem.toLocaleString()}
                     </span>
-                </div>
-            )
+                );
+            }
         },
         {
             accessorKey: "status",
             header: () => <div className="text-center w-full">Status</div>,
             cell: ({ row }) => {
-                const status = row.original.status as PurchaseStatus;
-                const safeStatus = statusMap[status] || statusMap.Completed;
-                const StatusIcon = safeStatus.icon;
+                const status = row.original.status || "Completed";
+                const config = statusMap[status] || {
+                    color: "bg-green-100 text-green-800 border-green-200",
+                    icon: <CheckCircle size={14} />,
+                };
+
+                const { color, icon } = config;
 
                 return (
                     <div className="flex items-center justify-center">
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div className={cn(
-                                        "h-7 w-7 rounded-full border flex items-center justify-center transition-all hover:scale-110 cursor-pointer shadow-sm",
-                                        safeStatus.color
-                                    )}>
-                                        <StatusIcon className="h-3.5 w-3.5 shrink-0" />
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-none shadow-xl">
-                                    {safeStatus.label}
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className={cn(
+                                    "h-7 w-7 rounded-full border flex items-center justify-center transition-all hover:scale-110 cursor-pointer shadow-sm",
+                                    color
+                                )}>
+                                    {icon}
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-none shadow-xl">
+                                {status}
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                 );
             },
         },
         {
             id: "actions",
-            header: () => (
-                <div className="flex items-center justify-end gap-2">
-                    <Info className="h-3 w-3 text-orange-500" />
-                    <span>Options</span>
-                </div>
-            ),
+            header: "Actions",
             enableHiding: false,
             cell: ({ row }) => {
                 const purchase = row.original;
+
                 return (
-                    <div className="text-right">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg hover:bg-orange-500/10 group transition-colors">
-                                    <MoreHorizontal className="h-4 w-4 text-zinc-400 group-hover:text-orange-500" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56 rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl p-1.5 backdrop-blur-xl bg-white/95 dark:bg-zinc-900/95">
-                                <div className="px-2 py-1.5 mb-1">
-                                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-2">Bill Options</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                            <Receipt className="h-4 w-4 text-orange-500" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-none truncate w-32">{purchase.invoice}</span>
-                                            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Bill Number</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/view`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
-                                    <Eye className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/edit`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
-                                    <Edit className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Edit Bill
-                                </DropdownMenuItem>
-                                <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
-                                <DropdownMenuItem onClick={() => router.visit(`/purchase/${purchase.id}/delete`)} className="rounded-lg text-xs font-bold gap-2 cursor-pointer text-rose-500 focus:bg-rose-500 focus:text-white group">
-                                    <Trash2 className="h-3.5 w-3.5 opacity-70 group-focus:opacity-100" />
-                                    Delete Bill
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-slate-50"
+                                onClick={() => router.visit(`/purchase/${purchase.id}/view`)}
+                            >
+                                <Eye size={14} className="mr-2 text-slate-500" /> View Invoice
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-blue-50 text-blue-600"
+                                onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=small`, '_blank')}
+                            >
+                                <Printer size={14} className="mr-2" /> Print Thermal
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-blue-50 text-blue-600"
+                                onClick={() => window.open(`/purchase/${purchase.id}/pdf?format=big`, '_blank')}
+                            >
+                                <Printer size={14} className="mr-2" /> Print A4
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem 
+                                className="font-medium focus:bg-slate-50"
+                                onClick={() => router.visit(`/purchase/${purchase.id}/edit`)}
+                            >
+                                <Edit2 size={14} className="mr-2 text-slate-500" /> Edit Invoice
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                className="text-rose-600 font-bold focus:text-rose-700 focus:bg-rose-50"
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                    setPurchaseToDelete(purchase);
+                                    setIsDeleteDialogOpen(true);
+                                }}
+                            >
+                                <Trash2 size={14} className="mr-2" /> Delete Permanent
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 );
             },
         },
@@ -326,140 +373,157 @@ export default function DataTable({ data }: DataTableProps) {
     });
 
     return (
-        <div className="w-full space-y-4">
-            <div className="overflow-x-auto custom-scrollbar rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md shadow-inner">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="hover:bg-transparent border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">
-                            {table.getHeaderGroups().map((headerGroup) => (
-                                <React.Fragment key={headerGroup.id}>
-                                    {headerGroup.headers.map((header) => (
-                                        <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 h-10 px-4">
-                                            <div
-                                                onClick={() => header.column.toggleSorting()}
-                                                className={cn(
-                                                    "flex items-center gap-1 cursor-pointer transition-colors active:scale-95",
-                                                    header.column.getIsSorted() ? "text-orange-500" : "hover:text-zinc-600 dark:hover:text-zinc-300"
-                                                )}
-                                            >
+        <TooltipProvider>
+            <div className="w-full min-w-0">
+                <div className="rounded-xl border border-border overflow-x-auto bg-card shadow-sm">
+                    <Table>
+                        <TableHeader className="bg-muted sticky top-0 z-10">
+                            <TableRow>
+                                {table.getHeaderGroups().map((headerGroup) =>
+                                    headerGroup.headers.map((header) => (
+                                        <TableHead key={header.id} className="whitespace-nowrap px-3 py-2 h-10 text-white font-bold bg-orange-400">
+                                            <div onClick={() => header.column.toggleSorting()} className="flex items-center cursor-pointer hover:text-white/80 transition-colors">
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
-                                                <AnimatePresence>
-                                                    {header.column.getIsSorted() === "asc" && (
-                                                        <motion.div initial={{ opacity: 0, y: 2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }}>
-                                                            <ChevronUp className="w-3 h-3 ml-1" />
-                                                        </motion.div>
-                                                    )}
-                                                    {header.column.getIsSorted() === "desc" && (
-                                                        <motion.div initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 2 }}>
-                                                            <ChevronDown className="w-3 h-3 ml-1" />
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                {header.column.getIsSorted() === "asc" && (
+                                                    <ChevronUp className="w-4 h-4 ml-1 inline" />
+                                                )}
+                                                {header.column.getIsSorted() === "desc" && (
+                                                    <ChevronDown className="w-4 h-4 ml-1 inline" />
+                                                )}
                                             </div>
                                         </TableHead>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </TableRow>
-                    </TableHeader>
+                                    )),
+                                )}
+                            </TableRow>
+                        </TableHeader>
 
-                    <TableBody>
-                        <AnimatePresence mode="popLayout">
+                        <TableBody>
                             {table.getRowModel().rows.length ? (
-                                table.getRowModel().rows.map((row, idx) => (
-                                    <motion.tr
-                                        key={row.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.03 }}
-                                        className="group h-14 border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-orange-500/[0.02] dark:hover:bg-orange-500/[0.02] transition-colors"
-                                    >
+                                table.getRowModel().rows.map((row) => (
+                                    <TableRow key={row.id} className="h-10">
                                         {row.getVisibleCells().map((cell) => (
-                                            <TableCell key={cell.id} className="py-2 px-4 whitespace-nowrap">
+                                            <TableCell key={cell.id} className="py-2 px-3 whitespace-nowrap">
                                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                             </TableCell>
                                         ))}
-                                    </motion.tr>
+                                    </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={columns.length} className="text-center py-24 bg-zinc-50/30 dark:bg-zinc-950/10">
-                                        <div className="flex flex-col items-center justify-center gap-3">
-                                            <div className="h-16 w-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700">
-                                                <Info className="h-8 w-8 text-zinc-300" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest leading-none">No Purchases Found</p>
-                                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">There are no purchase bills recorded in the system yet.</p>
-                                            </div>
-                                        </div>
+                                    <TableCell colSpan={11} className="text-center py-6">
+                                        No Purchase Records Found
                                     </TableCell>
                                 </TableRow>
                             )}
-                        </AnimatePresence>
-                    </TableBody>
-                </Table>
+                        </TableBody>
+                    </Table>
+
+                    {/* Pagination Footer */}
+                    <div className="flex items-center justify-between px-4 py-3 border-t">
+                        <div className="hidden flex-1 text-sm text-muted-foreground lg:flex">
+                            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                            {table.getFilteredRowModel().rows.length} row(s) selected.
+                        </div>
+
+                        <div className="flex w-full items-center gap-8 lg:w-fit">
+                            {/* Rows per page */}
+                            <div className="hidden items-center gap-2 lg:flex">
+                                <Label className="text-sm font-medium">Rows per page</Label>
+                                <Select
+                                    value={`${table.getState().pagination.pageSize}`}
+                                    onValueChange={(value) => table.setPageSize(Number(value))}
+                                >
+                                    <SelectTrigger size="sm" className="w-20">
+                                        <SelectValue placeholder={table.getState().pagination.pageSize} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[10, 20, 30, 40, 50, 100].map((pageSize) => (
+                                            <SelectItem key={pageSize} value={`${pageSize}`}>
+                                                {pageSize}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Page Info */}
+                            <div className="text-sm font-medium">
+                                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                            </div>
+
+                            {/* Pagination Buttons */}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="hidden h-8 w-8 p-0 lg:flex"
+                                    onClick={() => table.setPageIndex(0)}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    <IconChevronsLeft className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="size-8"
+                                    onClick={() => table.previousPage()}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    <IconChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="size-8"
+                                    onClick={() => table.nextPage()}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    <IconChevronRight className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="hidden size-8 lg:flex"
+                                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    <IconChevronsRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
 
-            {/* Pagination HUD */}
-            <div className="flex items-center justify-between px-2 pt-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pb-2">
-                <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] animate-pulse" />
-                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
-                        {table.getFilteredRowModel().rows.length} Total Purchases
-                    </span>
-                </div>
-
-                <div className="flex items-center gap-6">
-                    {/* Rows per page */}
-                    <div className="hidden md:flex items-center gap-3">
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Page Size:</span>
-                        <Select
-                            value={`${table.getState().pagination.pageSize}`}
-                            onValueChange={(value) => table.setPageSize(Number(value))}
+            {/* Deletion Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete bill <span className="font-bold text-foreground">{purchaseToDelete?.invoice}</span>?
+                            This action will revert technical stock levels and cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (purchaseToDelete) {
+                                    router.delete(`/purchase/${purchaseToDelete.id}/delete`, {
+                                        onSuccess: () => setIsDeleteDialogOpen(false)
+                                    });
+                                }
+                            }}
                         >
-                            <SelectTrigger className="h-8 w-16 rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[11px] font-black tabular-nums shadow-sm">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800">
-                                {[10, 20, 50, 100].map((pageSize) => (
-                                    <SelectItem key={pageSize} value={`${pageSize}`} className="text-[11px] font-black tabular-nums">
-                                        {pageSize}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
-
-                    <div className="flex items-center gap-4">
-                        <div className="text-[10px] font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest">
-                            {table.getState().pagination.pageIndex + 1} <span className="opacity-20 mx-1">/</span> {table.getPageCount() || 1}
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                            <Button
-                                variant="outline"
-                                className="h-8 w-8 p-0 rounded-lg border-zinc-200 dark:border-zinc-800 hover:bg-orange-500 hover:text-white transition-all disabled:opacity-20"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <IconChevronLeft className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                                variant="outline"
-                                className="h-8 w-8 p-0 rounded-lg border-zinc-200 dark:border-zinc-800 hover:bg-orange-500 hover:text-white transition-all disabled:opacity-20"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <IconChevronRight className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                            Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </TooltipProvider>
     );
 }

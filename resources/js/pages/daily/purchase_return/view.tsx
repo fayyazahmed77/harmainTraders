@@ -116,9 +116,9 @@ export default function View({ returnData }: Props) {
                             </Button>
                             <div className="flex items-center gap-3 flex-wrap">
                                 <h1 className="text-xl md:text-2xl font-black tracking-tight text-black dark:text-white flex items-center gap-2">
-                                    Purchase Return <span className="font-mono text-orange-500 bg-orange-500/5 dark:bg-orange-500/10 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-orange-500/10">{returnData.invoice}</span>
+                                    Purchase Return <span className="font-mono text-black dark:text-white bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-lg text-lg md:text-xl border border-zinc-200 dark:border-zinc-700">{returnData.invoice}</span>
                                 </h1>
-                                <Badge className="px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-300">
+                                <Badge className="px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-none bg-zinc-100 text-black border-zinc-200 dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
                                     <RotateCcw className="h-3 w-3" /> Debit Memo
                                 </Badge>
                             </div>
@@ -135,7 +135,7 @@ export default function View({ returnData }: Props) {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg">
                                         <DropdownMenuItem onClick={() => window.open(`/purchase-return/${returnData.id}/pdf`, "_blank")} className="cursor-pointer gap-2.5 text-xs font-bold py-2.5">
-                                            <PrinterIcon className="h-4 w-4 text-orange-500" /> Print Debit Note
+                                            <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print Debit Note
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -145,11 +145,11 @@ export default function View({ returnData }: Props) {
                             <div className="hidden md:flex lg:hidden items-center gap-1.5">
                                 <Button variant="outline" onClick={() => window.open(`/purchase-return/${returnData.id}/pdf?format=small`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5">
-                                    <PrinterIcon className="h-3.5 w-3.5 text-orange-500" /> Thermal Print
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" /> Thermal Print
                                 </Button>
                                 <Button variant="outline" onClick={() => window.open(`/purchase-return/${returnData.id}/pdf?format=big`, "_blank")}
                                     className="h-8 px-2.5 text-[11px] font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-1.5">
-                                    <PrinterIcon className="h-3.5 w-3.5 text-orange-500" /> Print A4
+                                    <PrinterIcon className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" /> Print A4
                                 </Button>
                             </div>
 
@@ -157,11 +157,11 @@ export default function View({ returnData }: Props) {
                             <div className="hidden lg:flex items-center gap-2">
                                 <Button variant="outline" onClick={() => window.open(`/purchase-return/${returnData.id}/pdf?format=small`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2">
-                                    <PrinterIcon className="h-4 w-4 text-orange-500" /> Thermal Print
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Thermal Print
                                 </Button>
                                 <Button variant="outline" onClick={() => window.open(`/purchase-return/${returnData.id}/pdf?format=big`, "_blank")}
                                     className="h-10 px-4 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-sm flex items-center gap-2">
-                                    <PrinterIcon className="h-4 w-4 text-orange-500" /> Print A4
+                                    <PrinterIcon className="h-4 w-4 text-zinc-700 dark:text-zinc-300" /> Print A4
                                 </Button>
                             </div>
                         </div>
@@ -179,7 +179,7 @@ export default function View({ returnData }: Props) {
                             <div className="flex items-center gap-2">
                                 <Receipt className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
                                 <span className="text-black dark:text-white font-extrabold min-w-[90px]">Return #:</span>
-                                <span className="text-orange-500 font-mono font-black">{returnData.invoice}</span>
+                                <span className="text-black dark:text-white font-mono font-black">{returnData.invoice}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
@@ -218,7 +218,7 @@ export default function View({ returnData }: Props) {
                             <CardHeader className="px-6 py-1 pt-3 pb-0 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2.5">
-                                        <Receipt className="h-5 w-5 text-orange-500" />
+                                        <Receipt className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
                                         <div>
                                             <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">Return Items Manifest</CardTitle>
                                             <CardDescription className="text-[10px] text-zinc-500 font-mono">Itemized reversal of returned goods and debit row totals</CardDescription>
@@ -261,8 +261,8 @@ export default function View({ returnData }: Props) {
                                                     <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">{it.qty_pcs}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{it.item?.retail ? fmt(it.item.retail) : "0.00"}</td>
                                                     <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{fmt(it.trade_price)}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-rose-500">{dp > 0 ? dp.toFixed(2) : "0.00"}</td>
-                                                    <td className="px-4 py-3.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{fmt(adr)}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{dp > 0 ? dp.toFixed(2) : "0.00"}</td>
+                                                    <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">{fmt(adr)}</td>
                                                     <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">{fmt(it.subtotal - it.discount)}</td>
                                                 </tr>
                                             );
@@ -275,9 +275,9 @@ export default function View({ returnData }: Props) {
                                             <td className="px-3 py-3.5 text-center font-mono text-zinc-900 dark:text-zinc-100">{returnData.items.reduce((a, i) => a + Number(i.qty_pcs || 0), 0)}</td>
                                             <td></td>
                                             <td></td>
-                                            <td className="px-4 py-3.5 text-right text-rose-500 font-mono">-{fmt(discTotal)}</td>
+                                            <td className="px-4 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">-{fmt(discTotal)}</td>
                                             <td></td>
-                                            <td className="px-6 py-3.5 text-right text-orange-500 font-mono">{fmt(returnData.items.reduce((a, i) => a + (Number(i.subtotal || 0) - Number(i.discount || 0)), 0))}</td>
+                                            <td className="px-6 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">{fmt(returnData.items.reduce((a, i) => a + (Number(i.subtotal || 0) - Number(i.discount || 0)), 0))}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -306,9 +306,9 @@ export default function View({ returnData }: Props) {
                                             <span>Gross Return Subtotal :-</span>
                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(grossTotal)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center text-black dark:text-zinc-100">
                                             <span>Discount Reclaim :-</span>
-                                            <span className="font-mono text-rose-500">{fmt(discTotal)}</span>
+                                            <span className="font-mono font-bold">{fmt(discTotal)}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span>Total Cartons Returned :-</span>
@@ -321,7 +321,7 @@ export default function View({ returnData }: Props) {
                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
                                         <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
                                             <span>Net Debit Entry :</span>
-                                            <span className="font-mono text-orange-500 text-base font-black">{fmt(netTotal)}</span>
+                                            <span className="font-mono text-black dark:text-zinc-100 text-base font-black">{fmt(netTotal)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -329,8 +329,8 @@ export default function View({ returnData }: Props) {
                         </Card>
 
                         {returnData.remarks && (
-                            <Card className="bg-orange-500/[0.02] border border-orange-500/10 shadow-sm rounded-xl p-5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-orange-500 block mb-2 flex items-center gap-1.5">
+                            <Card className="bg-zinc-100/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-xl p-5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300 block mb-2 flex items-center gap-1.5">
                                     <Info className="h-4 w-4" /> Memo Remarks / Special Notice
                                 </span>
                                 <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 italic uppercase">"{returnData.remarks}"</p>
