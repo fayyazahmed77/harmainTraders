@@ -17,7 +17,8 @@ import {
     BadgeInfo,
     LayoutGrid,
     Sparkles,
-    History
+    History,
+    RefreshCw
 } from "lucide-react";
 import { router } from "@inertiajs/react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -129,13 +130,25 @@ export default function View({ offer }: Props) {
                                     >
                                         <History className="mr-2 h-4 w-4 shrink-0" /> Com Print
                                     </Button>
-                                    <Button
-                                        onClick={() => window.location.href = `/offer-list/${offer.id}/download`}
-                                        className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-4 sm:px-6 h-full font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20"
-                                    >
-                                        <Download className="mr-2 h-4 w-4 hidden sm:block shrink-0" /> Download
-                                    </Button>
-                                </div>
+                                     <Button
+                                         variant="outline"
+                                         onClick={() => {
+                                             if (confirm("Are you sure you want to recalculate and sync prices for all items in this offer using current Item Master prices?")) {
+                                                 router.post(`/offer-list/${offer.id}/sync-prices`);
+                                             }
+                                         }}
+                                         className="flex-1 sm:flex-none rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-[9px] font-black uppercase tracking-widest px-4 h-full transition-all"
+                                         title="Synchronize offer prices with Item Master setup"
+                                     >
+                                         <RefreshCw className="mr-1.5 h-3.5 w-3.5 shrink-0" /> Sync Prices
+                                     </Button>
+                                     <Button
+                                         onClick={() => window.location.href = `/offer-list/${offer.id}/download`}
+                                         className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-4 sm:px-6 h-full font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20"
+                                     >
+                                         <Download className="mr-2 h-4 w-4 hidden sm:block shrink-0" /> Download
+                                     </Button>
+                                 </div>
                         </motion.div>
                     </div>
 

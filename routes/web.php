@@ -310,6 +310,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{offerlist}/download', [OfferListController::class, 'download'])->name('offerlist.download');
         Route::put('/{offerlist}', [OfferListController::class, 'update'])->name('offerlist.update');
         Route::post('/{id}/toggle-live', [OfferListController::class, 'toggleLive'])->name('offer-list.toggle-live');
+        Route::post('/{id}/sync-prices', [OfferListController::class, 'syncPrices'])->name('offer-list.sync-prices');
         Route::delete('/{id}', [OfferListController::class, 'destroy'])->name('offerlist.destroy');
     });
     //--------------------------------------------Sales-----------------------------------------------

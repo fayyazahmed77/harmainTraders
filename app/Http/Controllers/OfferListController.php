@@ -9,6 +9,7 @@ use App\Models\Account;
 use App\Models\PriceOfferTo;
 use App\Models\OfferList;
 use App\Models\Firm;
+use App\Services\OfferListSyncService;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class OfferListController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:view sales', only: ['index', 'view', 'pdf', 'download']),
-            new Middleware('permission:create sales', only: ['create', 'store', 'toggleLive']),
+            new Middleware('permission:create sales', only: ['create', 'store', 'toggleLive', 'syncPrices']),
             new Middleware('permission:delete sales', only: ['destroy']),
         ];
     }
@@ -157,5 +158,13 @@ class OfferListController extends Controller implements HasMiddleware
         $offer->save();
 
         return redirect()->back()->with('success', 'Offer status updated successfully!');
+    }
+
+    public function syncPrices($id)
+    {
+        $syncService = app(OfferListSyncService::class);
+        $count = $syncService->syncEntireOffer($id);
+
+        return redirect()->back()->with('success', "Successfully synchronized {$count} item price(s) with Item Master setup!");
     }
 }

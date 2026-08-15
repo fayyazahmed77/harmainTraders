@@ -1431,17 +1431,17 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
                     {showCartonAndLoose ? (
                         <div className="grid grid-cols-2 gap-1 mb-2 bg-surface-2/70 p-1.5 rounded-lg border border-border/50 text-center">
                             <div>
-                                <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block leading-none">Carton</span>
+                                <span className="text-[8px] font-mono-jet uppercase text-black font-bold block leading-none">Carton</span>
                                 <span className="font-mono-jet font-bold text-xs sm:text-sm text-text-primary block mt-0.5">{formatCurrency(cartonRate)}</span>
                             </div>
                             <div className="border-l border-border/60">
-                                <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block leading-none">Loose</span>
+                                <span className="text-[8px] font-mono-jet uppercase text-black font-bold block leading-none">Loose</span>
                                 <span className="font-mono-jet font-bold text-xs sm:text-sm text-text-primary block mt-0.5">{formatCurrency(looseRate)}</span>
                             </div>
                         </div>
                     ) : (
                         <div className="mb-2 bg-surface-2/70 p-1.5 rounded-lg border border-border/50 flex justify-between items-center px-2">
-                            <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold">Pcs Rate</span>
+                            <span className="text-[8px] font-mono-jet uppercase text-black font-bold">Pcs Rate</span>
                             <span className="font-mono-jet font-black text-xs sm:text-sm text-amber">{formatCurrency(looseRate || singleRate || cartonRate)}</span>
                         </div>
                     )}
@@ -1449,8 +1449,8 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
                     {/* MRP & Action Footer */}
                     <div className="flex justify-between items-center gap-1">
                         <div className="text-[9px] sm:text-[10px] font-mono-jet leading-none">
-                            <span className="text-text-muted block text-[8px] uppercase">M.R.P</span>
-                            <span className="font-bold text-text-muted line-through">{formatCurrency(offerItem.mrp)}</span>
+                            <span className="text-black block text-[8px] uppercase">M.R.P</span>
+                            <span className="font-mono-jet font-black text-xs sm:text-sm text-black">{formatCurrency(offerItem.mrp)}</span>
                         </div>
 
                         <button
@@ -1518,14 +1518,19 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-6 text-right shrink-0">
+                <div className="text-[9px] sm:text-[10px] font-mono-jet leading-none text-left sm:text-right">
+                    <span className="text-text-primary block text-[8px] uppercase">M.R.P</span>
+                    <span className="font-mono-jet font-black text-xs sm:text-sm text-text-primary">{formatCurrency(offerItem.mrp)}</span>
+                </div>
+
                 {showCartonAndLoose ? (
                     <div className="text-[10px] sm:text-xs font-mono-jet space-y-0.5">
-                        <div className="text-text-primary font-bold"><span className="text-text-muted font-normal text-[8px] uppercase mr-1">Ctn:</span>{formatCurrency(cartonRate)}</div>
-                        <div className="text-text-primary"><span className="text-text-muted font-normal text-[8px] uppercase mr-1">Loose:</span>{formatCurrency(looseRate)}</div>
+                        <div className="text-text-primary font-bold"><span className="text-blackfont-normal text-[8px] uppercase mr-1">Ctn:</span>{formatCurrency(cartonRate)}</div>
+                        <div className="text-text-primary"><span className="text-black font-normal text-[8px] uppercase mr-1">Loose:</span>{formatCurrency(looseRate)}</div>
                     </div>
                 ) : (
                     <div>
-                        <span className="text-[8px] font-mono-jet uppercase text-text-muted font-bold block">Pcs Rate</span>
+                        <span className="text-[8px] font-mono-jet uppercase text-black font-bold block">Pcs Rate</span>
                         <span className="font-mono-jet font-black text-xs sm:text-base text-amber">{formatCurrency(looseRate || singleRate || cartonRate)}</span>
                     </div>
                 )}

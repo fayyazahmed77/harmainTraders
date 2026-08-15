@@ -6,6 +6,7 @@ use App\Models\Items;
 use App\Models\ItemCategory;
 use App\Models\Account;
 use App\Models\ItemImage;
+use App\Services\OfferListSyncService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -337,6 +338,20 @@ class ItemsController extends Controller implements HasMiddleware
             'title.unique' => 'Item name already exists.',
         ]);
         $item->update($validated);
+
+        // Check if price or packing fields changed and sync active live offers safely
+        $priceFields = ['trade_price', 'retail', 'pt2', 'pt3', 'pt4', 'pt5', 'pt6', 'pt7', 'packing_qty'];
+        $hasPriceChanged = false;
+        foreach ($priceFields as $field) {
+            if ($item->wasChanged($field)) {
+                $hasPriceChanged = true;
+                break;
+            }
+        }
+
+        if ($hasPriceChanged || $request->boolean('sync_live_offers')) {
+            app(OfferListSyncService::class)->syncItemPricesForActiveOffers($item);
+        }
 
         // Handle deletions
         if ($request->has('deleted_images')) {
