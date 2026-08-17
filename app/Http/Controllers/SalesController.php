@@ -105,7 +105,8 @@ class SalesController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $accounts = Account::with('accountType')
+        $accounts = Account::active()
+            ->with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Customers']);
             })
@@ -137,7 +138,7 @@ class SalesController extends Controller implements HasMiddleware
         }
 
         // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
-        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
@@ -502,10 +503,8 @@ class SalesController extends Controller implements HasMiddleware
                     'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock (Billable + Bonus)
-                $packing = $item->packing_qty ?: 1;
-                $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-                $totalToDeduct = $it['total_pcs'] + $bonusUnits;
+                // Decrease Stock (total_pcs already includes billable + bonus units)
+                $totalToDeduct = (int)$it['total_pcs'];
 
                 \Illuminate\Support\Facades\Log::info("Deducting " . $totalToDeduct . " pcs from item " . $item->id . ". Current total_stock_pcs: " . $item->total_stock_pcs);
                 $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
@@ -546,7 +545,8 @@ class SalesController extends Controller implements HasMiddleware
         // Flag: does this sale already have a CustomerCredit allocation applied?
         $sale->has_advance_allocated = SalesReturnAllocation::where('sale_id', $id)->exists();
 
-        $accounts = Account::with('accountType')
+        $accounts = Account::active()
+            ->with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Customers']);
             })
@@ -566,7 +566,7 @@ class SalesController extends Controller implements HasMiddleware
             });
 
         // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
-        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
@@ -875,14 +875,12 @@ class SalesController extends Controller implements HasMiddleware
                 }
             }
 
-            // Revert Stock for old items (Increase back including bonus)
+            // Revert Stock for old items (total_pcs already includes bonus units)
             $oldItems = SalesItem::where('sale_id', $id)->get();
             foreach ($oldItems as $oldItem) {
                 $product = Items::find($oldItem->item_id);
                 if ($product) {
-                    $packing = $product->packing_qty ?: 1;
-                    $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
-                    $totalToRevert = $oldItem->total_pcs + $bonusUnits;
+                    $totalToRevert = (int)$oldItem->total_pcs;
                     $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
                 }
             }
@@ -908,12 +906,10 @@ class SalesController extends Controller implements HasMiddleware
                     'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock (Billable + Bonus)
+                // Decrease Stock (total_pcs already includes billable + bonus units)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = $item->packing_qty ?: 1;
-                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-                    $totalToDeduct = $it['total_pcs'] + $bonusUnits;
+                    $totalToDeduct = (int)$it['total_pcs'];
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
 
                     $item->refresh();
@@ -1024,13 +1020,11 @@ class SalesController extends Controller implements HasMiddleware
         try {
             $sale = Sales::with('items')->findOrFail($id);
 
-            // Revert Stock (Increase back including bonus)
+            // Revert Stock (total_pcs already includes bonus units)
             foreach ($sale->items as $item) {
                 $product = Items::find($item->item_id);
                 if ($product) {
-                    $packing = $product->packing_qty ?: 1;
-                    $bonusUnits = (($item->bonus_qty_carton ?? 0) * $packing) + ($item->bonus_qty_pcs ?? 0);
-                    $totalToRevert = $item->total_pcs + $bonusUnits;
+                    $totalToRevert = (int)$item->total_pcs;
 
                     $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
                 }
@@ -1064,13 +1058,11 @@ class SalesController extends Controller implements HasMiddleware
 
             $courierCharges = (float) $request->input('courier_charges', 0);
 
-            // Deduct Stock
+            // Deduct Stock (total_pcs already includes bonus units)
             foreach ($sale->items as $item) {
                 $product = Items::find($item->item_id);
                 if ($product) {
-                    $packing = $product->packing_qty ?: 1;
-                    $bonusUnits = (($item->bonus_qty_carton ?? 0) * $packing) + ($item->bonus_qty_pcs ?? 0);
-                    $totalToDeduct = $item->total_pcs + $bonusUnits;
+                    $totalToDeduct = (int)$item->total_pcs;
 
                     $product->updateStockFromPcs($product->total_stock_pcs - $totalToDeduct);
 

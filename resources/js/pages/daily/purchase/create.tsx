@@ -583,7 +583,7 @@ export default function Purchase({
             extraDiscount: extraDiscount,
             billNet: billNet,
             netPayable: netPayable,
-            net: netPayable,
+            net: billNet + courier,
             appliedAdvance,
             netSettlement,
             previousBalance: prevBal,

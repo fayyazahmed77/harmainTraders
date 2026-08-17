@@ -226,9 +226,10 @@ const SearchableAccountSelector = ({
   }, [accounts, value]);
 
   const filteredAccounts = useMemo(() => {
-    if (!search.trim()) return accounts;
+    const activeAccounts = accounts.filter(a => a.status !== false && a.status !== 0);
+    if (!search.trim()) return activeAccounts;
     const q = search.toLowerCase().trim();
-    return accounts.filter(a =>
+    return activeAccounts.filter(a =>
       a.title?.toLowerCase().includes(q) ||
       a.code?.toLowerCase().includes(q) ||
       a.account_type?.name?.toLowerCase().includes(q)
@@ -995,7 +996,8 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
         if (accTypeName.includes('cheque in hand')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cheque', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         } else if (accTypeName.includes('bank')) {
-          updated = updated.map(p => p.id === id ? { ...p, payment_method: '', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+          const defaultMethod = paymentType === 'RECEIPT' ? 'Online' : '';
+          updated = updated.map(p => p.id === id ? { ...p, payment_method: defaultMethod, cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         } else if (accTypeName.includes('cash')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cash', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         }
@@ -1571,13 +1573,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                               <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-lg group shadow-sm">
                                 <td className={`p-1 group-${t.borderHover} transition-all rounded-l-md bg-white dark:bg-zinc-900 shadow-sm`}>
                                   <SearchableAccountSelector
-                                    accounts={paymentAccounts.filter(acc => {
-                                      if (acc.id.toString() === selectedAccountId?.toString()) return false;
-                                      if (acc.id.toString() === row.payment_account_id?.toString()) return true;
-                                      const isChequeInHand = acc.account_type?.name?.toLowerCase() === 'cheque in hand';
-                                      if (isChequeInHand) return true;
-                                      return !splitPayments.some(p => p.id !== row.id && p.payment_account_id?.toString() === acc.id.toString());
-                                    })}
+                                    accounts={paymentAccounts.filter(acc => acc.id.toString() !== selectedAccountId)}
                                     value={row.payment_account_id ? row.payment_account_id.toString() : ""}
                                     onChange={v => updateSplitRow(row.id, 'payment_account_id', v)}
                                     placeholder="Account..."
@@ -1593,17 +1589,21 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                       {paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cash') ? (
                                         <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('bank') ? (
-                                        <>
+                                        paymentType === 'RECEIPT' ? (
                                           <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
-                                          <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
-                                        </>
+                                        ) : (
+                                          <>
+                                            <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
+                                            <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                          </>
+                                        )
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cheque in hand') ? (
                                         <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                       ) : (
                                         <>
                                           <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                           <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
-                                          <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                          {paymentType === 'PAYMENT' && <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>}
                                         </>
                                       )}
                                     </SelectContent>
@@ -1813,6 +1813,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                       <PopoverTrigger asChild>
                                         <Button
                                           variant="outline"
+                                          disabled={isMultiPayment}
                                           className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}
                                         >
                                           {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}

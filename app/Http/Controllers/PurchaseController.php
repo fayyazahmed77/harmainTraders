@@ -129,7 +129,8 @@ class PurchaseController extends Controller implements HasMiddleware
             }
             return $item;
         });
-        $accounts = Account::with(['accountType', 'accountCategory'])
+        $accounts = Account::active()
+            ->with(['accountType', 'accountCategory'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
             })
@@ -151,7 +152,7 @@ class PurchaseController extends Controller implements HasMiddleware
 
         $firms = Firm::select('id', 'name', 'defult')->get();
 
-        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
@@ -243,7 +244,7 @@ class PurchaseController extends Controller implements HasMiddleware
             }
 
             // Calculate how much goes to THIS bill vs Surplus (Previous Balance)
-            $netPurchaseTotal = $request->net_total - ($request->extra_discount ?? 0);
+            $netPurchaseTotal = max(0, (float)$request->net_total - (float)($request->extra_discount ?? 0));
             $actualPaidOnThisBill = min($totalPaidAmount, $netPurchaseTotal);
             $surplusAmount = max(0, $totalPaidAmount - $netPurchaseTotal);
             $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
@@ -434,13 +435,10 @@ class PurchaseController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Increase Stock & Update Trade Price
+                // Increase Stock (total_pcs already includes purchased + bonus units)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = $item->packing ?? 1;
-                    $freeUnits = (($it['bonus_full'] ?? 0) * $packing) + (($it['bonus_pcs'] ?? 0));
-                    
-                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs'] + $freeUnits);
+                    $item->updateStockFromPcs($item->total_stock_pcs + (int)$it['total_pcs']);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {
@@ -483,7 +481,8 @@ class PurchaseController extends Controller implements HasMiddleware
             }
             return $item;
         });
-        $accounts = Account::with(['accountType', 'accountCategory'])
+        $accounts = Account::active()
+            ->with(['accountType', 'accountCategory'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
             })
@@ -496,7 +495,7 @@ class PurchaseController extends Controller implements HasMiddleware
         $firms = Firm::select('id', 'name', 'defult')->get();
 
         // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
-        $paymentAccounts = Account::with('accountType')->whereHas('accountType', function ($q) {
+        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
         })->get();
 
@@ -587,7 +586,7 @@ class PurchaseController extends Controller implements HasMiddleware
             // Calculate updated totals
             $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netTotal = (float) $request->net_total;
-            $netPurchaseTotal = $netTotal - $extraDiscount;
+            $netPurchaseTotal = max(0, $netTotal - $extraDiscount);
             $existingPaid = (float) $purchase->paid_amount;
             
             // Increment paid amount with NEW payments made during this edit
@@ -760,14 +759,12 @@ class PurchaseController extends Controller implements HasMiddleware
                 }
             }
 
-            // Revert Stock for old items
+            // Revert Stock for old items (total_pcs already includes bonus units)
             $oldItems = PurchaseItem::where('purchase_id', $id)->get();
             foreach ($oldItems as $oldItem) {
                 $item = Items::find($oldItem->item_id);
                 if ($item) {
-                    $packing = $item->packing ?? 1;
-                    $freeUnits = (($oldItem->free_carton ?? 0) * $packing) + ($oldItem->free_pcs ?? 0);
-                    $item->updateStockFromPcs($item->total_stock_pcs - $oldItem->total_pcs - $freeUnits);
+                    $item->updateStockFromPcs($item->total_stock_pcs - (int)$oldItem->total_pcs);
                     $item->save();
                 }
             }
@@ -798,13 +795,10 @@ class PurchaseController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Increase Stock & Update Trade Price
+                // Increase Stock (total_pcs already includes purchased + bonus units)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $packing = $item->packing ?? 1;
-                    $freeUnits = (($it['bonus_full'] ?? 0) * $packing) + (($it['bonus_pcs'] ?? 0));
-                    
-                    $item->updateStockFromPcs($item->total_stock_pcs + $it['total_pcs'] + $freeUnits);
+                    $item->updateStockFromPcs($item->total_stock_pcs + (int)$it['total_pcs']);
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {
@@ -937,15 +931,11 @@ class PurchaseController extends Controller implements HasMiddleware
         try {
             $purchase = Purchase::with('items')->findOrFail($id);
 
-            // Revert Stock (Decrease stock by purchased and free units)
+            // Revert Stock (Decrease stock by total_pcs which already includes bonus units)
             foreach ($purchase->items as $pi) {
                 $item = Items::find($pi->item_id);
                 if ($item) {
-                    $packing = $item->packing ?? 1;
-                    $freeUnits = (($pi->free_carton ?? 0) * $packing) + (($pi->free_pcs ?? 0));
-                    $totalToDeduct = $pi->total_pcs + $freeUnits;
-
-                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - $totalToDeduct));
+                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - (int)$pi->total_pcs));
                 }
             }
 

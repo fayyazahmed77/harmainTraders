@@ -204,7 +204,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
             } else if (offerType === "2") {
                 tp6Price = calculatePrice(item, null, Number(marketPriceTier));
                 offerPrice = tp6Price;
-                loosePrice = Math.round(tp6Price / packingQty);
+                loosePrice = tp6Price;
                 selectedPercentage = Number(item[`pt${marketPriceTier}` as keyof Item] ?? 0);
                 packPrice = 0;
             }
@@ -410,7 +410,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
                         item_id: itemId,
                         title: selected.title,
                         pack_ctn: offerType === "1" ? calculatePrice(selected, null, Number(cartonPriceTier)) : 0,
-                        loos_ctn: offerType === "1" ? calculatePrice(selected, null, Number(loosePriceTier)) : Math.round(tp6Price / packingQty),
+                        loos_ctn: offerType === "1" ? calculatePrice(selected, null, Number(loosePriceTier)) : tp6Price,
                         trade_price: offerPrice,
                         retail: selected.retail,
                         category_name: catName,

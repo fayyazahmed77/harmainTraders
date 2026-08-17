@@ -622,7 +622,7 @@ export default function PurchaseEdit({
             extraDiscount: extraDiscount,
             billNet: billNet,
             netPayable: netPayable,
-            net: netPayable,
+            net: billNet + courier,
             appliedAdvance,
             netSettlement,
             previousBalance: prevBal,

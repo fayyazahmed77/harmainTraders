@@ -848,7 +848,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     qty_pcs: r.pcs,
                     bonus_qty_carton: r.bonus_full,
                     bonus_qty_pcs: r.bonus_pcs,
-                    total_pcs: r.full * r.packing + r.pcs,
+                    total_pcs: (toNum(r.full) + toNum(r.bonus_full || 0)) * r.packing + toNum(r.pcs) + toNum(r.bonus_pcs || 0),
                     trade_price: r.rate,
                     discount: +d.toFixed(2),
                     gst_amount: +t.toFixed(2),

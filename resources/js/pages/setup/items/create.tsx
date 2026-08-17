@@ -261,12 +261,12 @@ export default function Page({ categories, companies }: { categories: any, compa
     is_fridge: false,
     is_active: true,
     is_recipe: false,
-    pt2: 0,
-    pt3: 0,
-    pt4: 0,
-    pt5: 0,
-    pt6: 0,
-    pt7: 0,
+    pt2: "",
+    pt3: "",
+    pt4: "",
+    pt5: "",
+    pt6: "",
+    pt7: "",
     scheme: "",
     scheme2: "",
     images: [],
@@ -278,8 +278,13 @@ export default function Page({ categories, companies }: { categories: any, compa
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // small helper typed setter - using type bypass to resolve deep recursion in large forms
-  const onInputChange = (key: keyof ItemForm, value: any) =>
-    (setData as any)(key, value)
+  const onInputChange = (key: keyof ItemForm, value: any) => {
+    let val = value;
+    if (typeof val === "string") {
+      val = val.replace(/^0+(?=\d)/, '');
+    }
+    (setData as any)(key, val);
+  };
 
   // ---------- Autocomplete & Duplicate Checking state ----------
   const [suggestions, setSuggestions] = useState<any[]>([]);

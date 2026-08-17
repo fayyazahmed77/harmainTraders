@@ -16,7 +16,7 @@ class OfferListSyncService
      * @param bool $activeOnly Only sync active live offers (default: true)
      * @return int Number of updated offer list items
      */
-    public function syncItemPricesForActiveOffers(Items $item, bool $activeOnly = true): int
+    public function syncItemPricesForActiveOffers(Items $item, bool $activeOnly = false): int
     {
         $query = OfferList::where('item_id', $item->id);
 
@@ -69,27 +69,40 @@ class OfferListSyncService
     {
         $tradePrice = (float)($item->trade_price ?? 0);
         $retailPrice = (float)($item->retail ?? 0);
-        $packingQty = (int)($item->packing_qty ?: 1);
         $offerType = (string)($offerItem->priceOfferTo->offertype ?? '1');
 
         // Always update MRP from Retail
         $offerItem->mrp = $retailPrice;
 
+        // Helper function to calculate tier price based on percentage
+        $calculateTierPrice = function($percentage) use ($tradePrice) {
+            $pct = (float)$percentage;
+            return $pct > 0 ? round($tradePrice * (1 + $pct / 100), 2) : $tradePrice;
+        };
+
         if ($offerType === '1') {
             // Customer Offer (Group Offer)
-            $offerItem->price = $tradePrice;
-            $offerItem->pack_ctn = $tradePrice;
-            $offerItem->loos_ctn = $packingQty > 1 ? ceil($tradePrice / $packingQty) : $tradePrice;
-        } else {
-            // Market Offer (Tiered/PT Pricing, fallback to pt7 or trade_price)
-            $marketPrice = (float)($item->pt7 ?? $item->pt6 ?? $item->pt5 ?? $tradePrice);
-            if ($marketPrice <= 0) {
-                $marketPrice = $tradePrice;
-            }
+            // pack_ctn = T.P.1 (Trade Price)
+            // loos_ctn = T.P.2 (Trade Price + pt2 %)
+            $tp1Price = $tradePrice;
+            $tp2Price = $calculateTierPrice($item->pt2);
 
-            $offerItem->price = $marketPrice;
-            $offerItem->loos_ctn = $packingQty > 1 ? round($marketPrice / $packingQty) : $marketPrice;
+            $offerItem->pack_ctn = $tp1Price;
+            $offerItem->loos_ctn = $tp2Price;
+            $offerItem->price = $tp2Price;
+        } else {
+            // Market Offer (Tiered/PT Pricing)
+            // Uses pt7, pt6, or pt5
+            $pt7 = (float)($item->pt7 ?? 0);
+            $pt6 = (float)($item->pt6 ?? 0);
+            $pt5 = (float)($item->pt5 ?? 0);
+
+            $selectedPt = $pt7 > 0 ? $pt7 : ($pt6 > 0 ? $pt6 : $pt5);
+            $marketPrice = $calculateTierPrice($selectedPt);
+
             $offerItem->pack_ctn = 0;
+            $offerItem->loos_ctn = $marketPrice;
+            $offerItem->price = $marketPrice;
         }
 
         $offerItem->save();

@@ -44,7 +44,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     public function create(Request $request)
     {
         // Only accounts that have at least one sale
-        $accounts = Account::with('accountType')
+        $accounts = Account::active()->with('accountType')
             ->whereHas('sales')
             ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
 
@@ -55,7 +55,7 @@ class SalesReturnController extends Controller implements HasMiddleware
         $nextInvoiceNo = $this->generateNextReturnInvoice();
 
         // Payment accounts for refunds
-        $paymentAccounts = Account::whereHas('accountType', function($q) {
+        $paymentAccounts = Account::active()->whereHas('accountType', function($q) {
             $q->whereIn('name', ['Cash', 'Bank', 'Cheque In Hand']);
         })->get(['id', 'title', 'code']);
 
@@ -238,12 +238,10 @@ class SalesReturnController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // INCREASE Stock for Returns
+                // INCREASE Stock for Returns (total_pcs already includes bonus units)
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
-                    $packing = $item->packing_qty ?: 1;
-                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-                    $totalToReturn = $it['total_pcs'] + $bonusUnits;
+                    $totalToReturn = (int)$it['total_pcs'];
                     $item->updateStockFromPcs($item->total_stock_pcs + $totalToReturn);
                 }
             }
@@ -542,14 +540,12 @@ class SalesReturnController extends Controller implements HasMiddleware
             // Rollback old allocations and credit notes
             $allocationService->rollback($return);
 
-            // 1. Revert Stock for Old Items
+            // 1. Revert Stock for Old Items (total_pcs already includes bonus units)
             $oldItems = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($oldItems as $oldItem) {
                 $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
-                    $packing = $item->packing_qty ?: 1;
-                    $bonusUnits = (($oldItem->bonus_qty_carton ?? 0) * $packing) + ($oldItem->bonus_qty_pcs ?? 0);
-                    $totalToRevert = $oldItem->total_pcs + $bonusUnits;
+                    $totalToRevert = (int)$oldItem->total_pcs;
                     $item->updateStockFromPcs(max(0, $item->total_stock_pcs - $totalToRevert));
                 }
             }
@@ -600,12 +596,10 @@ class SalesReturnController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Update Stock (Increase for Return)
+                // Update Stock (Increase for Return, total_pcs already includes bonus units)
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
-                    $packing = $item->packing_qty ?: 1;
-                    $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-                    $totalToAdd = $it['total_pcs'] + $bonusUnits;
+                    $totalToAdd = (int)$it['total_pcs'];
                     $item->updateStockFromPcs($item->total_stock_pcs + $totalToAdd);
                 }
             }
@@ -638,14 +632,12 @@ class SalesReturnController extends Controller implements HasMiddleware
             // Rollback return allocations and credit notes
             $allocationService->rollback($return);
 
-            // 1. Revert Stock (Decrease because return added stock)
+            // 1. Revert Stock (Decrease because return added stock, total_pcs already includes bonus units)
             $items = SalesReturnItem::where('sales_return_id', $id)->get();
             foreach ($items as $si) {
                 $product = Items::where('id', $si->item_id)->lockForUpdate()->first();
                 if ($product) {
-                    $packing = $product->packing_qty ?: 1;
-                    $bonusUnits = (($si->bonus_qty_carton ?? 0) * $packing) + ($si->bonus_qty_pcs ?? 0);
-                    $totalToRevert = $si->total_pcs + $bonusUnits;
+                    $totalToRevert = (int)$si->total_pcs;
                     $product->updateStockFromPcs(max(0, $product->total_stock_pcs - $totalToRevert));
                 }
             }

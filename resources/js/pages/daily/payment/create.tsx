@@ -227,9 +227,10 @@ const SearchableAccountSelector = ({
   }, [accounts, value]);
 
   const filteredAccounts = useMemo(() => {
-    if (!search.trim()) return accounts;
+    const activeAccounts = accounts.filter(a => a.status !== false && a.status !== 0);
+    if (!search.trim()) return activeAccounts;
     const q = search.toLowerCase().trim();
-    return accounts.filter(a =>
+    return activeAccounts.filter(a =>
       a.title?.toLowerCase().includes(q) ||
       a.code?.toLowerCase().includes(q) ||
       a.account_type?.name?.toLowerCase().includes(q)
@@ -395,6 +396,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const [calOpen, setCalOpen] = useState(false);
   const [clearDateOpen, setClearDateOpen] = useState(false);
   const [chequeDateOpen, setChequeDateOpen] = useState(false);
+  const [openSplitDateId, setOpenSplitDateId] = useState<number | null>(null);
 
   useEffect(() => {
     if (flash?.error) {
@@ -610,14 +612,29 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       setClearDate(chq.clear_date || "");
       setAmount(toNum(chq.amount));
     } else if (typeof chequeSelectorTarget === 'number') {
-      setSplitPayments(prev => prev.map(p => p.id === chequeSelectorTarget ? {
-        ...p,
-        original_cheque_id: chq.id.toString(),
-        cheque_no: chq.cheque_no,
-        cheque_date: chq.cheque_date,
-        clear_date: chq.clear_date || "",
-        amount: toNum(chq.amount)
-      } : p));
+      setSplitPayments(prev => prev.map(p => {
+        if (p.id === chequeSelectorTarget) {
+          return {
+            ...p,
+            original_cheque_id: chq.id.toString(),
+            cheque_no: chq.cheque_no,
+            cheque_date: chq.cheque_date,
+            clear_date: chq.clear_date || "",
+            amount: toNum(chq.amount)
+          };
+        }
+        if (p.original_cheque_id === chq.id.toString() || (p.cheque_no && p.cheque_no === chq.cheque_no)) {
+          return {
+            ...p,
+            original_cheque_id: "",
+            cheque_no: "",
+            cheque_date: "",
+            clear_date: "",
+            amount: 0
+          };
+        }
+        return p;
+      }));
     }
     setChequeSelectorOpen(false);
     setChequeSearch("");
@@ -1155,7 +1172,8 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
         if (accTypeName.includes('cheque in hand')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cheque', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         } else if (accTypeName.includes('bank')) {
-          updated = updated.map(p => p.id === id ? { ...p, payment_method: '', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
+          const defaultMethod = paymentType === 'RECEIPT' ? 'Online' : '';
+          updated = updated.map(p => p.id === id ? { ...p, payment_method: defaultMethod, cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         } else if (accTypeName.includes('cash')) {
           updated = updated.map(p => p.id === id ? { ...p, payment_method: 'Cash', cheque_no: '', cheque_date: '', clear_date: '', original_cheque_id: '' } : p);
         }
@@ -1570,13 +1588,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                               <tr key={row.id} className="bg-zinc-50 dark:bg-zinc-900/30 rounded-md group">
                                 <td className={`p-1  group-${t.borderHover} transition-all rounded-l-md bg-white dark:bg-zinc-900 shadow-sm`}>
                                   <SearchableAccountSelector
-                                    accounts={paymentAccounts.filter(acc => {
-                                      if (acc.id.toString() === selectedAccountId) return false;
-                                      if (acc.id.toString() === row.payment_account_id) return true;
-                                      const isChequeInHand = acc.account_type?.name?.toLowerCase() === 'cheque in hand';
-                                      if (isChequeInHand) return true;
-                                      return !splitPayments.some(p => p.id !== row.id && p.payment_account_id === acc.id.toString());
-                                    })}
+                                    accounts={paymentAccounts.filter(acc => acc.id.toString() !== selectedAccountId)}
                                     value={row.payment_account_id}
                                     onChange={v => updateSplitRow(row.id, 'payment_account_id', v)}
                                     placeholder="Account..."
@@ -1592,17 +1604,21 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       {paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cash') ? (
                                         <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('bank') ? (
-                                        <>
-                                          <SelectItem value="Online" className="text-xs font-bold">Online </SelectItem>
-                                          <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
-                                        </>
+                                        paymentType === 'RECEIPT' ? (
+                                          <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
+                                        ) : (
+                                          <>
+                                            <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
+                                            <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                          </>
+                                        )
                                       ) : paymentAccounts.find(a => a.id.toString() === row.payment_account_id)?.account_type?.name?.toLowerCase().includes('cheque in hand') ? (
                                         <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
                                       ) : (
                                         <>
                                           <SelectItem value="Cash" className="text-xs font-bold">Cash</SelectItem>
                                           <SelectItem value="Online" className="text-xs font-bold">Online</SelectItem>
-                                          <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>
+                                          {paymentType === 'PAYMENT' && <SelectItem value="Cheque" className="text-xs font-bold">Cheque</SelectItem>}
                                         </>
                                       )}
                                     </SelectContent>
@@ -1637,17 +1653,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                   )}
                                 </td>
                                 <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" className="h-8.5 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs px-2">
-                                        {row.cheque_date ? fmtDate(row.cheque_date) : <span className="text-zinc-400 font-normal text-[10px]">Pick date...</span>}
-                                        <CalendarIcon size={12} className="text-zinc-400" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                      <Calendar mode="single" selected={row.cheque_date ? parseLocalDate(row.cheque_date) : undefined} onSelect={(d) => { if (d) updateSplitRow(row.id, 'cheque_date', formatLocalDate(d)); }} />
-                                    </PopoverContent>
-                                  </Popover>
+                                  <Popover open={openSplitDateId === row.id} onOpenChange={(open) => setOpenSplitDateId(open ? row.id : null)}>
+                                     <PopoverTrigger asChild>
+                                       <Button variant="outline" className="h-8.5 w-full justify-between bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 font-bold text-xs px-2">
+                                         {row.cheque_date ? fmtDate(row.cheque_date) : <span className="text-zinc-400 font-normal text-[10px]">Pick date...</span>}
+                                         <CalendarIcon size={12} className="text-zinc-400" />
+                                       </Button>
+                                     </PopoverTrigger>
+                                     <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl z-[100]" align="start">
+                                       <Calendar mode="single" selected={row.cheque_date ? parseLocalDate(row.cheque_date) : undefined} onSelect={(d) => { if (d) { updateSplitRow(row.id, 'cheque_date', formatLocalDate(d)); setOpenSplitDateId(null); } }} />
+                                     </PopoverContent>
+                                   </Popover>
                                 </td>
                                 <td className="p-1 bg-white dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-800 shadow-sm">
                                   <Input type="number" value={row.amount || ""} onChange={e => updateSplitRow(row.id, 'amount', toNum(e.target.value))} className={`h-8.5 bg-zinc-50 dark:bg-zinc-800/50 ${t.borderAlpha} text-right font-mono text-xs font-black px-2`} placeholder="0.00" />
@@ -1838,7 +1854,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    disabled={true}
+                                    disabled={isMultiPayment}
                                     className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all ${t.borderHover}`}
                                   >
                                     {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal text-xs">Pick date...</span>}
@@ -2068,20 +2084,79 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                       <td colSpan={4} className="py-20 text-center text-zinc-400 font-bold text-[10px] uppercase tracking-widest italic">No matching cheques found</td>
                     </tr>
                   ) : (
-                    filteredCustomerCheques.map((chq: any) => (
-                      <tr 
-                        key={chq.id} 
-                        onClick={() => handleChequeSelect(chq)}
-                        className={`group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all rounded-lg overflow-hidden ${originalChequeId === chq.id.toString() || splitPayments.some(p => p.original_cheque_id === chq.id.toString()) ? 'bg-zinc-50 dark:bg-zinc-900' : ''}`}
-                      >
-                        <td className="px-4 py-3 text-[11px] font-bold text-zinc-900 dark:text-zinc-100 group-hover:pl-5 transition-all">{chq.customer_name}</td>
-                        <td className="px-4 py-3 text-[11px] font-mono font-black text-zinc-500">{chq.cheque_no}</td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`text-[11px] font-mono font-black ${t.text}`}>Rs {toNum(chq.amount).toLocaleString()}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center text-[10px] font-mono text-zinc-400 font-bold uppercase">{fmtDate(chq.cheque_date)}</td>
-                      </tr>
-                    ))
+                    filteredCustomerCheques.map((chq: any) => {
+                      const isSelectedInCurrent = chequeSelectorTarget === 'single'
+                        ? (originalChequeId === chq.id.toString() || (chequeNo && chequeNo === chq.cheque_no))
+                        : typeof chequeSelectorTarget === 'number'
+                          ? splitPayments.some(p => p.id === chequeSelectorTarget && (p.original_cheque_id === chq.id.toString() || (p.cheque_no && p.cheque_no === chq.cheque_no)))
+                          : false;
+
+                      const otherRowIndex = typeof chequeSelectorTarget === 'number'
+                        ? splitPayments.findIndex(p => p.id !== chequeSelectorTarget && (p.original_cheque_id === chq.id.toString() || (p.cheque_no && p.cheque_no === chq.cheque_no)))
+                        : -1;
+
+                      const isSelectedInOther = chequeSelectorTarget === 'single'
+                        ? splitPayments.some(p => p.original_cheque_id === chq.id.toString() || (p.cheque_no && p.cheque_no === chq.cheque_no))
+                        : typeof chequeSelectorTarget === 'number'
+                          ? (
+                              (originalChequeId === chq.id.toString() || (chequeNo && chequeNo === chq.cheque_no)) ||
+                              otherRowIndex !== -1
+                            )
+                          : (originalChequeId === chq.id.toString() || (chequeNo && chequeNo === chq.cheque_no) || splitPayments.some(p => p.original_cheque_id === chq.id.toString() || (p.cheque_no && p.cheque_no === chq.cheque_no)));
+
+                      return (
+                        <tr 
+                          key={chq.id} 
+                          onClick={() => handleChequeSelect(chq)}
+                          className={cn(
+                            "group cursor-pointer transition-all rounded-lg overflow-hidden border-l-4",
+                            isSelectedInCurrent 
+                              ? "bg-orange-500/15 dark:bg-orange-500/25 border-orange-500 font-bold shadow-sm"
+                              : isSelectedInOther
+                                ? "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500 font-bold shadow-sm"
+                                : "border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                          )}
+                        >
+                          <td className="px-4 py-3 text-[11px] font-bold text-zinc-900 dark:text-zinc-100 group-hover:pl-5 transition-all">
+                            <div className="flex items-center gap-1.5">
+                              {isSelectedInCurrent && <CheckCircle2 size={13} className="text-orange-500 shrink-0" />}
+                              {isSelectedInOther && <CheckCircle2 size={13} className="text-amber-500 shrink-0" />}
+                              <span className={cn(
+                                isSelectedInCurrent && "text-orange-600 dark:text-orange-400 font-black",
+                                isSelectedInOther && "text-amber-600 dark:text-amber-400 font-black"
+                              )}>
+                                {chq.customer_name}
+                              </span>
+                              {isSelectedInOther && (
+                                <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded font-sans uppercase font-black tracking-wider">
+                                  {otherRowIndex >= 0 ? `Row ${otherRowIndex + 1}` : 'Selected'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className={cn("px-4 py-3 text-[11px] font-mono font-black", 
+                            isSelectedInCurrent ? "text-orange-600 dark:text-orange-400" : 
+                            isSelectedInOther ? "text-amber-600 dark:text-amber-400" : "text-zinc-500"
+                          )}>
+                            {chq.cheque_no}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={cn("text-[11px] font-mono font-black", 
+                              isSelectedInCurrent ? "text-orange-600 dark:text-orange-400" : 
+                              isSelectedInOther ? "text-amber-600 dark:text-amber-400" : t.text
+                            )}>
+                              Rs {toNum(chq.amount).toLocaleString()}
+                            </span>
+                          </td>
+                          <td className={cn("px-4 py-3 text-center text-[10px] font-mono font-bold uppercase", 
+                            isSelectedInCurrent ? "text-orange-600 dark:text-orange-400" : 
+                            isSelectedInOther ? "text-amber-600 dark:text-amber-400" : "text-zinc-400"
+                          )}>
+                            {fmtDate(chq.cheque_date)}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

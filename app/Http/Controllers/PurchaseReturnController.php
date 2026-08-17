@@ -44,7 +44,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     //create
     public function create(Request $request)
     {
-        $accounts = Account::with('accountType')
+        $accounts = Account::active()->with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
             })
@@ -190,11 +190,10 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // DECREASE Stock for Purchase Returns (We are giving items back)
+                // DECREASE Stock for Purchase Returns (We are giving items back, total_pcs already includes bonus units)
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
-                    $packing = (float)($item->packing_qty ?? 1);
-                    $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
+                    $totalReturnPcs = (float)($it['total_pcs']);
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
                 }
             }
@@ -494,13 +493,12 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $oldNetTotal = $return->net_total;
             $oldOriginalInvoice = $return->original_invoice;
 
-            // 1. Revert Stock for Old Items (Purchase return decreased stock, so increase it back)
+            // 1. Revert Stock for Old Items (Purchase return decreased stock, so increase it back, total_pcs already includes bonus units)
             $oldItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
             foreach ($oldItems as $oldItem) {
                 $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
-                    $packing = (float)($item->packing_qty ?? 1);
-                    $totalRevertPcs = (float)($oldItem->total_pcs) + ((float)($oldItem->bonus_qty_carton ?? 0) * $packing) + (float)($oldItem->bonus_qty_pcs ?? 0);
+                    $totalRevertPcs = (float)($oldItem->total_pcs);
                     $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
                 }
             }
@@ -554,11 +552,10 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Update Stock (Decrease for Purchase Return)
+                // Update Stock (Decrease for Purchase Return, total_pcs already includes bonus units)
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
-                    $packing = (float)($item->packing_qty ?? 1);
-                    $totalReturnPcs = (float)($it['total_pcs']) + ((float)($it['bonus_qty_carton'] ?? 0) * $packing) + (float)($it['bonus_qty_pcs'] ?? 0);
+                    $totalReturnPcs = (float)($it['total_pcs']);
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
                 }
             }
@@ -618,13 +615,12 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $netTotal = $return->net_total;
             $originalInvoice = $return->original_invoice;
 
-            // 2. Revert Stock for Items
+            // 2. Revert Stock for Items (total_pcs already includes bonus units)
             $returnItems = PurchaseReturnItem::where('purchase_return_id', $id)->get();
             foreach ($returnItems as $ri) {
                 $item = Items::where('id', $ri->item_id)->lockForUpdate()->first();
                 if ($item) {
-                    $packing = (float)($item->packing_qty ?? 1);
-                    $totalRevertPcs = (float)($ri->total_pcs) + ((float)($ri->bonus_qty_carton ?? 0) * $packing) + (float)($ri->bonus_qty_pcs ?? 0);
+                    $totalRevertPcs = (float)($ri->total_pcs);
                     $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
                 }
             }

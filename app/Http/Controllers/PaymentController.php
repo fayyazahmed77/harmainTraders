@@ -281,8 +281,9 @@ class PaymentController extends Controller implements HasMiddleware
         }
         $payment->splits = $splits;
 
-        $accounts = Account::with('accountType')->select('id', 'title', 'type')->get();
-        $paymentAccounts = Account::with('accountType')
+        $accounts = Account::active()->with('accountType')->select('id', 'title', 'type')->get();
+        $paymentAccounts = Account::active()
+            ->with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
             })
@@ -814,13 +815,15 @@ class PaymentController extends Controller implements HasMiddleware
         // Fetch accounts for selection
         // Assuming 'Customer' and 'Supplier' types or similar logic exists in Account model
         // For now fetching all, but ideally filter by type
-        $accounts = Account::with('accountType')
+        $accounts = Account::active()
+            ->with('accountType')
             ->select('id', 'title', 'type')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Customers', 'Supplier', 'Expense', 'Other', 'Bank']);
             })
             ->get();
-        $paymentAccounts = Account::with('accountType')
+        $paymentAccounts = Account::active()
+            ->with('accountType')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
             })

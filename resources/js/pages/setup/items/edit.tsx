@@ -295,8 +295,13 @@ export default function Page({ item, categories, companies, pagination }: Props)
   const { showConfirm, confirmNavigation, cancelNavigation } = useNavigationGuard(isDirty);
 
   // small helper typed setter - using type bypass to resolve deep recursion in large forms
-  const onInputChange = (key: keyof ItemForm, value: any) =>
-    (setData as any)(key, value)
+  const onInputChange = (key: keyof ItemForm, value: any) => {
+    let val = value;
+    if (typeof val === "string") {
+      val = val.replace(/^0+(?=\d)/, '');
+    }
+    (setData as any)(key, val);
+  };
 
   // ---------- Autocomplete & Duplicate Checking state ----------
   const [suggestions, setSuggestions] = useState<any[]>([]);

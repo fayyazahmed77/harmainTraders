@@ -865,7 +865,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                     item_id: r.item_id,
                     qty_carton: r.full,
                     qty_pcs: r.pcs,
-                    total_pcs: (toNum(r.full) * packing) + toNum(r.pcs),
+                    total_pcs: ((toNum(r.full) + toNum(r.bonus_full || 0)) * packing) + toNum(r.pcs) + toNum(r.bonus_pcs || 0),
                     bonus_qty_carton: r.bonus_full,
                     bonus_qty_pcs: r.bonus_pcs,
                     trade_price: r.rate,

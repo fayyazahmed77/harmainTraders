@@ -576,22 +576,23 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     });
 
     const net = Math.round(gross - discTotal + courier);
+    const netPayable = Math.max(0, net - extraDiscount);
 
     let appliedAdvance = 0;
-    let netSettlement = net;
-    let receivable = net;
+    let netSettlement = netPayable;
+    let receivable = netPayable;
 
     if (previousBalance < 0) {
       const availableAdvance = Math.abs(previousBalance);
-      appliedAdvance = useAdvance ? Math.min(net, availableAdvance) : 0;
-      netSettlement = Math.max(0, net - appliedAdvance);
+      appliedAdvance = useAdvance ? Math.min(netPayable, availableAdvance) : 0;
+      netSettlement = Math.max(0, netPayable - appliedAdvance);
       receivable = netSettlement;
     } else {
-      receivable = Math.round(net + previousBalance);
+      receivable = Math.round(netPayable + previousBalance);
       netSettlement = receivable;
     }
 
-    const finalAmount = Math.round(receivable - extraDiscount);
+    const finalAmount = receivable;
 
     return {
       gross: Number(gross.toFixed(2)),
@@ -599,6 +600,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       discTotal: Number(discTotal.toFixed(2)),
       courier,
       net,
+      netPayable,
       appliedAdvance,
       netSettlement,
       receivable,
@@ -1235,7 +1237,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                       <div className="hidden sm:flex flex-col shrink-0">
                         <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Net Payable</span>
                         <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300 font-mono leading-none">
-                          Rs {totals.net.toLocaleString()}
+                          Rs {totals.netPayable.toLocaleString()}
                         </span>
                       </div>
 
@@ -1385,7 +1387,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         </div>
                         <div className="text-2xl font-black tracking-tighter text-zinc-800 dark:text-zinc-100 italic">
                           <span className="text-sm font-normal mr-1 tracking-normal">Rs</span>
-                          {totals.net.toLocaleString()}
+                          {totals.netPayable.toLocaleString()}
                         </div>
                       </div>
 

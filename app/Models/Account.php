@@ -61,6 +61,15 @@ class Account extends Model
         'credit_limit' => 'decimal:2',
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('status', true)
+              ->orWhere('status', 1)
+              ->orWhereNull('status');
+        });
+    }
+
     public function accountCategory()
     {
         return $this->belongsTo(AccountCategory::class, 'category');
