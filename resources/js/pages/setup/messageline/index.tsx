@@ -33,6 +33,7 @@ interface MessageLine {
   messageline: string;
   category?: string[] | string | null;
   status: string;
+  is_default?: boolean;
   created_by_name?: string;
   created_at: string;
 }
@@ -75,6 +76,7 @@ export default function Index({ messagesline, filters }: IndexProps) {
   const [messageLine, setMessageLine] = useState("");
   const [categories, setCategories] = useState<string[]>(["Sales"]);
   const [status, setStatus] = useState("active");
+  const [isDefault, setIsDefault] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,13 +84,14 @@ export default function Index({ messagesline, filters }: IndexProps) {
 
     router.post(
       "/message-lines",
-      { messageline: messageLine, category: categories, status },
+      { messageline: messageLine, category: categories, status, is_default: isDefault },
       {
         onSuccess: () => {
           setOpenCreateDialog(false);
           setMessageLine("");
           setCategories(["Sales"]);
           setStatus("active");
+          setIsDefault(false);
         },
       }
     );
@@ -317,6 +320,20 @@ export default function Index({ messagesline, filters }: IndexProps) {
                   <Switch
                     checked={status === "active"}
                     onCheckedChange={(checked) => setStatus(checked ? "active" : "inactive")}
+                  />
+                </div>
+
+                {/* Default Switch */}
+                <div className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold text-amber-700 dark:text-amber-400">Set as Default</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically select this message line in Sales, Purchase, Payment & Offer List.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={isDefault}
+                    onCheckedChange={(checked) => setIsDefault(checked)}
                   />
                 </div>
               </div>

@@ -325,9 +325,12 @@ export default function Purchase({
     const [courier, setCourier] = useState<number>(0);
     const [extraDiscount, setExtraDiscount] = useState<number>(0);
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
-    const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+    const [selectedMessageId, setSelectedMessageId] = useState<string>(() => {
+        const defaultMsg = messageLines?.find((m: any) => m.is_default || m.defult);
+        return defaultMsg ? defaultMsg.id.toString() : "0";
+    });
     const [selectedFirmId, setSelectedFirmId] = useState<string>(() => {
-        const defaultFirm = firms?.find(f => f.defult === 1);
+        const defaultFirm = firms?.find(f => f.defult === 1 || (f as any).defult);
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
 

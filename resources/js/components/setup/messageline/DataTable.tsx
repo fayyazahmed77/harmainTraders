@@ -59,6 +59,7 @@ interface MessageLine {
   messageline: string;
   category?: string[] | string | null;
   status: string;
+  is_default?: boolean;
   created_by_name?: string;
   created_at: string;
 }
@@ -90,6 +91,7 @@ export function DataTable({ messagesline }: DataTableProps) {
   const [editText,     setEditText]     = useState("");
   const [editCategories, setEditCategories] = useState<string[]>(["Sales"]);
   const [editStatus,   setEditStatus]   = useState("active");
+  const [editIsDefault, setEditIsDefault] = useState(false);
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("en-GB", {
@@ -116,6 +118,7 @@ export function DataTable({ messagesline }: DataTableProps) {
     }
     setEditCategories(cats);
     setEditStatus(msg.status || "active");
+    setEditIsDefault(!!msg.is_default);
   };
 
   // ── Save changes ──────────────────────────────────────────────
@@ -125,7 +128,7 @@ export function DataTable({ messagesline }: DataTableProps) {
 
     router.put(
       `/message-lines/${editMessage.id}`,
-      { messageline: editText, category: editCategories, status: editStatus },
+      { messageline: editText, category: editCategories, status: editStatus, is_default: editIsDefault },
       {
         onSuccess: () => {
           toast.success("Message line updated.");
@@ -216,15 +219,63 @@ export function DataTable({ messagesline }: DataTableProps) {
     );
   };
 
+  // ── Default toggle cell ─────────────────────────────────────────
+  const DefaultToggleCell = ({ msg }: { msg: MessageLine }) => {
+    const [loading, setLoading] = useState(false);
+    const isDefault = !!msg.is_default;
+
+    const handleToggle = () => {
+      setLoading(true);
+      router.patch(
+        `/message-lines/${msg.id}/toggle-default`,
+        {},
+        {
+          preserveScroll: true,
+          onSuccess: () => {
+            setLoading(false);
+            toast.success(`Default status updated.`);
+          },
+          onError: () => {
+            setLoading(false);
+            toast.error("Failed to update default status.");
+          },
+        }
+      );
+    };
+
+    return (
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <Switch
+          checked={isDefault}
+          disabled={loading || !canEdit}
+          onCheckedChange={handleToggle}
+          aria-label="Toggle default"
+        />
+        {isDefault && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-500/10 text-amber-600 border border-amber-500/20">
+            Default
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // ── Table columns ─────────────────────────────────────────────
   const columns: ColumnDef<MessageLine>[] = [
     {
       accessorKey: "messageline",
       header: "Message Text",
       cell: ({ row }) => (
-        <p className="text-sm font-medium text-foreground/90 leading-relaxed max-w-sm truncate">
-          {row.original.messageline}
-        </p>
+        <div className="flex items-center gap-2 max-w-sm truncate">
+          {row.original.is_default && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-white uppercase tracking-wider">
+              Default
+            </span>
+          )}
+          <p className="text-sm font-medium text-foreground/90 leading-relaxed truncate">
+            {row.original.messageline}
+          </p>
+        </div>
       ),
       size: 450,
     },
@@ -266,6 +317,11 @@ export function DataTable({ messagesline }: DataTableProps) {
           </span>
         );
       },
+    },
+    {
+      accessorKey: "is_default",
+      header: "Default",
+      cell: ({ row }) => <DefaultToggleCell msg={row.original} />,
     },
     {
       accessorKey: "status",
@@ -434,6 +490,20 @@ export function DataTable({ messagesline }: DataTableProps) {
                   <Switch
                     checked={editStatus === "active"}
                     onCheckedChange={(checked) => setEditStatus(checked ? "active" : "inactive")}
+                  />
+                </div>
+
+                {/* Default Switch */}
+                <div className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold text-amber-700 dark:text-amber-400">Set as Default</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically select this message line in Sales, Purchase, Payment & Offer List.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editIsDefault}
+                    onCheckedChange={(checked) => setEditIsDefault(checked)}
                   />
                 </div>
               </div>

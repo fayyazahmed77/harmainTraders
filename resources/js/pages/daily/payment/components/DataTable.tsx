@@ -24,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal, Eye, Edit, FileText, Printer } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, FileText, Printer, Trash2 } from "lucide-react";
 import {
     ChevronLeft as IconChevronLeft,
     ChevronRight as IconChevronRight,
@@ -40,6 +40,15 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { router } from "@inertiajs/react";
 import { route } from 'ziggy-js';
+import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Payment {
     id: number;
@@ -61,6 +70,25 @@ export default function DataTable({ data }: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
+    const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDeleteConfirm = () => {
+        if (!paymentToDelete) return;
+        setIsDeleting(true);
+        router.delete(`/payments/${paymentToDelete.id}`, {
+            onSuccess: () => {
+                toast.success(`Payment voucher ${paymentToDelete.voucher_no} deleted successfully.`);
+                setPaymentToDelete(null);
+                setIsDeleting(false);
+            },
+            onError: (err) => {
+                console.error(err);
+                toast.error("Failed to delete payment voucher.");
+                setIsDeleting(false);
+            },
+        });
+    };
 
     const columns: ColumnDef<Payment>[] = [
         {
@@ -158,77 +186,63 @@ export default function DataTable({ data }: DataTableProps) {
                 const payment = row.original;
 
                 return (
-                    <TooltipProvider>
-                        <div className="flex items-center gap-1">
-                            {/* View Option */}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
-                                        onClick={() => router.visit(`/payments/${payment.id}/view`)}
-                                    >
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="text-[11px] font-bold">View</p>
-                                </TooltipContent>
-                            </Tooltip>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xl rounded-xl p-1 space-y-0.5">
+                            {/* View Invoice */}
+                            <DropdownMenuItem
+                                onClick={() => router.visit(`/payments/${payment.id}/view`)}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors"
+                            >
+                                <Eye className="h-4 w-4 text-zinc-500" />
+                                <span>View Invoice</span>
+                            </DropdownMenuItem>
 
-                            {/* Edit Option */}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
-                                        onClick={() => router.visit(`/payments/${payment.id}/edit`)}
-                                    >
-                                        <Edit className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="text-[11px] font-bold">Edit</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            {/* Print Thermal */}
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/payments/${payment.id}/pdf?format=small`, '_blank')}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg cursor-pointer transition-colors"
+                            >
+                                <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span>Print Thermal</span>
+                            </DropdownMenuItem>
 
-                            {/* A4 Print Option */}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
-                                        onClick={() => window.open(`/payments/${payment.id}/pdf?format=big`, '_blank')}
-                                    >
-                                        <FileText className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="text-[11px] font-bold">A4 Print</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            {/* Print A4 */}
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/payments/${payment.id}/pdf?format=big`, '_blank')}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg cursor-pointer transition-colors"
+                            >
+                                <Printer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span>Print A4</span>
+                            </DropdownMenuItem>
 
-                            {/* Thermal Print Option */}
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg transition-colors"
-                                        onClick={() => window.open(`/payments/${payment.id}/pdf?format=small`, '_blank')}
-                                    >
-                                        <Printer className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="text-[11px] font-bold">Thermal Print</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </TooltipProvider>
+                            {/* Edit Invoice */}
+                            <DropdownMenuItem
+                                onClick={() => router.visit(`/payments/${payment.id}/edit`)}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors"
+                            >
+                                <Edit className="h-4 w-4 text-zinc-500" />
+                                <span>Edit Invoice</span>
+                            </DropdownMenuItem>
+
+                            {/* Delete Permanent */}
+                            <DropdownMenuItem
+                                onClick={() => setPaymentToDelete(payment)}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer transition-colors"
+                            >
+                                <Trash2 className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                                <span>Delete Permanent</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 );
             },
         },
@@ -370,6 +384,73 @@ export default function DataTable({ data }: DataTableProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!paymentToDelete} onOpenChange={(open) => { if (!open) setPaymentToDelete(null); }}>
+                <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-0 overflow-hidden shadow-2xl">
+                    <DialogHeader className="p-6 pb-4 bg-rose-500/5 border-b border-rose-500/10">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20">
+                                <Trash2 className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-base font-black uppercase text-zinc-900 dark:text-zinc-100 tracking-tight">
+                                    Delete Payment Voucher
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-zinc-500 font-medium">
+                                    This action cannot be undone.
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    {paymentToDelete && (
+                        <div className="p-6 space-y-4 text-xs">
+                            <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black uppercase text-zinc-400">Voucher No</span>
+                                    <span className="font-mono font-black text-zinc-900 dark:text-zinc-100 text-sm">
+                                        {paymentToDelete.voucher_no}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center border-t border-zinc-200/60 dark:border-zinc-800 pt-2">
+                                    <span className="text-[10px] font-black uppercase text-zinc-400">Party</span>
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                        {paymentToDelete.account?.title || "N/A"}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center border-t border-zinc-200/60 dark:border-zinc-800 pt-2">
+                                    <span className="text-[10px] font-black uppercase text-zinc-400">Amount</span>
+                                    <span className="font-mono font-black text-rose-600 dark:text-rose-400 text-sm">
+                                        Rs {Number(paymentToDelete.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">
+                                Deleting this payment voucher will automatically revert any allocated invoice amounts and restore remaining balances.
+                            </p>
+                        </div>
+                    )}
+
+                    <DialogFooter className="p-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setPaymentToDelete(null)}
+                            className="flex-1 h-9 rounded-xl text-xs font-bold uppercase tracking-wider"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleDeleteConfirm}
+                            disabled={isDeleting}
+                            className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-600/20"
+                        >
+                            {isDeleting ? "Deleting..." : "Delete Payment"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

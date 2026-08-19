@@ -78,6 +78,8 @@ interface Item {
     gst_percent: number;
     retail_tp_diff: number;
     discount: number;
+    stock_1?: number;
+    stock_2?: number;
     pt2?: number;
     pt3?: number;
     pt4?: number;
@@ -141,7 +143,13 @@ export default function OfferListing({ items, categories, accounts, messageLines
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
     const [customerCategory, setCustomerCategory] = useState<string | null>(null);
-    const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+    const defaultMessage = useMemo(() => {
+        return messageLines?.find((m: any) => m.is_default || m.defult);
+    }, [messageLines]);
+
+    const [selectedMessageId, setSelectedMessageId] = useState<string>(() => {
+        return defaultMessage ? defaultMessage.id.toString() : "0";
+    });
     const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
     // Offer Types: 1 = One Customer Group, 2 = Market Offer
@@ -242,12 +250,16 @@ export default function OfferListing({ items, categories, accounts, messageLines
 
     const filteredRegistryItems = useMemo(() => {
         const q = searchQuery.toLowerCase();
-        return items.filter(it => 
-            it.title.toLowerCase().includes(q) || 
-            it.short_name?.toLowerCase().includes(q) ||
-            it.company?.toLowerCase().includes(q) ||
-            it.category?.toLowerCase().includes(q)
-        ).sort((a,b) => a.title.localeCompare(b.title));
+        return items.filter(it => {
+            const availableStock = ((Number(it.stock_1) || 0) * (Number(it.packing_qty) || 1)) + (Number(it.stock_2) || 0);
+            const hasStock = (it.stock_1 !== undefined || it.stock_2 !== undefined) ? availableStock > 0 : true;
+            return hasStock && (
+                it.title.toLowerCase().includes(q) || 
+                it.short_name?.toLowerCase().includes(q) ||
+                it.company?.toLowerCase().includes(q) ||
+                it.category?.toLowerCase().includes(q)
+            );
+        }).sort((a,b) => a.title.localeCompare(b.title));
     }, [searchQuery, items]);
 
     const handleSelectFromRegistry = (item: Item) => {
@@ -453,7 +465,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
             firm_id: selectedFirm && selectedFirm !== "0" ? Number(selectedFirm) : null,
             date: formattedDate,
             price_type: offerType, // 1 or 2
-            message_line_id: null,
+            message_line_id: selectedMessageId && selectedMessageId !== "0" ? Number(selectedMessageId) : null,
             items: itemsData,
         }, {
             onSuccess: () => resetRows(),

@@ -7,6 +7,8 @@ use App\Models\Account;
 use App\Models\Items;
 use App\Models\SupplierOrder;
 use App\Models\SupplierOrderItem;
+use App\Models\Firm;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -296,12 +298,24 @@ class SupplierOrderController extends Controller implements HasMiddleware
     public function print(Request $request, $id)
     {
         $order = SupplierOrder::with(['supplier', 'items.item'])->findOrFail($id);
+        $firm = Firm::where('defult', 1)->first() ?? Firm::first();
         $format = $request->get('format', 'big');
 
         if ($format === 'small' || $format === 'thermal') {
-            return view('admin.supplier-order.thermal', compact('order'));
+            $view = 'admin.supplier-order.thermal';
+            $pdf = Pdf::loadView($view, compact('order', 'firm'));
+
+            $itemCount = count($order->items);
+            $height = 320 + ($itemCount * 16);
+            if (($order->total_discount ?? 0) > 0) {
+                $height += 15;
+            }
+            $height = max(280, $height);
+            $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
+
+            return $pdf->stream("Supplier-Order-$id.pdf");
         }
 
-        return view('admin.supplier-order.print', compact('order'));
+        return view('admin.supplier-order.print', compact('order', 'firm'));
     }
 }

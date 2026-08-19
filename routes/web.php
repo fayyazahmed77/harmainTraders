@@ -277,6 +277,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [MessageLineController::class, 'store'])->name('message_lines.store');
         Route::put('/{messageLine}', [MessageLineController::class, 'update'])->name('message_lines.update');
         Route::patch('/{id}/toggle-status', [MessageLineController::class, 'toggleStatus'])->name('message_lines.toggle_status');
+        Route::patch('/{id}/toggle-default', [MessageLineController::class, 'toggleDefault'])->name('message_lines.toggle_default');
         Route::delete('/{id}', [MessageLineController::class, 'destroy'])->name('message_lines.destroy');
     });
     //---------------------Banks------------------------------------------------------------------

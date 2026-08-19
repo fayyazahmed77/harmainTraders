@@ -44,6 +44,12 @@ const SIGNAL_ORANGE = "bg-orange-500 hover:bg-orange-600 text-white shadow-lg sh
 const ACCENT_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
 const CARD_BASE = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none";
 const PREMIUM_GRADIENT = "bg-gradient-to-r from-orange-500 to-rose-500";
+const t = {
+    gradient: "bg-gradient-to-r from-orange-500 to-rose-500",
+    text: "text-orange-600 dark:text-orange-400",
+    textDark: "text-orange-500",
+    borderLight: "border-orange-500/30",
+};
 // ───────────────────────────────────────────
 // Types
 // ───────────────────────────────────────────
@@ -571,30 +577,6 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                                             </div>
                                         </PopoverContent>
                                     </Popover>
-                                    {previousBalance !== null && (
-                                        <div className="absolute -top-1.5 -right-1.5 flex flex-col items-end pointer-events-none z-10">
-                                            <div className="bg-zinc-900 border border-zinc-700 text-[9px] font-black px-2 py-1 rounded-lg shadow-2xl flex flex-col gap-1 min-w-[160px]">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-zinc-500 uppercase tracking-widest font-bold">Prev Bal</span>
-                                                    <span className={toNum(previousBalance) >= 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                                                        {fmtBalance(previousBalance, true)}
-                                                    </span>
-                                                </div>
-                                                {outstandingBalance !== null && <div className="flex items-center justify-between gap-3 border-t border-zinc-800 pt-0.5">
-                                                    <span className="text-zinc-500 uppercase tracking-widest">Payable</span>
-                                                    <span className="text-rose-400">Rs {toNum(outstandingBalance).toLocaleString()}</span>
-                                                </div>}
-                                                {creditBalance !== null && <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-zinc-500 uppercase tracking-widest">Credit</span>
-                                                    <span className="text-emerald-400">Rs {toNum(creditBalance).toLocaleString()}</span>
-                                                </div>}
-                                                {advanceBalance !== null && <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-zinc-500 uppercase tracking-widest">Advance</span>
-                                                    <span className="text-sky-400">Rs {toNum(advanceBalance).toLocaleString()}</span>
-                                                </div>}
-                                            </div>
-                                        </div>
-                                    )}
                                 </TechLabel>
                             </div>
 
@@ -605,21 +587,39 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                             </div>
                         </Card>
 
-                        {/* Transaction Bar */}
-                        {selectedAccount && (
-                            <Card className={`p-2.5 bg-zinc-900 dark:bg-zinc-900 text-white ${PREMIUM_ROUNDING_MD} border border-zinc-800 flex items-center justify-between gap-4 shadow-xl`}>
-                                <div className="space-y-0.5">
-                                    <div className="text-[8px] uppercase font-black text-zinc-500 tracking-widest">Source Document</div>
-                                    <Button variant="ghost" className="h-auto p-0 text-orange-400 hover:text-orange-300 font-black tracking-tighter text-xs flex items-center gap-1.5" onClick={openInvoiceDialog}>
-                                        {originalInvoiceNo || "SELECT SOURCE INVOICE"}
-                                        <ArrowRightLeft size={12} />
-                                    </Button>
-                                </div>
-                                <Button onClick={openInvoiceDialog} className={`h-7.5 px-3.5 bg-white text-black hover:bg-zinc-200 transition-all font-black text-[9px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
-                                    Replace Reference
-                                </Button>
-                            </Card>
-                        )}
+                        {/* Transaction Bar / Action Deck */}
+                        <AnimatePresence>
+                            {selectedAccount && (
+                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                                    <Card className={`p-0 ${PREMIUM_GRADIENT} ${PREMIUM_ROUNDING_MD} border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden relative group`}>
+                                        <div className={`absolute inset-0 opacity-[0.03] dark:opacity-10 ${ACCENT_GRADIENT}`} style={{ mixBlendMode: 'overlay' }} />
+                                        <div className="flex flex-col md:flex-row items-center justify-between p-2.5 px-3.5 relative z-10 font-mono gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={openInvoiceDialog} className={`flex items-center gap-2.5 px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} bg-zinc-50 dark:bg-zinc-800 hover:border-orange-500 transition-all group`}>
+                                                    <div className="flex flex-col items-start leading-none uppercase">
+                                                        <span className="text-[8px] font-black text-zinc-400 dark:text-zinc-500 group-hover:text-orange-500 transition-colors tracking-widest leading-none mb-0.5">Source Document</span>
+                                                        <span className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                                            {originalInvoiceNo || "SELECT SOURCE INVOICE"}
+                                                            <ArrowRightLeft size={11} className="text-orange-500" />
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Button onClick={openInvoiceDialog} size="sm" variant="outline" className={`h-8 px-3 text-[10px] font-black uppercase tracking-wider border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 ${PREMIUM_ROUNDING_MD} hover:border-orange-500 shadow-sm`}>
+                                                    Replace Reference
+                                                </Button>
+                                                <Button onClick={() => setAssignItemDialogOpen(true)} size="sm" className={`h-8 px-3 ${t.gradient} text-white font-black text-[10px] uppercase tracking-wider ${PREMIUM_ROUNDING_MD} shadow-sm`}>
+                                                    <Plus size={12} className="mr-1" />
+                                                    Assign Bulk
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         {/* Item Manifest */}
                         <div className={`flex-1 flex flex-col ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden min-h-0`}>

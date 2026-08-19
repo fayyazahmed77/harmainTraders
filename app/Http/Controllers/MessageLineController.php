@@ -55,10 +55,16 @@ class MessageLineController extends Controller implements HasMiddleware
             'category' => 'nullable|array',
             'category.*' => 'string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
+            'is_default' => 'nullable|boolean',
         ]);
 
         $validated['status'] = $validated['status'] ?? 'active';
+        $validated['is_default'] = $validated['is_default'] ?? false;
         $validated['created_by'] = Auth::id();
+
+        if ($validated['is_default']) {
+            MessageLine::query()->update(['is_default' => false]);
+        }
 
         MessageLine::create($validated);
 
@@ -75,10 +81,33 @@ class MessageLineController extends Controller implements HasMiddleware
             'category' => 'nullable|array',
             'category.*' => 'string|in:Sales,Purchase,Receipt,Payments,Offer List',
             'status' => 'nullable|in:active,inactive',
+            'is_default' => 'nullable|boolean',
         ]);
+
+        if (!empty($validated['is_default'])) {
+            MessageLine::where('id', '!=', $messageLine->id)->update(['is_default' => false]);
+        }
 
         $messageLine->update($validated);
         return back()->with('success', 'Message line updated successfully');
+    }
+
+    /**
+     * Toggle default status of specified message line.
+     */
+    public function toggleDefault($id)
+    {
+        $messageLine = MessageLine::findOrFail($id);
+        $newStatus = !$messageLine->is_default;
+
+        if ($newStatus) {
+            MessageLine::where('id', '!=', $id)->update(['is_default' => false]);
+        }
+
+        $messageLine->is_default = $newStatus;
+        $messageLine->save();
+
+        return back()->with('success', 'Default message line updated successfully.');
     }
 
     /**

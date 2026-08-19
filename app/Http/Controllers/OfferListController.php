@@ -39,7 +39,7 @@ class OfferListController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $items = Items::get();
+        $items = Items::whereRaw('(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0) > 0')->get();
         $categories = ItemCategory::where('status', 'active')->get();
         $accounts = Account::select('id', 'title', 'item_category')->whereHas('accountType', function ($q) {
             $q->where('name', 'Customers');

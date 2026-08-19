@@ -13,11 +13,13 @@ class MessageLine extends Model
         'messageline',
         'category',
         'status',
+        'is_default',
         'created_by',
     ];
 
     protected $casts = [
         'category' => 'array',
+        'is_default' => 'boolean',
     ];
 
     public function creator()

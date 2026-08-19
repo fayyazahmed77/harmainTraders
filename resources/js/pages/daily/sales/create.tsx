@@ -266,10 +266,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [showInfoPanel, setShowInfoPanel] = useState(false); // New state for bottom item info panel
   const [showStickyFooter, setShowStickyFooter] = useState(true);
 
-  // Firm selection state - default to firm marked as default
+  // Firm & Message selection state - default to firm/message marked as default
   const defaultFirm = firms.find(f => f.defult);
+  const defaultMessage = messageLines.find(m => (m as any).is_default || (m as any).defult);
   const [selectedFirmId, setSelectedFirmId] = useState<string>(defaultFirm ? defaultFirm.id.toString() : "0");
-  const [selectedMessageId, setSelectedMessageId] = useState<string>("0");
+  const [selectedMessageId, setSelectedMessageId] = useState<string>(defaultMessage ? defaultMessage.id.toString() : "0");
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
   // Track expanded mobile rows for item details
