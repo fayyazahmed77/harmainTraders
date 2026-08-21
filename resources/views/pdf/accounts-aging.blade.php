@@ -131,17 +131,17 @@ foreach($groupedData as $type => $accounts) {
     @endif
 </head>
 <body>
-    @if($firm && $firm->name == 'Harmain Traders')
+    @if($firm && $firm->name == 'Haramain Traders')
     <div class="watermark-container"><img src="{{ $logo_base64 }}" width="400"></div>
     @endif
 
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
-            @if($firm && $firm->name == 'Harmain Traders')
+            @if($firm && $firm->name == 'Haramain Traders')
             <div class="logo-section">
                 <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"></div>
                 <div class="brand-text">
-                    <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+                    <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
                     <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
                 </div>
             </div>
@@ -151,7 +151,7 @@ foreach($groupedData as $type => $accounts) {
                     <div class="logo-icon"><img src="{{ $firm_logo_base64 }}" style="max-height: 35px; width: auto;"></div>
                 @endif
                 <div class="brand-text">
-                    <div class="brand-name">{{ $firm->name ?? 'Harmain Traders' }}</div>
+                    <div class="brand-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
                     <div class="brand-tagline">{{ $firm->business ?? 'Wholesale & Supply Chain' }}</div>
                 </div>
             </div>

@@ -147,7 +147,7 @@ export const OfferSuccessDialog: React.FC<OfferSuccessDialogProps> = ({
 
     const handleWhatsApp = () => {
         const amtStr = amount ? ` (Total: ${formatter(amount)})` : '';
-        const message = `Hello Harmain Traders, I have placed order #${invoice}${amtStr} under Customer Code ${customerCode || 'GUEST'}. Please confirm my order!`;
+        const message = `Hello Haramain Traders, I have placed order #${invoice}${amtStr} under Customer Code ${customerCode || 'GUEST'}. Please confirm my order!`;
         window.open(`https://wa.me/923323218684?text=${encodeURIComponent(message)}`, '_blank');
     };
 

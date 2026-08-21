@@ -50,6 +50,6 @@
     
     <p style="font-size: 11px; color: #9CA3AF; margin: 0; line-height: 1.5;">
         &copy; {{ date('Y') }} {{ $settings->company_name ?? config('app.name') }}. All rights reserved.<br />
-        Powered by Harmain Trader ERP
+        Powered by Haramain Trader ERP
     </p>
 </div>

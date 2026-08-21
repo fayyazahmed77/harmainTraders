@@ -104,7 +104,7 @@ if (file_exists($logo_path)) {
             @endif
             <div style="display: inline-block; vertical-align: middle; text-align: left; line-height: 1.2;">
                 <div style="font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">
-                    <span style="color: #000;">Harmain</span> <span style="color: #f97316;">Traders</span>
+                    <span style="color: #000;">Haramain</span> <span style="color: #f97316;">Traders</span>
                 </div>
                 <div style="font-size: 11px; font-weight: normal; color: #666; margin-top: 2px;">
                     Wholesale <span style="color: #f97316; font-weight: bold;">&</span> Supply Chain

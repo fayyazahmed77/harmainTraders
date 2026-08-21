@@ -32,7 +32,7 @@ class PaymentConfirmedMail extends Mailable implements ShouldQueue
      */
     public function build()
     {
-        return $this->subject("Payment Receipt Confirmed: {$this->payment->voucher_no} - Harmain Traders")
+        return $this->subject("Payment Receipt Confirmed: {$this->payment->voucher_no} - Haramain Traders")
                     ->view('emails.payment-confirmed');
     }
 }

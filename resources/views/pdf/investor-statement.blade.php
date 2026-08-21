@@ -46,7 +46,7 @@
 <body>
     <div class="header">
         <div class="logo-area">
-            <div class="firm-name">{{ $firm->name ?? 'HARMAIN TRADERS' }}</div>
+            <div class="firm-name">{{ $firm->name ?? 'HARAMAIN TRADERS' }}</div>
             <div class="firm-tagline">INVESTMENT MANAGEMENT DIVISION</div>
         </div>
         <div class="statement-title-area">

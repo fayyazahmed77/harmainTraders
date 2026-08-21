@@ -10,7 +10,7 @@ export default function TopNavBar() {
                 </div>
                 <div className="flex flex-col">
                     <span className="text-[12px] font-medium text-[#f0f0f0] leading-tight">
-                        Harmain Traders
+                        Haramain Traders
                     </span>
                     <span className="text-[10px] text-[#888] leading-tight mt-0.5">
                         Counter Sales · Wholesale & Supply Chain

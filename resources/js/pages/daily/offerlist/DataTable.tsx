@@ -144,7 +144,7 @@ export default function DataTable({ data }: DataTableProps) {
             cell: ({ row }) => (
                 <div className="flex flex-col">
                     <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
-                        {row.original.firm?.name || "Default (Harmain)"}
+                        {row.original.firm?.name || "Default (Haramain)"}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">
                         Firm Info

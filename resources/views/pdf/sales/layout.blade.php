@@ -3,7 +3,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Sales Analysis - Harmain Traders</title>
+    <title>Sales Analysis - Haramain Traders</title>
     <style>
         @page { margin: 15px; }
         body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #1e293b; margin: 0; padding: 0; }
@@ -28,7 +28,7 @@
                     @endif
                 </td>
                 <td style="border: none; vertical-align: top;">
-                    <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+                    <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
                     <div class="brand-name" style="color:#000; font-size: 14px;">Wholesale & Supply Chain</div>
                 </td>
                 <td style="border: none; text-align: right; vertical-align: top;">
@@ -50,7 +50,7 @@
     <!-- Excel Header -->
     <table>
         <tr>
-            <td colspan="5" style="font-size: 18px; font-weight: bold; text-align: center;">HARMAIN TRADERS</td>
+            <td colspan="5" style="font-size: 18px; font-weight: bold; text-align: center;">HARAMAIN TRADERS</td>
         </tr>
         <tr>
             <td colspan="5" style="font-size: 14px; font-weight: bold; text-align: center;">{{ strtoupper($title) }}</td>
@@ -69,7 +69,7 @@
 
     @if(!isset($isExcel))
     <div class="footer">
-        GENERATE AT: {{ date('d M Y H:i:s') }} | HARMAIN TRADERS PLATFORM
+        GENERATE AT: {{ date('d M Y H:i:s') }} | HARAMAIN TRADERS PLATFORM
     </div>
     
     @if(isset($is_print_mode) && $is_print_mode)

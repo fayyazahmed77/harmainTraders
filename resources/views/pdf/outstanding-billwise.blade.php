@@ -161,7 +161,7 @@ if (file_exists($logo_path)) {
     <div class="header text-center">
         <div class="logo-section">
             <div class="brand-text">
-                <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+                <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
                 <div class="brand-tagline">Financial Portfolio Intelligence</div>
             </div>
         </div>

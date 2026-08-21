@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             
             // Branding
-            $table->string('company_name')->default('Harmain Traders');
+            $table->string('company_name')->default('Haramain Traders');
             $table->string('logo_path')->nullable();
             
             // Contact Info
@@ -44,13 +44,13 @@ return new class extends Migration
 
         // Seed initial data
         DB::table('site_settings')->insert([
-            'company_name' => 'Harmain Traders',
-            'contact_email' => 'support@harmaintraders.com',
+            'company_name' => 'Haramain Traders',
+            'contact_email' => 'support@haramaintraders.com',
             'contact_phone' => '+92 300 1234567',
             'address' => 'Main Market, City Center, Pakistan',
-            'facebook_url' => 'https://facebook.com/harmaintraders',
-            'linkedin_url' => 'https://linkedin.com/company/harmaintraders',
-            'mail_from_name' => 'Harmain Traders',
+            'facebook_url' => 'https://facebook.com/haramaintraders',
+            'linkedin_url' => 'https://linkedin.com/company/haramaintraders',
+            'mail_from_name' => 'Haramain Traders',
             'created_at' => now(),
             'updated_at' => now(),
         ]);

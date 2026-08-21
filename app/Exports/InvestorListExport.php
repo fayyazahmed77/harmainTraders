@@ -92,7 +92,7 @@ class InvestorListExport implements FromCollection, WithHeadings, WithMapping, S
 
                 // Branded Header
                 $sheet->mergeCells("A1:{$lastCol}1");
-                $sheet->setCellValue('A1', 'HARMAIN TRADERS - INVESTOR PORTFOLIO');
+                $sheet->setCellValue('A1', 'HARAMAIN TRADERS - INVESTOR PORTFOLIO');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => ['bold' => true, 'size' => 20, 'color' => ['rgb' => '0A0C10']],
                     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],

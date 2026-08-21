@@ -129,7 +129,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             <img src="{{ $logo_base64 }}" width="40" height="40" alt="Logo">
         </div>
         <div class="brand-text" style="display: inline-block;">
-            <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+            <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
             <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
         </div>
     </div>

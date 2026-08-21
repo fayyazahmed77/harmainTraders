@@ -8,7 +8,7 @@ export default function AppLogo() {
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-xl">Harmain</span> <span className="font-semibold text-sidebar-primary text-xl">Traders</span>
+              <span className="font-semibold text-xl">Haramain</span> <span className="font-semibold text-sidebar-primary text-xl">Traders</span>
             </div>
             <span className="text-xs">Wholesale <span className="text-sidebar-primary">&</span> Supply Chain</span>
           </div>

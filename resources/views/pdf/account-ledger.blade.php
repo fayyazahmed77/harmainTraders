@@ -173,7 +173,7 @@ if (file_exists($logo_path)) {
                 @endif
             </div>
             <div class="brand-text">
-                <div class="brand-name">Harmain <span style="color:#000">Traders</span></div>
+                <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
                 <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
             </div>
         </div>

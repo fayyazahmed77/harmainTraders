@@ -570,7 +570,7 @@ const VoucherCard = ({ p, mappedGroupPayments, combinedVoucherNo }: { p: Payment
             </div>
             <div className="text-right">
               <div className="text-[10px] text-[#94a3b8] font-mono">{p.voucher_number} · {formatDate(p.voucher_date)}</div>
-              <div className="text-[10px] text-[#94a3b8]">Harmain Traders ERP · v1.0</div>
+              <div className="text-[10px] text-[#94a3b8]">Haramain Traders ERP · v1.0</div>
             </div>
           </div>
         </div>
@@ -718,7 +718,7 @@ function mapPayment(raw: any): Payment {
       tagline: companyTagline || 'Wholesale & Supply Chain',
       address: companyAddress || 'Karachi, Pakistan',
       phone:   companyPhone || '+92 300 0000000',
-      email:   companyEmail || 'info@harmaintraders.com',
+      email:   companyEmail || 'info@haramaintraders.com',
       website: companyWebsite || 'aishtycoons.agency',
     },
     current_balance:     currentBalance,

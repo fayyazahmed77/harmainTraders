@@ -133,7 +133,7 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
 
                         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-surface-1 via-surface-1/80 to-transparent p-2.5 sm:p-3 pt-6 sm:pt-8">
                             <span className="text-[8px] sm:text-[9px] font-mono-jet font-black tracking-widest text-amber uppercase bg-amber/10 px-1.5 py-0.5 rounded border border-amber/20">
-                                {item.companyAccount?.title || 'Harmain Direct'}
+                                {item.companyAccount?.title || 'Haramain Direct'}
                             </span>
                             <h3 className="font-display font-black text-base sm:text-lg text-text-primary uppercase tracking-tight mt-0.5 line-clamp-1">
                                 {item.title}

@@ -327,11 +327,11 @@
 
         {{-- ═══ HEADER ═══ --}}
         @php
-            $f_name = $receipt->firm ? $receipt->firm->name : 'Harmain Traders';
+            $f_name = $receipt->firm ? $receipt->firm->name : 'Haramain Traders';
             $f_sub = $receipt->firm ? $receipt->firm->business : 'Wholesale & Supply Chain';
             $f_addr = $receipt->firm ? trim($receipt->firm->address1 . ' ' . $receipt->firm->address2) : 'Karachi, Pakistan';
             $f_phone = $receipt->firm ? $receipt->firm->phone : '+92 300 0000000';
-            $f_email = $receipt->firm ? $receipt->firm->email : 'info@harmaintraders.com';
+            $f_email = $receipt->firm ? $receipt->firm->email : 'info@haramaintraders.com';
             $f_website = $receipt->firm ? $receipt->firm->website : 'aishtycoons.agency';
         @endphp
         <div class="header">

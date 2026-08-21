@@ -57,6 +57,6 @@ class Saleman extends Model
             return $this->creator->email;
         }
 
-        return 'salesman@harmaintraders.com';
+        return 'salesman@haramaintraders.com';
     }
 }

@@ -22,7 +22,7 @@ function n($num) {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Purchase Return Report - Harmain Traders</title>
+    <title>Purchase Return Report - Haramain Traders</title>
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -101,7 +101,7 @@ function n($num) {
                     @endif
                 </td>
                 <td style="border: none; vertical-align: top;">
-                    <div class="brand-name" style="margin-top: 0;">Harmain <span style="color:#F69A2C">Traders</span></div>
+                    <div class="brand-name" style="margin-top: 0;">Haramain <span style="color:#F69A2C">Traders</span></div>
                     <div class="report-title">{{ strtoupper(str_replace('_', ' ', $type)) }} ANALYSIS</div>
                 </td>
                 <td style="border: none; text-align: right; vertical-align: top;">
@@ -123,7 +123,7 @@ function n($num) {
             <tr>
                 <td style="border: none;">PRINTED ON: {{ date('l, F d, Y g:i A') }}</td>
                 <td style="border: none;" class="text-center">CONFIDENTIAL BUSINESS SUMMARY</td>
-                <td style="border: none;" class="text-right">HARMAIN PLATFORM</td>
+                <td style="border: none;" class="text-right">HARAMAIN PLATFORM</td>
             </tr>
         </table>
     </div>

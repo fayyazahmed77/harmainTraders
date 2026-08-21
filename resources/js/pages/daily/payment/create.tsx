@@ -584,7 +584,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   const defaultMessage = messageLines?.find((m: any) => m.is_default || m.defult);
   const [selectedFirmId, setSelectedFirmId] = useState<string>(defaultFirm ? defaultFirm.id.toString() : "0");
   const [selectedMessageId, setSelectedMessageId] = useState<string>(defaultMessage ? defaultMessage.id.toString() : "0");
-  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(true);
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(false);
   const [isMultiPayment, setIsMultiPayment] = useState<boolean>(false);
   const [multiDialogOpen, setMultiDialogOpen] = useState<boolean>(false);
   const [splitPayments, setSplitPayments] = useState<any[]>([
@@ -706,10 +706,24 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
         return;
       }
 
+      // F3 or Alt+P: Toggle Right Panel
+      if (e.key === "F3" || (e.altKey && (e.key === "p" || e.key === "P"))) {
+        e.preventDefault();
+        setShowRightSidebar(prev => !prev);
+        return;
+      }
+
       // F4 or Alt+M: Toggle Multi Pay Switch
       if (e.key === "F4" || (e.altKey && (e.key === "m" || e.key === "M"))) {
         e.preventDefault();
         setIsMultiPayment(prev => !prev);
+        return;
+      }
+
+      // F9: Submit / Save Payment
+      if (e.key === "F9") {
+        e.preventDefault();
+        handleSaveRef.current();
         return;
       }
 
@@ -1118,6 +1132,11 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     onFinish: () => setLoading(false)
   });
 };
+
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
 
   const addSplitRow = () => {
     setSplitPayments(prev => [...prev, { id: Date.now(), payment_account_id: "", amount: 0, cheque_no: "", cheque_date: "", clear_date: "", payment_method: "", original_cheque_id: "" }]);
@@ -1737,7 +1756,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                 <button
                   onClick={() => setShowRightSidebar(false)}
                   className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-40 h-7 w-7 rounded-full bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 shadow-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 hover:border-orange-500 transition-all hover:scale-110 active:scale-95 group cursor-pointer"
-                  title="Hide Right Panel & Show Sticky Bar"
+                  title="Hide Right Panel (F3 / Alt+P)"
                 >
                   <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                 </button>
@@ -1953,6 +1972,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                           ? (paymentType === 'RECEIPT' ? "WITHDRAWAL" : "DEPOSIT") 
                           : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")
                       )}
+                      <kbd className="ml-1.5 px-1.5 py-0.5 text-[9px] font-mono font-bold text-white/90 bg-black/20 rounded border border-white/20">F9</kbd>
                     </motion.div>
                   </Button>
                 </div>
@@ -1963,200 +1983,21 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       </div>
     </main>
 
-        {/* ── DESKTOP & MOBILE BOTTOM STICKY BAR (When Right Sidebar is Collapsed) ── */}
+        {/* ── TOGGLE BUTTON FOR RIGHT PANEL (When Right Panel is Closed) ── */}
         <AnimatePresence>
           {!showRightSidebar && (
-            <motion.div
-              key="sticky-bottom-bar"
-              initial={{ y: 90, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 90, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-200/80 dark:border-zinc-800 shadow-[0_-12px_40px_rgba(0,0,0,0.15)] px-4 py-3"
+            <motion.button
+              key="right-sidebar-open-btn"
+              initial={{ scale: 0, opacity: 0, x: 20 }}
+              animate={{ scale: 1, opacity: 1, x: 0 }}
+              exit={{ scale: 0, opacity: 0, x: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onClick={() => setShowRightSidebar(true)}
+              className="fixed right-3 top-1/2 -translate-y-1/2 z-40 h-8 w-8 rounded-full bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 shadow-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 hover:border-orange-500 transition-all hover:scale-110 active:scale-95 group cursor-pointer"
+              title="Open Right Panel (F3 / Alt+P)"
             >
-              <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-                {/* Left: Expand Button & Badges */}
-                <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowRightSidebar(true)}
-                    className="h-7 w-7 rounded-full border-orange-500/30 hover:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 font-bold text-xs gap-1.5 transition-all active:scale-95 shadow-sm flex-shrink-0"
-                    title="Expand Right Panel"
-                  >
-                    <ChevronLeft size={16} />
-                    
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <SignalBadge text={isBankAccountSelected ? (paymentType === 'RECEIPT' ? 'WITHDRAWAL' : 'DEPOSIT') : paymentType} type={paymentType === 'RECEIPT' ? 'green' : 'red'} />
-                    <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter">Multi Pay</span>
-                      <Switch checked={isMultiPayment} onCheckedChange={setIsMultiPayment} className="scale-75" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center: Controls (Amount, Discount, Payout Source, Bank Method, Chq Date, Cheque No, Remarks) */}
-                <div className="flex flex-wrap items-center gap-2 flex-1 max-w-5xl justify-center w-full md:w-auto">
-                  {/* Amount */}
-                  <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 py-1">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Amount:</span>
-                    <Input
-                      type="number"
-                      value={amount || ""}
-                      onChange={e => setAmount(toNum(e.target.value))}
-                      disabled={isMultiPayment}
-                      placeholder="0.00"
-                      className="h-7 w-24 font-black font-mono text-xs bg-transparent border-0 focus-visible:ring-0 p-0 text-zinc-900 dark:text-white"
-                    />
-                    <span className="text-[9px] font-mono text-zinc-400">PKR</span>
-                  </div>
-
-                  {/* Discount */}
-                  <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 py-1">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">Disc:</span>
-                    <Input
-                      type="number"
-                      value={discount || ""}
-                      onChange={e => setDiscount(toNum(e.target.value))}
-                      placeholder="0.00"
-                      className="h-7 w-16 font-mono text-xs font-bold bg-transparent border-0 focus-visible:ring-0 p-0 text-zinc-900 dark:text-white"
-                    />
-                  </div>
-
-                  {/* Payout Source */}
-                  <div className="w-44 sm:w-48">
-                    <SearchableAccountSelector
-                      accounts={paymentAccounts.filter(acc => acc.id.toString() !== selectedAccountId)}
-                      value={paymentAccountId}
-                      onChange={setPaymentAccountId}
-                      disabled={isMultiPayment}
-                      placeholder="Payout Source..."
-                      className="h-8 rounded-xl text-xs"
-                    />
-                  </div>
-
-                  {/* Dynamic Bank & Cheque Options */}
-                  {paymentAccountId && ['Bank', 'Cheque in hand'].includes(paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name || "") && (
-                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-1.5 flex-wrap">
-                      {paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name !== 'Cheque in hand' && (
-                        <div className="w-28 sm:w-32">
-                          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                            <SelectTrigger className={`h-8 w-full bg-white dark:bg-zinc-800 ${t.borderLight} font-bold text-[10px] ${PREMIUM_ROUNDING_MD}`}>
-                              <SelectValue placeholder="Method..." />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl text-xs">
-                              {paymentType === 'RECEIPT' ? (
-                                <SelectItem value="Online">Online</SelectItem>
-                              ) : (
-                                <>
-                                  <SelectItem value="Online">Online</SelectItem>
-                                  <SelectItem value="Cheque">Cheque Release</SelectItem>
-                                </>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Chq Date */}
-                      <Popover open={chequeDateOpen} onOpenChange={setChequeDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isMultiPayment}
-                            className={`h-8 px-2 justify-between font-bold text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
-                          >
-                            {chequeDate ? fmtDate(chequeDate) : <span className="text-zinc-400 font-normal">Chq Date...</span>}
-                            <CalendarIcon size={11} className="text-zinc-400 ml-1" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl z-[100]" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={chequeDate ? parseLocalDate(chequeDate) : undefined}
-                            onSelect={(d) => {
-                              if (d) {
-                                setChequeDate(formatLocalDate(d));
-                                setChequeDateOpen(false);
-                              }
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-
-                      {/* Cheque No */}
-                      {paymentMethod === 'Cheque' && (
-                        <div className="w-32 sm:w-36">
-                          {paymentType === 'PAYMENT' ? (
-                            paymentAccounts.find(a => a.id.toString() === paymentAccountId)?.account_type?.name === 'Cheque in hand' ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setChequeSelectorTarget('single');
-                                  setChequeSelectorOpen(true);
-                                }}
-                                className={`h-8 w-full justify-between font-mono text-[10px] bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
-                              >
-                                <span className="truncate">{originalChequeId ? customerCheques.find(c => c.id.toString() === originalChequeId)?.cheque_no : "In Hand..."}</span>
-                                <Search size={11} className="text-zinc-400 ml-1" />
-                              </Button>
-                            ) : (
-                              <SearchableChequeSelector
-                                bankId={paymentAccountId}
-                                value={chequeNo}
-                                onChange={setChequeNo}
-                                availableCheques={availableCheques}
-                                disabled={!paymentAccountId}
-                                className="h-8 text-[10px]"
-                              />
-                            )
-                          ) : (
-                            <Input value={chequeNo} onChange={e => setChequeNo(e.target.value)} className={`h-8 font-mono text-[10px] ${PREMIUM_ROUNDING_MD}`} placeholder="CHQ#" />
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-
-                  {/* Remarks */}
-                  <div className="w-36 sm:w-44 hidden md:block">
-                    <Input
-                      value={remarks}
-                      onChange={e => setRemarks(e.target.value)}
-                      placeholder="Remarks..."
-                      className="h-8 rounded-lg text-xs font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Right: Net Disbursement & Submit Action */}
-                <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0 border-zinc-100 dark:border-zinc-800">
-                  <div className="flex flex-col text-left md:text-right">
-                    <span className="text-[9px] uppercase text-zinc-400 font-bold">Net Disbursement</span>
-                    <span className={`text-base font-black ${t.text} leading-none tracking-tight font-mono`}>
-                      Rs {(amount - discount).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <Button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className={`h-7 px-3 ${t.gradient} hover:opacity-90 text-white font-black text-xs uppercase tracking-wider shadow-lg ${t.gradientShadow} rounded-xl transition-all active:scale-95`}
-                  >
-                    {loading ? <RotateCcw size={14} className="mr-1.5 animate-spin" /> : <CheckCircle2 size={14} className="mr-1.5" />}
-                    {loading ? "PROCESSING..." : (
-                      isBankAccountSelected 
-                        ? (paymentType === 'RECEIPT' ? "WITHDRAW" : "DEPOSIT") 
-                        : (paymentType === 'RECEIPT' ? "RECEIPT" : "PAYMENT")
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
+              <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+            </motion.button>
           )}
         </AnimatePresence>
 

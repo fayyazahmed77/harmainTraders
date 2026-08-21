@@ -187,7 +187,7 @@ export default function EmailSettings({ settings }: Props) {
                       <Input 
                         value={data.mail_from_address} 
                         onChange={e => setData('mail_from_address', e.target.value)} 
-                        placeholder="noreply@harmaintraders.com"
+                        placeholder="noreply@haramaintraders.com"
                         className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                       />
                     </div>
@@ -196,7 +196,7 @@ export default function EmailSettings({ settings }: Props) {
                       <Input 
                         value={data.mail_from_name} 
                         onChange={e => setData('mail_from_name', e.target.value)} 
-                        placeholder="Harmain Traders"
+                        placeholder="Haramain Traders"
                         className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                       />
                     </div>

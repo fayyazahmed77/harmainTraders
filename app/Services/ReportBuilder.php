@@ -1402,16 +1402,22 @@ class ReportBuilder
             return $cost * $row->qty;
         });
 
-        // 3. Cash Summary (AccountType 1)
-        $cashAccounts = Account::where('type', 1)->pluck('id');
+        // 3. Cash Summary (AccountType 1 or name LIKE %Cash%)
+        $cashAccounts = Account::where('type', 1)
+            ->orWhereHas('accountType', fn($q) => $q->where('name', 'LIKE', '%Cash%'))
+            ->pluck('id');
         $cashSummary = $this->getAccountGroupSummary($cashAccounts, $fromDate, $toDate, 'dr');
 
-        // 4. Cheque Summary (AccountType 14)
-        $chequeAccounts = Account::where('type', 14)->pluck('id');
+        // 4. Cheque Summary (AccountType 14 or name LIKE %Cheque%)
+        $chequeAccounts = Account::where('type', 14)
+            ->orWhereHas('accountType', fn($q) => $q->where('name', 'LIKE', '%Cheque%'))
+            ->pluck('id');
         $chequeSummary = $this->getAccountGroupSummary($chequeAccounts, $fromDate, $toDate, 'dr');
 
-        // 5. Bank Summary (AccountType 2)
-        $bankAccounts = Account::where('type', 2)->get();
+        // 5. Bank Summary (AccountType 2 or name LIKE %Bank%)
+        $bankAccounts = Account::where('type', 2)
+            ->orWhereHas('accountType', fn($q) => $q->where('name', 'LIKE', '%Bank%'))
+            ->get();
         $bankDetails = [];
         foreach ($bankAccounts as $bank) {
             $summary = $this->getAccountGroupSummary([$bank->id], $fromDate, $toDate, 'dr');
@@ -1568,45 +1574,78 @@ class ReportBuilder
             ];
         }
 
-        $opening = 0;
+        $idsArray = is_array($accountIds) ? $accountIds : $accountIds->toArray();
+        $accounts = Account::with('accountType')->whereIn('id', $idsArray)->get();
+        if ($accounts->isEmpty()) {
+            return [
+                'opening' => 0,
+                'receiving' => 0,
+                'payment' => 0,
+                'closing' => 0
+            ];
+        }
 
-        foreach ($accountIds as $id) {
+        $opening = 0;
+        foreach ($idsArray as $id) {
             $opening += $this->calculateOpeningBalance($id, $fromDate, $orientation);
         }
 
-        // For Banks (Type 2), Cash (Type 1), and Cheques (Type 14), we must query 'payment_account_id'
-        $firstAccount = Account::find($accountIds[0]);
-        $isAsset = in_array($firstAccount->type, [1, 2, 14]);
-        $column = $isAsset ? 'payment_account_id' : 'account_id';
+        $firstAccount = $accounts->first();
+        $typeName = strtolower($firstAccount->accountType->name ?? '');
+        $isAsset = in_array((int)$firstAccount->type, [1, 2, 14]) || 
+                   in_array($typeName, ['cash', 'bank', 'cheque', 'cheque in hand']) ||
+                   str_contains($typeName, 'cash') || 
+                   str_contains($typeName, 'bank');
 
-        $payments = DB::table('payments')
-            ->whereIn($column, $accountIds)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->selectRaw("SUM(CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END) as receiving,
-                         SUM(CASE WHEN type = 'PAYMENT' THEN amount ELSE 0 END) as payment")
-            ->first();
+        if ($isAsset) {
+            // Financial payments (where payment_account_id = bank/cash ID)
+            $financialPayments = DB::table('payments')
+                ->whereIn('payment_account_id', $idsArray)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                })
+                ->selectRaw("SUM(CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END) as receiving,
+                             SUM(CASE WHEN type = 'PAYMENT' THEN amount ELSE 0 END) as payment")
+                ->first();
 
+            // Party payments (where account_id = bank/cash ID)
+            $partyPayments = DB::table('payments')
+                ->whereIn('account_id', $idsArray)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                })
+                ->selectRaw("SUM(CASE WHEN type = 'PAYMENT' THEN amount ELSE 0 END) as receiving,
+                             SUM(CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END) as payment")
+                ->first();
 
-        $receiving = (float)($payments->receiving ?? 0);
-        $payment = (float)($payments->payment ?? 0);
+            $receiving = (float)($financialPayments->receiving ?? 0) + (float)($partyPayments->receiving ?? 0);
+            $payment = (float)($financialPayments->payment ?? 0) + (float)($partyPayments->payment ?? 0);
 
-        // Determine adjustment based on account type
-        // For Banks (Type 2) and Cash (Type 1), Receiving increases balance (Debit)
-        // Check first account type in group (assuming groups are homogeneous)
-        $firstAccount = Account::find($accountIds[0]);
-        $isAsset = in_array($firstAccount->type, [1, 2, 14]);
-
-        if ($orientation === 'cr') {
-            $closing = $opening + ($receiving - $payment);
+            // For Cash / Bank Assets: Receiving INCREASES balance (+), Payment DECREASES balance (-)
+            $closing = $opening + $receiving - $payment;
         } else {
-            // If it's a Bank/Cash asset, receiving increases. If it's a Customer receivable, receiving decreases.
-            if ($isAsset) {
-                $closing = $opening + ($receiving - $payment);
+            // Customer / Supplier / Expense / Other accounts
+            $payments = DB::table('payments')
+                ->whereIn('account_id', $idsArray)
+                ->whereBetween('date', [$fromDate, $toDate])
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                })
+                ->selectRaw("SUM(CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END) as receiving,
+                             SUM(CASE WHEN type = 'PAYMENT' THEN amount ELSE 0 END) as payment")
+                ->first();
+
+            $receiving = (float)($payments->receiving ?? 0);
+            $payment = (float)($payments->payment ?? 0);
+
+            if ($orientation === 'cr') {
+                $closing = $opening + $receiving - $payment;
             } else {
-                $closing = $opening + ($payment - $receiving);
+                $closing = $opening + $payment - $receiving;
             }
         }
-
 
         return [
             'opening' => $opening,

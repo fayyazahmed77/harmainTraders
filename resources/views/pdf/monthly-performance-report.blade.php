@@ -122,7 +122,7 @@
         @if(isset($logo))
             <img src="{{ public_path($logo) }}" class="logo">
         @else
-            <h1 class="branding-gold">HARMAIN TRADERS</h1>
+            <h1 class="branding-gold">HARAMAIN TRADERS</h1>
         @endif
         <div class="report-title">Monthly Performance Report</div>
         <div class="report-period">{{ $period_formatted }}</div>
@@ -194,13 +194,13 @@
 
         <div style="margin-top: 50px; padding: 20px; background-color: #f3f4f6; border-radius: 8px;">
             <p style="font-size: 10px; color: #4B5563; margin: 0; line-height: 1.5;">
-                <strong>Disclaimer:</strong> This report is a generated statement of your investment performance for the specified period. Harmain Traders ensures all data is accurate as per our ledger records at the time of generation. Please contact our support if you notice any discrepancies.
+                <strong>Disclaimer:</strong> This report is a generated statement of your investment performance for the specified period. Haramain Traders ensures all data is accurate as per our ledger records at the time of generation. Please contact our support if you notice any discrepancies.
             </p>
         </div>
     </div>
 
     <div class="footer">
-        &copy; {{ date('Y') }} Harmain Traders. All Rights Reserved. | Support: info@harmaintraders.com
+        &copy; {{ date('Y') }} Haramain Traders. All Rights Reserved. | Support: info@haramaintraders.com
     </div>
 </body>
 </html>

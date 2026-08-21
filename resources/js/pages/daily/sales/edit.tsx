@@ -1218,18 +1218,43 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                     
                     {/* 1. Left Section: Financial Summary & Inputs */}
                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                      {/* 1. Previous Balance */}
-                      <div className="flex flex-col shrink-0">
-                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
-                          {previousBalance < 0 ? "Advance" : "Prev Balance"}
-                        </span>
-                        <span className={cn(
-                          "text-sm font-bold font-mono leading-none",
-                          previousBalance > 0 ? "text-rose-600 dark:text-rose-400" : previousBalance < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-700 dark:text-zinc-300"
-                        )}>
-                          Rs {previousBalance.toLocaleString()}
-                        </span>
-                      </div>
+                      {/* 1. Previous Balance / Advance */}
+                      {previousBalance < 0 ? (
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="flex flex-col shrink-0">
+                            <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                              Advance
+                            </span>
+                            <span className="text-sm font-bold font-mono leading-none text-emerald-600 dark:text-emerald-400">
+                              Rs {Math.abs(previousBalance).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-2 py-1 rounded-md shrink-0">
+                            <Checkbox 
+                              id="use-advance-sticky" 
+                              checked={useAdvance} 
+                              onCheckedChange={(v) => setUseAdvance(!!v)}
+                              className="w-3.5 h-3.5 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
+                            />
+                            <label htmlFor="use-advance-sticky" className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 cursor-pointer select-none whitespace-nowrap">
+                              Apply to bill {useAdvance && totals.appliedAdvance > 0 ? `(-Rs ${totals.appliedAdvance.toLocaleString()})` : ''}
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col shrink-0">
+                          <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                            Prev Balance
+                          </span>
+                          <span className={cn(
+                            "text-sm font-bold font-mono leading-none",
+                            previousBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300"
+                          )}>
+                            Rs {previousBalance.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden sm:block" />
 

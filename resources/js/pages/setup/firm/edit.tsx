@@ -201,7 +201,7 @@ export default function FirmEdit({ firm }: { firm: Firm }) {
                             name="name"
                             value={form.name}
                             onChange={handleChange}
-                            placeholder="e.g. HARMAIN TRADERS GLOBAL"
+                            placeholder="e.g. HARAMAIN TRADERS GLOBAL"
                             className="h-14 rounded-2xl border-zinc-200 dark:border-zinc-800 font-black focus:ring-orange-500/20 transition-all text-sm pl-12 uppercase"
                             required
                           />

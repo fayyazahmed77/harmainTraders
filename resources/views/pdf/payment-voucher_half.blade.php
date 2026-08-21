@@ -194,11 +194,11 @@
             return fmod((float)$num, 1) == 0 ? number_format((float)$num, 0) : number_format((float)$num, 2);
         };
 
-        $f_name = $payment->firm ? $payment->firm->name : 'Harmain Traders';
+        $f_name = $payment->firm ? $payment->firm->name : 'Haramain Traders';
         $f_sub = $payment->firm ? $payment->firm->business : 'Wholesale & Supply Chain';
         $f_addr = $payment->firm ? trim($payment->firm->address1 . ' ' . $payment->firm->address2) : 'Karachi, Pakistan';
         $f_phone = $payment->firm ? $payment->firm->phone : '+92 300 0000000';
-        $f_email = $payment->firm ? $payment->firm->email : 'info@harmaintraders.com';
+        $f_email = $payment->firm ? $payment->firm->email : 'info@haramaintraders.com';
         $f_website = $payment->firm ? $payment->firm->website : 'aishtycoons.agency';
 
         $totalAmount = isset($isCombined) && $isCombined

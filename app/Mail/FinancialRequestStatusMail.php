@@ -30,7 +30,7 @@ class FinancialRequestStatusMail extends Mailable
      */
     public function build()
     {
-        $subject = 'Financial Request ' . ucfirst($this->status) . ' - Harmain Traders';
+        $subject = 'Financial Request ' . ucfirst($this->status) . ' - Haramain Traders';
         
         return $this->subject($subject)
                     ->view('emails.financial-request-status');

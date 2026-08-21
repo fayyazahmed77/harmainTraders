@@ -47,7 +47,7 @@ if (file_exists($logo_path)) {
         @if($logo_base64)
             <img src="{{ $logo_base64 }}" alt="Logo" style="height: 50px; margin-bottom: 10px;">
         @endif
-        <div class="brand-name">Harmain Traders</div>
+        <div class="brand-name">Haramain Traders</div>
         <div class="report-title">SUMMARY FOR THE PERIOD ENDED {{ strtoupper(date('d-M-Y', strtotime($to_date))) }}</div>
     </div>
 

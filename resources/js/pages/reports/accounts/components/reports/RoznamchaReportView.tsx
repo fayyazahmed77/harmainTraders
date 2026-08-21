@@ -83,7 +83,7 @@ export function RoznamchaReportView({ data }: RoznamchaReportViewProps) {
                 
                 {/* Embedded Header for Screen Reference */}
                 <div className="flex flex-col items-center mb-10 border-b border-border pb-6">
-                    <h2 className="text-xl font-display font-black text-text-primary tracking-wider uppercase">Harmain Traders</h2>
+                    <h2 className="text-xl font-display font-black text-text-primary tracking-wider uppercase">Haramain Traders</h2>
                     <h3 className="text-[10px] font-display font-bold text-text-muted uppercase tracking-[0.2em] mt-1">
                         Summary for the period ended {format(new Date(to_date), 'dd-MMM-yyyy')}
                     </h3>

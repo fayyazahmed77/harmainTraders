@@ -394,7 +394,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
 
     return (
         <div className="min-h-screen bg-surface-0 text-text-primary selection:bg-amber/30 selection:text-amber-bright flex flex-col pb-20 sm:pb-24 antialiased">
-            <Head title="Live Offers & Rates Catalog | Harmain Traders" />
+            <Head title="Live Offers & Rates Catalog | Haramain Traders" />
 
             {/* Site Header */}
             <SiteHeader 
@@ -816,7 +816,7 @@ function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, ac
                         </div>
                         <div className="grid text-left leading-tight">
                             <div className="flex items-center gap-1">
-                                <span className="font-display font-black text-base sm:text-xl tracking-tight text-text-primary">Harmain</span> 
+                                <span className="font-display font-black text-base sm:text-xl tracking-tight text-text-primary">Haramain</span> 
                                 <span className="font-display font-black text-amber text-base sm:text-xl tracking-tight">Traders</span>
                             </div>
                             <span className="text-[8px] sm:text-[10px] font-mono-jet uppercase tracking-[0.12em] text-text-muted leading-none">Wholesale Catalog</span>
@@ -1068,7 +1068,7 @@ function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, 
                                 </div>
                                 <div>
                                     <h3 className="font-display font-black text-base uppercase text-text-primary leading-tight">Account & Portal</h3>
-                                    <span className="text-[10px] font-mono-jet text-text-muted uppercase">Harmain Traders</span>
+                                    <span className="text-[10px] font-mono-jet text-text-muted uppercase">Haramain Traders</span>
                                 </div>
                             </div>
                             <button 
@@ -1143,7 +1143,7 @@ function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, 
 
                             {/* Section 3: Wholesale Info Badge */}
                             <div className="p-3 bg-amber/10 border border-amber/20 rounded-xl text-center space-y-1">
-                                <span className="font-mono-jet text-[10px] uppercase font-bold text-amber block">Harmain Traders · Wholesale</span>
+                                <span className="font-mono-jet text-[10px] uppercase font-bold text-amber block">Haramain Traders · Wholesale</span>
                                 <p className="text-[10px] text-text-muted">Live rates catalog & direct order booking system.</p>
                             </div>
                         </div>
@@ -1369,7 +1369,7 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
     const isGroupOffer = String((offerItem as any).offertype) === '1';
     const packingQty = toNum(item?.packing_size || item?.packing_qty || 1);
     const showCartonAndLoose = isGroupOffer && packingQty > 1;
-    const brandName = getItemBrandName(item) || 'Harmain Direct';
+    const brandName = getItemBrandName(item) || 'Haramain Direct';
 
     return (
         <motion.div 
@@ -1504,7 +1504,7 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
 
             <div className="flex-1 min-w-0">
                 <span className="text-[8px] sm:text-[10px] font-mono-jet uppercase text-text-muted font-bold truncate block">
-                    {getItemBrandName(item) || 'Harmain Direct'}
+                    {getItemBrandName(item) || 'Haramain Direct'}
                 </span>
                 <h6 className="font-display font-black text-xs sm:text-base uppercase text-text-primary truncate">
                     {item?.title}
@@ -1577,7 +1577,7 @@ function SiteFooter() {
     return (
         <footer className="bg-surface-1 border-t border-border py-6 px-4 mt-auto">
             <div className="max-w-[1800px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-3 text-[10px] sm:text-xs font-mono-jet text-text-muted text-center sm:text-left">
-                <p>© 2026 HARMAIN TRADERS · WHOLESALE & SUPPLY CHAIN</p>
+                <p>© 2026 HARAMAIN TRADERS · WHOLESALE & SUPPLY CHAIN</p>
                 <div className="flex items-center gap-1.5">
                     <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
                     <span>Powered by Aishtycoons</span>

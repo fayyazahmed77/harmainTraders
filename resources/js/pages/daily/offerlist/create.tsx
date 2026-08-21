@@ -633,10 +633,10 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                     </div>
                                     <Select value={selectedFirm} onValueChange={setSelectedFirm}>
                                         <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
-                                            <SelectValue placeholder="General / Harmain" />
+                                            <SelectValue placeholder="General / Haramain" />
                                         </SelectTrigger>
                                         <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                                            <SelectItem value="0" className="text-xs font-bold">Default (Harmain)</SelectItem>
+                                            <SelectItem value="0" className="text-xs font-bold">Default (Haramain)</SelectItem>
                                             {firms.map((firm) => (
                                                 <SelectItem key={firm.id} value={firm.id.toString()} className="text-xs font-bold">
                                                     {firm.name}

@@ -159,7 +159,7 @@ if ($logo_path) {
                 <img src="{{ $logo_base64 }}" class="logo-img">
             @endif
             <div class="brand-text">
-                <h1 class="company-name">HARMAIN <span>TRADERS</span></h1>
+                <h1 class="company-name">HARAMAIN <span>TRADERS</span></h1>
                 <p class="tagline">WHOLESALE <span class="text-indigo">&</span> SUPPLY CHAIN</p>
             </div>
         </div>
@@ -176,7 +176,7 @@ if ($logo_path) {
     </table>
 
     <div class="footer">
-        <p>Procurement Audit Statement - Confidential & Proprietary - Harmain Traders Reporting Engine</p>
+        <p>Procurement Audit Statement - Confidential & Proprietary - Haramain Traders Reporting Engine</p>
         <p>Level 4 Security Validation: Success - End of Report</p>
     </div>
     

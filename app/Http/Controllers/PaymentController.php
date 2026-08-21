@@ -531,18 +531,28 @@ class PaymentController extends Controller implements HasMiddleware
     private function getTotalReturns($bill, string $billType): float
     {
         if ($billType === 'App\Models\Sales') {
-            return (float) \App\Models\SalesReturn::where(function($q) use ($bill) {
+            $allocatedReturns = (float) \App\Models\SalesReturnAllocation::where('sale_id', $bill->id)->sum('amount');
+            $directReturns = (float) \App\Models\SalesReturn::where(function($q) use ($bill) {
                 $q->where('sale_id', $bill->id)
                   ->orWhere(function($sub) use ($bill) {
                       $sub->whereNull('sale_id')
                           ->where('original_invoice', $bill->invoice)
                           ->where('customer_id', $bill->customer_id);
                   });
+            })->whereNotIn('id', function($sub) {
+                $sub->select('sales_return_id')->from('sales_return_allocations');
             })->sum(DB::raw('net_total - extra_discount'));
+
+            return $allocatedReturns + $directReturns;
         } else {
-            return (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)
+            $allocatedReturns = (float) \App\Models\PurchaseReturnAllocation::where('purchase_id', $bill->id)->sum('amount');
+            $directReturns = (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)
                 ->where('supplier_id', $bill->supplier_id)
-                ->sum(DB::raw('net_total - extra_discount'));
+                ->whereNotIn('id', function($sub) {
+                    $sub->select('purchase_return_id')->from('purchase_return_allocations');
+                })->sum(DB::raw('net_total - extra_discount'));
+
+            return $allocatedReturns + $directReturns;
         }
     }
 

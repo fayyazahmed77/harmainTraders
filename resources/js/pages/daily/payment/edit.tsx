@@ -30,7 +30,7 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trash2, Plus, CalendarIcon, RotateCcw, FileText,
-  Search, ChevronRight, Hash, User as UserIcon,
+  Search, ChevronRight, ChevronLeft, Hash, User as UserIcon,
   ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
   Navigation, Clock, Terminal, Scale, Hash as HashIcon, ArrowUpRight, ArrowDownLeft,
   CreditCard, ClipboardList, Printer, Receipt, Layout, ArrowLeft
@@ -573,6 +573,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
   const [paymentMethod, setPaymentMethod] = useState<string>(payment.payment_method || "Cash");
   const [selectedFirmId, setSelectedFirmId] = useState<string>(payment.firm_id?.toString() ?? "0");
   const [selectedMessageId, setSelectedMessageId] = useState<string>(payment.message_line_id?.toString() ?? "0");
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(false);
   
   const initialIsMulti = Boolean(payment.is_multi || (payment.splits && payment.splits.length > 1));
   const [isMultiPayment, setIsMultiPayment] = useState<boolean>(initialIsMulti);
@@ -697,10 +698,24 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
         return;
       }
 
+      // F3 or Alt+P: Toggle Right Panel
+      if (e.key === "F3" || (e.altKey && (e.key === "p" || e.key === "P"))) {
+        e.preventDefault();
+        setShowRightSidebar(prev => !prev);
+        return;
+      }
+
       // F4 or Alt+M: Toggle Multi Pay Switch
       if (e.key === "F4" || (e.altKey && (e.key === "m" || e.key === "M"))) {
         e.preventDefault();
         setIsMultiPayment(prev => !prev);
+        return;
+      }
+
+      // F9: Submit / Update Payment
+      if (e.key === "F9") {
+        e.preventDefault();
+        handleUpdateRef.current();
         return;
       }
 
@@ -1145,6 +1160,11 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
       onFinish: () => setLoading(false)
     });
   };
+
+  const handleUpdateRef = useRef(handleUpdate);
+  useEffect(() => {
+    handleUpdateRef.current = handleUpdate;
+  }, [handleUpdate]);
 
   return (
     <SidebarProvider defaultOpen={false} style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
@@ -1707,11 +1727,27 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
           </div>
 
           {/* ── FINANCIAL HUD (Right Sidebar) ── */}
-          <div className="w-full md:w-[350px] space-y-1 md:space-y-1 flex flex-col md:overflow-hidden">
+          <AnimatePresence mode="wait">
+            {showRightSidebar && (
+              <motion.div
+                key="right-sidebar"
+                initial={{ x: 50, opacity: 0, width: 0 }}
+                animate={{ x: 0, opacity: 1, width: "350px" }}
+                exit={{ x: 50, opacity: 0, width: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                className="w-full md:w-[350px] space-y-1 md:space-y-1 flex flex-col md:overflow-visible flex-shrink-0 relative"
+              >
+                {/* Vertically Centered Collapse Button on Left Border */}
+                <button
+                  onClick={() => setShowRightSidebar(false)}
+                  className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-40 h-7 w-7 rounded-full bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 shadow-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 hover:border-orange-500 transition-all hover:scale-110 active:scale-95 group cursor-pointer"
+                  title="Hide Right Panel (F3 / Alt+P)"
+                >
+                  <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </button>
 
-            {/* Executive Summary Card */}
-            <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1 min-h-0 flex flex-col">
-              <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none flex-1 flex flex-col min-h-0`}>
+                {/* Executive Summary Card */}
+                <Card className={`p-5 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING} relative overflow-hidden shadow-2xl shadow-zinc-200/50 dark:shadow-none flex-1 flex flex-col min-h-0`}>
                 <div className={`absolute top-0 right-0 w-32 h-32 ${t.blob} rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none`} />
 
                 <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-1 relative z-10 flex-shrink-0">
@@ -1940,14 +1976,34 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                       <div className="flex items-center justify-center gap-2 relative z-10">
                         {loading ? <RotateCcw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                         {loading ? "SAVING..." : "UPDATE VOUCHER"}
+                        <kbd className="ml-1.5 px-1.5 py-0.5 text-[9px] font-mono font-bold text-white/90 bg-black/20 rounded border border-white/20">F9</kbd>
                       </div>
                     </Button>
                   </div>
                 </div>
               </Card>
             </motion.div>
-          </div>
-        </main>
+          )}
+        </AnimatePresence>
+      </main>
+
+        {/* ── TOGGLE BUTTON FOR RIGHT PANEL (When Right Panel is Closed) ── */}
+        <AnimatePresence>
+          {!showRightSidebar && (
+            <motion.button
+              key="right-sidebar-open-btn"
+              initial={{ scale: 0, opacity: 0, x: 20 }}
+              animate={{ scale: 1, opacity: 1, x: 0 }}
+              exit={{ scale: 0, opacity: 0, x: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              onClick={() => setShowRightSidebar(true)}
+              className="fixed right-3 top-1/2 -translate-y-1/2 z-40 h-8 w-8 rounded-full bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 shadow-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-500 hover:border-orange-500 transition-all hover:scale-110 active:scale-95 group cursor-pointer"
+              title="Open Right Panel (F3 / Alt+P)"
+            >
+              <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Invoice Item Detail Dialog */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

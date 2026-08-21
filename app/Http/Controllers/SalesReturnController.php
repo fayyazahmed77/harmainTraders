@@ -729,8 +729,20 @@ class SalesReturnController extends Controller implements HasMiddleware
 
         $sale = $saleId ? Sales::find($saleId) : Sales::where('invoice', $invoiceNo)->first();
         if ($sale) {
-            // Calculate Total Returns for this invoice from allocations
-            $totalReturns = \App\Models\SalesReturnAllocation::where('sale_id', $sale->id)->sum('amount');
+            // Calculate Total Returns for this invoice (both allocated and direct returns)
+            $allocatedReturns = (float) \App\Models\SalesReturnAllocation::where('sale_id', $sale->id)->sum('amount');
+            $directReturns = (float) SalesReturn::where(function($q) use ($sale) {
+                $q->where('sale_id', $sale->id)
+                  ->orWhere(function($sub) use ($sale) {
+                      $sub->whereNull('sale_id')
+                          ->where('original_invoice', $sale->invoice)
+                          ->where('customer_id', $sale->customer_id);
+                  });
+            })->whereNotIn('id', function($sub) {
+                $sub->select('sales_return_id')->from('sales_return_allocations');
+            })->sum(DB::raw('net_total - extra_discount'));
+
+            $totalReturns = $allocatedReturns + $directReturns;
 
             // Calculate Total Payments for this invoice
             $totalPayments = \App\Models\PaymentAllocation::where('bill_id', $sale->id)

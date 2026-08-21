@@ -163,7 +163,7 @@ const AnalyticsDialog = ({ isOpen, onClose, reportType, data }: AnalyticsDialogP
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
                             <div className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">
-                                Harmain Traders Analytics Engine v4.0 • Real-time Processing Active
+                                Haramain Traders Analytics Engine v4.0 • Real-time Processing Active
                             </div>
                         </div>
                     </motion.div>

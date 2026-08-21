@@ -18,7 +18,9 @@ import {
     ChevronRight,
     TrendingUp,
     MapPin,
-    Database
+    Database,
+    Info,
+    AlertTriangle
 } from "lucide-react"
 
 // Lazy-load SalesMap so Leaflet (which accesses window/document at import
@@ -153,6 +155,21 @@ export default function SalesMapReport({ provinces, cities }: PageProps) {
                         </div>
                     </div>
 
+                    {/* Informational Banner about Latitude & Longitude Setup */}
+                    <div className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/20 px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-300 font-medium">
+                        <div className="flex items-center gap-2">
+                            <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span>
+                                <strong>Geospatial Notice:</strong> Please ensure your setup locations (Provinces, Cities, Areas, Subareas) have valid <strong>Latitude & Longitude</strong> configured to accurately display map markers.
+                            </span>
+                        </div>
+                        {data.length > 0 && data.some(d => !d.latitude || !d.longitude) && (
+                            <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                {data.filter(d => !d.latitude || !d.longitude).length} location(s) missing lat/lng
+                            </span>
+                        )}
+                    </div>
+
                     <div className="flex flex-1 overflow-hidden relative">
                         {/* Left Sidebar - Sales List */}
                         <div className="w-80 border-r bg-white dark:bg-gray-900 flex flex-col shadow-2xl z-10">
@@ -193,10 +210,17 @@ export default function SalesMapReport({ provinces, cities }: PageProps) {
                                                     <Badge variant="outline" className="text-[9px] font-black h-4 px-1.5 uppercase tracking-tighter bg-gray-100 dark:bg-gray-800 border-none">
                                                         {item.sales_count} Transactions
                                                     </Badge>
-                                                    <div className="flex items-center gap-1 text-emerald-600 text-[10px] font-bold">
-                                                        <TrendingUp className="w-3 h-3" />
-                                                        Active
-                                                    </div>
+                                                    {item.latitude && item.longitude ? (
+                                                        <div className="flex items-center gap-1 text-emerald-600 text-[10px] font-bold">
+                                                            <TrendingUp className="w-3 h-3" />
+                                                            Active
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[10px] font-bold" title="Missing Latitude / Longitude in Setup">
+                                                            <AlertTriangle className="w-3 h-3" />
+                                                            No Lat/Lng
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="text-right">

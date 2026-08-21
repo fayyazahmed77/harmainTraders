@@ -32,7 +32,7 @@ class SlaBreachMail extends Mailable implements ShouldQueue
      */
     public function build()
     {
-        return $this->subject("SLA Breach Alert: Access Request Pending > 24 Hours - Harmain Traders")
+        return $this->subject("SLA Breach Alert: Access Request Pending > 24 Hours - Haramain Traders")
                     ->view('emails.sla-breach');
     }
 }

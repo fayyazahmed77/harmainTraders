@@ -32,7 +32,7 @@ class GuestOrderPlacedMail extends Mailable implements ShouldQueue
      */
     public function build()
     {
-        return $this->subject("Order #{$this->sale->invoice} Received - Harmain Traders")
+        return $this->subject("Order #{$this->sale->invoice} Received - Haramain Traders")
                     ->view('emails.guest-order-placed');
     }
 }

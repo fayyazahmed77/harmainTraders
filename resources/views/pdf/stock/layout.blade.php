@@ -17,7 +17,7 @@
     <body>
     <table>
         <tr>
-            <td colspan="{{ $colspan ?? 10 }}" style="font-size: 18pt; font-weight: bold; color: #059669;">Harmain Traders</td>
+            <td colspan="{{ $colspan ?? 10 }}" style="font-size: 18pt; font-weight: bold; color: #059669;">Haramain Traders</td>
         </tr>
         <tr>
             <td colspan="{{ $colspan ?? 10 }}" style="font-size: 14pt; font-weight: bold;">{{ $title }}</td>
@@ -36,7 +36,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Stock Report - Harmain Traders</title>
+    <title>Stock Report - Haramain Traders</title>
     <style>
         @page { margin: 20px; }
         body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #333; }
@@ -59,7 +59,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="company-name">Harmain Traders</div>
+        <div class="company-name">Haramain Traders</div>
         <div class="report-title">{{ $title }}</div>
         <div class="criteria">
             VALUATION: {{ strtoupper(str_replace('_', ' ', $valuation)) }} | 

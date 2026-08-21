@@ -51,10 +51,10 @@ export default function Login({ status }: { status?: string }) {
                 </div>
                 <div className="space-y-1 sm:space-y-1.5">
                     <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-orange-400">
-                        Welcome to Harmain Traders
+                        Welcome to Haramain Traders
                     </h1>
                     <p className="text-xs sm:text-sm lg:text-base text-slate-500 font-medium">
-                        Harmain Traders Wholesale & Supply Chain.
+                        Haramain Traders Wholesale & Supply Chain.
                     </p>
                 </div>
             </div>

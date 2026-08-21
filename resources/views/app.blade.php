@@ -31,7 +31,7 @@
         }
     </style>
 
-    <title inertia>{{ config('app.name', 'Harmain Traders') }}</title>
+    <title inertia>{{ config('app.name', 'Haramain Traders') }}</title>
 
     <link rel="icon" href="/storage/img/favicon.png" type="image/png">
     <link rel="apple-touch-icon" href="/storage/img/favicon.png">

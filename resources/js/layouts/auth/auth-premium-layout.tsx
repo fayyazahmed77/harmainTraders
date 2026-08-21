@@ -95,7 +95,7 @@ export default function AuthPremiumLayout({ children, title, description }: Prop
                         <div className="space-y-2 lg:space-y-4">
                             <h2 className="text-2xl lg:text-3xl xl:text-4xl font-extrabold leading-[1.1] text-white tracking-tight drop-shadow-2xl">
                                 <span className="bg-gradient-to-r from-orange-300 via-orange-100 to-orange-300 bg-clip-text text-transparent text-xl lg:text-2xl xl:text-[2rem]">
-                                    Harmain Traders Wholesale & Supply Chain.
+                                    Haramain Traders Wholesale & Supply Chain.
                                 </span>
                             </h2>
                         </div>

@@ -32,6 +32,7 @@ use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ClearingChequeController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\PurchaseReportsController;
@@ -409,6 +410,8 @@ Route::middleware(['auth'])->group(function () {
 
     //--------------------------------------------Reports------------------------------------------------
     Route::prefix('/reports')->group(function () {
+        Route::get('/analytics', [AnalyticsController::class, 'index'])->name('reports.analytics.index');
+        Route::get('/analytics/data', [AnalyticsController::class, 'data'])->name('reports.analytics.data');
         Route::get('/', [ReportsController::class, 'index'])->name('reports.index');
         Route::get('/accounts/ledger', [ReportsController::class, 'accountLedger'])->name('reports.accounts.ledger');
         Route::get('/accounts/ledger/export/pdf', [ReportsController::class, 'accountLedgerExportPdf'])->name('reports.accounts.ledger.export.pdf');

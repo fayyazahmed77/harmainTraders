@@ -227,6 +227,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       permissions: ['view reports', 'view profit reports'],
       items: [
         {
+          title: "Analytics & Intelligence",
+          url: "/reports/analytics",
+          permissions: ['view reports'],
+        },
+        {
           title: "Accounts Report",
           url: "/reports/accounts/ledger",
           permissions: ['view reports'],

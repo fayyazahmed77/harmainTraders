@@ -146,7 +146,7 @@ class ProfitReportExport implements FromCollection, WithHeadings, WithMapping, S
 
                 // 1. BRANDED HEADER
                 $sheet->mergeCells("A1:{$lastCol}1");
-                $sheet->setCellValue('A1', 'HARMAIN TRADERS');
+                $sheet->setCellValue('A1', 'HARAMAIN TRADERS');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => ['bold' => true, 'size' => 22, 'color' => ['rgb' => '1e293b']],
                     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],

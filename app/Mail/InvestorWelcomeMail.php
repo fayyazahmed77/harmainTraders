@@ -34,7 +34,7 @@ class InvestorWelcomeMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Welcome to Harmain Traders - Investor Portal Access',
+            subject: 'Welcome to Haramain Traders - Investor Portal Access',
         );
     }
 

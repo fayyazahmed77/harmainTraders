@@ -37,7 +37,7 @@ export default function CounterDashboard({
 }: CounterDashboardProps) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Counter Dashboard', href: '/salesman/dashboard' }]}>
-            <Head title="Counter Dashboard - Harmain Traders" />
+            <Head title="Counter Dashboard - Haramain Traders" />
             <div className="flex flex-1 flex-col p-4 md:p-6 gap-3 bg-gray-50 dark:bg-gray-950 text-foreground font-sans">
                 <div className="mx-auto w-full flex flex-col gap-3">
                     

@@ -32,7 +32,7 @@ class LowStockAlertMail extends Mailable implements ShouldQueue
      */
     public function build()
     {
-        return $this->subject("Low Stock Alert: {$this->item->title} - Harmain Traders")
+        return $this->subject("Low Stock Alert: {$this->item->title} - Haramain Traders")
                     ->view('emails.low-stock-alert');
     }
 }

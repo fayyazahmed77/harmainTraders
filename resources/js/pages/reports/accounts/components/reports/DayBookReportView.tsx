@@ -387,13 +387,13 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
 
                                                 <TableRow className={`border-b-2 border-border/20 ${isZero ? 'opacity-50' : ''}`}>
                                                     <TableCell className="text-text-secondary pl-8 text-xs font-bold uppercase">Closing</TableCell>
-                                                    <TableCell className="text-right font-black text-text-primary border-t border-border/20">
-                                                        {formatCurrency(bank.closing)}
+                                                    <TableCell className={`text-right font-black border-t border-border/20 ${bank.closing < 0 ? 'text-rose-600' : 'text-text-primary'}`}>
+                                                        {formatCurrency(bank.closing, true)}
                                                     </TableCell>
 
                                                     <TableCell className="w-24 text-right pr-4">
                                                         {delta > 0 && <span className="text-[9px] text-emerald-600 flex items-center justify-end gap-1 font-bold">▲ {formatCurrency(delta)}</span>}
-                                                        {delta < 0 && <span className="text-[9px] text-rose-600 flex items-center justify-end gap-1 font-bold">▼ {formatCurrency(delta)}</span>}
+                                                        {delta < 0 && <span className="text-[9px] text-rose-600 flex items-center justify-end gap-1 font-bold">▼ {formatCurrency(Math.abs(delta))}</span>}
                                                         {delta === 0 && <span className="text-[9px] text-text-muted/50 flex items-center justify-end gap-1 font-bold"><Minus className="h-2 w-2" /></span>}
                                                     </TableCell>
                                                 </TableRow>

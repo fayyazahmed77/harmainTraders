@@ -30,7 +30,7 @@ class TwoFactorAuthMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your Login Verification Code - Harmain Traders',
+            subject: 'Your Login Verification Code - Haramain Traders',
         );
     }
 

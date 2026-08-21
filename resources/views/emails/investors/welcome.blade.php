@@ -1,7 +1,7 @@
 @extends('emails.layouts.master')
 
 @section('content')
-    <h2 style="color: #111827; margin-top: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Welcome to Harmain Traders</h2>
+    <h2 style="color: #111827; margin-top: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Welcome to Haramain Traders</h2>
     <p style="color: #4B5563; line-height: 1.6; font-size: 15px; margin-top: 8px;">
         Hello {{ $user->name }},<br>
         We are pleased to inform you that your Investor Portal account has been successfully created. You can now track your investments, monitor profits, and manage financial requests directly from our secure platform.

@@ -517,7 +517,7 @@ export default function ChequeGenerationPage() {
 
                                   {/* Bottom MICR Strip */}
                                   <div className="mt-3 pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-800 text-center font-mono text-[11px] font-black tracking-[0.25em] text-zinc-500 dark:text-zinc-400 select-none bg-zinc-100/50 dark:bg-zinc-900/50 -mx-5 -mb-5 py-1.5">
-                                    ⑈ {form.prefix || ''}{num} ⑈ {form.bank_id ? form.bank_id.padStart(3, '0') : '000'} ⑈ HARMAIN-ERP ⑈
+                                    ⑈ {form.prefix || ''}{num} ⑈ {form.bank_id ? form.bank_id.padStart(3, '0') : '000'} ⑈ HARAMAIN-ERP ⑈
                                   </div>
                                 </motion.div>
                               );

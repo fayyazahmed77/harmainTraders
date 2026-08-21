@@ -452,7 +452,14 @@ export function ParameterForm({
                                                 onValueChange={(v: string) => updateParam('companyId', v)}
                                                 options={[
                                                     { value: 'ALL', label: 'ALL Company' },
-                                                    ...(companies || []).map(c => ({ value: c.id.toString(), label: c.title }))
+                                                    ...(companies || [])
+                                                        .filter((c: any) => {
+                                                            if (c.type_name) return c.type_name.toLowerCase().includes('company');
+                                                            if (c.account_type?.name) return c.account_type.name.toLowerCase().includes('company');
+                                                            if (c.type !== undefined && c.type !== null) return Number(c.type) === 5;
+                                                            return true;
+                                                        })
+                                                        .map(c => ({ value: c.id.toString(), label: c.title }))
                                                 ]}
                                                 placeholder="Select Company"
                                                 emptyMessage="No company found"

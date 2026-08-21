@@ -39,7 +39,7 @@ class AccessRequestStatusMail extends Mailable implements ShouldQueue
             default => ucfirst($this->accessRequest->status),
         };
 
-        return $this->subject("Access Request {$statusLabel} - Harmain Traders")
+        return $this->subject("Access Request {$statusLabel} - Haramain Traders")
                     ->view('emails.access-request-status');
     }
 }

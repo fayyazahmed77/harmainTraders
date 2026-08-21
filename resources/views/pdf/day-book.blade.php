@@ -26,7 +26,7 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Day Book Summary - Harmain Traders</title>
+    <title>Day Book Summary - Haramain Traders</title>
     <style>
         /* ─── Page Setup ─────────────────────────────────────────── */
         @page {
@@ -194,7 +194,7 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
                 <img src="{{ $logo_base64 }}" width="30" height="30" style="vertical-align: middle; margin-right: 10px;">
             @endif
             <div class="logo-section">
-                <div class="brand-name">Harmain <span style="color:#f97316">Traders</span></div>
+                <div class="brand-name">Haramain <span style="color:#f97316">Traders</span></div>
                 <div class="brand-tagline">Premium Wholesale Distribution</div>
             </div>
         </div>
@@ -425,11 +425,11 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
             <tr>
                 <td class="text-left" style="border: none;">GENERATE AT: {{ date('l, F d, Y g:i A') }}</td>
                 <td class="text-center" style="border: none; font-weight: bold; color: #475569;">PRIVATE &amp; CONFIDENTIAL SUMMARY</td>
-                <td class="text-right" style="border: none;">HARMAIN PLATFORM v2.0</td>
+                <td class="text-right" style="border: none;">HARAMAIN PLATFORM v2.0</td>
             </tr>
             <tr>
                 <td colspan="3" class="text-center" style="border: none; padding-top: 3px; opacity: 0.6;">
-                    SYSTEM USER: {{ strtoupper(Auth::user()->name ?? 'AUTHORIZED ADMIN') }} | HARMAIN TRADERS DISTRIBUTION NETWORK
+                    SYSTEM USER: {{ strtoupper(Auth::user()->name ?? 'AUTHORIZED ADMIN') }} | HARAMAIN TRADERS DISTRIBUTION NETWORK
                 </td>
             </tr>
         </table>
