@@ -32,9 +32,12 @@ import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem, type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Menu, Search, Keyboard } from 'lucide-react';
 import AppLogo from './app-logo';
 import AppLogoIcon from './app-logo-icon';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import { CommandCenterModal } from '@/components/command/CommandCenterModal';
+import { ShortcutsHelpModal } from '@/components/command/ShortcutsHelpModal';
 
 const mainNavItems: NavItem[] = [
     {
@@ -68,6 +71,13 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
     const page = usePage<SharedData>();
     const { auth } = page.props;
     const getInitials = useInitials();
+    const {
+        isCommandOpen,
+        setIsCommandOpen,
+        isShortcutsHelpOpen,
+        setIsShortcutsHelpOpen,
+        isMac,
+    } = useKeyboardShortcuts();
     return (
         <>
             <div className="border-b border-sidebar-border/80">
@@ -186,13 +196,26 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
 
                     <div className="ml-auto flex items-center space-x-2">
                         <div className="relative flex items-center space-x-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="group h-9 w-9 cursor-pointer"
+                            <button
+                                type="button"
+                                onClick={() => setIsCommandOpen(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-900/80 text-xs text-neutral-400 dark:text-neutral-500 hover:border-orange-500/50 hover:bg-white dark:hover:bg-neutral-800/90 transition-all duration-200 shadow-2xs group cursor-pointer"
                             >
-                                <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                            </Button>
+                                <Search className="w-3.5 h-3.5 text-neutral-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                <span className="hidden sm:inline font-medium">Search pages...</span>
+                                <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shrink-0">
+                                    {isMac ? '⌘K' : 'Ctrl K'}
+                                </kbd>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsShortcutsHelpOpen(true)}
+                                title="Keyboard Shortcuts (?)"
+                                className="p-2 rounded-xl text-neutral-500 hover:text-orange-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer relative group"
+                            >
+                                <Keyboard className="w-4 h-4" />
+                                <span className="sr-only">Keyboard Shortcuts</span>
+                            </button>
                             <div className="hidden lg:flex">
                                 {rightNavItems.map((item) => (
                                     <TooltipProvider
@@ -257,6 +280,16 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                     </div>
                 </div>
             )}
+            <CommandCenterModal
+                open={isCommandOpen}
+                onOpenChange={setIsCommandOpen}
+                isMac={isMac}
+            />
+            <ShortcutsHelpModal
+                open={isShortcutsHelpOpen}
+                onOpenChange={setIsShortcutsHelpOpen}
+                isMac={isMac}
+            />
         </>
     );
 }

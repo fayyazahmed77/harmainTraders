@@ -117,28 +117,36 @@ class PurchaseController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $items = Items::with(['lastPurchaseItem.purchase.supplier'])->get()->map(function ($item) {
-            $lastP = $item->lastPurchaseItem;
-            if ($lastP) {
-                $item->last_purchase_rate = (float) $lastP->trade_price;
-                $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
-                $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
-                $item->last_purchase_qty_full = (float) $lastP->qty_carton;
-                $item->last_purchase_qty_pcs = (float) $lastP->qty_pcs;
-                $item->last_purchase_total = (float) $lastP->subtotal;
-            }
-            return $item;
-        });
+        $items = Items::select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
+            ->with(['lastPurchaseItem.purchase.supplier' => function($q) {
+                $q->select('id', 'title');
+            }])
+            ->get()
+            ->map(function ($item) {
+                $lastP = $item->lastPurchaseItem;
+                if ($lastP) {
+                    $item->last_purchase_rate = (float) $lastP->trade_price;
+                    $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
+                    $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
+                    $item->last_purchase_qty_full = (float) $lastP->qty_carton;
+                    $item->last_purchase_qty_pcs = (float) $lastP->qty_pcs;
+                    $item->last_purchase_total = (float) $lastP->subtotal;
+                }
+                return $item;
+            });
+
         $accounts = Account::active()
-            ->with(['accountType', 'accountCategory'])
+            ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id')
+            ->with(['accountType:id,name', 'accountCategory:id,name'])
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Supplier']);
             })
             ->get();
-        $salemans = Saleman::get();
+
+        $salemans = Saleman::select('id', 'name', 'code')->get();
 
         // Calculate Next Invoice Number
-        $lastPurchase = Purchase::latest()->first();
+        $lastPurchase = Purchase::select('id', 'invoice')->latest()->first();
         $nextInvoiceNo = 'PUR-000002';
 
         if ($lastPurchase && preg_match('/PUR-(\d+)/', $lastPurchase->invoice, $matches)) {
@@ -152,9 +160,12 @@ class PurchaseController extends Controller implements HasMiddleware
 
         $firms = Firm::select('id', 'name', 'defult')->get();
 
-        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-        })->get();
+        $paymentAccounts = Account::active()
+            ->select('id', 'title', 'type', 'code')
+            ->with('accountType:id,name')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
+            })->get();
 
         $customerCheques = Payment::where('type', 'RECEIPT')
             ->where('payment_method', 'Cheque')

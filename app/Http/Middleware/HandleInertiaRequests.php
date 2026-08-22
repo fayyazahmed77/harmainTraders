@@ -49,8 +49,20 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return null;
                     return $user->loadMissing('shift:id,name,start_time,end_time,break_duration_minutes,overtime_limit_minutes,color');
                 },
-                'permissions' => $request->user()?->getAllPermissions()?->pluck('name'),
-                'roles' => $request->user()?->getRoleNames(),
+                'permissions' => function() use ($request) {
+                    $user = $request->user();
+                    if (!$user) return [];
+                    return \Illuminate\Support\Facades\Cache::remember('user_perms_' . $user->id, 300, function() use ($user) {
+                        return $user->getAllPermissions()->pluck('name');
+                    });
+                },
+                'roles' => function() use ($request) {
+                    $user = $request->user();
+                    if (!$user) return [];
+                    return \Illuminate\Support\Facades\Cache::remember('user_roles_' . $user->id, 300, function() use ($user) {
+                        return $user->getRoleNames();
+                    });
+                },
             ],
             'ziggy' => fn(): array => [
                 ...(new Ziggy)->toArray(),

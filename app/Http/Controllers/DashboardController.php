@@ -102,17 +102,28 @@ class DashboardController extends Controller
         $heatmapData = [];
         $daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+        $categoryIds = $categories->pluck('id')->toArray();
+        $countsMap = [];
+
+        if (count($categoryIds) > 0) {
+            $countsRaw = DB::table('sales_items')
+                ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
+                ->join('items', 'sales_items.item_id', '=', 'items.id')
+                ->whereIn('items.category', $categoryIds)
+                ->where('sales.date', '>=', $now->copy()->subDays(30))
+                ->select('items.category as cat_id', DB::raw("DATE_FORMAT(sales.date, '%a') as day_name"), DB::raw('COUNT(*) as total_count'))
+                ->groupBy('items.category', 'day_name')
+                ->get();
+
+            foreach ($countsRaw as $row) {
+                $countsMap[$row->cat_id][$row->day_name] = (int)$row->total_count;
+            }
+        }
+
         foreach ($categories as $cat) {
             $values = [];
             foreach ($daysOfWeek as $day) {
-                $count = DB::table('sales_items')
-                    ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
-                    ->join('items', 'sales_items.item_id', '=', 'items.id')
-                    ->where('items.category', $cat->id)
-                    ->where(DB::raw("DATE_FORMAT(sales.date, '%a')"), $day)
-                    ->where('sales.date', '>=', $now->copy()->subDays(30)) // Last 30 days for better distribution
-                    ->count();
-                $values[] = $count;
+                $values[] = $countsMap[$cat->id][$day] ?? 0;
             }
             // Normalize values for heatmap (0 to 1)
             $max = count($values) > 0 ? max($values) : 1;
@@ -238,15 +249,31 @@ class DashboardController extends Controller
         $salesRecoveries = [];
 
         // Daily (Last 7 Days)
+        $sevenDaysAgo = Carbon::today()->subDays(6)->startOfDay();
+
+        $dailySalesGrouped = Sales::where('date', '>=', $sevenDaysAgo)
+            ->select(DB::raw('DATE(date) as sale_date'), DB::raw('SUM(net_total) as total_sales'))
+            ->groupBy('sale_date')
+            ->pluck('total_sales', 'sale_date');
+
+        $dailyRecoveriesGrouped = Payment::where('date', '>=', $sevenDaysAgo)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+            })
+            ->select(DB::raw('DATE(date) as pay_date'), DB::raw('SUM(amount) as total_rec'))
+            ->groupBy('pay_date')
+            ->pluck('total_rec', 'pay_date');
+
         $days = collect(range(6, 0))->map(fn($i) => Carbon::today()->subDays($i));
-        $salesRecoveries['daily'] = $days->map(fn($d) => [
-            'label' => $d->format('D'),
-            'sales' => (float)Sales::whereDate('date', $d)->sum('net_total'),
-            'recoveries' => (float)Payment::whereDate('date', $d)->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-                })->sum('amount'),
-        ]);
+        $salesRecoveries['daily'] = $days->map(function($d) use ($dailySalesGrouped, $dailyRecoveriesGrouped) {
+            $dateStr = $d->format('Y-m-d');
+            return [
+                'label' => $d->format('D'),
+                'sales' => (float)($dailySalesGrouped[$dateStr] ?? 0),
+                'recoveries' => (float)($dailyRecoveriesGrouped[$dateStr] ?? 0),
+            ];
+        });
 
         // Weekly (Last 4 Weeks)
         $weeks = collect(range(3, 0))->map(fn($i) => [

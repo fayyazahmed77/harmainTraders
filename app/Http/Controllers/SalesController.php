@@ -106,14 +106,20 @@ class SalesController extends Controller implements HasMiddleware
     public function create()
     {
         $accounts = Account::active()
-            ->with('accountType')
+            ->select('id', 'code', 'title', 'type', 'city_id', 'area_id', 'saleman_id')
+            ->with('accountType:id,name')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Customers']);
             })
             ->get();
-        $salemans = Saleman::get();
-        // Load all items (including out of stock)
-        $items = Items::with('lastPurchaseItem.purchase.supplier')
+
+        $salemans = Saleman::select('id', 'name', 'code', 'commission_percentage')->get();
+
+        // Load items with lightweight column selection
+        $items = Items::select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
+            ->with(['lastPurchaseItem.purchase.supplier' => function($q) {
+                $q->select('id', 'title');
+            }])
             ->get()
             ->map(function ($item) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
@@ -126,10 +132,7 @@ class SalesController extends Controller implements HasMiddleware
                 return $item;
             });
 
-        // Invoice number is generated server-side at save time inside a DB transaction.
-        // This preview is shown as a read-only badge on the frontend — the actual number
-        // is locked and assigned in store() to prevent race conditions.
-        $lastSale = Sales::orderByDesc('id')->first();
+        $lastSale = Sales::select('id', 'invoice')->orderByDesc('id')->first();
         $nextInvoiceNo = 'SLS-000001';
 
         if ($lastSale && preg_match('/SLS-(\d+)/', $lastSale->invoice, $matches)) {
@@ -137,15 +140,16 @@ class SalesController extends Controller implements HasMiddleware
             $nextInvoiceNo = 'SLS-' . str_pad($number + 1, 6, '0', STR_PAD_LEFT);
         }
 
-        // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
-        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-        })->get();
+        // Fetch Payment Accounts
+        $paymentAccounts = Account::active()
+            ->select('id', 'title', 'type', 'code')
+            ->with('accountType:id,name')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
+            })->get();
 
-        // Fetch Firms for invoice branding
         $firms = Firm::select('id', 'name', 'defult')->get();
 
-        // Fetch Message Lines (Category: Sales, Status: active)
         $messageLines = MessageLine::whereJsonContains('category', 'Sales')
             ->where('status', 'active')
             ->get();
