@@ -27,10 +27,18 @@ export function StockAccountSelectionDialog({
 }: StockAccountSelectionDialogProps) {
     const [search, setSearch] = useState("");
 
-    const filteredAccounts = accounts.filter(acc => 
-        acc.title.toLowerCase().includes(search.toLowerCase()) ||
-        acc.id.toString().includes(search)
-    );
+    const filteredAccounts = accounts
+        .filter(acc => {
+            const typeName = (acc.type_name || '').toLowerCase();
+            const isCompany = typeName.includes('company') || Number(acc.type) === 5;
+            const isSpecial = ['cheque', 'bank', 'cash', 'expense', 'capital', 'drawing', 'taxation', 'loan', 'asset'].some(k => typeName.includes(k));
+            if (isCompany || isSpecial) return false;
+            return true;
+        })
+        .filter(acc => 
+            acc.title.toLowerCase().includes(search.toLowerCase()) ||
+            acc.id.toString().includes(search)
+        );
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,6 +83,9 @@ export function StockAccountSelectionDialog({
 
                     {filteredAccounts.map((acc) => {
                         const isActive = selectedAccountId === acc.id.toString();
+                        const isCustomer = acc.type === 3 || (acc.type_name || '').toLowerCase().includes('cust');
+                        const codeDisplay = acc.code || acc.id;
+
                         return (
                             <button
                                 key={acc.id}
@@ -83,37 +94,47 @@ export function StockAccountSelectionDialog({
                                     onOpenChange(false);
                                 }}
                                 className={cn(
-                                    "w-full flex items-center gap-4 p-3 rounded-sm transition-all text-left border mb-1 group",
+                                    "w-full flex items-center justify-between gap-3 p-3 rounded-md transition-all text-left border mb-1.5 group cursor-pointer",
                                     isActive 
-                                        ? "bg-emerald-500/10 border-emerald-500/50" 
-                                        : "bg-surface-1 border-transparent hover:border-emerald-500/30"
+                                        ? "bg-emerald-500/10 border-emerald-500/50 shadow-sm" 
+                                        : "bg-surface-1/90 border-border/30 hover:border-emerald-500/30 hover:bg-surface-0/60"
                                 )}
                             >
-                                <div className={cn(
-                                    "h-8 w-8 rounded-sm flex items-center justify-center border transition-all",
-                                    isActive ? "bg-emerald-600 border-emerald-400 text-white" : "bg-surface-1 border-border/10 text-text-muted group-hover:text-emerald-600"
-                                )}>
-                                    <User className="h-4 w-4" />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-black uppercase text-text-primary leading-tight">{acc.title}</span>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[9px] font-bold text-text-muted opacity-60">CODE: {acc.id}</span>
-                                        {acc.type_name && (
-                                            <>
-                                                <span className="text-[9px] text-text-muted opacity-40">•</span>
-                                                <span className={cn(
-                                                    "text-[8px] font-black uppercase px-1.5 py-0.5 rounded-sm tracking-widest leading-none",
-                                                    acc.type === 3 && "bg-blue-500/10 text-blue-500 border border-blue-500/20",
-                                                    acc.type === 6 && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                )}>
-                                                    {acc.type_name}
-                                                </span>
-                                            </>
-                                        )}
+                                {/* Left Side: Icon + Code + Name */}
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {/* Icon */}
+                                    <div className={cn(
+                                        "h-8 w-8 shrink-0 rounded-md flex items-center justify-center border transition-all",
+                                        isActive ? "bg-emerald-600 border-emerald-400 text-white" : "bg-surface-0 border-border/20 text-text-muted group-hover:text-emerald-600 group-hover:border-emerald-500/30"
+                                    )}>
+                                        <User className="h-4 w-4" />
                                     </div>
+
+                                    {/* Code Badge */}
+                                    <span className="shrink-0 text-[9px] font-black font-mono text-text-muted bg-surface-0/90 px-2 py-1 rounded border border-border/40 tracking-wider">
+                                        CODE: {codeDisplay}
+                                    </span>
+
+                                    {/* Name / Title */}
+                                    <span className="text-[12px] font-black text-text-primary uppercase leading-tight truncate">
+                                        {acc.title}
+                                    </span>
                                 </div>
-                                {isActive && <Check className="h-4 w-4 text-emerald-600 ml-auto" />}
+
+                                {/* Right Side: Type Badge + Checkmark */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {acc.type_name && (
+                                        <span className={cn(
+                                            "text-[9px] font-black uppercase px-2.5 py-1 rounded border tracking-widest leading-none",
+                                            isCustomer
+                                                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                                : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        )}>
+                                            {acc.type_name}
+                                        </span>
+                                    )}
+                                    {isActive && <Check className="h-4 w-4 text-emerald-600 shrink-0" />}
+                                </div>
                             </button>
                         );
                     })}

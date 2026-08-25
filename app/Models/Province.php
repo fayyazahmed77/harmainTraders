@@ -23,4 +23,14 @@ class Province extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class, 'country_id');
+    }
+
+    public function cities()
+    {
+        return $this->hasMany(City::class, 'province_id');
+    }
 }

@@ -77,14 +77,17 @@ interface DayBookReportViewProps {
 export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, criteria }) => {
     if (!data) return null;
 
-    const formatCurrency = (amount: number, accountingStyle = false) => {
+    const formatCurrency = (amount: number, accountingStyle = true) => {
+        if (amount === undefined || amount === null || isNaN(amount)) return '0.00';
         const abs = Math.abs(amount);
         const formatted = new Intl.NumberFormat('en-PK', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         }).format(abs);
         
-        if (accountingStyle && amount < 0) return `(${formatted})`;
+        if (amount < 0) {
+            return accountingStyle ? `(${formatted})` : `-${formatted}`;
+        }
         return formatted;
     };
 
@@ -99,7 +102,7 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                     <div key={idx} className="flex justify-between items-center text-sm py-1 border-b border-border/10 last:border-0">
                         <span className="text-text-muted font-medium">{item.label} :</span>
                         <span className={`font-bold ${item.isBold ? 'text-text-primary' : 'text-text-secondary'} ${item.className || ''}`}>
-                            {item.isCurrency ? formatCurrency(item.value, item.accounting) : item.value}
+                            {item.isCurrency ? formatCurrency(item.value, item.accounting ?? true) : item.value}
                         </span>
                     </div>
                 ))}
@@ -371,7 +374,7 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                                                 </TableRow>
                                                 <TableRow className={isZero ? 'opacity-50' : ''}>
                                                     <TableCell className="text-text-muted/60 pl-8 text-xs font-medium uppercase min-w-[150px]">Opening</TableCell>
-                                                    <TableCell className="text-right font-bold text-text-secondary">{formatCurrency(bank.opening)}</TableCell>
+                                                    <TableCell className={`text-right font-bold ${bank.opening < 0 ? 'text-rose-600' : 'text-text-secondary'}`}>{formatCurrency(bank.opening, true)}</TableCell>
                                                     <TableCell />
                                                 </TableRow>
                                                 <TableRow className={isZero ? 'opacity-50' : ''}>
@@ -413,7 +416,7 @@ export const DayBookReportView: React.FC<DayBookReportViewProps> = ({ data, crit
                             <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                                     <span className="text-xs text-slate-400 uppercase font-semibold">Bank Opening</span>
-                                    <span className="font-bold text-slate-200">{formatCurrency(data.bank.summary.opening)}</span>
+                                    <span className={`font-bold ${data.bank.summary.opening < 0 ? 'text-rose-400' : 'text-slate-200'}`}>{formatCurrency(data.bank.summary.opening, true)}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                                     <span className="text-xs text-slate-400 uppercase font-semibold">Bank Receiving</span>

@@ -53,6 +53,10 @@ interface SalesReturn {
     discount_total: number;
     tax_total: number;
     net_total: number;
+    previous_balance?: number;
+    extra_discount?: number;
+    paid_amount?: number;
+    remaining_amount?: number;
     remarks?: string;
     customer: { id: number; title: string };
     salesman: { id: number; name: string } | null;
@@ -95,8 +99,15 @@ export default function View({ returnData }: Props) {
     const discTotal    = Number(returnData.discount_total || 0);
     const taxTotal     = Number(returnData.tax_total      || 0);
     const netTotal     = Number(returnData.net_total      || 0);
+    const extraDisc    = Number(returnData.extra_discount || 0);
+    const prevBal      = Number(returnData.previous_balance || 0);
+    const paidAmt      = Number(returnData.paid_amount    || 0);
     const totalCartons = returnData.items.reduce((a, c) => a + Number(c.qty_carton), 0);
     const totalPcs     = returnData.items.reduce((a, c) => a + Number(c.total_pcs),   0);
+
+    const netReturnAmount = netTotal - extraDisc;
+    const totalBal        = prevBal - netReturnAmount;
+    const netBal          = totalBal + paidAmt;
 
     return (
         <SidebarProvider>
@@ -305,34 +316,58 @@ export default function View({ returnData }: Props) {
 
                                     {/* Right */}
                                     <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
-                                        <div className="flex justify-between items-center">
-                                            <span>Gross Return Subtotal :-</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(grossTotal)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-black dark:text-zinc-100">
-                                            <span>Discount Reclaim :-</span>
-                                            <span className="font-mono font-bold">{fmt(discTotal)}</span>
-                                        </div>
-                                        {taxTotal > 0 && (
-                                            <div className="flex justify-between items-center text-black dark:text-zinc-100">
-                                                <span>Tax Adjustment (GST) :-</span>
-                                                <span className="font-mono font-bold">+{fmt(taxTotal)}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center">
-                                            <span>Total Cartons Returned :-</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">{totalCartons}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span>Total Units (Pcs) Returned :-</span>
-                                            <span className="font-mono text-zinc-800 dark:text-zinc-200">{totalPcs}</span>
-                                        </div>
-                                        <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
-                                        <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
-                                            <span>Net Credit Entry :</span>
-                                            <span className="font-mono text-black dark:text-zinc-100 text-base font-black">{fmt(netTotal)}</span>
-                                        </div>
-                                    </div>
+                                         <div className="flex justify-between items-center">
+                                             <span>Gross Return Subtotal :-</span>
+                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{fmt(grossTotal)}</span>
+                                         </div>
+                                         <div className="flex justify-between items-center text-black dark:text-zinc-100">
+                                             <span>Discount Reclaim :-</span>
+                                             <span className="font-mono font-bold">-{fmt(discTotal)}</span>
+                                         </div>
+                                         {taxTotal > 0 && (
+                                             <div className="flex justify-between items-center text-black dark:text-zinc-100">
+                                                 <span>Tax Adjustment (GST) :-</span>
+                                                 <span className="font-mono font-bold">+{fmt(taxTotal)}</span>
+                                             </div>
+                                         )}
+                                         <div className="flex justify-between items-center">
+                                             <span>Total Cartons Returned :-</span>
+                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{totalCartons}</span>
+                                         </div>
+                                         <div className="flex justify-between items-center">
+                                             <span>Total Units (Pcs) Returned :-</span>
+                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{totalPcs}</span>
+                                         </div>
+                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                         <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                             <span>Net Credit Entry :-</span>
+                                             <span className="font-mono text-black dark:text-zinc-100 font-black">{fmt(netTotal)}</span>
+                                         </div>
+                                         {extraDisc > 0 && (
+                                             <div className="flex justify-between items-center text-black dark:text-zinc-100">
+                                                 <span>Extra Discount :-</span>
+                                                 <span className="font-mono font-bold">-{fmt(extraDisc)}</span>
+                                             </div>
+                                         )}
+                                         <div className="flex justify-between items-center">
+                                             <span>Previous Balance :-</span>
+                                             <span className="font-mono font-bold text-black dark:text-zinc-100">
+                                                 {prevBal < 0 ? "-" : ""}{fmt(Math.abs(prevBal))}
+                                             </span>
+                                         </div>
+                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                         {paidAmt > 0 && (
+                                             <div className="flex justify-between items-center text-black dark:text-zinc-100 font-bold">
+                                                 <span>Cash Refunded :-</span>
+                                                 <span className="font-mono font-black">{fmt(paidAmt)}</span>
+                                             </div>
+                                         )}
+                                         <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                         <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                             <span>Net Balance :-</span>
+                                             <span className="font-mono text-black dark:text-zinc-100 text-base font-black">{fmt(netBal)}</span>
+                                         </div>
+                                     </div>
                                 </div>
                             </div>
                         </Card>

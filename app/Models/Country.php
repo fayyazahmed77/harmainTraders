@@ -19,7 +19,17 @@ class Country extends Model
     ];
 
     public function creator()
-{
-    return $this->belongsTo(User::class, 'created_by');
-}
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function provinces()
+    {
+        return $this->hasMany(Province::class, 'country_id');
+    }
+
+    public function states()
+    {
+        return $this->hasMany(Province::class, 'country_id');
+    }
 }

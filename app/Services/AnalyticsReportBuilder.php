@@ -31,6 +31,10 @@ class AnalyticsReportBuilder
             'customer_id' => ($params['customerId'] ?? 'ALL') === 'ALL' ? null : $params['customerId'],
             'supplier_id' => ($params['supplierId'] ?? 'ALL') === 'ALL' ? null : $params['supplierId'],
             'salesman_id' => ($params['salesmanId'] ?? 'ALL') === 'ALL' ? null : $params['salesmanId'],
+            'province_id' => ($params['provinceId'] ?? 'ALL') === 'ALL' ? null : $params['provinceId'],
+            'city_id' => ($params['cityId'] ?? 'ALL') === 'ALL' ? null : $params['cityId'],
+            'area_id' => ($params['areaId'] ?? 'ALL') === 'ALL' ? null : $params['areaId'],
+            'subarea_id' => ($params['subareaId'] ?? 'ALL') === 'ALL' ? null : $params['subareaId'],
         ];
 
         return match ($reportType) {
@@ -79,19 +83,23 @@ class AnalyticsReportBuilder
         $qtyGrowth = $prevQty > 0 ? (($currentQty - $prevQty) / $prevQty) * 100 : ($currentQty > 0 ? 100 : 0);
 
         // Top Customer
-        $topCustomerRow = DB::table('sales')
+        $topCustomerQuery = DB::table('sales')
             ->join('accounts', 'sales.customer_id', '=', 'accounts.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters($topCustomerQuery, null, $filters, true);
+        $topCustomerRow = $topCustomerQuery
             ->select('accounts.title', DB::raw('SUM(sales.net_total) as total'))
             ->groupBy('accounts.id', 'accounts.title')
             ->orderByDesc('total')
             ->first();
 
         // Top Product
-        $topProductRow = DB::table('sales_items')
+        $topProductQuery = DB::table('sales_items')
             ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
             ->join('items', 'sales_items.item_id', '=', 'items.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters(null, $topProductQuery, $filters);
+        $topProductRow = $topProductQuery
             ->select('items.title', DB::raw('SUM(sales_items.qty_carton) as total_qty'), DB::raw('SUM(sales_items.subtotal) as total_val'))
             ->groupBy('items.id', 'items.title')
             ->orderByDesc('total_val')
@@ -114,29 +122,32 @@ class AnalyticsReportBuilder
         ];
 
         // Sales Daily Trend
-        $trendRaw = DB::table('sales')
-            ->whereBetween('date', [$fromDate, $toDate])
+        $trendQuery = DB::table('sales')->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters($trendQuery, null, $filters);
+        $trendRaw = $trendQuery
             ->select(
-                'date',
-                DB::raw('SUM(net_total) as revenue'),
-                DB::raw('COUNT(id) as orders')
+                'sales.date',
+                DB::raw('SUM(sales.net_total) as revenue'),
+                DB::raw('COUNT(sales.id) as orders')
             )
-            ->groupBy('date')
-            ->orderBy('date', 'asc')
+            ->groupBy('sales.date')
+            ->orderBy('sales.date', 'asc')
             ->get();
 
         $trend = $trendRaw->map(fn($row) => [
-            'date' => Carbon::parse($row->date)->format('d MMM'),
+            'date' => Carbon::parse($row->date)->format('d M'),
             'full_date' => $row->date,
             'revenue' => (float) $row->revenue,
             'orders' => (int) $row->orders,
         ]);
 
         // Top 10 Products Horizontal Bar Chart Data
-        $topProducts = DB::table('sales_items')
+        $topProductsQuery = DB::table('sales_items')
             ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
             ->join('items', 'sales_items.item_id', '=', 'items.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters(null, $topProductsQuery, $filters);
+        $topProducts = $topProductsQuery
             ->select(
                 'items.id',
                 'items.code',
@@ -156,9 +167,11 @@ class AnalyticsReportBuilder
             ]);
 
         // Top 10 Customers Chart Data
-        $topCustomers = DB::table('sales')
+        $topCustomersQuery = DB::table('sales')
             ->join('accounts', 'sales.customer_id', '=', 'accounts.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters($topCustomersQuery, null, $filters, true);
+        $topCustomers = $topCustomersQuery
             ->select(
                 'accounts.id',
                 'accounts.title',
@@ -176,11 +189,13 @@ class AnalyticsReportBuilder
             ]);
 
         // Category Sales Contribution (Donut Chart)
-        $categoryBreakdown = DB::table('sales_items')
+        $categoryBreakdownQuery = DB::table('sales_items')
             ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
             ->join('items', 'sales_items.item_id', '=', 'items.id')
             ->leftJoin('item_categories', 'items.category', '=', 'item_categories.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters(null, $categoryBreakdownQuery, $filters);
+        $categoryBreakdown = $categoryBreakdownQuery
             ->select(
                 DB::raw('COALESCE(item_categories.name, "Uncategorized") as category_name'),
                 DB::raw('SUM(sales_items.subtotal) as amount')
@@ -194,12 +209,14 @@ class AnalyticsReportBuilder
             ]);
 
         // Table Data Summary (Items / Sales)
-        $tableData = DB::table('sales_items')
+        $tableDataQuery = DB::table('sales_items')
             ->join('sales', 'sales_items.sale_id', '=', 'sales.id')
             ->join('items', 'sales_items.item_id', '=', 'items.id')
             ->leftJoin('item_categories', 'items.category', '=', 'item_categories.id')
             ->leftJoin('accounts as company_acc', 'items.company', '=', 'company_acc.id')
-            ->whereBetween('sales.date', [$fromDate, $toDate])
+            ->whereBetween('sales.date', [$fromDate, $toDate]);
+        $this->applySalesFilters(null, $tableDataQuery, $filters);
+        $tableData = $tableDataQuery
             ->select(
                 'items.id',
                 'items.code',
@@ -323,7 +340,7 @@ class AnalyticsReportBuilder
             ->orderBy('date', 'asc')
             ->get()
             ->map(fn($row) => [
-                'date' => Carbon::parse($row->date)->format('d MMM'),
+                'date' => Carbon::parse($row->date)->format('d M'),
                 'full_date' => $row->date,
                 'cost' => (float) $row->cost,
                 'orders' => (int) $row->orders,
@@ -568,28 +585,54 @@ class AnalyticsReportBuilder
         ];
     }
 
-    private function applySalesFilters($salesQuery, $itemsQuery, array $filters): void
+    private function applySalesFilters($salesQuery, $itemsQuery, array $filters, bool $accountsJoined = false): void
     {
-        if (!empty($filters['firm_id'])) {
-            $salesQuery->where('sales.firm_id', $filters['firm_id']);
-            $itemsQuery->where('sales.firm_id', $filters['firm_id']);
+        $hasGeo = !empty($filters['subarea_id']) || !empty($filters['area_id']) || !empty($filters['city_id']) || !empty($filters['province_id']);
+
+        $applyToQuery = function ($query) use ($filters, $hasGeo, $accountsJoined) {
+            if (!$query) return;
+
+            if (!empty($filters['firm_id'])) {
+                $query->where('sales.firm_id', $filters['firm_id']);
+            }
+            if (!empty($filters['customer_id'])) {
+                $query->where('sales.customer_id', $filters['customer_id']);
+            }
+            if (!empty($filters['salesman_id'])) {
+                $query->where('sales.salesman_id', $filters['salesman_id']);
+            }
+
+            if ($hasGeo) {
+                if (!$accountsJoined) {
+                    $query->join('accounts', 'sales.customer_id', '=', 'accounts.id');
+                }
+                if (!empty($filters['subarea_id'])) {
+                    $query->where('accounts.subarea_id', $filters['subarea_id']);
+                } elseif (!empty($filters['area_id'])) {
+                    $query->where('accounts.area_id', $filters['area_id']);
+                } elseif (!empty($filters['city_id'])) {
+                    $query->where('accounts.city_id', $filters['city_id']);
+                } elseif (!empty($filters['province_id'])) {
+                    $query->where('accounts.province_id', $filters['province_id']);
+                }
+            }
+        };
+
+        if ($salesQuery) {
+            $applyToQuery($salesQuery);
         }
-        if (!empty($filters['customer_id'])) {
-            $salesQuery->where('sales.customer_id', $filters['customer_id']);
-            $itemsQuery->where('sales.customer_id', $filters['customer_id']);
-        }
-        if (!empty($filters['salesman_id'])) {
-            $salesQuery->where('sales.salesman_id', $filters['salesman_id']);
-            $itemsQuery->where('sales.salesman_id', $filters['salesman_id']);
-        }
-        if (!empty($filters['category_id'])) {
-            $itemsQuery->where('items.category', $filters['category_id']);
-        }
-        if (!empty($filters['company_id'])) {
-            $itemsQuery->where('items.company', $filters['company_id']);
-        }
-        if (!empty($filters['item_id'])) {
-            $itemsQuery->where('items.id', $filters['item_id']);
+
+        if ($itemsQuery) {
+            $applyToQuery($itemsQuery);
+            if (!empty($filters['category_id'])) {
+                $itemsQuery->where('items.category', $filters['category_id']);
+            }
+            if (!empty($filters['company_id'])) {
+                $itemsQuery->where('items.company', $filters['company_id']);
+            }
+            if (!empty($filters['item_id'])) {
+                $itemsQuery->where('items.id', $filters['item_id']);
+            }
         }
     }
 

@@ -12,6 +12,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionCatController;
 use App\Http\Controllers\CountryController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ProvinceController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\AreasController;
@@ -204,6 +205,17 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{booker}', [BookerController::class, 'update'])->name('bookers.update');
         Route::delete('/{booker}', [BookerController::class, 'destroy'])->name('bookers.destroy');
     });
+    //---------------------Locations (Unified Location Management)------------------
+    Route::prefix('/locations')->group(function () {
+        Route::get('/', [LocationController::class, 'index'])->name('locations.index');
+        Route::get('/children', [LocationController::class, 'children'])->name('locations.children');
+        Route::get('/search', [LocationController::class, 'search'])->name('locations.search');
+        Route::get('/stats', [LocationController::class, 'stats'])->name('locations.stats');
+        Route::post('/', [LocationController::class, 'store'])->name('locations.store');
+        Route::put('/{type}/{id}', [LocationController::class, 'update'])->name('locations.update');
+        Route::delete('/{type}/{id}', [LocationController::class, 'destroy'])->name('locations.destroy');
+    });
+
     //---------------------Country------------------------------------------------------------------
     Route::prefix('/countries')->group(function () {
         Route::get('/', [CountryController::class, 'index'])->name('countries.index');

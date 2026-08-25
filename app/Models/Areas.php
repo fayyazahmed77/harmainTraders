@@ -35,4 +35,9 @@ class Areas extends Model
     {
         return $this->belongsTo(City::class, 'city_id');
     }
+
+    public function subareas()
+    {
+        return $this->hasMany(Subarea::class, 'area_id');
+    }
 }

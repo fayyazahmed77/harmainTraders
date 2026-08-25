@@ -49,6 +49,24 @@ class StockReportsController extends Controller implements HasMiddleware
                 'type' => $acc->type,
                 'type_name' => $acc->accountType->name ?? 'Company',
             ]),
+            'parties' => Account::where(function ($q) {
+                $q->whereIn('type', [3, 6])
+                  ->orWhereHas('accountType', function ($sub) {
+                      $sub->whereIn('name', ['Customers', 'Customer', 'Supplier', 'Suppliers']);
+                  });
+            })
+            ->whereNotIn('type', [5, 1, 2, 4, 7, 8, 9, 10, 11, 12, 14])
+            ->with('accountType')
+            ->select('id', 'code', 'title', 'type', 'sale', 'purchase')
+            ->orderBy('title')
+            ->get()
+            ->map(fn($acc) => [
+                'id' => $acc->id,
+                'code' => $acc->code ? $acc->code : $acc->id,
+                'title' => $acc->title,
+                'type' => $acc->type,
+                'type_name' => $acc->accountType->name ?? ($acc->type == 3 ? 'Customers' : 'Supplier'),
+            ]),
             'categories' => ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
             'firms' => DB::table('firms')->select('id', 'name as title')->get(),
         ]);

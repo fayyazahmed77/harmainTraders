@@ -358,14 +358,38 @@ class ReportBuilder
         $purchaseReturns = $purchaseReturnsQuery->sum(DB::raw('net_total - extra_discount'));
 
         if ($isAsset) {
-            $pQuery->where(function($q) {
-                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                  ->orWhereNull('cheque_status')
-                  ->orWhere('cheque_status', '')
-                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
-            });
-            $debit = $pQuery->clone()->where('type', 'RECEIPT')->sum('amount');
-            $credit = $pQuery->clone()->where('type', 'PAYMENT')->sum('amount');
+            $finPayments = Payment::where('payment_account_id', $accountId)
+                ->where('date', '<', $date)
+                ->where('cheque_status', '!=', 'Canceled')
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhere('cheque_status', '')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                });
+            if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+                $finPayments->where('account_id', $params['contraId']);
+            }
+            $finReceiving = (float)$finPayments->clone()->where('type', 'RECEIPT')->sum('amount');
+            $finPayment   = (float)$finPayments->clone()->where('type', 'PAYMENT')->sum('amount');
+
+            $partyPayments = Payment::where('account_id', $accountId)
+                ->where('date', '<', $date)
+                ->where('cheque_status', '!=', 'Canceled')
+                ->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('cheque_status')
+                      ->orWhere('cheque_status', '')
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                });
+            if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+                $partyPayments->where('payment_account_id', $params['contraId']);
+            }
+            $partyReceiving = (float)$partyPayments->clone()->where('type', 'PAYMENT')->sum('amount');
+            $partyPayment   = (float)$partyPayments->clone()->where('type', 'RECEIPT')->sum('amount');
+
+            $debit  = $finReceiving + $partyReceiving;
+            $credit = $finPayment   + $partyPayment;
         } else {
             $debit = $sales + $pQuery->clone()->where('type', 'PAYMENT')->sum(DB::raw('amount + discount')) + $purchaseReturns;
             $credit = $purchases + $pQuery->clone()->where('type', 'RECEIPT')->sum(DB::raw('amount + discount')) + $salesReturns;

@@ -30,6 +30,10 @@ interface AnalyticsIndexProps {
     firms: any[];
     items: any[];
     salesmen: any[];
+    provinces?: any[];
+    cities?: any[];
+    areas?: any[];
+    subareas?: any[];
 }
 
 export default function AnalyticsIndex({
@@ -42,6 +46,10 @@ export default function AnalyticsIndex({
     firms,
     items,
     salesmen,
+    provinces = [],
+    cities = [],
+    areas = [],
+    subareas = [],
 }: AnalyticsIndexProps) {
     const [filters, setFilters] = useState(initialFilters);
     const [analytics, setAnalytics] = useState(initialAnalytics);
@@ -148,6 +156,11 @@ export default function AnalyticsIndex({
                         categories={categories}
                         firms={firms}
                         items={items}
+                        salesmen={salesmen}
+                        provinces={provinces}
+                        cities={cities}
+                        areas={areas}
+                        subareas={subareas}
                         loading={loading}
                     />
 

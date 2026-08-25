@@ -7,6 +7,10 @@ use App\Models\Account;
 use App\Models\ItemCategory;
 use App\Models\Items;
 use App\Models\Saleman;
+use App\Models\Province;
+use App\Models\City;
+use App\Models\Areas;
+use App\Models\Subarea;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -60,6 +64,11 @@ class AnalyticsController extends Controller
         $items = Items::select('id', 'code', 'title')->orderBy('title')->get();
         $salesmen = Saleman::select('id', 'name as title')->orderBy('name')->get();
 
+        $provinces = Province::select('id', 'name')->orderBy('name')->get();
+        $cities = City::select('id', 'name', 'province_id')->orderBy('name')->get();
+        $areas = Areas::select('id', 'name', 'city_id', 'province_id')->orderBy('name')->get();
+        $subareas = Subarea::select('id', 'name', 'area_id', 'city_id', 'province_id')->orderBy('name')->get();
+
         return Inertia::render('reports/analytics/index', [
             'initialAnalytics' => $analyticsData,
             'filters' => [
@@ -73,6 +82,10 @@ class AnalyticsController extends Controller
                 'supplierId' => $request->input('supplierId', 'ALL'),
                 'itemId' => $request->input('itemId', 'ALL'),
                 'salesmanId' => $request->input('salesmanId', 'ALL'),
+                'provinceId' => $request->input('provinceId', 'ALL'),
+                'cityId' => $request->input('cityId', 'ALL'),
+                'areaId' => $request->input('areaId', 'ALL'),
+                'subareaId' => $request->input('subareaId', 'ALL'),
             ],
             'companies' => $companies,
             'customers' => $customers,
@@ -81,6 +94,10 @@ class AnalyticsController extends Controller
             'firms' => $firms,
             'items' => $items,
             'salesmen' => $salesmen,
+            'provinces' => $provinces,
+            'cities' => $cities,
+            'areas' => $areas,
+            'subareas' => $subareas,
         ]);
     }
 

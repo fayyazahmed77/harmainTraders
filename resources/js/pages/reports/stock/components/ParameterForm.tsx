@@ -78,6 +78,7 @@ interface ParameterFormProps {
     loading: boolean;
     items: any[];
     companies: any[];
+    parties?: any[];
     categories: any[];
     firms: any[];
 }
@@ -153,6 +154,7 @@ export function ParameterForm({
     loading, 
     items, 
     companies, 
+    parties = [],
     categories, 
     firms 
 }: ParameterFormProps) {
@@ -168,6 +170,7 @@ export function ParameterForm({
     const selectedReport = stockReports.find(r => r.id === params.reportId) || stockReports[0];
     const selectedItem = items.find(i => i.id.toString() === params.itemId);
     const selectedCompany = companies.find(c => c.id.toString() === params.companyId);
+    const selectedParty = (parties || []).find(p => p.id.toString() === params.partyId);
 
     return (
         <div className="space-y-4">
@@ -232,7 +235,7 @@ export function ParameterForm({
                         <div className="flex flex-col min-w-0 flex-1">
                              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-text-muted leading-none mb-1">Supplier/Customer Selection</span>
                              <span className="text-[11px] font-bold text-text-primary truncate group-hover:text-emerald-600 italic">
-                                {params.companyId === 'ALL' ? 'All Active Parties' : (selectedCompany?.title || 'Selected Party')}
+                                {params.partyId === 'ALL' ? 'All Active Parties' : (selectedParty?.title || 'Selected Party')}
                              </span>
                         </div>
                         <ChevronRight className="h-3 w-3 text-text-muted/30 mr-1 group-hover:translate-x-0.5 transition-all" />
@@ -486,9 +489,9 @@ export function ParameterForm({
             <StockAccountSelectionDialog 
                 open={isAccountDialogOpen}
                 onOpenChange={setIsAccountDialogOpen}
-                accounts={companies}
-                selectedAccountId={params.companyId}
-                onSelect={(id) => updateParam('companyId', id)}
+                accounts={parties}
+                selectedAccountId={params.partyId}
+                onSelect={(id) => updateParam('partyId', id)}
             />
 
             <StockItemSelectionDialog

@@ -11,9 +11,12 @@ class StockReportBuilder
     {
         $toDate = $params['toDate'] ?? date('Y-m-d');
         
+        $partyIdParam = $params['partyId'] ?? $params['supplierId'] ?? 'ALL';
+
         $filters = [
             'item_id' => ($params['itemId'] ?? 'ALL') === 'ALL' ? null : $params['itemId'],
             'company_id' => ($params['companyId'] ?? 'ALL') === 'ALL' ? null : $params['companyId'],
+            'party_id' => $partyIdParam === 'ALL' ? null : $partyIdParam,
             'category_id' => ($params['categoryId'] ?? 'ALL') === 'ALL' ? null : $params['categoryId'],
             'item_type' => ($params['itemType'] ?? 'ALL') === 'ALL' ? null : $params['itemType'],
             'godown_id' => ($params['godownId'] ?? 'ALL') === 'ALL' ? null : $params['godownId'],
@@ -323,29 +326,33 @@ class StockReportBuilder
         }
 
         if ($filters['company_id']) {
-            // Look up account type to apply filter to the correct queries only
-            $accountType = DB::table('accounts')->where('id', $filters['company_id'])->value('type');
+            $purchases->where('items.company', $filters['company_id']);
+            $sales->where('items.company', $filters['company_id']);
+            $saleReturns->where('items.company', $filters['company_id']);
+            $purchaseReturns->where('items.company', $filters['company_id']);
+        }
+
+        if ($filters['party_id']) {
+            $account = DB::table('accounts')->where('id', $filters['party_id'])->first();
+            $accountType = $account->type ?? null;
             
-            if ($accountType == 3) {
+            if ($accountType == 3 || (!empty($account->sale))) {
                 // Customer: filter sales and sale returns only
-                $sales->where('sales.customer_id', $filters['company_id']);
-                $saleReturns->where('sales_returns.customer_id', $filters['company_id']);
-                // Exclude all purchases (no matching supplier)
+                $sales->where('sales.customer_id', $filters['party_id']);
+                $saleReturns->where('sales_returns.customer_id', $filters['party_id']);
                 $purchases->whereRaw('1=0');
                 $purchaseReturns->whereRaw('1=0');
-            } elseif ($accountType == 6) {
+            } elseif ($accountType == 6 || (!empty($account->purchase))) {
                 // Supplier: filter purchases and purchase returns only
-                $purchases->where('purchases.supplier_id', $filters['company_id']);
-                $purchaseReturns->where('purchase_returns.supplier_id', $filters['company_id']);
-                // Exclude all sales (no matching customer)
+                $purchases->where('purchases.supplier_id', $filters['party_id']);
+                $purchaseReturns->where('purchase_returns.supplier_id', $filters['party_id']);
                 $sales->whereRaw('1=0');
                 $saleReturns->whereRaw('1=0');
             } else {
-                // Unknown type: try both sides
-                $purchases->where('purchases.supplier_id', $filters['company_id']);
-                $sales->where('sales.customer_id', $filters['company_id']);
-                $saleReturns->where('sales_returns.customer_id', $filters['company_id']);
-                $purchaseReturns->where('purchase_returns.supplier_id', $filters['company_id']);
+                $purchases->where('purchases.supplier_id', $filters['party_id']);
+                $sales->where('sales.customer_id', $filters['party_id']);
+                $saleReturns->where('sales_returns.customer_id', $filters['party_id']);
+                $purchaseReturns->where('purchase_returns.supplier_id', $filters['party_id']);
             }
         }
 

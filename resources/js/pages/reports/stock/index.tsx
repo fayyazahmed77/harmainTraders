@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 interface PageProps {
     items: any[];
     companies: any[];
+    parties?: any[];
     categories: any[];
     firms: any[];
 }
@@ -26,7 +27,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: "Stock Playground", href: "/reports/stock" },
 ];
 
-export default function StockReportsIndex({ items, companies, categories, firms }: PageProps) {
+export default function StockReportsIndex({ items, companies, parties = [], categories, firms }: PageProps) {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [reportData, setReportData] = useState<any[]>([]);
@@ -48,6 +49,7 @@ export default function StockReportsIndex({ items, companies, categories, firms 
         deadStockDate: `${new Date().getFullYear()}-01-01`,
         itemId: 'ALL',
         companyId: 'ALL',
+        partyId: 'ALL',
         categoryId: 'ALL',
         itemType: 'ALL',
         firmId: 'ALL',
@@ -185,6 +187,7 @@ export default function StockReportsIndex({ items, companies, categories, firms 
                                 loading={loading}
                                 items={items}
                                 companies={companies}
+                                parties={parties}
                                 categories={categories}
                                 firms={firms}
                             />

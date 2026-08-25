@@ -307,6 +307,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: Settings2,
       permissions: ['manage permissions', 'manage roles'],
       items: [
+        // {
+        //   title: "Location",
+        //   url: "/locations",
+        //   permissions: ['view cities', 'view areas', 'manage permissions', 'manage roles'],
+        // },
         {
           title: "Country",
           url: "/countries",
