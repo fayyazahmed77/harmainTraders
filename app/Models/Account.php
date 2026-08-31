@@ -157,7 +157,17 @@ class Account extends Model
             return \App\Services\PaymentAccountingService::getCustomerCurrentBalance($this);
         } elseif ($type === 'supplier') {
             return \App\Services\PaymentAccountingService::getSupplierCurrentBalance($this);
-        } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
+        } elseif ($type === 'cheque in hand') {
+            $baseQuery = $this->financialPayments()
+                ->where(function($q) {
+                    $q->whereIn('cheque_status', ['In Hand'])->orWhereNull('cheque_status');
+                });
+
+            $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')->sum('amount');
+            $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')->sum('amount');
+
+            return (float)$this->opening_balance + $totalIn - $totalOut;
+        } elseif (in_array($type, ['bank', 'cash'])) {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');

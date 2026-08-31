@@ -211,3 +211,54 @@ it('calculates the running balance correctly with mixed statuses, pagination, an
     // Verify the newest row's running_balance on Page 1 equals $account->current_balance
     expect($data1[0]['running_balance'])->toEqual((float)$account->current_balance);
 });
+
+it('correctly calculates available amount of check for cheque in hand account type when cheques are distributed or deposited', function () {
+    $chequeType = AccountType::create(['name' => 'Cheque in hand']);
+    $chequeAccount = Account::create([
+        'code' => 'CHQ-999',
+        'title' => 'Cheque In Hand Test',
+        'type' => $chequeType->id,
+        'opening_balance' => 0,
+    ]);
+
+    // 1. Receive customer cheque into Cheque in hand
+    $receipt1 = Payment::create([
+        'voucher_no' => 'CHQ-REC-1',
+        'account_id' => $this->dummyCustomer->id,
+        'payment_account_id' => $chequeAccount->id,
+        'type' => 'RECEIPT',
+        'amount' => 50000,
+        'discount' => 0,
+        'payment_method' => 'Cheque',
+        'cheque_status' => 'In Hand',
+        'date' => '2026-08-01',
+    ]);
+
+    expect($chequeAccount->fresh()->current_balance)->toBe(50000.0);
+
+    // 2. Give cheque to supplier -> cheque_status becomes 'Distributed'
+    $receipt1->update(['cheque_status' => 'Distributed']);
+
+    expect($chequeAccount->fresh()->current_balance)->toBe(0.0);
+
+    // 3. Receive another cheque of 30,000
+    $receipt2 = Payment::create([
+        'voucher_no' => 'CHQ-REC-2',
+        'account_id' => $this->dummyCustomer->id,
+        'payment_account_id' => $chequeAccount->id,
+        'type' => 'RECEIPT',
+        'amount' => 30000,
+        'discount' => 0,
+        'payment_method' => 'Cheque',
+        'cheque_status' => 'In Hand',
+        'date' => '2026-08-02',
+    ]);
+
+    expect($chequeAccount->fresh()->current_balance)->toBe(30000.0);
+
+    // 4. Deposit cheque into bank -> cheque_status becomes 'Deposit'
+    $receipt2->update(['cheque_status' => 'Deposit']);
+
+    expect($chequeAccount->fresh()->current_balance)->toBe(0.0);
+});
+

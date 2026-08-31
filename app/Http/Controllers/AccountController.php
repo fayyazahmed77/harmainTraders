@@ -462,7 +462,22 @@ class AccountController extends Controller implements HasMiddleware
                 'credit_balance' => $creditBalance,
                 'advance_balance' => $advance,
             ];
-        } elseif (in_array($typeLower, ['bank', 'cash', 'cheque in hand'])) {
+        } elseif ($typeLower === 'cheque in hand') {
+            $financialQuery = \App\Models\Payment::where('payment_account_id', $account->id)
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned', 'Refund'])->orWhereNull('cheque_status');
+                });
+
+            $totalIn = (clone $financialQuery)->where('type', 'RECEIPT')->sum('amount');
+            $currentBalance = (float)$account->current_balance;
+            $totalOut = max(0.0, $totalIn - $currentBalance);
+
+            $summary = [
+                'total_in' => $totalIn,
+                'total_out' => $totalOut,
+                'current_balance' => $currentBalance,
+            ];
+        } elseif (in_array($typeLower, ['bank', 'cash'])) {
             // Financial payments query (where payment_account_id = $account->id)
             $financialQuery = \App\Models\Payment::where('payment_account_id', $account->id)
                 ->where(function($q) {

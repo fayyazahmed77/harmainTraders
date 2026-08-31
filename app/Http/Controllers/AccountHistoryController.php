@@ -165,7 +165,7 @@ class AccountHistoryController extends Controller implements HasMiddleware
                 $status = $item->cheque_status;
                 $isNotCanceled = !in_array($status, ['Canceled', 'Returned', 'Refund']);
                 $isBypassedMethod = !in_array($item->payment_method, ['Cheque', 'Online']);
-                $isClearedStatus = in_array($status, ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                $isClearedStatus = in_array($status, ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']) || empty($status);
                 if ($isNotCanceled && ($isBypassedMethod || $isClearedStatus)) {
                     $netFlow += $item->type === 'RECEIPT' ? (float)$item->amount : -(float)$item->amount;
                 }

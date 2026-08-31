@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        \Illuminate\Support\Facades\DB::statement("ALTER TABLE payments MODIFY COLUMN cheque_status ENUM('Pending', 'Clear', 'Canceled', 'Returned', 'In Hand', 'Distributed', 'Refund') DEFAULT 'Pending' NOT NULL");
+        \Illuminate\Support\Facades\DB::statement("ALTER TABLE payments MODIFY COLUMN cheque_status ENUM('Pending', 'Clear', 'Cleared', 'Canceled', 'Returned', 'In Hand', 'Distributed', 'Refund', 'Deposit', 'Withdrawal') DEFAULT 'Pending' NOT NULL");
     }
 
     /**
@@ -19,6 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        \Illuminate\Support\Facades\DB::statement("ALTER TABLE payments MODIFY COLUMN cheque_status ENUM('Pending', 'Clear', 'Canceled', 'Returned', 'In Hand', 'Distributed', 'Refund') DEFAULT 'Pending' NOT NULL");
+        \Illuminate\Support\Facades\DB::statement("ALTER TABLE payments MODIFY COLUMN cheque_status ENUM('Pending', 'Clear', 'Cleared', 'Canceled', 'Returned', 'In Hand', 'Distributed', 'Refund', 'Deposit', 'Withdrawal') DEFAULT 'Pending' NOT NULL");
     }
 };

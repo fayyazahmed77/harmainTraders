@@ -21,10 +21,11 @@ return new class extends Migration
             }
 
             // Standardize prefix to empty string if null for index consistency
-            DB::statement("UPDATE chequebooks SET prefix = '' WHERE prefix IS NULL");
-
-            // Add composite unique constraint (bank_id, prefix, cheque_no)
-            $table->unique(['bank_id', 'prefix', 'cheque_no'], 'chequebooks_bank_prefix_chequeno_unique');
+            if (Schema::hasColumn('chequebooks', 'prefix')) {
+                DB::statement("UPDATE chequebooks SET prefix = '' WHERE prefix IS NULL");
+                // Add composite unique constraint (bank_id, prefix, cheque_no)
+                $table->unique(['bank_id', 'prefix', 'cheque_no'], 'chequebooks_bank_prefix_chequeno_unique');
+            }
         });
     }
 
