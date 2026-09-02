@@ -21,19 +21,20 @@ use App\Models\Investor;
 use App\Models\InvestorCapitalAccount;
 use App\Services\InvestorCapitalService;
 use App\Mail\InvestorWelcomeMail;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
+use App\Exports\AccountSampleExport;
+use App\Services\AccountBulkUploadService;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AccountController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode', 'searchSuggestions']),
-            new Middleware('permission:manage accounts', only: ['create', 'store', 'edit', 'update', 'destroy', 'toggleStatus', 'resetGuestToken']),
+            new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode', 'searchSuggestions', 'downloadSample']),
+            new Middleware('permission:manage accounts', only: ['create', 'store', 'edit', 'update', 'destroy', 'toggleStatus', 'resetGuestToken', 'bulkUpload', 'previewBulkUpload', 'processBulkImport']),
         ];
     }
     public function index(Request $request)
@@ -659,5 +660,46 @@ class AccountController extends Controller implements HasMiddleware
         });
 
         return response()->json($results);
+    }
+
+    public function bulkUpload()
+    {
+        return Inertia::render("setup/account/bulk-upload");
+    }
+
+    public function downloadSample(Request $request)
+    {
+        $format = $request->query('format', 'xlsx');
+
+        if ($format === 'csv') {
+            return Excel::download(new AccountSampleExport, 'chart_of_accounts_sample.csv', \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download(new AccountSampleExport, 'chart_of_accounts_sample.xlsx', \Maatwebsite\Excel\Excel::XLSX);
+    }
+
+    public function previewBulkUpload(Request $request, AccountBulkUploadService $service)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        $preview = $service->preview($request->file('file'));
+
+        return response()->json($preview);
+    }
+
+    public function processBulkImport(Request $request, AccountBulkUploadService $service)
+    {
+        $request->validate([
+            'rows' => 'required|array|min:1',
+        ]);
+
+        $result = $service->import($request->input('rows'));
+
+        return response()->json([
+            'message' => "Successfully imported {$result['success_count']} accounts.",
+            'result' => $result,
+        ]);
     }
 }

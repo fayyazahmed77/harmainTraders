@@ -37,9 +37,10 @@ export function AccountSelectionDialog({
     const [accountSearch, setAccountSearch] = useState('');
 
     const filteredAccounts = useMemo(() => {
-        if (!accountSearch) return accounts;
+        const activeAccounts = accounts.filter(acc => (acc as any).status !== false && (acc as any).status !== 0);
+        if (!accountSearch) return activeAccounts;
         const search = accountSearch.toLowerCase();
-        return accounts.filter(acc =>
+        return activeAccounts.filter(acc =>
             acc.title.toLowerCase().includes(search) ||
             (acc.code && acc.code.toLowerCase().includes(search)) ||
             (acc.account_type?.name && acc.account_type.name.toLowerCase().includes(search)) ||

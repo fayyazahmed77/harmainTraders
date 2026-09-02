@@ -38,8 +38,8 @@ class SalesReturnReportsController extends Controller implements HasMiddleware
     public function index()
     {
         return Inertia::render('reports/sales-return/index', [
-            'customers' => Account::where('sale', 1)->select('id', 'title', 'code')->get(),
-            'items' => Items::select('id', 'title', 'code')->get(),
+            'customers' => Account::active()->where('sale', 1)->select('id', 'title', 'code')->get(),
+            'items' => Items::active()->select('id', 'title', 'code')->get(),
             'firms' => Firm::select('id', 'name')->get(),
             'salesmen' => Saleman::select('id', 'name')->get(),
             'areas' => Areas::select('id', 'name', 'city_id', 'province_id')->get(),
@@ -48,7 +48,7 @@ class SalesReturnReportsController extends Controller implements HasMiddleware
             'cities' => \App\Models\City::select('id', 'name', 'province_id')->get(),
             'categories' => ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
             'users' => \App\Models\User::select('id', 'name')->get(),
-            'companies' => Account::where('type', 5)->select('id', 'title')->orderBy('title')->get(),
+            'companies' => Account::active()->where('type', 5)->select('id', 'title')->orderBy('title')->get(),
         ]);
     }
 

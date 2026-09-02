@@ -34,11 +34,12 @@ class StockReportsController extends Controller implements HasMiddleware
     public function index()
     {
         return Inertia::render('reports/stock/index', [
-            'items' => Items::select('id', 'title')->orderBy('title')->get(),
-            'companies' => Account::whereHas('accountType', function ($q) {
-                $q->where('name', 'Company');
+            'items' => Items::active()->select('id', 'title')->orderBy('title')->get(),
+            'companies' => Account::active()->where(function ($query) {
+                $query->whereHas('accountType', function ($q) {
+                    $q->where('name', 'Company');
+                })->orWhere('type', 5);
             })
-            ->orWhere('type', 5)
             ->with('accountType')
             ->select('id', 'title', 'type')
             ->orderBy('title')
@@ -49,7 +50,7 @@ class StockReportsController extends Controller implements HasMiddleware
                 'type' => $acc->type,
                 'type_name' => $acc->accountType->name ?? 'Company',
             ]),
-            'parties' => Account::where(function ($q) {
+            'parties' => Account::active()->where(function ($q) {
                 $q->whereIn('type', [3, 6])
                   ->orWhereHas('accountType', function ($sub) {
                       $sub->whereIn('name', ['Customers', 'Customer', 'Supplier', 'Suppliers']);

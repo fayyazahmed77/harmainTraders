@@ -5,7 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, FileSpreadsheet, Download } from "lucide-react";
 import { BreadcrumbItem } from "@/types";
 import { router, Link, usePage } from "@inertiajs/react";
 import { DataTable } from "@/components/setup/items/DataTable";
@@ -66,6 +66,7 @@ import ItemsFilters from "./ItemsFilters";
 export default function ItemsPage({ items, summary, filters, categories }: Props) {
   function routeHelper(name: string): string {
     if (name === "items.create") return "/items/create";
+    if (name === "items.bulk-upload") return "/items/bulk-upload";
     return "/";
   }
 
@@ -91,11 +92,28 @@ export default function ItemsPage({ items, summary, filters, categories }: Props
               </p>
             </div>
 
-            <Link href={routeHelper("items.create")}>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Add Item
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <a href="/items/bulk-upload/sample?format=xlsx" download>
+                <Button variant="outline" size="sm" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Export Excel
+                </Button>
+              </a>
+              <a href="/items/bulk-upload/sample?format=csv" download>
+                <Button variant="outline" size="sm" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Export CSV
+                </Button>
+              </a>
+              <Link href={routeHelper("items.bulk-upload")}>
+                <Button variant="outline" size="sm" className="border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Bulk Upload
+                </Button>
+              </Link>
+              <Link href={routeHelper("items.create")}>
+                <Button size="sm">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Item
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <ItemsSummary summary={summary} />

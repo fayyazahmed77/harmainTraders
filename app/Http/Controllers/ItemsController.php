@@ -7,6 +7,9 @@ use App\Models\ItemCategory;
 use App\Models\Account;
 use App\Models\ItemImage;
 use App\Services\OfferListSyncService;
+use App\Services\ItemsBulkUploadService;
+use App\Exports\ItemsSampleExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -19,7 +22,7 @@ class ItemsController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:view stock', only: ['index', 'show', 'getNextCode', 'searchSuggestions']),
-            new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive']),
+            new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive', 'bulkUpload', 'downloadSample', 'previewBulkUpload', 'processBulkImport']),
         ];
     }
     public function index(Request $request)
@@ -592,6 +595,97 @@ class ItemsController extends Controller implements HasMiddleware
         });
 
         return response()->json($results);
+    }
+
+    public function bulkUpload()
+    {
+        $categories = ItemCategory::select(['id', 'name'])->get();
+        $companies = Account::with('accountType')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Company']);
+            })
+            ->get();
+
+        return Inertia::render("setup/items/bulk-upload", [
+            'categories' => $categories,
+            'companies' => $companies,
+        ]);
+    }
+
+    public function downloadSample(Request $request)
+    {
+        $format = strtolower($request->query('format', 'xlsx'));
+        $filename = 'items_bulk_upload_sample.' . ($format === 'csv' ? 'csv' : 'xlsx');
+        $writerType = $format === 'csv' ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX;
+
+        return Excel::download(new ItemsSampleExport(), $filename, $writerType);
+    }
+
+    public function previewBulkUpload(Request $request, ItemsBulkUploadService $service)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ], [
+            'file.required' => 'Please select a CSV or Excel file to upload.',
+            'file.mimes' => 'The file must be a CSV or Excel spreadsheet (.xlsx, .xls, .csv).',
+            'file.max' => 'The file size cannot exceed 10 MB.',
+        ]);
+
+        $file = $request->file('file');
+        $result = $service->preview($file);
+
+        return response()->json($result);
+    }
+
+    public function processBulkImport(Request $request, ItemsBulkUploadService $service)
+    {
+        $validated = $request->validate([
+            'rows' => 'required|array|min:1',
+            'rows.*.title' => 'required|string|max:255',
+            'rows.*.category_id' => 'required|exists:item_categories,id',
+            'rows.*.company_id' => 'required|exists:accounts,id',
+            'rows.*.trade_price' => 'required|numeric|min:0',
+            'rows.*.retail' => 'required|numeric|min:0',
+            'rows.*.packing_qty' => 'required|numeric|min:1',
+            'rows.*.packing_size' => 'required|string|max:255',
+            'rows.*.reorder_level' => 'required|numeric|min:0',
+            'rows.*.code' => 'nullable|string|max:255',
+            'rows.*.short_name' => 'nullable|string|max:255',
+            'rows.*.formation' => 'nullable|string|max:255',
+            'rows.*.type' => 'nullable|string|max:255',
+            'rows.*.shelf' => 'nullable|string|max:255',
+            'rows.*.pcs' => 'nullable|numeric',
+            'rows.*.limit_pcs' => 'nullable|numeric',
+            'rows.*.order_qty' => 'nullable|numeric',
+            'rows.*.weight' => 'nullable|numeric',
+            'rows.*.stock_1' => 'nullable|numeric',
+            'rows.*.stock_2' => 'nullable|numeric',
+            'rows.*.pt2' => 'nullable|numeric',
+            'rows.*.pt3' => 'nullable|numeric',
+            'rows.*.pt4' => 'nullable|numeric',
+            'rows.*.pt5' => 'nullable|numeric',
+            'rows.*.pt6' => 'nullable|numeric',
+            'rows.*.pt7' => 'nullable|numeric',
+            'rows.*.scheme' => 'nullable|string|max:255',
+            'rows.*.scheme2' => 'nullable|string|max:255',
+            'rows.*.discount' => 'nullable|numeric',
+            'rows.*.gst_percent' => 'nullable|numeric',
+            'rows.*.gst_amount' => 'nullable|numeric',
+            'rows.*.adv_tax_filer' => 'nullable|numeric',
+            'rows.*.adv_tax_non_filer' => 'nullable|numeric',
+            'rows.*.adv_tax_manufacturer' => 'nullable|numeric',
+            'rows.*.is_import' => 'nullable',
+            'rows.*.is_fridge' => 'nullable',
+            'rows.*.is_recipe' => 'nullable',
+            'rows.*.is_active' => 'nullable',
+        ]);
+
+        $result = $service->import($validated['rows']);
+
+        return response()->json([
+            'message' => "Successfully imported {$result['success_count']} item(s).",
+            'result' => $result,
+        ]);
     }
 }
 

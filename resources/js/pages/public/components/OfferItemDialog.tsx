@@ -253,7 +253,7 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
                             </div>
 
                             {/* Live Pricing Breakdown Card */}
-                            {isGroupOffer && totalPcs > 0 && (
+                            {isGroupOffer && packingQty > 1 && totalPcs > 0 && (
                                 <div className="p-2 sm:p-2.5 bg-surface-2/80 rounded-xl border border-border text-xs space-y-1 font-mono-jet shadow-inner">
                                     <div className="flex justify-between items-center text-text-muted font-bold text-[8px] sm:text-[9px] uppercase">
                                         <span className="flex items-center gap-1">

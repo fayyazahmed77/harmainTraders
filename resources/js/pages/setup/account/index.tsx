@@ -5,8 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { BreadcrumbItem } from "@/types";
+import { Plus, FileSpreadsheet, Download } from "lucide-react";
 import { DataTable } from "@/components/setup/account/DataTable";
 import { usePage, Link } from "@inertiajs/react";
 
@@ -64,12 +63,12 @@ interface Props {
 
 import AccountSummary from "./AccountSummary";
 import AccountFilters from "./AccountFilters";
+import { BreadcrumbItem } from "@/types";
 
 export default function AccountsPage({ accounts, summary, filters, cities, accountTypes }: Props) {
-  //   const { accounts } = usePage<{ accounts: Account[] }>().props; // Removed usePage hook usage as props are passed directly
-
   function route(_name: string): string {
     if (_name === "account.create") return "/account/create";
+    if (_name === "account.bulk-upload") return "/account/bulk-upload";
     return "";
   }
 
@@ -93,11 +92,28 @@ export default function AccountsPage({ accounts, summary, filters, cities, accou
                 Comprehensive financial overview and account management.
               </p>
             </div>
-            <Link href={route("account.create")}>
-              <Button className="w-full md:w-auto bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold px-6 py-6 rounded-xl shadow-lg shadow-orange-500/20 dark:shadow-none transition-all hover:scale-105 active:scale-95">
-                <Plus className="mr-2 h-5 w-5 stroke-[3px]" /> Add New Account
-              </Button>
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <a href="/account/bulk-upload/sample?format=xlsx" download>
+                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Export Excel
+                </Button>
+              </a>
+              <a href="/account/bulk-upload/sample?format=csv" download>
+                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                  <Download className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" /> Export CSV
+                </Button>
+              </a>
+              <Link href={route("account.bulk-upload")}>
+                <Button variant="outline" className="border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 font-semibold">
+                  <FileSpreadsheet className="mr-2 h-4 w-4 text-orange-500" /> Bulk Upload
+                </Button>
+              </Link>
+              <Link href={route("account.create")}>
+                <Button className="bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold shadow-lg shadow-orange-500/20 dark:shadow-none transition-all hover:scale-105 active:scale-95">
+                  <Plus className="mr-2 h-5 w-5 stroke-[3px]" /> Add New Account
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <AccountSummary summary={summary} />

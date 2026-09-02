@@ -40,28 +40,30 @@ class AnalyticsController extends Controller
         $analyticsData = $this->analyticsBuilder->calculate($reportType, $params);
 
         // Fetch Dropdown Filter Options
-        $companies = Account::whereHas('accountType', function ($q) {
-            $q->where('name', 'Company');
+        $companies = Account::active()->where(function ($query) {
+            $query->whereHas('accountType', function ($q) {
+                $q->where('name', 'Company');
+            })->orWhere('type', 5);
         })
-        ->orWhere('type', 5)
         ->select('id', 'title')
         ->orderBy('title')
         ->get();
 
-        $customers = Account::where('sale', 1)
+        $customers = Account::active()->where('sale', 1)
             ->select('id', 'title')
             ->orderBy('title')
             ->get();
 
-        $suppliers = Account::where('purchase', 1)
-            ->orWhere('type', 6)
+        $suppliers = Account::active()->where(function ($query) {
+            $query->where('purchase', 1)->orWhere('type', 6);
+        })
             ->select('id', 'title')
             ->orderBy('title')
             ->get();
 
         $categories = ItemCategory::select('id', 'name as title')->orderBy('name')->get();
         $firms = DB::table('firms')->select('id', 'name as title')->get();
-        $items = Items::select('id', 'code', 'title')->orderBy('title')->get();
+        $items = Items::active()->select('id', 'code', 'title')->orderBy('title')->get();
         $salesmen = Saleman::select('id', 'name as title')->orderBy('name')->get();
 
         $provinces = Province::select('id', 'name')->orderBy('name')->get();

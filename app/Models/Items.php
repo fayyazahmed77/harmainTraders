@@ -71,6 +71,15 @@ class Items extends Model
         'primary_image_url',
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('is_active', true)
+              ->orWhere('is_active', 1)
+              ->orWhereNull('is_active');
+        });
+    }
+
     /**
      * Get the calculated price per piece.
      * Trade Price / Packing Qty (Rounded up)

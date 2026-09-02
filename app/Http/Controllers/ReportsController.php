@@ -65,7 +65,7 @@ class ReportsController extends Controller implements HasMiddleware
             }
 
             if ($reportId === 'account_list') {
-                $query = Account::with(['accountType', 'area', 'subarea']);
+                $query = Account::active()->with(['accountType', 'area', 'subarea']);
                 $this->reportBuilder->applyAccountFilters($query, $request->all());
                 $data = $query->get();
                 return response()->json(['data' => $data]);
@@ -189,7 +189,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/accounts/ledger', [
-            'accounts' => Account::with(['accountType', 'area', 'subarea'])
+            'accounts' => Account::active()->with(['accountType', 'area', 'subarea'])
                 ->select('id', 'code', 'title', 'type', 'area_id', 'subarea_id')
                 ->get(),
             'firms' => Firm::select('id', 'name', 'code')->get(),
@@ -502,7 +502,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/stock/ledger', [
-            'items' => \App\Models\Items::select('id', 'title')->get()
+            'items' => \App\Models\Items::active()->select('id', 'title')->get()
         ]);
     }
 
@@ -537,7 +537,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/purchase/index', [
-            'suppliers' => Account::where('purchase', 1)->select('id', 'title')->get()
+            'suppliers' => Account::active()->where('purchase', 1)->select('id', 'title')->get()
         ]);
     }
 
@@ -568,7 +568,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/purchase-return/index', [
-            'suppliers' => Account::where('purchase', 1)->select('id', 'title')->get()
+            'suppliers' => Account::active()->where('purchase', 1)->select('id', 'title')->get()
         ]);
     }
 
@@ -599,7 +599,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/sales/index', [
-            'customers' => Account::where('sale', 1)->select('id', 'title')->get()
+            'customers' => Account::active()->where('sale', 1)->select('id', 'title')->get()
         ]);
     }
 
@@ -630,7 +630,7 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/sales-return/index', [
-            'customers' => Account::where('sale', 1)->select('id', 'title')->get()
+            'customers' => Account::active()->where('sale', 1)->select('id', 'title')->get()
         ]);
     }
 

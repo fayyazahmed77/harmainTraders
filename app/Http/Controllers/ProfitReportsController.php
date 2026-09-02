@@ -35,8 +35,8 @@ class ProfitReportsController extends Controller implements HasMiddleware
     public function index()
     {
         return Inertia::render('reports/profit/index', [
-            'accounts' => Account::where('sale', 1)->select('id', 'title', 'code')->get(),
-            'items' => \App\Models\Items::select('id', 'title', 'code')->get(),
+            'accounts' => Account::active()->where('sale', 1)->select('id', 'title', 'code')->get(),
+            'items' => \App\Models\Items::active()->select('id', 'title', 'code')->get(),
             'salesmen' => Saleman::select('id', 'name')->get(),
             'firms' => Firm::select('id', 'name')->get(),
             'areas' => \App\Models\Areas::select('id', 'name', 'city_id', 'province_id')->get(),

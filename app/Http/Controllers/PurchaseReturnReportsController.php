@@ -34,8 +34,8 @@ class PurchaseReturnReportsController extends Controller implements HasMiddlewar
     public function index()
     {
         return Inertia::render('reports/purchase-return/index', [
-            'accounts' => Account::where('purchase', 1)->select('id', 'title', 'code')->get(),
-            'items' => Items::select('id', 'title', 'code')->get(),
+            'accounts' => Account::active()->where('purchase', 1)->select('id', 'title', 'code')->get(),
+            'items' => Items::active()->select('id', 'title', 'code')->get(),
             'firms' => Firm::select('id', 'name')->get(),
             'areas' => \App\Models\Areas::select('id', 'name', 'city_id', 'province_id')->get(),
             'sub_areas' => \App\Models\Subarea::select('id', 'name', 'area_id')->get(),
@@ -44,7 +44,7 @@ class PurchaseReturnReportsController extends Controller implements HasMiddlewar
             'categories' => \App\Models\ItemCategory::select('id', 'name as title')->orderBy('name')->get(),
             'salesmen' => \App\Models\Saleman::select('id', 'name')->get(),
             'users' => \App\Models\User::select('id', 'name')->get(),
-            'companies' => Account::where('type', 5)->select('id', 'title')->orderBy('title')->get(),
+            'companies' => Account::active()->where('type', 5)->select('id', 'title')->orderBy('title')->get(),
         ]);
     }
 

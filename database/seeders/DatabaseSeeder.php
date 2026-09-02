@@ -21,13 +21,17 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
         ]);
 
-        User::firstOrCreate(
-            ['email' => 'test@example.com'],
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
             [
-                'name' => 'Test User',
+                'name' => 'Admin User',
                 'password' => 'password',
                 'email_verified_at' => now(),
             ]
         );
+
+        if (!$admin->hasRole('Admin')) {
+            $admin->assignRole('Admin');
+        }
     }
 }

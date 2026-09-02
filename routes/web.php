@@ -125,6 +125,10 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::prefix('/account')->group(function () {
         Route::get('/', [AccountController::class, 'index'])->name('account.index');
+        Route::get('/bulk-upload', [AccountController::class, 'bulkUpload'])->name('account.bulk-upload');
+        Route::get('/bulk-upload/sample', [AccountController::class, 'downloadSample'])->name('account.bulk-upload.sample');
+        Route::post('/bulk-upload/preview', [AccountController::class, 'previewBulkUpload'])->name('account.bulk-upload.preview');
+        Route::post('/bulk-upload/import', [AccountController::class, 'processBulkImport'])->name('account.bulk-upload.import');
         Route::get('/create', [AccountController::class, 'create'])->name('account.create');
         Route::get('/search-suggestions', [AccountController::class, 'searchSuggestions'])->name('account.search-suggestions');
         Route::post('/', [AccountController::class, 'store'])->name('account.store');
@@ -275,6 +279,10 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/items')->group(function () {
         Route::get('/', [ItemsController::class, 'index'])->name('items.index');
         Route::get('/create', [ItemsController::class, 'create'])->name('items.create');
+        Route::get('/bulk-upload', [ItemsController::class, 'bulkUpload'])->name('items.bulk-upload');
+        Route::get('/bulk-upload/sample', [ItemsController::class, 'downloadSample'])->name('items.bulk-upload.sample');
+        Route::post('/bulk-upload/preview', [ItemsController::class, 'previewBulkUpload'])->name('items.bulk-upload.preview');
+        Route::post('/bulk-upload/import', [ItemsController::class, 'processBulkImport'])->name('items.bulk-upload.import');
         Route::get('/search-suggestions', [ItemsController::class, 'searchSuggestions'])->name('items.search-suggestions');
         Route::post('/', [ItemsController::class, 'store'])->name('items.store');
         Route::get('/next-code', [ItemsController::class, 'getNextCode'])->name('items.next-code');

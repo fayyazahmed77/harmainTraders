@@ -28,6 +28,7 @@ export function StockAccountSelectionDialog({
     const [search, setSearch] = useState("");
 
     const filteredAccounts = accounts
+        .filter(acc => acc.status !== false && acc.status !== 0)
         .filter(acc => {
             const typeName = (acc.type_name || '').toLowerCase();
             const isCompany = typeName.includes('company') || Number(acc.type) === 5;
