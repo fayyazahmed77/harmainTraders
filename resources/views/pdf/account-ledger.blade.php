@@ -130,33 +130,26 @@ if (file_exists($logo_path)) {
 <body>
 
     @php
-        function formatVoucherNo($type, $id, $credit, $debit) {
+        function formatVoucherNo($type, $id, $credit, $debit, $voucher_no = null) {
+            if (!empty($voucher_no)) return $voucher_no;
             if ($type === 'Sale') return str_pad($id, 6, "0", STR_PAD_LEFT);
             if ($type === 'Purchase') return str_pad($id, 6, "0", STR_PAD_LEFT);
             if ($type === 'Sales Return') return 'SR-' . str_pad($id, 6, "0", STR_PAD_LEFT);
             if ($type === 'Purchase Return') return 'PR-' . str_pad($id, 6, "0", STR_PAD_LEFT);
             if ($type === 'Payment') {
-                if ($credit > 0) return 'BR-' . $id; 
-                else return 'BP-' . $id; 
+                if ($credit > 0) return 'CPV-' . $id; 
+                else return 'CRV-' . $id; 
             }
             return $id;
         }
 
         function formatRemarks($type, $description) {
-            // Already uppercase or contains brackets, just return it
-            if (stripos($description, '{') !== false) return strtoupper($description);
-
-            if ($type === 'Sale') return 'TOTAL SALES { SALE }';
-            if ($type === 'Purchase') return 'TOTAL PURCHASE { PURCHASE }';
-            if ($type === 'Sales Return') return 'SALES RETURN { RETURN }';
-            if ($type === 'Purchase Return') return 'PURCHASE RETURN { RETURN }';
-            if ($type === 'Payment') {
-                if(trim(strtoupper($description)) === 'CASH IN HAND') {
-                    return 'CASH IN HAND { BNK_REC }';
-                }
-                return 'CASH IN HAND { ' . strtoupper($description ?: 'BNK_REC') . ' }';
-            }
-            return strtoupper($description);
+            if (!empty($description)) return $description;
+            if ($type === 'Sale') return 'TOTAL SALES';
+            if ($type === 'Purchase') return 'TOTAL PURCHASE';
+            if ($type === 'Sales Return') return 'SALES RETURN';
+            if ($type === 'Purchase Return') return 'PURCHASE RETURN';
+            return 'PAYMENT';
         }
 
         function renderBalance($bal, $orient) {
@@ -223,7 +216,7 @@ if (file_exists($logo_path)) {
             @foreach($data as $row)
             <tr>
                 <td class="text-center">{{ date('d-M-y', strtotime($row->date)) }}</td>
-                <td class="text-center">{{ formatVoucherNo($row->type, $row->id, $row->credit, $row->debit) }}</td>
+                <td class="text-center">{{ formatVoucherNo($row->type, $row->id, $row->credit, $row->debit, $row->voucher_no ?? null) }}</td>
                 <td>{{ formatRemarks($row->type, $row->description) }}</td>
                 <td class="text-center">{{ $row->cheque_no }}</td>
                 <td class="text-center">{{ $row->cheque_date ? date('d-m-y', strtotime($row->cheque_date)) : '' }}</td>

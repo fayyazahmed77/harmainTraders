@@ -25,7 +25,7 @@ use App\Models\User;
 use App\Models\InvestorCapitalAccount;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Account;
-
+use App\Models\Payment;
 
 class InvestorManagementController extends Controller
 {
@@ -131,10 +131,31 @@ class InvestorManagementController extends Controller
     {
         $investor = Investor::with(['capitalAccount', 'capitalHistory.approvedBy', 'transactions.creator'])->findOrFail($id);
         
+        $paymentAccounts = Account::active()
+            ->with('accountType')
+            ->whereHas('accountType', function ($q) {
+                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
+            })
+            ->get();
+
+        $availableCustomerCheques = Payment::where('type', 'RECEIPT')
+            ->where('payment_method', 'Cheque')
+            ->whereHas('paymentAccount.accountType', function ($q) {
+                $q->where('name', 'Cheque in hand');
+            })
+            ->where(function ($q) {
+                $q->where('cheque_status', 'In Hand')
+                    ->orWhereNull('cheque_status');
+            })
+            ->with(['account', 'paymentAccount'])
+            ->get();
+
         return Inertia::render('admin/investors/show', [
             'investor' => $investor,
             'pending_requests' => FinancialRequest::where('investor_id', $id)->where('status', 'pending')->get(),
             'available_balance' => app(InvestorCapitalService::class)->getAvailableBalance($id),
+            'paymentAccounts' => $paymentAccounts,
+            'availableCustomerCheques' => $availableCustomerCheques,
         ]);
     }
 
@@ -235,20 +256,35 @@ class InvestorManagementController extends Controller
     public function adjustCapital(int $id, Request $request)
     {
         $request->validate([
-            'amount' => 'required|numeric|min:1',
+            'amount' => 'required|numeric|min:0.01',
             'type' => 'required|in:capital_in,capital_out',
+            'payment_account_id' => 'required|exists:accounts,id',
+            'payment_method' => 'nullable|string|in:Cash,Online,Cheque',
+            'cheque_no' => 'nullable|string|max:100',
+            'cheque_date' => 'nullable|date',
+            'clear_date' => 'nullable|date',
+            'cheque_id' => 'nullable|exists:chequebooks,id',
+            'original_cheque_id' => 'nullable|exists:payments,id',
             'notes' => 'nullable|string|max:500',
         ]);
 
-        app(InvestorCapitalService::class)->adjustCapital(
+        $payment = app(InvestorCapitalService::class)->adjustCapital(
             $id, 
-            $request->amount, 
+            (float)$request->amount, 
             $request->type, 
             Auth::id(), 
-            $request->notes ?? ''
+            $request->notes ?? '',
+            $request->payment_account_id ? (int)$request->payment_account_id : null,
+            $request->payment_method ?? 'Cash',
+            $request->cheque_no,
+            $request->cheque_date,
+            $request->clear_date,
+            $request->cheque_id ? (int)$request->cheque_id : null,
+            $request->original_cheque_id ? (int)$request->original_cheque_id : null
         );
 
-        return back()->with('success', 'Capital adjusted manually.');
+        $actionText = $request->type === 'capital_in' ? 'Capital In' : 'Capital Out';
+        return back()->with('success', "{$actionText} recorded successfully with Voucher: {$payment->voucher_no}.");
     }
 
     public function bulkApproveRequests(Request $request)

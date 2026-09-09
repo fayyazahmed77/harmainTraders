@@ -27,7 +27,8 @@ export function GeneralLedgerReportView({
     };
 
     const formatVoucherNo = (row: any) => {
-        const { type, id, credit, debit, payment_method } = row;
+        if (row.voucher_no) return row.voucher_no;
+        const { type, id, credit, payment_method } = row;
         const paddedId = String(id).padStart(6, '0');
         if (type === 'Sale') return paddedId;
         if (type === 'Purchase') return paddedId;
@@ -35,30 +36,19 @@ export function GeneralLedgerReportView({
         if (type === 'Purchase Return') return `PR-${paddedId}`;
         if (type === 'Payment') {
             if (payment_method === 'Journal') return `JV-${paddedId}`;
-            return Number(credit) > 0 ? `BR-${id}` : `BP-${id}`;
+            return Number(credit) > 0 ? `CPV-${id}` : `CRV-${id}`;
         }
         return String(id);
     };
 
     const formatRemarks = (row: any) => {
-        const { type, description, payment_method } = row;
-        const descStr = String(description || '').toUpperCase();
-        if (descStr.includes('{')) return descStr;
-
-        if (type === 'Sale') return 'TOTAL SALES { SALE }';
-        if (type === 'Purchase') return 'TOTAL PURCHASE { PURCHASE }';
-        if (type === 'Sales Return') return 'SALES RETURN { RETURN }';
-        if (type === 'Purchase Return') return 'PURCHASE RETURN { RETURN }';
-        if (type === 'Payment') {
-            if (payment_method === 'Journal') {
-                return `JOURNAL ENTRY { ${descStr} }`;
-            }
-            if (descStr.trim() === 'CASH IN HAND' || !descStr) {
-                return 'CASH IN HAND { BNK_REC }';
-            }
-            return `CASH IN HAND { ${descStr} }`;
-        }
-        return descStr;
+        if (row.description) return row.description;
+        const { type } = row;
+        if (type === 'Sale') return 'TOTAL SALES';
+        if (type === 'Purchase') return 'TOTAL PURCHASE';
+        if (type === 'Sales Return') return 'SALES RETURN';
+        if (type === 'Purchase Return') return 'PURCHASE RETURN';
+        return 'PAYMENT';
     };
 
     const renderBalance = (bal: number, orient: string) => {
@@ -85,13 +75,13 @@ export function GeneralLedgerReportView({
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Opening Balance</p>
                     <h3 className="text-2xl font-bold text-text-primary">{formatCurrency(openingBalance)}</h3>
                 </div>
-                <div className="bg-card rounded-lg border border-border border-l-4 border-l-emerald-500 p-5 shadow-sm">
-                    <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Credit</p>
-                    <h3 className="text-2xl font-bold text-emerald-500">{formatCurrency(totalCredit)}</h3>
-                </div>
                 <div className="bg-card rounded-lg border border-border border-l-4 border-l-rose-500 p-5 shadow-sm">
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Debit</p>
                     <h3 className="text-2xl font-bold text-rose-500">{formatCurrency(totalDebit)}</h3>
+                </div>
+                <div className="bg-card rounded-lg border border-border border-l-4 border-l-emerald-500 p-5 shadow-sm">
+                    <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Credit</p>
+                    <h3 className="text-2xl font-bold text-emerald-500">{formatCurrency(totalCredit)}</h3>
                 </div>
                 <div className={cn("bg-card rounded-lg border border-border border-l-4 p-5 shadow-sm", closingBalance >= 0 ? "border-l-text-primary" : "border-l-red-500")}>
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Closing Balance</p>

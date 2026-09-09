@@ -61,7 +61,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $sales->selectRaw("'Sale' as type, id, date, CONCAT('Sale #', id) as description, NULL as payment_method, (net_total - extra_discount) as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $sales->selectRaw("'Sale' as type, sales.id, sales.date, sales.invoice as voucher_no, CONCAT('Sale #', COALESCE(sales.invoice, sales.id)) as description, NULL as payment_method, (sales.net_total - sales.extra_discount) as debit, 0 as credit, sales.created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchases = Purchase::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate]);
@@ -78,44 +78,93 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $purchases->selectRaw("'Purchase' as type, id, date, CONCAT('Purchase #', id) as description, NULL as payment_method, 0 as debit, net_total as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $purchases->selectRaw("'Purchase' as type, purchases.id, purchases.date, purchases.invoice as voucher_no, CONCAT('Purchase #', COALESCE(purchases.invoice, purchases.id)) as description, NULL as payment_method, 0 as debit, purchases.net_total as credit, purchases.created_at, NULL as cheque_no, NULL as cheque_date");
 
         // Determine which column to query in payments table
         $isAsset = in_array($account->type, [1, 2, 14]);
 
-        $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
-
-        $payments = Payment::where($paymentColumn, $accountId)
-            ->whereBetween('date', [$fromDate, $toDate])
-            ->where('cheque_status', '!=', 'Canceled');
-
-        if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
-            $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
-            $payments->where($otherCol, $params['contraId']);
-        }
-        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
-            $payments->where(function($q) use ($params) {
-                $q->where('remarks', 'like', "%{$params['remarks']}%")
-                  ->orWhere('cheque_no', 'like', "%{$params['remarks']}%")
-                  ->orWhere('voucher_no', 'like', "%{$params['remarks']}%")
-                  ->orWhere('id', 'like', "%{$params['remarks']}%");
-            });
-        }
-
         if ($isAsset) {
-            $payments->where(function($q) {
-                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                  ->orWhereNull('cheque_status')
-                  ->orWhere('cheque_status', '')
-                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+            $payments = Payment::where(function($q) use ($accountId) {
+                    $q->where('payment_account_id', $accountId)
+                      ->orWhere('account_id', $accountId);
+                })
+                ->whereBetween('payments.date', [$fromDate, $toDate])
+                ->where('payments.cheque_status', '!=', 'Canceled')
+                ->where(function($q) {
+                    $q->whereNotIn('payments.payment_method', ['Cheque', 'Online'])
+                      ->orWhereNull('payments.cheque_status')
+                      ->orWhere('payments.cheque_status', '')
+                      ->orWhereIn('payments.cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                });
+
+            if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+                $payments->where(function($q) use ($params) {
+                    $q->where('account_id', $params['contraId'])
+                      ->orWhere('payment_account_id', $params['contraId']);
+                });
+            }
+            if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+                $payments->where(function($q) use ($params) {
+                    $q->where('payments.remarks', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.cheque_no', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.voucher_no', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.id', 'like', "%{$params['remarks']}%");
+                });
+            }
+
+            $payments->leftJoin('accounts as party_acc', function($join) use ($accountId) {
+                $join->on('party_acc.id', '=', DB::raw("CASE WHEN payments.payment_account_id = {$accountId} THEN payments.account_id ELSE payments.payment_account_id END"));
             });
-            $payments->selectRaw("'Payment' as type, id, date, remarks as description, payment_method,
-                CASE WHEN type = 'RECEIPT' THEN amount ELSE 0 END as debit,
-                CASE WHEN type = 'RECEIPT' THEN 0 ELSE amount END as credit, created_at, cheque_no, cheque_date");
+
+            $payments->selectRaw("'Payment' as type, payments.id, payments.date, payments.voucher_no as voucher_no,
+                CASE 
+                    WHEN payments.remarks IS NOT NULL AND TRIM(payments.remarks) != '' 
+                    THEN CONCAT(COALESCE(party_acc.title, ''), ' (', payments.remarks, ')')
+                    ELSE COALESCE(party_acc.title, 'Payment')
+                END as description,
+                payments.payment_method,
+                CASE 
+                    WHEN payments.payment_account_id = {$accountId} THEN 
+                        CASE WHEN payments.type = 'RECEIPT' THEN payments.amount ELSE 0 END
+                    ELSE 
+                        CASE WHEN payments.type = 'PAYMENT' THEN payments.amount ELSE 0 END
+                END as debit,
+                CASE 
+                    WHEN payments.payment_account_id = {$accountId} THEN 
+                        CASE WHEN payments.type = 'RECEIPT' THEN 0 ELSE payments.amount END
+                    ELSE 
+                        CASE WHEN payments.type = 'PAYMENT' THEN 0 ELSE payments.amount END
+                END as credit,
+                payments.created_at, payments.cheque_no, payments.cheque_date");
         } else {
-            $payments->selectRaw("'Payment' as type, id, date, remarks as description, payment_method,
-                CASE WHEN type = 'RECEIPT' THEN 0 ELSE (amount + discount) END as debit,
-                CASE WHEN type = 'RECEIPT' THEN (amount + discount) ELSE 0 END as credit, created_at, cheque_no, cheque_date");
+            $paymentColumn = 'account_id';
+            $payments = Payment::where($paymentColumn, $accountId)
+                ->whereBetween('payments.date', [$fromDate, $toDate])
+                ->where('payments.cheque_status', '!=', 'Canceled')
+                ->leftJoin('accounts as party_acc', 'party_acc.id', '=', 'payments.payment_account_id');
+
+            if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
+                $payments->where('payments.payment_account_id', $params['contraId']);
+            }
+            if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+                $payments->where(function($q) use ($params) {
+                    $q->where('payments.remarks', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.cheque_no', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.voucher_no', 'like', "%{$params['remarks']}%")
+                      ->orWhere('payments.id', 'like', "%{$params['remarks']}%");
+                });
+            }
+
+            $payments->selectRaw("'Payment' as type, payments.id, payments.date, payments.voucher_no as voucher_no,
+                CASE 
+                    WHEN payments.remarks IS NOT NULL AND TRIM(payments.remarks) != '' 
+                    THEN CONCAT(COALESCE(party_acc.title, ''), ' (', payments.remarks, ')')
+                    ELSE COALESCE(party_acc.title, 'Payment')
+                END as description,
+                payments.payment_method,
+                CASE WHEN payments.type = 'RECEIPT' THEN 0 ELSE (payments.amount + payments.discount) END as debit,
+                CASE WHEN payments.type = 'RECEIPT' THEN (payments.amount + payments.discount) ELSE 0 END as credit,
+                payments.created_at, payments.cheque_no, payments.cheque_date");
         }
 
         $salesReturns = SalesReturn::where('customer_id', $accountId)
@@ -131,7 +180,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $salesReturns->selectRaw("'Sales Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, (net_total - extra_discount) as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $salesReturns->selectRaw("'Sales Return' as type, id, date, CONCAT('SR-', LPAD(id, 6, '0')) as voucher_no, CONCAT('Return #', id) as description, NULL as payment_method, 0 as debit, (net_total - extra_discount) as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $purchaseReturns = PurchaseReturn::where('supplier_id', $accountId)
             ->whereBetween('date', [$fromDate, $toDate]);
@@ -146,7 +195,7 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $purchaseReturns->selectRaw("'Purchase Return' as type, id, date, CONCAT('Return #', id) as description, NULL as payment_method, (net_total - extra_discount) as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
+        $purchaseReturns->selectRaw("'Purchase Return' as type, id, date, CONCAT('PR-', LPAD(id, 6, '0')) as voucher_no, CONCAT('Return #', id) as description, NULL as payment_method, (net_total - extra_discount) as debit, 0 as credit, created_at, NULL as cheque_no, NULL as cheque_date");
 
         $query = $sales->unionAll($purchases)
             ->unionAll($payments)
@@ -162,18 +211,27 @@ class ReportBuilder
         }
         $query->orderBy('date', 'asc')->orderBy('created_at', 'asc');
 
-        $transactions = $query->paginate($perPage);
+        // Clone unpaginated query BEFORE paginate() mutates it!
+        $unpaginatedQuery = clone $query;
+
+        $page = (int)($params['page'] ?? request()->input('page', 1));
 
         // 4. Calculate Balance at the start of the current page
         $pageStartBalance = $openingBalance;
-        if ($transactions->currentPage() > 1) {
-            $offset = ($transactions->currentPage() - 1) * $perPage;
+        if ($page > 1) {
+            $offset = ($page - 1) * $perPage;
 
-            $previousRowsQuery = DB::table(DB::raw("({$query->toSql()}) as transactions"))
-                ->mergeBindings($query->getQuery())
+            $previousRowsSubquery = DB::table(DB::raw("({$unpaginatedQuery->toSql()}) as transactions"))
+                ->mergeBindings($unpaginatedQuery->getQuery())
+                ->orderBy('date', 'asc')
+                ->orderBy('created_at', 'asc')
                 ->limit($offset);
 
-            $prevTotals = $previousRowsQuery->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')->first();
+            $prevTotals = DB::table(DB::raw("({$previousRowsSubquery->toSql()}) as prev_transactions"))
+                ->mergeBindings($previousRowsSubquery)
+                ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+                ->first();
+
             $totalPrevDebit = $prevTotals->total_debit ?? 0;
             $totalPrevCredit = $prevTotals->total_credit ?? 0;
 
@@ -184,9 +242,9 @@ class ReportBuilder
             }
         }
 
-        // 5. Calculate Totals for the entire period
-        $totalQuery = DB::table(DB::raw("({$query->toSql()}) as transactions"))
-            ->mergeBindings($query->getQuery());
+        // 5. Calculate Totals for the entire period from unpaginated query
+        $totalQuery = DB::table(DB::raw("({$unpaginatedQuery->toSql()}) as transactions"))
+            ->mergeBindings($unpaginatedQuery->getQuery());
 
         $totals = $totalQuery->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')->first();
 
@@ -197,6 +255,18 @@ class ReportBuilder
             $closingBalance = $openingBalance + $totalCredit - $totalDebit;
         } else {
             $closingBalance = $openingBalance + $totalDebit - $totalCredit;
+        }
+
+        $transactions = $query->paginate($perPage, ['*'], 'page', $page);
+
+        $runningBalance = $pageStartBalance;
+        foreach ($transactions->items() as $item) {
+            if ($orientation === 'cr') {
+                $runningBalance += ((float)$item->credit - (float)$item->debit);
+            } else {
+                $runningBalance += ((float)$item->debit - (float)$item->credit);
+            }
+            $item->balance = (float)$runningBalance;
         }
 
         return [
@@ -242,27 +312,25 @@ class ReportBuilder
         
         foreach($transactions as $txn) {
             $details = collect();
-            $voucherNo = $txn->id;
+            $voucherNo = $txn->voucher_no ?? $txn->id;
             $remarks = $txn->description;
             
             if ($txn->type === 'Sale') {
-                $voucherNo = str_pad($txn->id, 6, '0', STR_PAD_LEFT);
+                $voucherNo = $txn->voucher_no ?: str_pad($txn->id, 6, '0', STR_PAD_LEFT);
                 $details = $salesItems->get($txn->id) ?? collect();
             } elseif ($txn->type === 'Purchase') {
-                $voucherNo = str_pad($txn->id, 6, '0', STR_PAD_LEFT);
+                $voucherNo = $txn->voucher_no ?: str_pad($txn->id, 6, '0', STR_PAD_LEFT);
                 $details = $purchaseItems->get($txn->id) ?? collect();
             } elseif ($txn->type === 'Sales Return') {
-                $voucherNo = 'SR-' . str_pad($txn->id, 6, '0', STR_PAD_LEFT);
+                $voucherNo = $txn->voucher_no ?: ('SR-' . str_pad($txn->id, 6, '0', STR_PAD_LEFT));
                 $details = $salesReturnItems->get($txn->id) ?? collect();
             } elseif ($txn->type === 'Purchase Return') {
-                $voucherNo = 'PR-' . str_pad($txn->id, 6, '0', STR_PAD_LEFT);
+                $voucherNo = $txn->voucher_no ?: ('PR-' . str_pad($txn->id, 6, '0', STR_PAD_LEFT));
                 $details = $purchaseReturnItems->get($txn->id) ?? collect();
             } elseif ($txn->type === 'Payment') {
                 $payment = $payments->get($txn->id);
                 if ($payment) {
-                    $prefix = $payment->type === 'RECEIPT' ? 'BR-' : 'BP-';
-                    $voucherNo = $prefix . $txn->id;
-                    $remarks = $payment->remarks ?: 'CASH IN HAND';
+                    $voucherNo = $payment->voucher_no ?: $txn->voucher_no ?: (($payment->type === 'RECEIPT' ? 'CRV-' : 'CPV-') . $txn->id);
                 }
             }
             

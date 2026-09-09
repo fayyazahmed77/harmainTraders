@@ -207,6 +207,18 @@ class Account extends Model
                 })->sum(DB::raw('amount + discount'));
 
             return (float)$this->opening_balance + $totalPayments - $totalReceipts;
+        } elseif ($type === 'capital' || $this->type == 9) {
+            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+
+            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+
+            return (float)$this->opening_balance + $totalReceipts - $totalPayments;
         }
         
         return (float)$this->opening_balance;

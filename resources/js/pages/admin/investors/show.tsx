@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { 
@@ -12,7 +12,11 @@ import {
     Plus,
     Minus,
     ExternalLink,
-    AlertCircle
+    AlertCircle,
+    Landmark,
+    Banknote,
+    FileCheck,
+    Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -29,39 +33,187 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogFooter,
     DialogDescription
 } from '@/components/ui/dialog';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+    SheetFooter,
+} from '@/components/ui/sheet';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+
+interface PaymentAccount {
+    id: number;
+    title: string;
+    type: string | number;
+    account_type?: {
+        name: string;
+    };
+}
+
+interface CustomerCheque {
+    id: number;
+    voucher_no: string;
+    cheque_no: string;
+    cheque_date: string;
+    amount: number | string;
+    account?: {
+        title: string;
+    };
+    payment_account?: {
+        title: string;
+    };
+}
 
 interface Props {
     investor: any;
     pending_requests: any[];
     available_balance: number;
+    paymentAccounts?: PaymentAccount[];
+    availableCustomerCheques?: CustomerCheque[];
 }
 
-export default function Show({ investor, pending_requests, available_balance }: Props) {
+export default function Show({ 
+    investor, 
+    pending_requests, 
+    available_balance,
+    paymentAccounts = [],
+    availableCustomerCheques = []
+}: Props) {
     const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [isRejectOpen, setIsRejectOpen] = useState(false);
     const [isApproveOpen, setIsApproveOpen] = useState(false);
+    const [bankCheques, setBankCheques] = useState<any[]>([]);
+    const [loadingBankCheques, setLoadingBankCheques] = useState(false);
 
     const breadcrumbs = [
         { title: 'Investor Management', href: '/admin/investors' },
         { title: investor.full_name, href: `/admin/investors/${investor.id}` },
     ];
 
+    const cashAccounts = useMemo(() => {
+        return (paymentAccounts || []).filter(a => {
+            const name = (a.account_type?.name || a.title || '').toLowerCase();
+            return name.includes('cash');
+        });
+    }, [paymentAccounts]);
+
+    const bankAccounts = useMemo(() => {
+        return (paymentAccounts || []).filter(a => {
+            const name = (a.account_type?.name || a.title || '').toLowerCase();
+            return name.includes('bank');
+        });
+    }, [paymentAccounts]);
+
+    const chequeInHandAccounts = useMemo(() => {
+        return (paymentAccounts || []).filter(a => {
+            const name = (a.account_type?.name || a.title || '').toLowerCase();
+            return name.includes('cheque in hand');
+        });
+    }, [paymentAccounts]);
+
     const adjustmentForm = useForm({
         amount: '',
         type: 'capital_in',
+        payment_category: 'cash', // 'cash' | 'bank' | 'cheque'
+        payment_account_id: '',
+        payment_method: 'Cash', // 'Cash' | 'Online' | 'Cheque'
+        cheque_no: '',
+        cheque_date: '',
+        clear_date: '',
+        cheque_id: '',
+        original_cheque_id: '',
         notes: '',
     });
 
     const rejectionForm = useForm({
         admin_note: '',
     });
+
+    // Set initial payment account when modal opens or category changes
+    const selectPaymentCategory = (category: 'cash' | 'bank' | 'cheque') => {
+        let accountId = '';
+        let method = 'Cash';
+
+        if (category === 'cash') {
+            accountId = cashAccounts[0]?.id?.toString() || '';
+            method = 'Cash';
+        } else if (category === 'bank') {
+            accountId = bankAccounts[0]?.id?.toString() || '';
+            method = 'Online';
+        } else if (category === 'cheque') {
+            accountId = chequeInHandAccounts[0]?.id?.toString() || '';
+            method = 'Cheque';
+        }
+
+        adjustmentForm.setData(data => ({
+            ...data,
+            payment_category: category,
+            payment_account_id: accountId,
+            payment_method: method,
+            cheque_no: '',
+            cheque_date: '',
+            clear_date: '',
+            cheque_id: '',
+            original_cheque_id: '',
+        }));
+    };
+
+    // Open modal with clean defaults
+    const openAdjustmentModal = () => {
+        const defaultAcc = cashAccounts[0] || paymentAccounts[0];
+        const defaultCat = (defaultAcc?.account_type?.name?.toLowerCase().includes('bank'))
+            ? 'bank' 
+            : (defaultAcc?.account_type?.name?.toLowerCase().includes('cheque in hand'))
+                ? 'cheque'
+                : 'cash';
+
+        adjustmentForm.setData({
+            amount: '',
+            type: 'capital_in',
+            payment_category: defaultCat,
+            payment_account_id: defaultAcc?.id?.toString() || '',
+            payment_method: defaultCat === 'bank' ? 'Online' : (defaultCat === 'cheque' ? 'Cheque' : 'Cash'),
+            cheque_no: '',
+            cheque_date: '',
+            clear_date: '',
+            cheque_id: '',
+            original_cheque_id: '',
+            notes: '',
+        });
+        setIsAdjustmentOpen(true);
+    };
+
+    // Fetch unused bank cheques if Bank + Cheque + capital_out
+    useEffect(() => {
+        if (
+            adjustmentForm.data.payment_category === 'bank' &&
+            adjustmentForm.data.payment_method === 'Cheque' &&
+            adjustmentForm.data.payment_account_id
+        ) {
+            setLoadingBankCheques(true);
+            fetch(`/payment/available-cheques?account_id=${adjustmentForm.data.payment_account_id}`)
+                .then(res => res.json())
+                .then(data => {
+                    setBankCheques(Array.isArray(data) ? data : []);
+                })
+                .catch(() => setBankCheques([]))
+                .finally(() => setLoadingBankCheques(false));
+        } else {
+            setBankCheques([]);
+        }
+    }, [
+        adjustmentForm.data.payment_category, 
+        adjustmentForm.data.payment_method, 
+        adjustmentForm.data.payment_account_id
+    ]);
 
     const handleAdjustment = (e: React.FormEvent) => {
         e.preventDefault();
@@ -140,7 +292,7 @@ export default function Show({ investor, pending_requests, available_balance }: 
                             </Button>
                         </a>
                         <Button 
-                            onClick={() => setIsAdjustmentOpen(true)}
+                            onClick={openAdjustmentModal}
                             className="h-10 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
                         >
                             <Plus size={16} className="mr-2" /> 
@@ -205,56 +357,61 @@ export default function Show({ investor, pending_requests, available_balance }: 
                                                         <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">{month}</h4>
                                                     </div>
 
-                                                    {txs.map((tx: any) => (
-                                                        <div key={tx.id} className="relative pl-10 group">
-                                                            <div className={`absolute left-2.5 top-2 h-3 w-3 rounded-full border-2 border-background z-10 transition-all duration-300 group-hover:scale-125 ${
-                                                                ['capital_in', 'profit_credit', 'reinvestment'].includes(tx.transaction_type) 
-                                                                ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
-                                                                : 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]'
-                                                            }`} />
-                                                            
-                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-surface-2/20 border border-border/40 hover:border-primary/30 hover:bg-surface-2/40 transition-all duration-300 shadow-sm">
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className={`p-2.5 rounded-xl ${
-                                                                        ['capital_in', 'profit_credit', 'reinvestment'].includes(tx.transaction_type) 
-                                                                        ? 'bg-emerald-500/5 text-emerald-500' 
-                                                                        : 'bg-rose-500/5 text-rose-500'
-                                                                    }`}>
-                                                                        {tx.transaction_type === 'profit_credit' && <CheckCircle2 size={18} />}
-                                                                        {tx.transaction_type === 'capital_in' && <Wallet size={18} />}
-                                                                        {tx.transaction_type === 'profit_withdrawal' && <ExternalLink size={18} />}
-                                                                        {['capital_out', 'withdrawal'].includes(tx.transaction_type) && <Minus size={18} />}
-                                                                        {tx.transaction_type === 'reinvestment' && <HistoryIcon size={18} />}
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="text-xs font-black text-foreground uppercase tracking-tight">{tx.description || 'System Transaction'}</span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 mt-1.5">
-                                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                                                                                ['capital_in', 'profit_credit', 'reinvestment'].includes(tx.transaction_type) 
-                                                                                ? 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10' 
-                                                                                : 'bg-rose-500/5 text-rose-500 border-rose-500/10'
-                                                                            }`}>
-                                                                                {(tx.transaction_type || '').replace('_', ' ')}
-                                                                            </span>
-                                                                            <span className="text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter">
-                                                                                {new Date(tx.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
+                                                    {txs.map((tx: any) => {
+                                                        const txType = tx.type || tx.transaction_type;
+                                                        const isCredit = ['capital_in', 'profit_credit', 'reinvestment'].includes(txType);
+                                                        const txDesc = tx.narration || tx.description || 'System Transaction';
+
+                                                        return (
+                                                            <div key={tx.id} className="relative pl-10 group">
+                                                                <div className={`absolute left-2.5 top-2 h-3 w-3 rounded-full border-2 border-background z-10 transition-all duration-300 group-hover:scale-125 ${
+                                                                    isCredit 
+                                                                    ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
+                                                                    : 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]'
+                                                                }`} />
                                                                 
-                                                                <div className="flex items-center gap-8 text-right">
-                                                                    <div>
-                                                                        <p className="text-[9px] font-black uppercase text-muted-foreground/50 tracking-widest mb-0.5">Amount</p>
-                                                                        <p className={`text-sm font-black font-mono tabular-nums ${
-                                                                            ['capital_in', 'profit_credit', 'reinvestment'].includes(tx.transaction_type) ? 'text-emerald-500' : 'text-rose-500'
+                                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-surface-2/20 border border-border/40 hover:border-primary/30 hover:bg-surface-2/40 transition-all duration-300 shadow-sm">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className={`p-2.5 rounded-xl ${
+                                                                            isCredit 
+                                                                            ? 'bg-emerald-500/5 text-emerald-500' 
+                                                                            : 'bg-rose-500/5 text-rose-500'
                                                                         }`}>
-                                                                            {['capital_in', 'profit_credit', 'reinvestment'].includes(tx.transaction_type) ? '+' : '-'}
-                                                                            {tx.amount.toLocaleString()}
-                                                                        </p>
+                                                                            {txType === 'profit_credit' && <CheckCircle2 size={18} />}
+                                                                            {txType === 'capital_in' && <Wallet size={18} />}
+                                                                            {txType === 'profit_withdrawal' && <ExternalLink size={18} />}
+                                                                            {['capital_out', 'withdrawal'].includes(txType) && <Minus size={18} />}
+                                                                            {txType === 'reinvestment' && <HistoryIcon size={18} />}
+                                                                        </div>
+                                                                        <div>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-xs font-black text-foreground uppercase tracking-tight">{txDesc}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 mt-1.5">
+                                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                                                                                    isCredit 
+                                                                                    ? 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10' 
+                                                                                    : 'bg-rose-500/5 text-rose-500 border-rose-500/10'
+                                                                                }`}>
+                                                                                    {(txType || '').replace('_', ' ')}
+                                                                                </span>
+                                                                                <span className="text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter">
+                                                                                    {new Date(tx.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
+                                                                    
+                                                                    <div className="flex items-center gap-8 text-right">
+                                                                        <div>
+                                                                            <p className="text-[9px] font-black uppercase text-muted-foreground/50 tracking-widest mb-0.5">Amount</p>
+                                                                            <p className={`text-sm font-black font-mono tabular-nums ${
+                                                                                isCredit ? 'text-emerald-500' : 'text-rose-500'
+                                                                            }`}>
+                                                                                {isCredit ? '+' : '-'}
+                                                                                {Number(tx.amount || 0).toLocaleString()}
+                                                                            </p>
+                                                                        </div>
                                                                     <div className="min-w-[120px]">
                                                                         <p className="text-[9px] font-black uppercase text-muted-foreground/50 tracking-widest mb-0.5">Rolling Balance</p>
                                                                         <p className="text-sm font-black text-foreground font-mono tabular-nums tracking-tighter">
@@ -264,7 +421,8 @@ export default function Show({ investor, pending_requests, available_balance }: 
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                    );
+                                                })}
                                                 </div>
                                             ));
                                         })()
@@ -369,72 +527,477 @@ export default function Show({ investor, pending_requests, available_balance }: 
                 </div>
             </div>
 
-            {/* Adjustment Modal */}
-            <Dialog open={isAdjustmentOpen} onOpenChange={setIsAdjustmentOpen}>
-                <DialogContent className="bg-surface-1 border-border/50 text-foreground rounded-2xl shadow-2xl max-w-md p-0 overflow-hidden">
-                    <DialogHeader className="p-6 bg-surface-2/50 border-b border-border/50">
-                        <DialogTitle className="text-sm font-black uppercase tracking-widest">Manual Capital Entry</DialogTitle>
-                        <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-1">
-                            Directly modify {investor.full_name}'s capital position.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleAdjustment} className="p-6 space-y-6">
+            {/* Manual Capital Entry Drawer (Slide-over on Right Side) */}
+            <Sheet open={isAdjustmentOpen} onOpenChange={setIsAdjustmentOpen}>
+                <SheetContent 
+                    side="right" 
+                    className="w-full sm:max-w-xl p-0 flex flex-col h-full bg-surface-1 border-l border-border/50 text-foreground shadow-2xl overflow-hidden gap-0"
+                >
+                    <SheetHeader className="p-5 bg-surface-2/70 border-b border-border/50 shrink-0">
+                        <div className="flex items-center justify-between pr-8">
+                            <div>
+                                <SheetTitle className="text-sm font-black uppercase tracking-widest text-foreground">
+                                    Manual Capital Entry
+                                </SheetTitle>
+                                <SheetDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                                    Directly modify {investor.full_name}'s capital position & update accounts.
+                                </SheetDescription>
+                            </div>
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border shrink-0 ${
+                                adjustmentForm.data.type === 'capital_in'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                            }`}>
+                                {adjustmentForm.data.type === 'capital_in' ? 'Voucher: CRV (Receipt)' : 'Voucher: CPV (Payment)'}
+                            </span>
+                        </div>
+                    </SheetHeader>
+
+                    <form id="capital-adjustment-form" onSubmit={handleAdjustment} className="flex-1 overflow-y-auto p-5 space-y-5">
+                        {/* 1. Transaction Type Toggle */}
                         <div className="grid grid-cols-2 gap-3">
-                            <div className={`cursor-pointer rounded-xl border-2 p-4 transition-all text-center ${
-                                adjustmentForm.data.type === 'capital_in' 
-                                ? 'border-primary bg-primary/5 text-primary' 
-                                : 'border-border/50 bg-background/50 text-muted-foreground'
-                            }`} onClick={() => adjustmentForm.setData('type', 'capital_in')}>
-                                <Plus size={24} className="mx-auto mb-2" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Capital In</p>
+                            <div 
+                                className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all text-center select-none ${
+                                    adjustmentForm.data.type === 'capital_in' 
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-sm' 
+                                    : 'border-border/50 bg-background/50 text-muted-foreground hover:bg-surface-2/50'
+                                }`} 
+                                onClick={() => adjustmentForm.setData('type', 'capital_in')}
+                            >
+                                <Plus size={20} className="mx-auto mb-1 text-emerald-500" />
+                                <p className="text-[11px] font-black uppercase tracking-wider">Capital In</p>
+                                <p className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Equity Injection (+)</p>
                             </div>
-                            <div className={`cursor-pointer rounded-xl border-2 p-4 transition-all text-center ${
-                                adjustmentForm.data.type === 'capital_out' 
-                                ? 'border-rose-500 bg-rose-500/5 text-rose-500' 
-                                : 'border-border/50 bg-background/50 text-muted-foreground'
-                            }`} onClick={() => adjustmentForm.setData('type', 'capital_out')}>
-                                <Minus size={24} className="mx-auto mb-2" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Capital Out</p>
+
+                            <div 
+                                className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all text-center select-none ${
+                                    adjustmentForm.data.type === 'capital_out' 
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-500 shadow-sm' 
+                                    : 'border-border/50 bg-background/50 text-muted-foreground hover:bg-surface-2/50'
+                                }`} 
+                                onClick={() => adjustmentForm.setData('type', 'capital_out')}
+                            >
+                                <Minus size={20} className="mx-auto mb-1 text-rose-500" />
+                                <p className="text-[11px] font-black uppercase tracking-wider">Capital Out</p>
+                                <p className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Withdrawal / Drawing (-)</p>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="amount" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount (PKR)</Label>
-                            <Input 
-                                id="amount" 
-                                type="number" 
-                                placeholder="0.00"
-                                className="h-12 bg-background/50 border-border/50 text-lg font-black tracking-tighter font-mono rounded-xl focus:ring-primary/50"
-                                value={adjustmentForm.data.amount}
-                                onChange={e => adjustmentForm.setData('amount', e.target.value)}
-                                required
-                            />
+                        {/* 2. Amount Input */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="amount" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                                <span>Amount (PKR) <span className="text-rose-500">*</span></span>
+                                {adjustmentForm.data.amount && !isNaN(Number(adjustmentForm.data.amount)) && (
+                                    <span className="font-mono text-[9px] text-primary font-bold">
+                                        RS {Number(adjustmentForm.data.amount).toLocaleString()}
+                                    </span>
+                                )}
+                            </Label>
+                            <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-muted-foreground font-mono">
+                                    PKR
+                                </span>
+                                <Input 
+                                    id="amount" 
+                                    type="number" 
+                                    step="any"
+                                    placeholder="0.00"
+                                    className="h-11 pl-14 bg-background/50 border-border/50 text-base font-black tracking-tight font-mono rounded-xl focus:ring-primary/50"
+                                    value={adjustmentForm.data.amount}
+                                    onChange={e => adjustmentForm.setData('amount', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            {adjustmentForm.errors.amount && (
+                                <p className="text-[10px] font-bold text-rose-500">{adjustmentForm.errors.amount}</p>
+                            )}
                         </div>
 
+                        {/* 3. Account Category Selection (Bank, Cash, Cheque in Hand) */}
                         <div className="space-y-2">
-                            <Label htmlFor="notes" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Transaction Memo</Label>
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Payment Account / Treasury Channel <span className="text-rose-500">*</span>
+                            </Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => selectPaymentCategory('bank')}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                                        adjustmentForm.data.payment_category === 'bank'
+                                        ? 'border-primary bg-primary/10 text-primary font-black shadow-sm'
+                                        : 'border-border/50 bg-background/50 text-muted-foreground hover:bg-surface-2/40'
+                                    }`}
+                                >
+                                    <Landmark size={18} className="mb-1" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider">Bank</span>
+                                    <span className="text-[8px] text-muted-foreground uppercase mt-0.5">Transfer/Cheque</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => selectPaymentCategory('cash')}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                                        adjustmentForm.data.payment_category === 'cash'
+                                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 font-black shadow-sm'
+                                        : 'border-border/50 bg-background/50 text-muted-foreground hover:bg-surface-2/40'
+                                    }`}
+                                >
+                                    <Banknote size={18} className="mb-1 text-emerald-600" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider">Cash in Hand</span>
+                                    <span className="text-[8px] text-muted-foreground uppercase mt-0.5">Direct Cash</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => selectPaymentCategory('cheque')}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                                        adjustmentForm.data.payment_category === 'cheque'
+                                        ? 'border-amber-500 bg-amber-500/10 text-amber-600 font-black shadow-sm'
+                                        : 'border-border/50 bg-background/50 text-muted-foreground hover:bg-surface-2/40'
+                                    }`}
+                                >
+                                    <FileCheck size={18} className="mb-1 text-amber-600" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider">Cheque in Hand</span>
+                                    <span className="text-[8px] text-muted-foreground uppercase mt-0.5">Physical Cheque</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 4. Specific Account Selector & Details */}
+                        <div className="p-4 rounded-xl bg-surface-2/30 border border-border/40 space-y-4">
+                            {/* Bank Specific Controls */}
+                            {adjustmentForm.data.payment_category === 'bank' && (
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Select Bank Account <span className="text-rose-500">*</span>
+                                        </Label>
+                                        <Combobox 
+                                            options={bankAccounts.map(b => ({
+                                                value: b.id.toString(),
+                                                label: b.title
+                                            }))}
+                                            value={adjustmentForm.data.payment_account_id}
+                                            onChange={val => adjustmentForm.setData('payment_account_id', val)}
+                                            placeholder="Choose Bank Account..."
+                                            searchPlaceholder="Search bank accounts..."
+                                            className="h-10 text-xs font-bold bg-background border-border/50 rounded-xl"
+                                        />
+                                    </div>
+
+                                    {/* Bank Mode (Online vs Cheque) */}
+                                    <div className="space-y-1">
+                                        <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Transaction Mode
+                                        </Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={adjustmentForm.data.payment_method === 'Online' ? 'default' : 'outline'}
+                                                className="h-8 rounded-lg text-[9px] font-black uppercase tracking-wider"
+                                                onClick={() => adjustmentForm.setData(d => ({ ...d, payment_method: 'Online', cheque_id: '', cheque_no: '' }))}
+                                            >
+                                                Online / IBFT
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={adjustmentForm.data.payment_method === 'Cheque' ? 'default' : 'outline'}
+                                                className="h-8 rounded-lg text-[9px] font-black uppercase tracking-wider"
+                                                onClick={() => adjustmentForm.setData(d => ({ ...d, payment_method: 'Cheque' }))}
+                                            >
+                                                Bank Cheque
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* If Bank Cheque Selected */}
+                                    {adjustmentForm.data.payment_method === 'Cheque' && (
+                                        <div className="pt-2 border-t border-border/30 space-y-3">
+                                            {adjustmentForm.data.type === 'capital_out' && bankCheques.length > 0 ? (
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground flex justify-between">
+                                                        <span>Pick Cheque Leaf from Chequebook</span>
+                                                        {loadingBankCheques && <Loader2 size={10} className="animate-spin" />}
+                                                    </Label>
+                                                    <Combobox 
+                                                        options={bankCheques.map(c => ({
+                                                            value: c.id.toString(),
+                                                            label: c.label || c.value || c.cheque_no || ''
+                                                        }))}
+                                                        value={adjustmentForm.data.cheque_id}
+                                                        onChange={val => {
+                                                            const chq = bankCheques.find(c => c.id.toString() === val);
+                                                            adjustmentForm.setData(d => ({
+                                                                ...d,
+                                                                cheque_id: val,
+                                                                cheque_no: chq?.cheque_no || chq?.value || ''
+                                                            }));
+                                                        }}
+                                                        placeholder="Select unused cheque leaf..."
+                                                        searchPlaceholder="Search cheque number..."
+                                                        emptyMessage={loadingBankCheques ? "Loading cheques..." : "No unused cheques found."}
+                                                        className="h-9 text-xs font-mono font-bold bg-background border-border/50 rounded-xl"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Cheque Number {adjustmentForm.data.type === 'capital_in' && '(Investor\'s Cheque)'}
+                                                    </Label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="e.g. 00482910"
+                                                        className="h-9 text-xs font-mono bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.cheque_no}
+                                                        onChange={e => adjustmentForm.setData('cheque_no', e.target.value)}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Cheque Date
+                                                    </Label>
+                                                    <Input
+                                                        type="date"
+                                                        className="h-8 text-[11px] bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.cheque_date}
+                                                        onChange={e => adjustmentForm.setData('cheque_date', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Clear Date
+                                                    </Label>
+                                                    <Input
+                                                        type="date"
+                                                        className="h-8 text-[11px] bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.clear_date}
+                                                        onChange={e => adjustmentForm.setData('clear_date', e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Cash Specific Controls */}
+                            {adjustmentForm.data.payment_category === 'cash' && (
+                                <div className="space-y-2">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Select Cash Account <span className="text-rose-500">*</span>
+                                        </Label>
+                                        <Combobox 
+                                            options={cashAccounts.map(c => ({
+                                                value: c.id.toString(),
+                                                label: c.title
+                                            }))}
+                                            value={adjustmentForm.data.payment_account_id}
+                                            onChange={val => adjustmentForm.setData('payment_account_id', val)}
+                                            placeholder="Choose Cash Account..."
+                                            searchPlaceholder="Search cash accounts..."
+                                            className="h-10 text-xs font-bold bg-background border-border/50 rounded-xl"
+                                        />
+                                    </div>
+                                    <p className="text-[9px] text-muted-foreground font-semibold italic flex items-center gap-1.5">
+                                        <CheckCircle2 size={12} className="text-emerald-500" />
+                                        Will immediately credit/debit the physical Cash in Hand ledger.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Cheque In Hand Controls */}
+                            {adjustmentForm.data.payment_category === 'cheque' && (
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Cheque In Hand Account <span className="text-rose-500">*</span>
+                                        </Label>
+                                        <Combobox 
+                                            options={chequeInHandAccounts.map(c => ({
+                                                value: c.id.toString(),
+                                                label: c.title
+                                            }))}
+                                            value={adjustmentForm.data.payment_account_id}
+                                            onChange={val => adjustmentForm.setData('payment_account_id', val)}
+                                            placeholder="Choose Cheque Account..."
+                                            searchPlaceholder="Search cheque in hand accounts..."
+                                            className="h-10 text-xs font-bold bg-background border-border/50 rounded-xl"
+                                        />
+                                    </div>
+
+                                    {/* If Capital In: Receiving physical cheque into In Hand */}
+                                    {adjustmentForm.data.type === 'capital_in' && (
+                                        <div className="space-y-2 pt-1">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Cheque No <span className="text-rose-500">*</span>
+                                                    </Label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="e.g. CHQ-9210"
+                                                        className="h-9 text-xs font-mono bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.cheque_no}
+                                                        onChange={e => adjustmentForm.setData('cheque_no', e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Cheque Date
+                                                    </Label>
+                                                    <Input
+                                                        type="date"
+                                                        className="h-9 text-[11px] bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.cheque_date}
+                                                        onChange={e => adjustmentForm.setData('cheque_date', e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[9px] text-muted-foreground font-semibold italic flex items-center gap-1.5">
+                                                <CheckCircle2 size={12} className="text-amber-500" />
+                                                Cheque will be recorded as active 'In Hand' in your cheque portfolio.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* If Capital Out: Distributing an in-hand cheque to investor */}
+                                    {adjustmentForm.data.type === 'capital_out' && (
+                                        <div className="space-y-2 pt-1">
+                                            {availableCustomerCheques && availableCustomerCheques.length > 0 ? (
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Select In-Hand Cheque to Transfer <span className="text-rose-500">*</span>
+                                                    </Label>
+                                                    <Combobox
+                                                        options={availableCustomerCheques.map(chk => ({
+                                                            value: chk.id.toString(),
+                                                            label: `#${chk.cheque_no} — RS ${Number(chk.amount).toLocaleString()} (${chk.account?.title || 'Party'})`
+                                                        }))}
+                                                        value={adjustmentForm.data.original_cheque_id}
+                                                        onChange={val => {
+                                                            const chk = availableCustomerCheques.find(c => c.id.toString() === val);
+                                                            if (chk) {
+                                                                adjustmentForm.setData(d => ({
+                                                                    ...d,
+                                                                    original_cheque_id: val,
+                                                                    amount: chk.amount.toString(),
+                                                                    cheque_no: chk.cheque_no || '',
+                                                                    cheque_date: chk.cheque_date || '',
+                                                                }));
+                                                            }
+                                                        }}
+                                                        placeholder="Select available in-hand cheque..."
+                                                        searchPlaceholder="Search by cheque #, amount, party..."
+                                                        emptyMessage="No available in-hand cheques."
+                                                        className="h-9 text-xs font-mono font-bold bg-background border-border/50 rounded-xl"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                                                        Cheque No
+                                                    </Label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="Cheque No..."
+                                                        className="h-9 text-xs font-mono bg-background border-border/50 rounded-lg"
+                                                        value={adjustmentForm.data.cheque_no}
+                                                        onChange={e => adjustmentForm.setData('cheque_no', e.target.value)}
+                                                    />
+                                                </div>
+                                            )}
+                                            <p className="text-[9px] text-muted-foreground font-semibold italic flex items-center gap-1.5">
+                                                <AlertCircle size={12} className="text-amber-500" />
+                                                Selected cheque will be endorsed to investor and marked 'Distributed'.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 5. Transaction Memo */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="notes" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Transaction Memo / Notes
+                            </Label>
                             <Textarea 
                                 id="notes" 
-                                placeholder="Explain the reason for this adjustment..."
-                                className="bg-background/50 border-border/50 text-xs font-medium rounded-xl min-h-[80px] focus:ring-primary/50"
+                                placeholder="Explain reason for capital adjustment..."
+                                className="bg-background/50 border-border/50 text-xs font-medium rounded-xl min-h-[60px] focus:ring-primary/50"
                                 value={adjustmentForm.data.notes}
                                 onChange={e => adjustmentForm.setData('notes', e.target.value)}
                             />
                         </div>
 
-                        <div className="flex gap-3 mt-4">
-                            <Button type="button" variant="ghost" onClick={() => setIsAdjustmentOpen(false)} className="flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest">Cancel</Button>
+                        {/* 6. Live Impact Preview Card */}
+                        {adjustmentForm.data.amount && Number(adjustmentForm.data.amount) > 0 && (
+                            <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border/50 space-y-2 text-[10px]">
+                                <p className="font-black uppercase tracking-wider text-muted-foreground">
+                                    Impact Summary
+                                </p>
+                                <div className="grid grid-cols-2 gap-2 font-mono">
+                                    <div>
+                                        <span className="text-muted-foreground">Voucher Type: </span>
+                                        <span className="font-black text-foreground">
+                                            {adjustmentForm.data.type === 'capital_in' ? 'CRV (Receipt Voucher)' : 'CPV (Payment Voucher)'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">New Capital: </span>
+                                        <span className="font-black text-foreground">
+                                            RS {(
+                                                adjustmentForm.data.type === 'capital_in'
+                                                ? (Number(investor.capital_account?.current_capital || 0) + Number(adjustmentForm.data.amount))
+                                                : Math.max(0, Number(investor.capital_account?.current_capital || 0) - Number(adjustmentForm.data.amount))
+                                            ).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </form>
+
+                    {/* 7. Pinned Drawer Footer */}
+                    <SheetFooter className="p-4 bg-surface-2/60 border-t border-border/50 shrink-0 mt-auto">
+                        <div className="flex w-full gap-3">
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                onClick={() => setIsAdjustmentOpen(false)} 
+                                className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                            >
+                                Cancel
+                            </Button>
                             <Button 
                                 type="submit" 
-                                className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-black uppercase tracking-widest shadow-lg shadow-primary/20"
-                                disabled={adjustmentForm.processing}
+                                form="capital-adjustment-form"
+                                className={`flex-1 h-11 rounded-xl font-black uppercase tracking-widest shadow-lg ${
+                                    adjustmentForm.data.type === 'capital_in'
+                                    ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20'
+                                    : 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-500/20'
+                                }`}
+                                disabled={adjustmentForm.processing || !adjustmentForm.data.amount || !adjustmentForm.data.payment_account_id}
                             >
-                                Process Entry
+                                {adjustmentForm.processing ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 size={16} className="animate-spin" /> Processing...
+                                    </span>
+                                ) : (
+                                    adjustmentForm.data.type === 'capital_in' ? 'Process Capital In' : 'Process Capital Out'
+                                )}
                             </Button>
                         </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
 
             {/* Rejection Modal */}
             <Dialog open={isRejectOpen} onOpenChange={setIsRejectOpen}>

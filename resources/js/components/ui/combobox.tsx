@@ -17,6 +17,8 @@ interface ComboboxProps {
   searchPlaceholder?: string
   emptyMessage?: string
   className?: string
+  popoverClassName?: string
+  modal?: boolean
 }
 
 export function Combobox({
@@ -27,6 +29,8 @@ export function Combobox({
   searchPlaceholder = "Search...",
   emptyMessage = "No results found.",
   className,
+  popoverClassName,
+  modal = true,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -47,10 +51,10 @@ export function Combobox({
     }
   }, [open])
 
-  const selectedOption = options.find((option) => option.value === value)
+  const selectedOption = options.find((option) => String(option.value) === String(value))
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -68,7 +72,13 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl border-zinc-200 dark:border-zinc-800" align="start">
+      <PopoverContent 
+        className={cn(
+          "w-[--radix-popover-trigger-width] min-w-[220px] p-0 shadow-2xl border-zinc-200 dark:border-zinc-800 z-[100] bg-white dark:bg-zinc-900",
+          popoverClassName
+        )} 
+        align="start"
+      >
         <div className="flex flex-col h-full max-h-[300px]">
           <div className="flex items-center border-b px-3 dark:border-zinc-800">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-orange-500" />
@@ -90,12 +100,12 @@ export function Combobox({
             {filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-sm text-zinc-500">{emptyMessage}</div>
             ) : (
-              filteredOptions.map((option) => (
+              filteredOptions.map((option, idx) => (
                 <div
-                  key={option.value}
+                  key={`${option.value}-${idx}`}
                   className={cn(
                     "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-orange-50 hover:text-orange-900 dark:hover:bg-orange-950/20 dark:hover:text-orange-200 transition-colors",
-                    value === option.value && "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
+                    String(value) === String(option.value) && "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
                   )}
                   onClick={() => {
                     onChange(option.value)
@@ -104,11 +114,11 @@ export function Combobox({
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4 text-orange-600",
-                      value === option.value ? "opacity-100" : "opacity-0"
+                      "mr-2 h-4 w-4 text-orange-600 shrink-0",
+                      String(value) === String(option.value) ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option.label}
+                  <span className="truncate flex-1">{option.label}</span>
                 </div>
               ))
             )}
