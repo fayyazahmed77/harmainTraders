@@ -424,8 +424,9 @@ export default function Page({ item, categories, companies, pagination }: Props)
   }, [data.trade_price, data.retail]);
 
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (processing || exactDuplicateExists) return
 
     const payload: any = { ...data };
     
@@ -460,6 +461,23 @@ export default function Page({ item, categories, companies, pagination }: Props)
       },
     })
   }
+
+  const submitRef = React.useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+
+  // Global Keyboard Shortcuts (F9 -> Submit / Update Item)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!showConfirm && !processing && !exactDuplicateExists) {
+          submitRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirm, processing, exactDuplicateExists]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -778,15 +796,15 @@ export default function Page({ item, categories, companies, pagination }: Props)
                         <Input type="number" placeholder="%" value={data.pt4} onChange={(e) => onInputChange("pt4", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt4 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt4) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.4 " icon={Percent}>
+                      <TechLabel label="T.P.5 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt5} onChange={(e) => onInputChange("pt5", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt5 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt5) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.5 " icon={Percent}>
+                      <TechLabel label="T.P.6 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt6} onChange={(e) => onInputChange("pt6", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt6 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt6) / 100)).toFixed(2)}</div>}
                       </TechLabel>
-                      <TechLabel label="T.P.6 " icon={Percent}>
+                      <TechLabel label="T.P.7 " icon={Percent}>
                         <Input type="number" placeholder="%" value={data.pt7} onChange={(e) => onInputChange("pt7", e.target.value)} className="h-8 text-xs font-mono bg-zinc-50 dark:bg-zinc-800" />
                         {data.trade_price && data.pt7 && <div className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-1">Rs {(Number(data.trade_price) * (1 + Number(data.pt7) / 100)).toFixed(2)}</div>}
                       </TechLabel>
@@ -1133,8 +1151,13 @@ export default function Page({ item, categories, companies, pagination }: Props)
                   }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
-                    {processing ? "Saving..." : "Update Item"}
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD} flex items-center gap-2`}>
+                    {processing ? "Saving..." : (
+                      <>
+                        <span>Update Item</span>
+                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

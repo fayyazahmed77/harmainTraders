@@ -479,8 +479,9 @@ export default function Edit({
 
 
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (processing || exactDuplicateExists) return;
     clearErrors();
 
     // Client-side validation
@@ -564,6 +565,23 @@ export default function Edit({
   const [exactDuplicateExists, setExactDuplicateExists] = useState(false);
   const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
   const [availabilityStatus, setAvailabilityStatus] = useState<"none" | "loading" | "available" | "duplicate">("none");
+
+  const submitRef = React.useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+
+  // Global Keyboard Shortcuts (F9 -> Submit / Update Account)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!showConfirm && !processing && !exactDuplicateExists) {
+          submitRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirm, processing, exactDuplicateExists]);
 
   // Debounced search for account title uniqueness (excluding current account ID)
   useEffect(() => {
@@ -1304,7 +1322,8 @@ export default function Edit({
                       ) : (
                         <>
                           <Save size={16} />
-                          UPDATE ACCOUNT
+                          <span>UPDATE ACCOUNT</span>
+                          <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
                         </>
                       )}
                     </Button>

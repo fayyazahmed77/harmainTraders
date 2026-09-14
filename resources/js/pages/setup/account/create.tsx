@@ -532,8 +532,9 @@ export default function Create({
   };
 
   // ---------- submit ----------
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (processing || exactDuplicateExists) return;
     clearErrors();
 
     // Client-side validation
@@ -648,6 +649,23 @@ export default function Create({
   const [exactDuplicateExists, setExactDuplicateExists] = useState(false);
   const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
   const [availabilityStatus, setAvailabilityStatus] = useState<"none" | "loading" | "available" | "duplicate">("none");
+
+  const submitRef = React.useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+
+  // Global Keyboard Shortcuts (F9 -> Submit / Create Account)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!showConfirm && !processing && !exactDuplicateExists) {
+          submitRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirm, processing, exactDuplicateExists]);
 
   // Debounced search for account title uniqueness
   useEffect(() => {
@@ -1407,8 +1425,13 @@ export default function Create({
                   >
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
-                    {processing ? "Saving..." : "Create Account"}
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD} flex items-center gap-2`}>
+                    {processing ? "Saving..." : (
+                      <>
+                        <span>Create Account</span>
+                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

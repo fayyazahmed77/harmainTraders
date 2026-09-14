@@ -409,8 +409,9 @@ export default function Page({ categories, companies }: { categories: any, compa
   }, [data.category]);
 
   // submit handler
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (processing || exactDuplicateExists) return
 
     const payload: any = { ...data };
 
@@ -452,6 +453,23 @@ export default function Page({ categories, companies }: { categories: any, compa
       },
     })
   }
+
+  const submitRef = React.useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+
+  // Global Keyboard Shortcuts (F9 -> Submit / Create Item)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!showConfirm && !processing && !exactDuplicateExists) {
+          submitRef.current();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirm, processing, exactDuplicateExists]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -1052,8 +1070,13 @@ export default function Page({ categories, companies }: { categories: any, compa
                   }} className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}>
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD}`}>
-                    {processing ? "Saving..." : "Create Item"}
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD} flex items-center gap-2`}>
+                    {processing ? "Saving..." : (
+                      <>
+                        <span>Create Item</span>
+                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
