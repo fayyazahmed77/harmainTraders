@@ -33,6 +33,10 @@ interface Item {
     last_purchase_qty_full?: number;
     last_purchase_qty_pcs?: number;
     last_purchase_total?: number;
+    has_purchases?: boolean;
+    avg_purchase_rate?: number;
+    has_sales?: boolean;
+    avg_sale_rate?: number;
 }
 
 interface RowData {
@@ -420,7 +424,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                             <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const tradePrice = toNumber(item.trade_price);
-                                    const avgPrice = (toNumber(item.trade_price) + toNumber(item.retail)) / 2;
+                                    const avgPurchPrice = item.has_purchases && toNumber(item.avg_purchase_rate) > 0 ? toNumber(item.avg_purchase_rate) : 0;
                                     const isSelected = rows.some(r => Number(r.item_id) === Number(item.id));
                                     const isFocused = idx === selectedIndex;
 
@@ -463,7 +467,11 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                                     </div>
                                                 </div>
                                                 <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
-                                                    {avgPrice.toFixed(0)}
+                                                    {avgPurchPrice > 0 ? (
+                                                        avgPurchPrice.toFixed(0)
+                                                    ) : (
+                                                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-normal italic">New Item</span>
+                                                    )}
                                                 </div>
                                                 <div className="col-span-2 text-right pr-2 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
                                                     {item.stock_1 ? `${item.stock_1} units` : '0 units'}
@@ -706,10 +714,20 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         </div>
 
                                         <div className="p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between shadow-2xs">
-                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest">AVERAGE</span>
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-400 uppercase tracking-widest">AVG PURCHASE</span>
                                             <div className="mt-1 flex items-baseline gap-0.5">
-                                                <span className="text-[9px] text-zinc-700 font-bold">Rs</span>
-                                                <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 font-mono">{((toNumber(selectedItemForQty.trade_price) + toNumber(selectedItemForQty.retail)) / 2).toFixed(2)}</span>
+                                                {selectedItemForQty.has_purchases && toNumber(selectedItemForQty.avg_purchase_rate) > 0 ? (
+                                                    <>
+                                                        <span className="text-[9px] text-zinc-700 font-bold">Rs</span>
+                                                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                                            {toNumber(selectedItemForQty.avg_purchase_rate).toFixed(2)}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                                        New Item
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -728,13 +746,19 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Calendar size={12} /> Date
                                             </span>
-                                            <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">{formatDate(selectedItemForQty.last_purchase_date)}</span>
+                                            <span className="text-zinc-800 dark:text-zinc-200 font-mono font-black">
+                                                {selectedItemForQty.has_purchases || selectedItemForQty.last_purchase_date
+                                                    ? formatDate(selectedItemForQty.last_purchase_date)
+                                                    : 'New Item - No Purchase'}
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
                                             <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <Building2 size={12} /> Supplier
                                             </span>
-                                            <span className="text-orange-600 dark:text-orange-400 font-black">{selectedItemForQty.last_supplier_name || selectedItemForQty.company || 'N/A'}</span>
+                                            <span className="text-orange-600 dark:text-orange-400 font-black">
+                                                {selectedItemForQty.last_supplier_name || (selectedItemForQty.has_purchases ? (selectedItemForQty.company || 'N/A') : 'New Item')}
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2">
                                             <span className="text-zinc-700 dark:text-zinc-500 text-[10px] font-black uppercase flex items-center gap-1">
@@ -746,7 +770,11 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                             <span className="text-amber-600 dark:text-amber-400/80 text-[10px] font-black uppercase flex items-center gap-1">
                                                 <TrendingUp size={12} /> Last Rate
                                             </span>
-                                            <span className="font-mono font-black">Rs {toNumber(selectedItemForQty.last_purchase_rate || selectedItemForQty.trade_price).toFixed(2)}</span>
+                                            <span className="font-mono font-black">
+                                                {selectedItemForQty.has_purchases || toNumber(selectedItemForQty.last_purchase_rate) > 0
+                                                    ? `Rs ${toNumber(selectedItemForQty.last_purchase_rate).toFixed(2)}`
+                                                    : 'Rs 0.00'}
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                                             <span className="text-emerald-600 dark:text-emerald-400/80 text-[10px] font-black uppercase flex items-center gap-1">

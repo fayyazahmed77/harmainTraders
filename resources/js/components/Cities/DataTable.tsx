@@ -15,24 +15,20 @@ import {
   ChevronUp,
   ChevronDown,
   MoreHorizontal,
-  ChevronLeft as IconChevronLeft,
-  ChevronRight as IconChevronRight,
-  ChevronsLeft as IconChevronsLeft,
-  ChevronsRight as IconChevronsRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   PencilLine,
   Trash2,
-  Mail,
-  User,
-  Calendar,
-  Hash,
   MapPin,
-  Activity,
-  ShieldCheck,
   Building2,
   Globe,
-  Navigation
+  Navigation,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { router, usePage } from "@inertiajs/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -59,6 +55,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -67,7 +64,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "react-hot-toast";
+import Select, { SingleValue } from "react-select";
+import { toast } from "sonner";
 
 interface City {
   id: number;
@@ -82,12 +80,14 @@ interface City {
   created_by: number;
   created_by_name?: string;
   created_by_avatar?: string;
+  country?: { id: number; name: string; code: string };
+  province?: { id: number; name: string; code: string };
 }
 
 interface Country {
   id: number;
   name: string;
-  code: string; // ISO code for flag
+  code: string;
 }
 
 interface Province {
@@ -95,6 +95,12 @@ interface Province {
   name: string;
   code: string;
   country_id: number;
+}
+
+interface Option {
+  value: number;
+  label: string;
+  code?: string;
 }
 
 interface DataTableProps {
@@ -106,176 +112,311 @@ interface DataTableProps {
 export function DataTable({ data, countries, provinces }: DataTableProps) {
   const pageProps = usePage().props as unknown as {
     auth: { user: any; permissions: string[] };
-    errors: Record<string, string>;
   };
-  const permissions = pageProps.auth.permissions;
+  const permissions = pageProps.auth.permissions || [];
+  const canEdit = Array.isArray(permissions) && permissions.includes("edit cities");
+  const canDelete = Array.isArray(permissions) && permissions.includes("delete cities");
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
 
+  // Dialog states
   const [editCity, setEditCity] = useState<City | null>(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  const [cityToDelete, setCityToDelete] = useState<City | null>(null);
 
-  // form states
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<string>("");
-  const [selectedProvince, setSelectedProvince] = useState<string>("");
+  // Edit form states
+  const [editName, setEditName] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [editLatitude, setEditLatitude] = useState("");
+  const [editLongitude, setEditLongitude] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [selectedCountry, setSelectedCountry] = useState<Option | null>(null);
+  const [selectedProvince, setSelectedProvince] = useState<Option | null>(null);
+  const [provinceOptions, setProvinceOptions] = useState<Option[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // handle update
-  const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
+  const countryOptions: Option[] = countries.map((c) => ({
+    value: c.id,
+    label: c.name,
+    code: c.code,
+  }));
+
+  const openEdit = (city: City) => {
+    setEditCity(city);
+    setEditName(city.name);
+    setEditCode(city.code);
+    setEditLatitude(city.latitude || "");
+    setEditLongitude(city.longitude || "");
+    setEditIsActive(Boolean(city.is_active));
+
+    const currentCountry = countries.find((c) => c.id === Number(city.country_id));
+    const countryOpt = currentCountry
+      ? { value: currentCountry.id, label: currentCountry.name, code: currentCountry.code }
+      : null;
+    setSelectedCountry(countryOpt);
+
+    const countryProvs = provinces.filter((p) => p.country_id === Number(city.country_id));
+    const provOpts = countryProvs.map((p) => ({ value: p.id, label: p.name, code: p.code }));
+    setProvinceOptions(provOpts);
+
+    const currentProv = provinces.find((p) => p.id === Number(city.province_id));
+    setSelectedProvince(
+      currentProv
+        ? { value: currentProv.id, label: currentProv.name, code: currentProv.code }
+        : null
+    );
+  };
+
+  const handleEditCountryChange = async (opt: SingleValue<Option>) => {
+    setSelectedCountry(opt);
+    setSelectedProvince(null);
+
+    if (opt) {
+      try {
+        const response = await fetch(`/cities/countries/${opt.value}/provinces`);
+        if (response.ok) {
+          const fetched: Province[] = await response.json();
+          setProvinceOptions(fetched.map((p) => ({ value: p.id, label: p.name, code: p.code })));
+        } else {
+          const fallback = provinces.filter((p) => p.country_id === Number(opt.value));
+          setProvinceOptions(fallback.map((p) => ({ value: p.id, label: p.name, code: p.code })));
+        }
+      } catch {
+        const fallback = provinces.filter((p) => p.country_id === Number(opt.value));
+        setProvinceOptions(fallback.map((p) => ({ value: p.id, label: p.name, code: p.code })));
+      }
+    } else {
+      setProvinceOptions([]);
+    }
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editCity) return;
+    if (!editCity || !selectedCountry || !selectedProvince) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
 
+    setIsUpdating(true);
     router.put(
       `/cities/${editCity.id}`,
       {
-        name,
-        code,
-        country_id: selectedCountry,
-        province_id: selectedProvince,
-        latitude,
-        longitude,
+        name: editName,
+        code: editCode,
+        country_id: selectedCountry.value,
+        province_id: selectedProvince.value,
+        latitude: editLatitude || null,
+        longitude: editLongitude || null,
+        is_active: editIsActive,
       },
       {
         onSuccess: () => {
           toast.success("City updated successfully!");
           setEditCity(null);
+          setIsUpdating(false);
         },
-        onError: () => toast.error("Update failed"),
+        onError: (err) => {
+          setIsUpdating(false);
+          const firstErr = Object.values(err)[0];
+          toast.error(firstErr || "Failed to update city.");
+        },
       }
     );
   };
 
-  // handle delete
+  const confirmDelete = (city: City) => {
+    setCityToDelete(city);
+    setOpenDeleteDialog(true);
+  };
+
   const handleDelete = () => {
-    if (!selectedCity) return;
-    router.delete(`/cities/${selectedCity.id}`, {
+    if (!cityToDelete) return;
+    router.delete(`/cities/${cityToDelete.id}`, {
       onSuccess: () => {
-        toast.success("City deleted successfully!");
+        toast.success("City deleted successfully.");
         setOpenDeleteDialog(false);
+        setCityToDelete(null);
       },
-      onError: () => toast.error("Delete failed"),
+      onError: () => toast.error("Failed to delete city."),
     });
   };
 
   const columns: ColumnDef<City>[] = [
     {
       accessorKey: "country",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country</span>
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground p-0 hover:bg-transparent"
+        >
+          Country
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-1 h-3.5 w-3.5" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-1 h-3.5 w-3.5" />
+          ) : null}
+        </Button>
       ),
       cell: ({ row }) => {
         const city = row.original;
         const country = countries.find((c) => c.id === Number(city.country_id));
-        if (!country) return <span className="text-xs font-black text-muted-foreground/30 uppercase tracking-widest italic">Node Isolated</span>;
+        if (!country) return <span className="text-xs text-muted-foreground italic">Isolated</span>;
 
         return (
-          <div className="flex items-center gap-3 leading-none group/jurisdiction">
-            <div className="relative leading-none">
-              <div className="absolute -inset-1 bg-orange-500 rounded-sm blur opacity-0 group-hover/jurisdiction:opacity-20 transition duration-500" />
-              <img
-                src={`https://flagcdn.com/w80/${country.code.toLowerCase()}.png`}
-                alt={country.name}
-                className="relative w-8 h-5 rounded-sm object-cover border border-orange-500/10 shadow-sm transition-transform group-hover/jurisdiction:scale-110 duration-500"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-black text-foreground/70 uppercase tracking-tight leading-none group-hover/jurisdiction:text-orange-600 transition-colors">{country.name}</span>
-              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none font-mono">#{country.code}</span>
+          <div className="flex items-center gap-2.5">
+            <img
+              src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
+              alt={country.name}
+              className="w-5 h-3.5 object-cover rounded-xs border border-border/70 shadow-xs"
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-foreground leading-tight">
+                {country.name}
+              </span>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                #{country.code}
+              </span>
             </div>
           </div>
         );
       },
     },
     {
-      accessorKey: "province.name",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Province</span>
+      accessorKey: "province",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground p-0 hover:bg-transparent"
+        >
+          Province
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-1 h-3.5 w-3.5" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-1 h-3.5 w-3.5" />
+          ) : null}
+        </Button>
       ),
       cell: ({ row }) => {
         const province = provinces.find((p) => p.id === Number(row.original.province_id));
         return (
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-black text-foreground uppercase tracking-tight leading-none">{province?.name || "Unknown"}</span>
-            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none font-mono">SEC-{province?.code || "???"}</span>
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-foreground leading-tight">
+              {province?.name || "Unknown"}
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {province?.code ? `SEC-${province.code}` : "---"}
+            </span>
           </div>
         );
-      }
+      },
     },
     {
       accessorKey: "name",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">City</span>
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground p-0 hover:bg-transparent"
+        >
+          City Name
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="ml-1 h-3.5 w-3.5" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="ml-1 h-3.5 w-3.5" />
+          ) : null}
+        </Button>
       ),
       cell: ({ row }) => (
-        <div className="flex flex-col gap-1">
-          <span className="font-black text-foreground tracking-tight uppercase leading-none group-hover/row:text-orange-600 transition-colors">{row.original.name}</span>
-          <span className="text-[10px] font-bold text-muted-foreground/40 tracking-widest uppercase leading-none font-mono">Registry #CITY-{row.original.id}</span>
-        </div>
-      )
-    },
-    {
-      accessorKey: "code",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Registry Code</span>
-      ),
-      cell: ({ row }) => (
-        <div className="px-3 py-1 bg-orange-500/5 border border-orange-500/10 rounded-sm inline-flex items-center justify-center">
-          <span className="text-xs font-black text-orange-600 font-mono tracking-widest leading-none uppercase">{row.original.code}</span>
-        </div>
-      )
-    },
-    {
-      accessorKey: "is_active",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Status</span>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2.5 group/status">
-          <div className={`relative w-2 h-2 rounded-full leading-none overflow-visible`}>
-            <div className={`absolute inset-0 rounded-full animate-ping opacity-20 ${row.original.is_active ? 'bg-orange-500' : 'bg-rose-500'}`} />
-            <div className={`relative w-2 h-2 rounded-full border border-white/20 shadow-[0_0_8px_rgba(0,0,0,0.1)] ${row.original.is_active ? 'bg-orange-500' : 'bg-rose-500'}`} />
-          </div>
-          <span className={`text-[10px] font-black uppercase tracking-widest leading-none ${row.original.is_active ? 'text-orange-600' : 'text-rose-600'}`}>
-            {row.original.is_active ? 'Active' : 'Offline'}
+        <div className="flex flex-col">
+          <span className="text-xs font-bold text-foreground leading-tight">
+            {row.original.name}
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground">
+            #CITY-{row.original.id}
           </span>
         </div>
       ),
     },
     {
-      accessorKey: "created_by",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Added By</span>
+      accessorKey: "code",
+      header: "Code",
+      cell: ({ row }) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-muted text-foreground border border-border/80">
+          {row.original.code}
+        </span>
       ),
+    },
+    {
+      accessorKey: "coordinates",
+      header: "Coordinates",
       cell: ({ row }) => {
-        const name = row.original.created_by_name || "System";
-        const email = row.original.created_by_name ? `${row.original.created_by_name.toLowerCase().replace(' ', '.')}@harnain.com` : "harnain.sys@cloud.io";
-        const imageUrl = row.original.created_by_avatar || "";
-        const firstLetter = name.charAt(0).toUpperCase();
+        const { latitude, longitude } = row.original;
+        if (!latitude || !longitude) {
+          return <span className="text-[11px] text-muted-foreground/60 italic">Unmapped</span>;
+        }
+        return (
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+            <MapPin className="h-3 w-3" />
+            <span>{Number(latitude).toFixed(4)}, {Number(longitude).toFixed(4)}</span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "is_active",
+      header: "Status",
+      cell: ({ row }) => {
+        const active = Boolean(row.original.is_active);
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+              active
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                : "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                active ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"
+              }`}
+            />
+            {active ? "Active" : "Offline"}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "created_at",
+      header: "Created By",
+      cell: ({ row }) => {
+        const city = row.original;
+        const dateStr = city.created_at
+          ? new Date(city.created_at).toLocaleDateString("en-US", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "---";
 
         return (
-          <div className="flex items-center gap-3 group/registrar">
-            <div className="relative">
-              <div className="absolute -inset-1 bg-orange-500 rounded-full blur opacity-0 group-hover/registrar:opacity-20 transition duration-500" />
-              <Avatar className="h-9 w-9 border-2 border-white ring-2 ring-orange-500/10 ring-offset-1 group-hover/registrar:ring-orange-500/40 transition-all duration-500 rounded-sm">
-                {imageUrl ? (
-                  <AvatarImage src={imageUrl} alt={name} className="object-cover rounded-sm" />
-                ) : (
-                  <AvatarFallback className="bg-orange-600 text-[10px] font-black text-white rounded-sm">{firstLetter}</AvatarFallback>
-                )}
-              </Avatar>
-            </div>
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6 border border-border">
+              <AvatarImage src={city.created_by_avatar} />
+              <AvatarFallback className="text-[10px] font-bold">
+                {city.created_by_name?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black text-foreground/80 uppercase tracking-tight leading-none mb-1">{name}</span>
-              <div className="flex items-center gap-1.5 opacity-40 group-hover/registrar:opacity-100 transition-opacity">
-                <Mail className="w-2.5 h-2.5 text-orange-600" />
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{email}</span>
-              </div>
+              <span className="text-[11px] font-medium text-foreground leading-tight">
+                {city.created_by_name || "Admin"}
+              </span>
+              <span className="text-[10px] text-muted-foreground">{dateStr}</span>
             </div>
           </div>
         );
@@ -283,57 +424,39 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
     },
     {
       id: "actions",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Actions</span>
-      ),
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => {
         const city = row.original;
-        const canEdit = permissions.includes("edit cities");
-        const canDelete = permissions.includes("delete cities");
-
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-orange-500/10 hover:text-orange-600 border border-transparent hover:border-orange-500/20 rounded-sm transition-all focus-visible:ring-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2 rounded-sm border-2 border-orange-500/10 bg-white/95 backdrop-blur-xl shadow-2xl overflow-hidden">
-              <div className="px-3 py-2 border-b border-orange-500/5 mb-1">
-                <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none mb-1">Node Operations</p>
-                <p className="text-[10px] font-bold text-foreground truncate uppercase tracking-tight leading-none">{city.name}</p>
-              </div>
-              {canEdit && (
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-orange-600 hover:bg-orange-500/5 cursor-pointer rounded-sm transition-all group/item"
-                  onClick={() => {
-                    setEditCity(city);
-                    setName(city.name);
-                    setCode(city.code);
-                    setLatitude(city.latitude || "");
-                    setLongitude(city.longitude || "");
-                    setSelectedCountry(city.country_id?.toString() || "");
-                    setSelectedProvince(city.province_id?.toString() || "");
-                  }}
-                >
-                  <PencilLine className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
-                  Edit City
-                </DropdownMenuItem>
-              )}
-              {canDelete && (
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:text-white hover:bg-rose-600 cursor-pointer rounded-sm transition-all group/item-delete mt-1"
-                  onClick={() => {
-                    setSelectedCity(city);
-                    setOpenDeleteDialog(true);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 group-hover/item-delete:scale-110 transition-transform" />
-                  Delete City
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {canEdit && (
+                  <DropdownMenuItem
+                    onClick={() => openEdit(city)}
+                    className="cursor-pointer gap-2 text-xs font-semibold"
+                  >
+                    <PencilLine className="h-3.5 w-3.5 text-blue-500" />
+                    Edit City
+                  </DropdownMenuItem>
+                )}
+                {canDelete && (
+                  <DropdownMenuItem
+                    onClick={() => confirmDelete(city)}
+                    className="cursor-pointer gap-2 text-xs font-semibold text-rose-600 focus:text-rose-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -342,158 +465,322 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
   const table = useReactTable({
     data,
     columns,
+    state: {
+      sorting,
+      columnVisibility,
+    },
     onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: { sorting, columnVisibility, rowSelection },
+    initialState: {
+      pagination: {
+        pageSize: 15,
+      },
+    },
   });
 
+  const selectModalStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: "42px",
+      fontSize: "13px",
+      backgroundColor: "var(--background, #ffffff)",
+      borderColor: state.isFocused ? "var(--ring, #e8941a)" : "var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: "var(--ring, #e8941a)",
+      },
+    }),
+    singleValue: (base: any) => ({ ...base, color: "var(--foreground, #080706)" }),
+    placeholder: (base: any) => ({ ...base, color: "var(--muted-foreground, #71717a)" }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      color: "var(--popover-foreground, #080706)",
+      border: "1px solid var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+      zIndex: 9999,
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      borderRadius: "0.5rem",
+      padding: "4px",
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? "var(--primary, #e8941a)"
+        : state.isFocused
+        ? "var(--accent, #f4f4f5)"
+        : "transparent",
+      color: state.isSelected
+        ? "var(--primary-foreground, #ffffff)"
+        : "var(--foreground, #080706)",
+      fontSize: "13px",
+      cursor: "pointer",
+      borderRadius: "0.375rem",
+    }),
+  };
+
   return (
-    <div className="w-full space-y-4">
-      {/* Modify Identity Dialog */}
-      <Dialog open={!!editCity} onOpenChange={() => setEditCity(null)}>
-        <DialogContent className="rounded-sm border-2 border-orange-500/20 p-0 overflow-hidden sm:max-w-[550px] bg-white shadow-2xl">
-          <div className="h-2 bg-orange-600 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
-          <div className="p-8 lg:p-10">
-            <DialogHeader className="mb-10 text-left">
-              <div className="flex items-center gap-5">
-                <div className="p-4 bg-orange-600 text-white rounded-sm shadow-xl shadow-orange-600/20 ring-4 ring-orange-500/10 rotate-3 transition-transform hover:rotate-0 duration-500">
-                  <PencilLine className="w-8 h-8" />
+    <div className="space-y-4">
+      {/* Table Container */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-transparent border-b border-border/80">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="h-11 px-4 text-xs font-bold text-muted-foreground uppercase">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-muted/30 border-b border-border/60 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="px-4 py-3">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-40 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Building2 className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      No matching cities found.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Try adjusting your search criteria or filter options.
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Pagination Console */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-muted/20 border-t border-border/60 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <ShadSelect
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(val) => table.setPageSize(Number(val))}
+            >
+              <SelectTrigger className="h-8 w-[70px] text-xs bg-background">
+                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 15, 25, 50, 100].map((size) => (
+                  <SelectItem key={size} value={`${size}`} className="text-xs">
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </ShadSelect>
+            <span className="ml-2 font-medium">
+              Showing {data.length === 0 ? 0 : table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
+              {Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                data.length
+              )}{" "}
+              of {data.length} records
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="mr-2 font-medium">
+              Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 p-0"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 p-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 p-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 p-0"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modern Edit Dialog */}
+      <Dialog open={Boolean(editCity)} onOpenChange={(open) => !open && setEditCity(null)}>
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden rounded-xl bg-card border-border shadow-xl">
+          <div className="p-6 space-y-6">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Building2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    Edit <span className="text-orange-500 italic">City</span>
+                  <DialogTitle className="text-lg font-bold text-foreground">
+                    Edit City
                   </DialogTitle>
-                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Update city details.
+                  <DialogDescription className="text-xs text-muted-foreground">
+                    Update jurisdiction, naming, and coordinate details for #{editCity?.code}.
                   </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
 
-            <form onSubmit={handleUpdate} className="space-y-8">
-              <div className="grid gap-6">
-                {/* Country Dropdown */}
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Country</Label>
-                  <ShadSelect
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Country *</Label>
+                  <Select<Option, false>
+                    options={countryOptions}
                     value={selectedCountry}
-                    onValueChange={(value) => {
-                      setSelectedCountry(value);
-                      setSelectedProvince("");
-                    }}
-                  >
-                    <SelectTrigger className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-black uppercase tracking-tight transition-all">
-                      <SelectValue placeholder="SELECT COUNTRY" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-sm border-2 border-orange-500/10 shadow-2xl">
-                      {countries.map((country) => (
-                        <SelectItem
-                          key={country.id}
-                          value={country.id.toString()}
-                          className="px-3 py-2.5 text-xs font-black uppercase tracking-widest rounded-sm focus:bg-orange-50 opacity-100"
-                        >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
-                              alt={country.name}
-                              className="w-5 h-3.5 rounded-sm object-cover border border-orange-500/10 mr-1"
-                            />
-                            <span>{country.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </ShadSelect>
+                    onChange={handleEditCountryChange}
+                    styles={selectModalStyles}
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                    placeholder="Select country..."
+                  />
                 </div>
 
-                {/* Province Dropdown */}
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Province</Label>
-                  <ShadSelect
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Province *</Label>
+                  <Select<Option, false>
+                    options={provinceOptions}
                     value={selectedProvince}
-                    onValueChange={setSelectedProvince}
-                    disabled={!selectedCountry}
-                  >
-                    <SelectTrigger className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-black uppercase tracking-tight transition-all">
-                      <SelectValue placeholder="SELECT PROVINCE" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-sm border-2 border-orange-500/10 shadow-2xl">
-                      {provinces
-                        .filter((p) => p.country_id === Number(selectedCountry))
-                        .map((province) => (
-                          <SelectItem
-                            key={province.id}
-                            value={province.id.toString()}
-                            className="px-3 py-2.5 text-xs font-black uppercase tracking-widest rounded-sm focus:bg-orange-50 opacity-100"
-                          >
-                            {province.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </ShadSelect>
+                    onChange={(opt) => setSelectedProvince(opt)}
+                    isDisabled={!selectedCountry}
+                    styles={selectModalStyles}
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                    placeholder={selectedCountry ? "Select province..." : "Choose country first"}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">City Name *</Label>
+                  <Input
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="e.g. Lahore"
+                    className="h-10 text-xs bg-background"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">City Name</Label>
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-white font-black uppercase tracking-tight transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">City Code</Label>
-                    <Input
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      required
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/10 font-mono font-black uppercase tracking-widest transition-all"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">City Code *</Label>
+                  <Input
+                    required
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. LHE"
+                    className="h-10 text-xs font-mono font-bold uppercase bg-background"
+                  />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Latitude</Label>
+              <div className="p-3.5 rounded-lg border border-border/70 bg-muted/20 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>GPS Coordinates (Optional)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Latitude</Label>
                     <Input
-                      value={latitude}
-                      onChange={(e) => setLatitude(e.target.value)}
+                      value={editLatitude}
+                      onChange={(e) => setEditLatitude(e.target.value)}
                       placeholder="e.g. 31.5204"
-                      className="h-12 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs shadow-sm"
+                      className="h-9 text-xs font-mono bg-background"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Longitude</Label>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Longitude</Label>
                     <Input
-                      value={longitude}
-                      onChange={(e) => setLongitude(e.target.value)}
+                      value={editLongitude}
+                      onChange={(e) => setEditLongitude(e.target.value)}
                       placeholder="e.g. 74.3587"
-                      className="h-12 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs shadow-sm"
+                      className="h-9 text-xs font-mono bg-background"
                     />
                   </div>
                 </div>
               </div>
 
-              <DialogFooter className="pt-6 border-t-2 border-orange-500/10 gap-3">
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card">
+                <div className="space-y-0.5">
+                  <Label className="text-xs font-semibold cursor-pointer">Active Status</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Inactive cities will be hidden from new transaction forms.
+                  </p>
+                </div>
+                <Switch
+                  checked={editIsActive}
+                  onCheckedChange={setEditIsActive}
+                />
+              </div>
+
+              <DialogFooter className="pt-2 gap-2">
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
+                  variant="outline"
                   onClick={() => setEditCity(null)}
+                  className="text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group transition-all text-white border-b-4 border-orange-800/50"
+                  disabled={isUpdating}
+                  className="text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  Save Changes
+                  {isUpdating ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
@@ -501,195 +788,44 @@ export function DataTable({ data, countries, provinces }: DataTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Purge Dialog */}
+      {/* Delete Confirmation Modal */}
       <Dialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
-        <DialogContent className="rounded-sm border-4 border-red-500/20 p-0 overflow-hidden sm:max-w-[450px] bg-white shadow-2xl">
-          <div className="h-2 bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]" />
-          <div className="p-8 lg:p-10 text-center">
-            <div className="mx-auto w-20 h-20 bg-red-600/10 text-red-600 rounded-sm flex items-center justify-center mb-6 ring-4 ring-red-500/5 rotate-45 group hover:rotate-0 transition-transform duration-500">
-              <Trash2 className="w-10 h-10 -rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+        <DialogContent className="sm:max-w-[420px] rounded-xl bg-card border-border shadow-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-foreground">
+                  Confirm Deletion
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Are you sure you want to delete <span className="font-bold text-foreground">{cityToDelete?.name}</span>? This action cannot be undone.
+                </DialogDescription>
+              </div>
             </div>
-            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-2">
-              Delete <span className="text-red-600 italic">City</span>
-            </DialogTitle>
-            <DialogDescription className="font-black text-rose-600 uppercase text-[10px] tracking-widest opacity-70 mb-8">
-              This action cannot be undone.
-            </DialogDescription>
-
-            <div className="p-6 bg-red-50 border-2 border-red-500/10 rounded-sm mb-10 text-left">
-              <p className="text-xs font-black text-red-950 uppercase leading-relaxed mb-1">Warning: Irreversible Operation</p>
-              <p className="text-xs font-bold text-red-900/60 leading-relaxed uppercase tracking-tight">
-                Are you sure you want to delete <span className="text-red-600 font-black">{selectedCity?.name}</span>?
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 w-full pt-4">
-              <Button
-                variant="ghost"
-                className="h-14 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all"
-                onClick={() => setOpenDeleteDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700 h-14 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-red-600/20 active:scale-95 transition-all text-white border-b-4 border-red-800/50"
-                onClick={handleDelete}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenDeleteDialog(false)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              className="text-xs font-bold"
+            >
+              Delete City
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Technical Console Table */}
-      <div className="bg-white/80 backdrop-blur-xl border-2 border-orange-500/10 rounded-sm shadow-2xl shadow-orange-500/5 overflow-hidden group/table hover:border-orange-500/20 transition-all duration-700">
-        <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
-          <Table>
-            <TableHeader className="bg-muted/30 sticky top-0 z-10 border-b-2 border-orange-500/10 h-14">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="px-6 py-0">
-                      <div
-                        onClick={() => header.column.toggleSorting()}
-                        className="flex items-center gap-3 cursor-pointer select-none group/header py-4"
-                      >
-                        <div className="flex flex-col">
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          <div className="h-[2px] w-0 bg-orange-500 group-hover/header:w-full transition-all duration-500 mt-1" />
-                        </div>
-                        <div className="flex flex-col opacity-0 group-hover/header:opacity-100 transition-opacity">
-                          {header.column.getIsSorted() === "asc" && <ChevronUp className="w-3 h-3 text-orange-600 font-black" />}
-                          {header.column.getIsSorted() === "desc" && <ChevronDown className="w-3 h-3 text-orange-600 font-black" />}
-                          {!header.column.getIsSorted() && <div className="w-3 h-3 border-2 border-orange-600/20 rounded-full" />}
-                        </div>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence mode="wait">
-                {table.getRowModel().rows.length > 0 ? (
-                  table.getRowModel().rows.map((row, index) => (
-                    <motion.tr
-                      key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3, delay: index * 0.03 }}
-                      className="group/row border-b border-orange-500/5 hover:bg-orange-500/[0.02] transition-colors h-16"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="px-6 py-0 align-middle">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </motion.tr>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-[400px] text-center">
-                      <div className="flex flex-col items-center justify-center opacity-20">
-                        <Activity className="w-12 h-12 mb-4 animate-pulse" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.5em]">No nodes detected in local segment</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Technical Footer */}
-        <div className="px-6 py-6 bg-[#fafafa] border-t-2 border-orange-500/10 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-8">
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none">Density selection</p>
-              <ShadSelect
-                value={table.getState().pagination.pageSize.toString()}
-                onValueChange={(value) => table.setPageSize(Number(value))}
-              >
-                <SelectTrigger className="h-9 w-[100px] bg-white border-2 border-orange-500/10 focus:ring-0 rounded-sm text-[10px] font-black uppercase shadow-sm group hover:border-orange-500/30 transition-all">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-sm border-2 border-orange-500/10 bg-white">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={pageSize.toString()} className="text-[10px] font-black uppercase focus:bg-orange-50 rounded-sm py-2">
-                      {pageSize} Nodes
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </ShadSelect>
-            </div>
-
-            <div className="h-10 w-[2px] bg-orange-500/10 hidden sm:block" />
-
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40 leading-none">Segment Information</p>
-              <div className="h-9 flex items-center px-4 bg-white border-2 border-orange-500/10 rounded-sm shadow-sm group hover:border-orange-500/30 transition-all">
-                <p className="text-[10px] font-black text-foreground uppercase tracking-tighter">
-                  Index {table.getState().pagination.pageIndex + 1} <span className="text-orange-600/40 font-mono mx-1">/</span> {table.getPageCount()}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-white border-2 border-orange-500/10 rounded-sm p-1 shadow-sm mr-2 group/stream">
-              <div className="flex items-center gap-1.5 px-3 border-r border-orange-500/10 mr-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse" />
-                <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest leading-none">Live stream</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 opacity-40 group-hover/stream:opacity-100 transition-opacity">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="w-1 h-3 bg-orange-600/20 rounded-full group-hover/stream:animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 bg-white border-2 border-orange-500/10 rounded-sm p-1 shadow-sm overflow-hidden group/pagination">
-              <Button
-                variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <IconChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="h-5 w-[1px] bg-orange-500/10 mx-1" />
-              <Button
-                variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <IconChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-9 w-9 p-0 hover:bg-orange-500/10 hover:text-orange-600 rounded-sm disabled:opacity-20 transition-all active:scale-95"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <IconChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

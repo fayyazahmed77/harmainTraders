@@ -106,29 +106,58 @@ class SalesController extends Controller implements HasMiddleware
     public function create()
     {
         $accounts = Account::active()
-            ->select('id', 'code', 'title', 'type', 'city_id', 'area_id', 'saleman_id')
+            ->select('id', 'code', 'title', 'type', 'city_id', 'area_id', 'saleman_id', 'item_category')
             ->with('accountType:id,name')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers']);
+                $q->whereIn('name', ['Customers','indirect expense']);
             })
             ->get();
 
         $salemans = Saleman::select('id', 'name', 'code', 'commission_percentage')->get();
 
+        // Historical average stats for items
+        $purchaseStats = DB::table('purchase_items')
+            ->select('item_id',
+                DB::raw('COUNT(*) as cnt'),
+                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+            )
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $saleStats = DB::table('sales_items')
+            ->select('item_id',
+                DB::raw('COUNT(*) as cnt'),
+                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+            )
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
         // Load items with lightweight column selection
-        $items = Items::select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
+        $items = Items::select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active', 'pt2', 'pt3', 'pt4', 'pt5', 'pt6', 'pt7')
             ->with(['lastPurchaseItem.purchase.supplier' => function($q) {
                 $q->select('id', 'title');
             }])
             ->get()
-            ->map(function ($item) {
+            ->map(function ($item) use ($purchaseStats, $saleStats) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
                     $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
                     $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
                     $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
-                    $item->last_purchase_rate = $item->lastPurchaseItem->trade_price;
+                    $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
                     $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
                 }
+
+                $pStat = $purchaseStats->get($item->id);
+                $sStat = $saleStats->get($item->id);
+
+                $item->has_purchases = $pStat ? ($pStat->cnt > 0) : false;
+                $item->avg_purchase_rate = $pStat ? (float) $pStat->avg_rate : 0;
+
+                $item->has_sales = $sStat ? ($sStat->cnt > 0) : false;
+                $item->avg_sale_rate = $sStat ? (float) $sStat->avg_rate : 0;
+
                 return $item;
             });
 
@@ -552,20 +581,49 @@ class SalesController extends Controller implements HasMiddleware
         $accounts = Account::active()
             ->with('accountType')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers']);
+                $q->whereIn('name', ['Customers','indirect expense']);
             })
             ->get();
         $salemans = Saleman::get();
+        // Historical average stats for items
+        $purchaseStats = DB::table('purchase_items')
+            ->select('item_id',
+                DB::raw('COUNT(*) as cnt'),
+                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+            )
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $saleStats = DB::table('sales_items')
+            ->select('item_id',
+                DB::raw('COUNT(*) as cnt'),
+                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+            )
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
         $items = Items::with('lastPurchaseItem.purchase.supplier')
             ->get()
-            ->map(function ($item) {
+            ->map(function ($item) use ($purchaseStats, $saleStats) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
                     $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
                     $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
                     $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
-                    $item->last_purchase_rate = $item->lastPurchaseItem->trade_price;
+                    $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
                     $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
                 }
+
+                $pStat = $purchaseStats->get($item->id);
+                $sStat = $saleStats->get($item->id);
+
+                $item->has_purchases = $pStat ? ($pStat->cnt > 0) : false;
+                $item->avg_purchase_rate = $pStat ? (float) $pStat->avg_rate : 0;
+
+                $item->has_sales = $sStat ? ($sStat->cnt > 0) : false;
+                $item->avg_sale_rate = $sStat ? (float) $sStat->avg_rate : 0;
+
                 return $item;
             });
 

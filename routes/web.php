@@ -438,6 +438,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/accounts/ledger/print', [ReportsController::class, 'accountLedgerPrint'])->name('reports.accounts.ledger.print');
         Route::get('/accounts/aging/export/pdf', [ReportsController::class, 'accountAgingExportPdf'])->name('reports.accounts.aging.export.pdf');
         Route::get('/accounts/aging/print', [ReportsController::class, 'accountAgingPrint'])->name('reports.accounts.aging.print');
+        Route::get('/accounts/account-list/export/pdf', [ReportsController::class, 'accountListExportPdf'])->name('reports.accounts.account_list.export.pdf');
+        Route::get('/accounts/account-list/print', [ReportsController::class, 'accountListPrint'])->name('reports.accounts.account_list.print');
         Route::get('/accounts/due-bills/export/pdf', [ReportsController::class, 'dueBillsExportPdf'])->name('reports.accounts.due_bills.export.pdf');
         Route::get('/accounts/due-bills/print', [ReportsController::class, 'dueBillsPrint'])->name('reports.accounts.due_bills.print');
         Route::get('/accounts/outstanding-billwise/export/pdf', [ReportsController::class, 'outstandingBillWiseExportPdf'])->name('reports.accounts.outstanding_billwise.export.pdf');

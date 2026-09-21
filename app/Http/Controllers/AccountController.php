@@ -274,6 +274,10 @@ class AccountController extends Controller implements HasMiddleware
     }
     public function edit(Account $account)
     {
+        $account->has_purchases = \App\Models\Purchase::where('supplier_id', $account->id)->exists();
+        $account->has_sales = \App\Models\Sales::where('customer_id', $account->id)->exists();
+        $account->has_cashbank = \App\Models\Payment::where('account_id', $account->id)->exists();
+
         $countries = Country::all();
         $provinces = Province::all();
         $cities = City::all();
@@ -519,6 +523,28 @@ class AccountController extends Controller implements HasMiddleware
                 $summary['issued_cheques'] = $issuedCheques;
                 $summary['available_cheques'] = $totalCheques - $issuedCheques;
             }
+        } elseif (in_array($typeLower, ['capital', 'amanat payable', 'reserve'])) {
+            $receiptsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+            $totalIn = (float)(clone $receiptsQuery)->sum(DB::raw('amount + discount'));
+            $paymentsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+            $totalOut = (float)(clone $paymentsQuery)->sum(DB::raw('amount + discount'));
+
+            $summary = [
+                'total_in' => $totalIn,
+                'total_out' => $totalOut,
+                'current_balance' => $account->current_balance,
+            ];
+        } elseif ($typeLower === 'drawings') {
+            $paymentsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+            $totalIn = (float)(clone $paymentsQuery)->sum(DB::raw('amount + discount'));
+            $receiptsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+            $totalOut = (float)(clone $receiptsQuery)->sum(DB::raw('amount + discount'));
+
+            $summary = [
+                'total_in' => $totalIn,
+                'total_out' => $totalOut,
+                'current_balance' => $account->current_balance,
+            ];
         }
 
         return Inertia::render("setup/account/view", [

@@ -207,7 +207,7 @@ class Account extends Model
                 })->sum(DB::raw('amount + discount'));
 
             return (float)$this->opening_balance + $totalPayments - $totalReceipts;
-        } elseif ($type === 'capital' || $this->type == 9) {
+        } elseif (in_array($type, ['capital', 'amanat payable', 'reserve']) || in_array($this->type, [9, 17, 18])) {
             $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
                 ->where(function($q) {
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
@@ -219,6 +219,18 @@ class Account extends Model
                 })->sum(DB::raw('amount + discount'));
 
             return (float)$this->opening_balance + $totalReceipts - $totalPayments;
+        } elseif ($type === 'drawings' || $this->type == 8) {
+            $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+
+            $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                })->sum(DB::raw('amount + discount'));
+
+            return (float)$this->opening_balance + $totalPayments - $totalReceipts;
         }
         
         return (float)$this->opening_balance;

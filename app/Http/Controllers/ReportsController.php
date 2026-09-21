@@ -67,7 +67,10 @@ class ReportsController extends Controller implements HasMiddleware
             if ($reportId === 'account_list') {
                 $query = Account::active()->with(['accountType', 'area', 'subarea']);
                 $this->reportBuilder->applyAccountFilters($query, $request->all());
-                $data = $query->get();
+                if ($accountId !== 'ALL') {
+                    $query->where('id', $accountId);
+                }
+                $data = $query->orderBy('code', 'asc')->get();
                 return response()->json(['data' => $data]);
             }
 
@@ -264,6 +267,10 @@ class ReportsController extends Controller implements HasMiddleware
         $account = $accountId !== 'ALL' ? Account::findOrFail($accountId) : null;
         $reportId = strtolower($request->input('report_id') ?? 'ledger');
 
+        if ($reportId === 'account_list') {
+            return $this->accountListExportPdf($request);
+        }
+
         if ($reportId === 'detail_ledger') {
             $data = $this->reportBuilder->accountDetailLedger(
                 $accountId,
@@ -329,6 +336,10 @@ class ReportsController extends Controller implements HasMiddleware
         $accountId = $validated['account_id'];
         $account = $accountId !== 'ALL' ? Account::findOrFail($accountId) : null;
         $reportId = strtolower($request->input('report_id') ?? 'ledger');
+
+        if ($reportId === 'account_list') {
+            return $this->accountListPrint($request);
+        }
 
         if ($reportId === 'detail_ledger') {
             $data = $this->reportBuilder->accountDetailLedger(
@@ -434,6 +445,109 @@ class ReportsController extends Controller implements HasMiddleware
         ];
 
         return view('pdf.accounts-aging', $pdfData);
+    }
+
+    public function accountListExportPdf(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'nullable',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+        ]);
+
+        $query = Account::active()->with(['accountType', 'area', 'subarea']);
+        $this->reportBuilder->applyAccountFilters($query, $request->all());
+
+        $accountId = $request->input('account_id', 'ALL');
+        if ($accountId && $accountId !== 'ALL') {
+            $query->where('id', $accountId);
+        }
+
+        $accounts = $query->orderBy('code', 'asc')->get();
+
+        $pdfData = [
+            'data' => $accounts,
+            'criteria' => $this->buildAccountListCriteria($request),
+            'from_date' => $validated['from'] ?? null,
+            'to_date' => $validated['to'] ?? null,
+            'is_print_mode' => false,
+        ];
+
+        $pdf = PDF::loadView('pdf.account-list', $pdfData);
+        return $pdf->download('account-list-' . date('d-M-Y') . '.pdf');
+    }
+
+    public function accountListPrint(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'nullable',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+        ]);
+
+        $query = Account::active()->with(['accountType', 'area', 'subarea']);
+        $this->reportBuilder->applyAccountFilters($query, $request->all());
+
+        $accountId = $request->input('account_id', 'ALL');
+        if ($accountId && $accountId !== 'ALL') {
+            $query->where('id', $accountId);
+        }
+
+        $accounts = $query->orderBy('code', 'asc')->get();
+
+        $pdfData = [
+            'data' => $accounts,
+            'criteria' => $this->buildAccountListCriteria($request),
+            'from_date' => $validated['from'] ?? null,
+            'to_date' => $validated['to'] ?? null,
+            'is_print_mode' => true,
+        ];
+
+        return view('pdf.account-list', $pdfData);
+    }
+
+    private function buildAccountListCriteria(Request $request): string
+    {
+        $parts = [];
+        $from = $request->input('from');
+        $to = $request->input('to');
+        if ($from && $to) {
+            $parts[] = date('d/m/Y', strtotime($from)) . ' TO ' . date('d/m/Y', strtotime($to));
+        }
+
+        $accountId = $request->input('account_id', 'ALL');
+        if ($accountId && $accountId !== 'ALL') {
+            $acc = Account::find($accountId);
+            $parts[] = 'ACCOUNT: ' . ($acc ? strtoupper($acc->title) : $accountId);
+        } else {
+            $parts[] = 'ALL ACCOUNTS';
+        }
+
+        $typeId = $request->input('type');
+        if ($typeId && $typeId !== 'ALL') {
+            $type = AccountType::find($typeId);
+            if ($type) {
+                $parts[] = 'TYPE: ' . strtoupper($type->name);
+            }
+        }
+
+        $areaId = $request->input('areaId') ?? $request->input('area_id');
+        if ($areaId && $areaId !== 'ALL') {
+            $area = Areas::find($areaId);
+            if ($area) {
+                $parts[] = 'AREA: ' . strtoupper($area->name);
+            }
+        }
+
+        $salemanId = $request->input('salemanId') ?? $request->input('saleman_id');
+        if ($salemanId && $salemanId !== 'ALL') {
+            $saleman = Saleman::find($salemanId);
+            if ($saleman) {
+                $parts[] = 'SALESMAN: ' . strtoupper($saleman->name);
+            }
+        }
+
+        return implode(' | ', $parts);
     }
 
     public function dayBookExportPdf(Request $request)

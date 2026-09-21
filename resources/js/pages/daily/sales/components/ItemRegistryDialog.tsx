@@ -50,6 +50,10 @@ interface Item {
     last_purchase_pcs?: number;
     last_purchase_rate?: number;
     last_supplier?: string;
+    has_purchases?: boolean;
+    avg_purchase_rate?: number;
+    has_sales?: boolean;
+    avg_sale_rate?: number;
 }
 
 interface ItemRegistryDialogProps {
@@ -794,7 +798,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         </div>
                                     )}
 
-                                    {/* 5. PRICING & COST ANALYSIS (Trade, Retail & Average Rate) */}
+                                    {/* 5. PRICING & COST ANALYSIS (Trade, Retail & Average Rates) */}
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <Banknote className="w-4 h-4 text-purple-500" />
@@ -810,12 +814,29 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                 <span className="font-mono font-bold text-orange-600 dark:text-orange-400">Rs {toNumber(selectedItemForQty.retail).toLocaleString()}</span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
-                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Average Rate</span>
-                                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                    Rs {((toNumber(selectedItemForQty.trade_price) + toNumber(selectedItemForQty.retail)) / 2).toLocaleString()}
-                                                </span>
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Avg Purchase Rate</span>
+                                                {selectedItemForQty.has_purchases && toNumber(selectedItemForQty.avg_purchase_rate) > 0 ? (
+                                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                        Rs {toNumber(selectedItemForQty.avg_purchase_rate).toLocaleString()}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                                        New Item - No Purchase
+                                                    </span>
+                                                )}
                                             </div>
-                                           
+                                            <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
+                                                <span className="text-[9px] font-bold uppercase text-zinc-700">Avg Sales Rate</span>
+                                                {selectedItemForQty.has_sales && toNumber(selectedItemForQty.avg_sale_rate) > 0 ? (
+                                                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                                        Rs {toNumber(selectedItemForQty.avg_sale_rate).toLocaleString()}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] font-medium text-zinc-400 dark:text-zinc-500 italic">
+                                                        No Sales History
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -828,12 +849,16 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2.5">
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className="text-[9px] font-bold uppercase text-zinc-700">Purchase Date</span>
-                                                <span className="font-bold text-zinc-800 dark:text-zinc-200">{formatDate(selectedItemForQty.last_purchase_date)}</span>
+                                                <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                                    {selectedItemForQty.has_purchases || selectedItemForQty.last_purchase_date
+                                                        ? formatDate(selectedItemForQty.last_purchase_date)
+                                                        : 'New Item - No Purchase'}
+                                                </span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
                                                 <span className="text-[9px] font-bold uppercase text-zinc-700">Last Rate</span>
                                                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                    Rs {toNumber(selectedItemForQty.last_purchase_rate).toLocaleString()}
+                                                    Rs {toNumber(selectedItemForQty.last_purchase_rate || 0).toLocaleString()}
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
@@ -844,7 +869,9 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             </div>
                                             <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
                                                 <span className="text-[9px] font-bold uppercase text-zinc-700">Last Supplier</span>
-                                                <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase truncate max-w-[140px]">{selectedItemForQty.last_supplier || 'MARKET_DIRECT'}</span>
+                                                <span className="font-bold text-zinc-800 dark:text-zinc-200 uppercase truncate max-w-[140px]">
+                                                    {selectedItemForQty.last_supplier || (selectedItemForQty.has_purchases ? 'MARKET_DIRECT' : 'N/A')}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

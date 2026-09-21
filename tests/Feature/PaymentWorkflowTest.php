@@ -60,7 +60,7 @@ it('creates a single payment receipt and auto-allocates to unpaid sale via FIFO'
         'allocations' => [],
     ]);
 
-    $response->assertRedirect(route('payment.create'));
+    $response->assertRedirect(route('payments.index'));
     $response->assertSessionHas('success');
 
     // 3. Assert sale is now fully paid
@@ -119,7 +119,7 @@ it('handles decimal precision in allocations without rounding artifacts', functi
         'allocations' => [],
     ]);
 
-    $response->assertRedirect(route('payment.create'));
+    $response->assertRedirect(route('payments.index'));
 
     $sale->refresh();
     expect((float)$sale->paid_amount)->toBe(1879790.75);

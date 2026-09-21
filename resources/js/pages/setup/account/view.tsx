@@ -88,13 +88,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function AccountView({ account, financial_summary }: Props) {
     const itemCategoryMap: Record<string, string> = {
-        "1": "1 (Trade Price)",
-        "2": "2 (T.P 1)",
-        "3": "3 (T.P 2)",
-        "4": "4 (T.P 3)",
-        "5": "5 (T.P 4)",
-        "6": "6 (T.P 5)",
-        "7": "7 (T.P 6)",
+        "1": "(Trade Price 1)",
+        "2": "(Trade Price 2)",
+        "3": "(Trade Price 3)",
+        "4": "(Trade Price 4)",
+        "5": "(Trade Price 5)",
+        "6": "(Trade Price 6)",
+        "7": "(Trade Price 7)",
     };
 
     const formatDate = (dateString: string | null) => {

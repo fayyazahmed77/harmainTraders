@@ -829,7 +829,10 @@ class PaymentController extends Controller implements HasMiddleware
             ->with('accountType')
             ->select('id', 'title', 'type')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers', 'Supplier', 'Expense', 'Other', 'Bank']);
+                $q->whereIn('name', [
+                    'Customers', 'Supplier', 'Expense', 'Other', 'Bank',
+                    'AMANAT PAYABLE', 'RESERVE', 'Drawings', 'Capital'
+                ]);
             })
             ->get();
         $paymentAccounts = Account::active()
@@ -962,7 +965,9 @@ class PaymentController extends Controller implements HasMiddleware
                 $netLedgerBalance += ($paymentObj->amount + $paymentObj->discount);
             }
 
-            $orientation = $account->purchase == 1 ? 'cr' : 'dr';
+            $type = strtolower($account->accountType->name ?? '');
+            $isCreditNormal = in_array($type, ['supplier', 'capital', 'amanat payable', 'reserve']) || (int)$account->purchase === 1;
+            $orientation = $isCreditNormal ? 'cr' : 'dr';
 
             // Calculate Unpaid Billed Balance (Sum of remaining amounts on invoices)
             $totalUnpaidBilled = collect($bills)->sum('remaining_amount');
@@ -971,7 +976,6 @@ class PaymentController extends Controller implements HasMiddleware
             $advanceAmount = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
 
             // Compute Financial Auditor Stats based on Account Type
-            $type = strtolower($account->accountType->name ?? '');
             $totalSalesOrPurchases = 0;
             $totalReceivedOrPaid = 0;
             $totalBalance = 0;
@@ -1041,6 +1045,50 @@ class PaymentController extends Controller implements HasMiddleware
                     $totalBalance = 0;
                     $advancePaid = abs($netLedgerBalance);
                 }
+            } elseif (in_array($type, ['capital', 'amanat payable', 'reserve'])) {
+                $receiptsQuery = $account->partyPayments()->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    });
+                $paymentsQuery = $account->partyPayments()->where('type', 'PAYMENT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    });
+                $totalReceipts = (float)(clone $receiptsQuery)->sum(DB::raw('amount + discount'));
+                $totalPayments = (float)(clone $paymentsQuery)->sum(DB::raw('amount + discount'));
+
+                $totalReceivedOrPaid = $totalReceipts - $totalPayments;
+                if ($paymentObj && $paymentObj->account_id == $account->id) {
+                    if ($paymentObj->type === 'RECEIPT') {
+                        $totalReceivedOrPaid -= ($paymentObj->amount + $paymentObj->discount);
+                    } else {
+                        $totalReceivedOrPaid += ($paymentObj->amount + $paymentObj->discount);
+                    }
+                }
+                $totalSalesOrPurchases = (float)$account->opening_balance;
+                $totalBalance = $netLedgerBalance;
+            } elseif ($type === 'drawings') {
+                $paymentsQuery = $account->partyPayments()->where('type', 'PAYMENT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    });
+                $receiptsQuery = $account->partyPayments()->where('type', 'RECEIPT')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+                    });
+                $totalPayments = (float)(clone $paymentsQuery)->sum(DB::raw('amount + discount'));
+                $totalReceipts = (float)(clone $receiptsQuery)->sum(DB::raw('amount + discount'));
+
+                $totalReceivedOrPaid = $totalPayments - $totalReceipts;
+                if ($paymentObj && $paymentObj->account_id == $account->id) {
+                    if ($paymentObj->type === 'PAYMENT') {
+                        $totalReceivedOrPaid -= ($paymentObj->amount + $paymentObj->discount);
+                    } else {
+                        $totalReceivedOrPaid += ($paymentObj->amount + $paymentObj->discount);
+                    }
+                }
+                $totalSalesOrPurchases = (float)$account->opening_balance;
+                $totalBalance = $netLedgerBalance;
             } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
                 $baseQuery = $account->financialPayments()
                     ->where(function($q) {

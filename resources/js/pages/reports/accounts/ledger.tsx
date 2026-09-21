@@ -240,11 +240,35 @@ export default function AccountReports({
         }).format(amount);
     };
 
+    const buildReportQueryParams = (reportId: string) => {
+        const queryParams: Record<string, any> = {
+            account_id: params.accountId,
+            report_id: reportId,
+            from: format(params.fromDate, 'yyyy-MM-dd'),
+            to: format(params.toDate, 'yyyy-MM-dd'),
+        };
+
+        if (params.firmId && params.firmId !== 'ALL') queryParams.firmId = params.firmId;
+        if (params.salemanId && params.salemanId !== 'ALL') queryParams.salemanId = params.salemanId;
+        if (params.areaId && params.areaId !== 'ALL') queryParams.areaId = params.areaId;
+        if (params.subareaId && params.subareaId !== 'ALL') queryParams.subareaId = params.subareaId;
+        if (params.cityId && params.cityId !== 'ALL') queryParams.cityId = params.cityId;
+        if (params.provinceId && params.provinceId !== 'ALL') queryParams.provinceId = params.provinceId;
+        if (params.type && params.type !== 'ALL') queryParams.type = params.type;
+        if (params.noteHead && params.noteHead !== 'ALL') queryParams.noteHead = params.noteHead;
+        if (params.nature && params.nature !== 'ALL') queryParams.nature = params.nature;
+        if (params.remarks) queryParams.remarks = params.remarks;
+
+        return queryParams;
+    };
+
     const handleExportPdf = () => {
         const reportId = params.reportId.toLowerCase();
         let routeName = 'reports.accounts.ledger.export.pdf';
         
-        if (reportId === 'accounts_aging') {
+        if (reportId === 'account_list') {
+            routeName = 'reports.accounts.account_list.export.pdf';
+        } else if (reportId === 'accounts_aging') {
             routeName = 'reports.accounts.aging.export.pdf';
         } else if (reportId === 'due_bills') {
             routeName = 'reports.accounts.due_bills.export.pdf';
@@ -270,12 +294,7 @@ export default function AccountReports({
             routeName = 'reports.accounts.trial_balance_6col.export.pdf';
         }
 
-        const url = route(routeName, {
-            account_id: params.accountId,
-            report_id: reportId,
-            from: format(params.fromDate, 'yyyy-MM-dd'),
-            to: format(params.toDate, 'yyyy-MM-dd'),
-        });
+        const url = route(routeName, buildReportQueryParams(reportId));
         window.open(url, '_blank');
     };
 
@@ -283,7 +302,9 @@ export default function AccountReports({
         const reportId = params.reportId.toLowerCase();
         let routeName = 'reports.accounts.ledger.print';
         
-        if (reportId === 'accounts_aging') {
+        if (reportId === 'account_list') {
+            routeName = 'reports.accounts.account_list.print';
+        } else if (reportId === 'accounts_aging') {
             routeName = 'reports.accounts.aging.print';
         } else if (reportId === 'due_bills') {
             routeName = 'reports.accounts.due_bills.print';
@@ -309,12 +330,7 @@ export default function AccountReports({
             routeName = 'reports.accounts.trial_balance_6col.print';
         }
 
-        const url = route(routeName, {
-            account_id: params.accountId,
-            report_id: reportId,
-            from: format(params.fromDate, 'yyyy-MM-dd'),
-            to: format(params.toDate, 'yyyy-MM-dd'),
-        });
+        const url = route(routeName, buildReportQueryParams(reportId));
         window.open(url, '_blank');
     };
 
@@ -329,6 +345,10 @@ export default function AccountReports({
             parts.push('ALL ACCOUNTS');
         }
 
+        if (params.type !== 'ALL') {
+            const t = account_types?.find(x => x.id.toString() === params.type);
+            if (t) parts.push(`TYPE: ${t.name.toUpperCase()}`);
+        }
         if (params.areaId !== 'ALL') parts.push('AREA FILTERED');
         if (params.salemanId !== 'ALL') parts.push('SALEMAN FILTERED');
 

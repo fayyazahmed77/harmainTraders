@@ -658,6 +658,10 @@ function mapPayment(raw: any): Payment {
     expense: 'Expense',   expenses: 'Expense',
     'cheque in hand': 'Cheque in Hand',
     cash: 'Cash Account', bank: 'Bank Account',
+    capital: 'Capital Account',
+    drawings: 'Drawings',
+    'amanat payable': 'Amanat Payable',
+    reserve: 'Reserve Account',
     other: 'Other',
   };
   const accountTypeLabel = accountTypeLabelMap[accountTypeRaw.toLowerCase()] ?? (accountTypeRaw || '—');

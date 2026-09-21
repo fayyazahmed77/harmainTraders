@@ -671,7 +671,8 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
       if (selectedCategory === "CUSTOMERS") return typeName.includes("customer");
       if (selectedCategory === "SUPPLIERS") return typeName.includes("supplier");
       if (selectedCategory === "BANKS") return typeName.includes("bank");
-      if (selectedCategory === "OTHERS") return !typeName.includes("customer") && !typeName.includes("supplier") && !typeName.includes("bank");
+      if (selectedCategory === "EQUITY / LIABILITIES") return typeName.includes("capital") || typeName.includes("drawing") || typeName.includes("amanat") || typeName.includes("reserve");
+      if (selectedCategory === "OTHERS") return !typeName.includes("customer") && !typeName.includes("supplier") && !typeName.includes("bank") && !typeName.includes("capital") && !typeName.includes("drawing") && !typeName.includes("amanat") && !typeName.includes("reserve");
 
       return true;
     });
@@ -810,10 +811,14 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
             accTypeLower.includes('expanc') || 
             rawTypeStr === '4' || 
             rawTypeStr.includes('expense');
+          const isCapital = accTypeLower.includes('capital') || rawTypeStr === '9';
+          const isDrawings = accTypeLower.includes('drawing') || rawTypeStr === '8';
+          const isAmanat = accTypeLower.includes('amanat') || rawTypeStr === '17';
+          const isReserve = accTypeLower.includes('reserve') || rawTypeStr === '18';
 
-          if (isCustomer) {
+          if (isCustomer || isCapital || isAmanat || isReserve) {
             setPaymentType('RECEIPT');
-          } else if (isSupplier || isExpense) {
+          } else if (isSupplier || isExpense || isDrawings) {
             setPaymentType('PAYMENT');
           }
         }
@@ -1269,7 +1274,7 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                             
                             {/* Category Filter Pills */}
                             <div className="flex items-center gap-1.5 pt-3 pb-1 overflow-x-auto custom-scrollbar">
-                              {["ALL", "CUSTOMERS", "SUPPLIERS", "BANKS", "OTHERS"].map((cat) => (
+                              {["ALL", "CUSTOMERS", "SUPPLIERS", "BANKS", "EQUITY / LIABILITIES", "OTHERS"].map((cat) => (
                                 <button
                                   key={cat}
                                   onClick={() => setSelectedCategory(cat)}
@@ -1314,6 +1319,10 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                         if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
                                         if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
                                         if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
+                                        if (name.includes("capital")) return "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold";
+                                        if (name.includes("drawing")) return "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-bold";
+                                        if (name.includes("amanat")) return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold";
+                                        if (name.includes("reserve")) return "bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold";
                                         return "text-zinc-400 dark:text-zinc-500 opacity-40";
                                       })()
                                     )}

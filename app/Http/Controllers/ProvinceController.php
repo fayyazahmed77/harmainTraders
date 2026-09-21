@@ -23,11 +23,45 @@ class ProvinceController extends Controller implements HasMiddleware
             new Middleware('permission:delete areas', only: ['destroy']),
         ];
     }
-    public function index()
+    public function index(Request $request)
     {
         $countries = Country::all();
-        $provinces  = Province::with('creator')
-            ->latest()
+
+        $query = Province::with(['creator', 'country'])->withCount('cities');
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhereHas('country', function ($cq) use ($search) {
+                      $cq->where('name', 'like', "%{$search}%")
+                         ->orWhere('code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('country_id') && $request->country_id !== 'ALL') {
+            $query->where('country_id', $request->country_id);
+        }
+
+        if ($request->filled('is_active') && $request->is_active !== 'ALL') {
+            $isActive = filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isActive !== null) {
+                $query->where('is_active', $isActive);
+            }
+        }
+
+        $allProvinces = Province::withCount('cities')->get();
+        $summary = [
+            'total_provinces' => $allProvinces->count(),
+            'active_provinces' => $allProvinces->where('is_active', true)->count(),
+            'total_cities_count' => $allProvinces->sum('cities_count'),
+            'countries_count' => $allProvinces->pluck('country_id')->unique()->filter()->count(),
+            'mapped_coordinates_count' => $allProvinces->filter(fn($p) => !empty($p->latitude) && !empty($p->longitude))->count(),
+        ];
+
+        $provinces = $query->latest()
             ->get()
             ->map(function ($item) {
                 $item->created_by_name = $item->creator?->name ?? 'Unknown';
@@ -36,9 +70,12 @@ class ProvinceController extends Controller implements HasMiddleware
                     : null;
                 return $item;
             });
+
         return Inertia::render('Provinces/index', [
             'provinces' => $provinces,
-            'countries' => $countries
+            'countries' => $countries,
+            'filters' => $request->only(['search', 'country_id', 'is_active']),
+            'summary' => $summary,
         ]);
     }
     public function getByCountry($countryId)

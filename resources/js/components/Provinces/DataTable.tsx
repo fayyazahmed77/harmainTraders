@@ -11,8 +11,24 @@ import {
   useReactTable,
   flexRender,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown, MoreHorizontal, PencilLine, Trash2, Globe, Database } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  ChevronUp,
+  ChevronDown,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  PencilLine,
+  Trash2,
+  MapPin,
+  Map,
+  Building2,
+  Globe,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+} from "lucide-react";
 import { router, usePage } from "@inertiajs/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -37,15 +53,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Select from "react-select";
-import {
-  ChevronLeft as IconChevronLeft,
-  ChevronRight as IconChevronRight,
-  ChevronsLeft as IconChevronsLeft,
-  ChevronsRight as IconChevronsRight,
-} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -54,9 +64,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "react-hot-toast";
+import Select, { SingleValue } from "react-select";
+import { toast } from "sonner";
 
-// ✅ Types
+interface Country {
+  id: number;
+  name: string;
+  code: string;
+}
+
 interface Province {
   id: number;
   country_id: number;
@@ -65,22 +81,18 @@ interface Province {
   latitude?: string;
   longitude?: string;
   is_active: boolean;
+  cities_count?: number;
   created_at: string;
   created_by: number;
   created_by_name?: string;
   created_by_avatar?: string;
+  country?: Country;
 }
 
-interface Country {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface CountryOption {
+interface Option {
   value: number;
   label: string;
-  code: string;
+  code?: string;
 }
 
 interface DataTableProps {
@@ -91,99 +103,159 @@ interface DataTableProps {
 export function DataTable({ data, countries }: DataTableProps) {
   const pageProps = usePage().props as unknown as {
     auth: { user: any; permissions: string[] };
-    errors: Record<string, string>;
   };
-  const permissions = pageProps.auth.permissions;
+  const permissions = pageProps.auth?.permissions || [];
+  const canEdit =
+    Array.isArray(permissions) &&
+    (permissions.includes("edit areas") || permissions.includes("edit provinces"));
+  const canDelete =
+    Array.isArray(permissions) &&
+    (permissions.includes("delete areas") || permissions.includes("delete provinces"));
 
-  // Table states
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
   // Dialog states
   const [editProvince, setEditProvince] = useState<Province | null>(null);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [selectedProvince, setSelectedProvince] = useState<Province | null>(
-    null
-  );
+  const [deleteProvince, setDeleteProvince] = useState<Province | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Form states
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [editCountry, setEditCountry] = useState<CountryOption | null>(null);
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [editLatitude, setEditLatitude] = useState("");
+  const [editLongitude, setEditLongitude] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [selectedCountry, setSelectedCountry] = useState<Option | null>(null);
 
-  // ✅ Build options for country select
-  const countryOptions: CountryOption[] = countries.map((c) => ({
+  const countryOptions: Option[] = countries.map((c) => ({
     value: c.id,
     label: c.name,
     code: c.code,
   }));
 
-  // ✅ Handle update
-  const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
+  const openEditDialog = (province: Province) => {
+    setEditProvince(province);
+    setEditName(province.name);
+    setEditCode(province.code);
+    setEditLatitude(province.latitude || "");
+    setEditLongitude(province.longitude || "");
+    setEditIsActive(Boolean(province.is_active));
+
+    const matchedCountry = countryOptions.find(
+      (c) => c.value === province.country_id
+    );
+    setSelectedCountry(matchedCountry || null);
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editProvince) return;
+
+    if (!editName.trim()) {
+      toast.error("Province name is required");
+      return;
+    }
+    if (!editCode.trim()) {
+      toast.error("Province code is required");
+      return;
+    }
+    if (!selectedCountry) {
+      toast.error("Please select a Country");
+      return;
+    }
+
+    setIsUpdating(true);
 
     router.put(
       `/provinces/${editProvince.id}`,
       {
-        name,
-        code,
-        country_id: editCountry?.value,
-        latitude,
-        longitude,
+        name: editName.trim(),
+        code: editCode.trim().toUpperCase(),
+        country_id: selectedCountry.value,
+        latitude: editLatitude.trim() || null,
+        longitude: editLongitude.trim() || null,
+        is_active: editIsActive,
       },
       {
+        preserveScroll: true,
         onSuccess: () => {
-          toast.success("Province updated successfully!");
+          toast.success("Province updated successfully");
           setEditProvince(null);
         },
-        onError: () => toast.error("Update failed"),
+        onError: (errs) => {
+          const msg = Object.values(errs)[0] || "Failed to update province";
+          toast.error(msg);
+        },
+        onFinish: () => {
+          setIsUpdating(false);
+        },
       }
     );
   };
 
-  // ✅ Handle delete
   const handleDelete = () => {
-    if (!selectedProvince) return;
-    router.delete(`/provinces/${selectedProvince.id}`, {
+    if (!deleteProvince) return;
+
+    setIsDeleting(true);
+
+    router.delete(`/provinces/${deleteProvince.id}`, {
+      preserveScroll: true,
       onSuccess: () => {
-        toast.success("Province deleted successfully!");
-        setOpenDeleteDialog(false);
+        toast.success("Province deleted successfully");
+        setDeleteProvince(null);
       },
-      onError: () => toast.error("Delete failed"),
+      onError: (errs) => {
+        const msg = Object.values(errs)[0] || "Failed to delete province";
+        toast.error(msg);
+      },
+      onFinish: () => {
+        setIsDeleting(false);
+      },
     });
   };
 
-  // ✅ Table columns
   const columns: ColumnDef<Province>[] = [
     {
       accessorKey: "country",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Country</span>
+      header: ({ column }) => (
+        <button
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="flex items-center gap-1.5 font-semibold text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Country
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5 text-primary" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="w-3.5 h-3.5 text-primary" />
+          ) : null}
+        </button>
       ),
       cell: ({ row }) => {
-        const province = row.original;
-        const country = countries.find(
-          (c) => c.id === Number(province.country_id)
-        );
-        if (!country) return <span className="text-[10px] font-black text-muted-foreground opacity-20 uppercase">Unknown Node</span>;
-
+        const country = row.original.country;
+        const code = country?.code;
         return (
-          <div className="flex items-center gap-3 leading-none group/jurisdiction">
-            <div className="relative leading-none">
-              <div className="absolute -inset-1 bg-orange-500 rounded-sm blur opacity-0 group-hover/jurisdiction:opacity-20 transition duration-500" />
+          <div className="flex items-center gap-2.5">
+            {code ? (
               <img
-                src={`https://flagcdn.com/w80/${country.code.toLowerCase()}.png`}
-                alt={country.name}
-                className="relative w-8 h-5 rounded-sm object-cover border border-orange-500/10 shadow-sm transition-transform group-hover/jurisdiction:scale-110 duration-500"
+                src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
+                alt={code}
+                className="w-5 h-3.5 rounded-xs object-cover border border-border shadow-2xs"
               />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-black text-foreground/70 uppercase tracking-tight leading-none group-hover/jurisdiction:text-orange-600 transition-colors uppercase">{country.name}</span>
-              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none font-mono">#{country.code}</span>
+            ) : (
+              <Globe className="w-4 h-4 text-muted-foreground" />
+            )}
+            <div className="flex flex-col">
+              <span className="font-medium text-xs text-foreground">
+                {country?.name || "Unassigned"}
+              </span>
+              {code && (
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {code}
+                </span>
+              )}
             </div>
           </div>
         );
@@ -191,466 +263,617 @@ export function DataTable({ data, countries }: DataTableProps) {
     },
     {
       accessorKey: "name",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Province</span>
+      header: ({ column }) => (
+        <button
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="flex items-center gap-1.5 font-semibold text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Province / Region
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5 text-primary" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="w-3.5 h-3.5 text-primary" />
+          ) : null}
+        </button>
       ),
       cell: ({ row }) => (
-        <div className="flex flex-col gap-1">
-          <span className="font-black text-foreground tracking-tight uppercase leading-none">{row.original.name}</span>
-          <span className="text-[10px] font-bold text-muted-foreground/40 tracking-widest uppercase leading-none">Registry #PROV-{row.original.id}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-xs text-foreground">
+            {row.original.name}
+          </span>
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-muted text-muted-foreground border border-border/60">
+            {row.original.code}
+          </span>
         </div>
-      )
+      ),
     },
     {
-      accessorKey: "code",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Code</span>
+      accessorKey: "cities_count",
+      header: ({ column }) => (
+        <button
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="flex items-center gap-1.5 font-semibold text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Cities
+          {column.getIsSorted() === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5 text-primary" />
+          ) : column.getIsSorted() === "desc" ? (
+            <ChevronDown className="w-3.5 h-3.5 text-primary" />
+          ) : null}
+        </button>
       ),
-      cell: ({ row }) => (
-        <span className="font-mono font-black text-orange-600 bg-orange-500/5 px-2 py-1 rounded-sm border border-orange-500/10 tracking-widest leading-none block w-fit">{row.original.code}</span>
-      )
+      cell: ({ row }) => {
+        const count = row.original.cities_count || 0;
+        return (
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${
+                count > 0
+                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                  : "bg-muted text-muted-foreground border border-border/60"
+              }`}
+            >
+              <Building2 className="w-3 h-3" />
+              {count} {count === 1 ? "City" : "Cities"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "coordinates",
+      header: "Coordinates",
+      cell: ({ row }) => {
+        const lat = row.original.latitude;
+        const lng = row.original.longitude;
+        if (!lat && !lng) {
+          return (
+            <span className="text-[11px] text-muted-foreground/60 italic">
+              Unmapped
+            </span>
+          );
+        }
+        return (
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono bg-muted/40 text-muted-foreground border border-border/50">
+            <MapPin className="w-3 h-3 text-muted-foreground" />
+            <span>
+              {lat || "—"}, {lng || "—"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "is_active",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Status</span>
-      ),
+      header: "Status",
+      cell: ({ row }) => {
+        const active = row.original.is_active;
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+              active
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                : "bg-muted text-muted-foreground border border-border/60"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                active ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/60"
+              }`}
+            />
+            {active ? "Active" : "Inactive"}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "created_by",
+      header: "Created By",
       cell: ({ row }) => (
-        <div className="flex items-center leading-none">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm border ${row.original.is_active
-              ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-600"
-              : "bg-orange-500/5 border-orange-500/20 text-orange-600"
-            }`}>
-            <div className={`h-1.5 w-1.5 rounded-full animate-pulse ${row.original.is_active ? "bg-emerald-500" : "bg-orange-500"
-              }`} />
-            <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-              {row.original.is_active ? "Verified" : "Offline"}
+        <div className="flex items-center gap-2">
+          <Avatar className="w-6 h-6 border border-border">
+            <AvatarImage src={row.original.created_by_avatar} />
+            <AvatarFallback className="text-[10px] font-bold">
+              {row.original.created_by_name?.charAt(0) || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-foreground">
+              {row.original.created_by_name || "System"}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {row.original.created_at
+                ? new Date(row.original.created_at).toLocaleDateString()
+                : ""}
             </span>
           </div>
         </div>
       ),
     },
     {
-      accessorKey: "created_by",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Added By</span>
-      ),
-      cell: ({ row }) => {
-        const name = row.original.created_by_name || "Unknown";
-        const imageUrl = row.original.created_by_avatar || "";
-        const firstLetter = name.charAt(0).toUpperCase();
-
-        return (
-          <div className="flex items-center gap-3 leading-none">
-            <div className="relative group/avatar leading-none invisible sm:visible">
-              <div className="absolute -inset-0.5 bg-orange-500 rounded-sm blur opacity-0 group-hover/avatar:opacity-30 transition duration-300" />
-              <Avatar className="h-8 w-8 rounded-sm border border-orange-500/20 relative">
-                {imageUrl ? (
-                  <AvatarImage src={imageUrl} alt={name} className="object-cover" />
-                ) : (
-                  <AvatarFallback className="bg-orange-500 text-white font-black text-xs rounded-none">{firstLetter}</AvatarFallback>
-                )}
-              </Avatar>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-black text-foreground/70 uppercase tracking-tight leading-none uppercase">{name}</span>
-              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest leading-none font-mono">Registrar</span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
       id: "actions",
-      header: () => (
-        <span className="text-[10px] font-black uppercase tracking-widest text-orange-600/60 leading-none">Actions</span>
-      ),
-      enableHiding: false,
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => {
         const province = row.original;
-        const canEdit = permissions.includes("edit provinces");
-        const canDelete = permissions.includes("delete provinces");
-
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-9 w-9 p-0 hover:bg-orange-500/5 hover:text-orange-600 rounded-sm transition-colors border-2 border-transparent hover:border-orange-500/20">
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-sm border-2 border-orange-500/20 p-2 min-w-[180px] shadow-2xl bg-white">
-              <div className="px-2 py-1.5 mb-1.5 border-b border-orange-500/10">
-                <p className="text-[9px] font-black text-orange-600/60 uppercase tracking-widest leading-none">Record Operations</p>
-              </div>
-              {canEdit && (
-                <DropdownMenuItem
-                  className="flex items-center gap-3 font-bold uppercase text-[10px] tracking-widest p-3 transition-all hover:bg-orange-600 hover:text-white cursor-pointer rounded-sm mb-1 group"
-                  onClick={() => {
-                    setEditProvince(province);
-                    setName(province.name);
-                    setCode(province.code);
-                    setLatitude(province.latitude || "");
-                    setLongitude(province.longitude || "");
-
-                    const selectedCountry = countryOptions.find(
-                      (opt) => opt.value === province.country_id
-                    );
-                    setEditCountry(selectedCountry || null);
-                  }}
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                 >
-                  <PencilLine className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Edit Province</span>
-                </DropdownMenuItem>
-              )}
-              {canDelete && (
-                <DropdownMenuItem
-                  className="flex items-center gap-3 font-bold uppercase text-[10px] tracking-widest p-3 transition-all hover:bg-red-600 hover:text-white cursor-pointer rounded-sm group"
-                  onClick={() => {
-                    setSelectedProvince(province);
-                    setOpenDeleteDialog(true);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Delete Province</span>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36 rounded-lg">
+                {canEdit && (
+                  <DropdownMenuItem
+                    onClick={() => openEditDialog(province)}
+                    className="gap-2 cursor-pointer text-xs font-medium"
+                  >
+                    <PencilLine className="w-3.5 h-3.5 text-muted-foreground" />
+                    Edit Province
+                  </DropdownMenuItem>
+                )}
+                {canDelete && (
+                  <DropdownMenuItem
+                    onClick={() => setDeleteProvince(province)}
+                    className="gap-2 cursor-pointer text-xs font-medium text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
   ];
 
-  // ✅ React Table instance
   const table = useReactTable({
     data,
     columns,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+    },
     onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: { sorting, columnVisibility, rowSelection },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
   });
 
+  const customSelectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: "var(--background, #ffffff)",
+      borderColor: state.isFocused ? "var(--ring, #e8941a)" : "var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      minHeight: "40px",
+      fontSize: "0.875rem",
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: "var(--ring, #e8941a)",
+      },
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      color: "var(--popover-foreground, #080706)",
+      borderColor: "var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      boxShadow:
+        "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+      zIndex: 9999,
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      borderRadius: "0.5rem",
+      padding: "4px",
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? "var(--primary, #e8941a)"
+        : state.isFocused
+        ? "var(--accent, #f4f4f5)"
+        : "transparent",
+      color: state.isSelected
+        ? "var(--primary-foreground, #ffffff)"
+        : "var(--foreground, #080706)",
+      cursor: "pointer",
+      fontSize: "0.875rem",
+      padding: "6px 12px",
+      borderRadius: "0.375rem",
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: "var(--foreground, #080706)",
+      fontSize: "0.875rem",
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: "var(--muted-foreground, #71717a)",
+      fontSize: "0.875rem",
+    }),
+  };
+
   return (
-    <div className="w-full space-y-6">
-      {/* Modification Dialog */}
-      <Dialog open={!!editProvince} onOpenChange={() => setEditProvince(null)}>
-        <DialogContent className="rounded-sm border-2 border-orange-500/20 p-0 overflow-hidden sm:max-w-[550px] bg-white shadow-2xl">
-          <div className="h-2 bg-orange-600 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
-          <div className="p-8 lg:p-10">
-            <DialogHeader className="mb-10 text-left">
-              <div className="flex items-center gap-5">
-                <div className="p-4 bg-orange-600 text-white rounded-sm shadow-xl shadow-orange-600/20 ring-4 ring-orange-500/10 rotate-3 flex-shrink-0">
-                  <PencilLine className="w-8 h-8" />
-                </div>
-                <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    Edit <span className="text-orange-500 italic">Province</span>
-                  </DialogTitle>
-                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Update province details.
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <form onSubmit={handleUpdate} className="space-y-8">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
-                    <Globe className="w-3 h-3" />
-                    Country
-                  </Label>
-                  <Select<CountryOption, false>
-                    options={countryOptions}
-                    value={editCountry}
-                    onChange={(option) => setEditCountry(option)}
-                    placeholder="REASSIGNING COUNTRY..."
-                    className="technical-select"
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderRadius: '2px',
-                        border: '2px solid rgba(0,0,0,0.1)',
-                        '&:hover': { borderColor: 'rgba(249,115,22,0.4)' },
-                        boxShadow: 'none',
-                        height: '48px',
-                        fontSize: '12px',
-                        fontWeight: '900',
-                        textTransform: 'uppercase',
-                        backgroundColor: 'rgba(0,0,0,0.02)'
-                      })
-                    }}
-                    formatOptionLabel={(option: CountryOption) => (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={`https://flagcdn.com/w40/${option.code.toLowerCase()}.png`}
-                            alt={option.label}
-                            className="w-6 h-4 rounded-sm object-cover border border-orange-500/10 shadow-sm"
-                          />
-                          <span className="tracking-tight">{option.label}</span>
-                        </div>
-                        <span className="text-[10px] font-black text-orange-600/40 font-mono">#{option.code}</span>
-                      </div>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2 col-span-2 sm:col-span-1">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Province Name
-                    </Label>
-                    <Input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-black uppercase tracking-tight"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2 sm:col-span-1">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Province Code
-                    </Label>
-                    <Input
-                      required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-mono font-black uppercase tracking-widest text-orange-600"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-orange-500/5 p-6 rounded-sm border-2 border-orange-500/10 space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Location Info</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Latitude</Label>
-                      <Input
-                        value={latitude}
-                        onChange={(e) => setLatitude(e.target.value)}
-                        className="h-10 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Longitude</Label>
-                      <Input
-                        value={longitude}
-                        onChange={(e) => setLongitude(e.target.value)}
-                        className="h-10 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t-2 border-orange-500/10">
-                <DialogFooter className="gap-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
-                    onClick={() => setEditProvince(null)}
+    <div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow
+                key={headerGroup.id}
+                className="border-b border-border/70 hover:bg-transparent"
+              >
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="h-11 px-4 text-xs font-semibold text-muted-foreground"
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1 text-white border-b-4 border-orange-800/50"
-                  >
-                    Save Changes
-                  </Button>
-                </DialogFooter>
-              </div>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Purge Dialog */}
-      <Dialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
-        <DialogContent className="rounded-sm border-4 border-red-500/20 p-0 overflow-hidden sm:max-w-[450px] bg-white shadow-2xl">
-          <div className="h-2 bg-red-600 animate-pulse" />
-          <div className="p-8 lg:p-10">
-            <div className="flex flex-col items-center text-center space-y-6">
-              <div className="p-6 bg-red-600 text-white rounded-sm shadow-2xl shadow-red-600/40 animate-bounce">
-                <Trash2 className="w-10 h-10" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-3xl font-black tracking-tighter uppercase text-foreground leading-none">
-                  Delete <span className="text-red-600">Province</span>
-                </h3>
-                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest opacity-60">This action cannot be undone.</p>
-              </div>
-              <div className="w-full p-6 bg-red-50 rounded-sm border-2 border-red-200/50 space-y-2">
-                <p className="text-xs font-bold text-red-800 uppercase leading-relaxed">
-                  Are you sure you want to delete this province?
-                </p>
-                <p className="text-xl font-black text-red-600 uppercase tracking-tight">
-                  {selectedProvince?.name}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 w-full pt-4">
-                <Button
-                  variant="ghost"
-                  className="h-14 font-black uppercase tracking-widest rounded-sm border-2 border-transparent hover:border-border transition-all"
-                  onClick={() => setOpenDeleteDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-red-600 hover:bg-red-700 h-14 font-black uppercase tracking-widest rounded-sm shadow-xl shadow-red-600/20 text-white border-b-4 border-red-800/50 active:scale-95 transition-all"
-                  onClick={handleDelete}
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Main Table Assembly */}
-      <div className="relative group/table">
-        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/5 to-orange-600/5 rounded-sm blur-xl opacity-50 transition duration-1000 group-hover/table:opacity-100" />
-        <div className="relative bg-white border-2 border-orange-500/10 rounded-sm overflow-hidden shadow-2xl">
-          <Table>
-            <TableHeader className="bg-orange-500/5 border-b-2 border-orange-500/20">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="hover:bg-transparent border-none h-14">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="px-6">
-                      <div
-                        onClick={() => header.column.toggleSorting()}
-                        className="flex items-center gap-2 cursor-pointer select-none group/h"
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && (
-                          <div className="flex flex-col opacity-0 group-hover/h:opacity-100 transition-opacity">
-                            <ChevronUp className={`w-3 h-3 -mb-1 ${header.column.getIsSorted() === 'asc' ? 'text-orange-600' : 'text-orange-600/20'}`} />
-                            <ChevronDown className={`w-3 h-3 ${header.column.getIsSorted() === 'desc' ? 'text-orange-600' : 'text-orange-600/20'}`} />
-                          </div>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
                         )}
-                      </div>
-                    </TableHead>
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="py-3 px-4 text-xs">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
                   ))}
                 </TableRow>
-              ))}
-            </TableHeader>
-
-            <TableBody>
-              <AnimatePresence mode="wait">
-                {table.getRowModel().rows.length > 0 ? (
-                  table.getRowModel().rows.map((row, index) => (
-                    <motion.tr
-                      key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3, delay: index * 0.03 }}
-                      className="group/row border-b border-orange-500/5 hover:bg-orange-500/[0.02] transition-colors h-16"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="px-6">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </motion.tr>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-64 text-center">
-                      <div className="flex flex-col items-center justify-center space-y-4">
-                        <div className="p-4 bg-orange-500/5 rounded-sm animate-pulse">
-                          <Database className="w-8 h-8 text-orange-500/20" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-black text-foreground uppercase tracking-tighter">No regional data detected</p>
-                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40 italic">No entries found</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-
-          {/* Technical Footer */}
-          <div className="px-6 py-6 bg-[#fafafa] border-t-2 border-orange-500/10 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-8">
-              <div className="flex flex-col gap-1">
-                <p className="text-[9px] font-black text-muted-foreground uppercase swallow-wider opacity-40 leading-none">Stream Density</p>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-orange-600" />
-                  <div className="flex items-center gap-4">
-                    {[10, 20, 30, 40, 50].map((pageSize) => (
-                      <button
-                        key={pageSize}
-                        onClick={() => table.setPageSize(pageSize)}
-                        className={`text-xs font-black transition-all hover:text-orange-600 ${table.getState().pagination.pageSize === pageSize
-                            ? "text-orange-600 scale-110"
-                            : "text-muted-foreground/40"
-                          }`}
-                      >
-                        {pageSize}
-                      </button>
-                    ))}
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-muted-foreground text-xs"
+                >
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <Map className="w-8 h-8 text-muted-foreground/40 mb-1" />
+                    <p className="font-medium">No provinces found matching criteria</p>
+                    <p className="text-[11px] text-muted-foreground/70">
+                      Try clearing filters or adding a new province
+                    </p>
                   </div>
-                </div>
-              </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-              <div className="h-8 w-[2px] bg-orange-500/10" />
+      {/* Pagination Footer */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border/60 bg-muted/20">
+        <div className="text-xs text-muted-foreground">
+          Showing{" "}
+          <span className="font-medium text-foreground">
+            {table.getState().pagination.pageIndex *
+              table.getState().pagination.pageSize +
+              (data.length > 0 ? 1 : 0)}
+          </span>{" "}
+          to{" "}
+          <span className="font-medium text-foreground">
+            {Math.min(
+              (table.getState().pagination.pageIndex + 1) *
+                table.getState().pagination.pageSize,
+              data.length
+            )}
+          </span>{" "}
+          of <span className="font-medium text-foreground">{data.length}</span>{" "}
+          provinces
+        </div>
 
-              <div className="flex flex-col gap-1 invisible sm:visible">
-                <p className="text-[9px] font-black text-muted-foreground uppercase swallow-wider opacity-40 leading-none">Segment Information</p>
-                <p className="text-xs font-black text-foreground uppercase tracking-tight">
-                  PAGE {table.getState().pagination.pageIndex + 1} <span className="text-orange-600/40 font-mono mx-1">/</span> {table.getPageCount()}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 mr-4">
-                {Array.from({ length: Math.min(table.getPageCount(), 5) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`h-1 rounded-full transition-all duration-500 ${table.getState().pagination.pageIndex === i
-                        ? "w-8 bg-orange-600 shadow-[0_0_8px_rgba(249,115,22,0.4)]"
-                        : "w-2 bg-orange-500/20"
-                      }`}
-                  />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Rows per page:</span>
+            <ShadSelect
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+            >
+              <SelectTrigger className="h-8 w-16 text-xs rounded-md">
+                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 25, 50, 100].map((pageSize) => (
+                  <SelectItem
+                    key={pageSize}
+                    value={`${pageSize}`}
+                    className="text-xs"
+                  >
+                    {pageSize}
+                  </SelectItem>
                 ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="h-10 w-10 p-0 rounded-sm border-2 border-orange-500/10 hover:border-orange-500/40 hover:bg-orange-500/5 hover:text-orange-600 transition-all active:scale-90 disabled:opacity-20"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                >
-                  <IconChevronLeft className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-10 w-10 p-0 rounded-sm border-2 border-orange-500/10 hover:border-orange-500/40 hover:bg-orange-500/5 hover:text-orange-600 transition-all active:scale-90 disabled:opacity-20"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                >
-                  <IconChevronRight className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
+              </SelectContent>
+            </ShadSelect>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xs font-medium px-2">
+              Page {table.getState().pagination.pageIndex + 1} of{" "}
+              {table.getPageCount() || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-md"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Edit Province Modal */}
+      <Dialog
+        open={Boolean(editProvince)}
+        onOpenChange={(open) => !open && setEditProvince(null)}
+      >
+        <DialogContent className="rounded-xl border border-border sm:max-w-[540px] p-0 overflow-hidden bg-card text-card-foreground shadow-2xl">
+          <div className="px-6 pt-6 pb-4 border-b border-border/60 bg-muted/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                <Map className="w-5 h-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold tracking-tight">
+                  Edit Province
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Update administrative territory specifications and country alignment
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleUpdate} className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                Country <span className="text-destructive">*</span>
+              </Label>
+              <Select<Option, false>
+                options={countryOptions}
+                value={selectedCountry}
+                onChange={(opt) => setSelectedCountry(opt)}
+                placeholder="Select country..."
+                styles={customSelectStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                formatOptionLabel={(option: Option) => (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {option.code && (
+                        <img
+                          src={`https://flagcdn.com/w20/${option.code.toLowerCase()}.png`}
+                          alt=""
+                          className="w-4 h-3 rounded-xs object-cover"
+                        />
+                      )}
+                      <span>{option.label}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {option.code}
+                    </span>
+                  </div>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Province Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Punjab, Sindh"
+                  className="h-10 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Province Code <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={editCode}
+                  onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. PB, SD"
+                  className="h-10 rounded-lg font-mono text-sm uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-border/70 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-foreground">
+                  Geospatial Coordinates (Optional)
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">
+                    Latitude
+                  </Label>
+                  <Input
+                    value={editLatitude}
+                    onChange={(e) => setEditLatitude(e.target.value)}
+                    placeholder="31.1704"
+                    className="h-9 text-xs font-mono rounded-md bg-background"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">
+                    Longitude
+                  </Label>
+                  <Input
+                    value={editLongitude}
+                    onChange={(e) => setEditLongitude(e.target.value)}
+                    placeholder="72.7097"
+                    className="h-9 text-xs font-mono rounded-md bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold cursor-pointer">
+                  Operational Status
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Active regions can register cities and areas
+                </p>
+              </div>
+              <Switch
+                checked={editIsActive}
+                onCheckedChange={setEditIsActive}
+              />
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-border/60 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-lg"
+                onClick={() => setEditProvince(null)}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="h-10 rounded-lg px-6 font-semibold"
+                disabled={isUpdating}
+              >
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={Boolean(deleteProvince)}
+        onOpenChange={(open) => !open && setDeleteProvince(null)}
+      >
+        <DialogContent className="rounded-xl border border-border sm:max-w-[420px] p-6 bg-card text-card-foreground shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold">
+                Delete Province?
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                This action cannot be undone.
+              </DialogDescription>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold text-foreground">
+              "{deleteProvince?.name}"
+            </span>
+            ? All linked cities and geographical hierarchies may be affected.
+          </p>
+
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-lg"
+              onClick={() => setDeleteProvince(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="h-9 rounded-lg px-4 font-semibold"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Confirm Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

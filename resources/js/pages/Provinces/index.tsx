@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Head, router, usePage } from "@inertiajs/react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { AppSidebar } from "@/components/app-sidebar";
-import { DataTable } from "@/components/Provinces/DataTable"; // ✅ use Provinces table
+import { DataTable } from "@/components/Provinces/DataTable";
+import ProvinceSummary from "./ProvinceSummary";
+import ProvinceFilters from "./ProvinceFilters";
 import { type BreadcrumbItem } from "@/types";
-import { Plus, Map, Globe, Database, Activity, ShieldCheck } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus,
+  Map,
+  Globe,
+  Download,
+  MapPin,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,15 +27,22 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import useToastFromQuery from "@/hooks/useToastFromQuery";
-
-
-// ✅ react-select import
 import Select, { SingleValue } from "react-select";
+import { toast } from "sonner";
 
 const breadcrumbs: BreadcrumbItem[] = [
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "Master Setup", href: "#" },
   { title: "Provinces", href: "/provinces" },
 ];
+
+interface Country {
+  id: number;
+  name: string;
+  code: string;
+}
 
 interface Province {
   id: number;
@@ -38,31 +52,51 @@ interface Province {
   latitude?: string;
   longitude?: string;
   is_active: boolean;
+  cities_count?: number;
   created_at: string;
   created_by: number;
   created_by_name?: string;
   created_by_avatar?: string;
+  country?: Country;
 }
 
-interface Country {
-  id: number;
-  name: string;
-  code: string; // ISO code (e.g. "PK")
-}
-
-interface CountryOption {
+interface Option {
   value: number;
   label: string;
-  code: string;
+  code?: string;
 }
 
 interface IndexProps {
   countries: Country[];
   provinces: Province[];
+  filters: {
+    search?: string;
+    country_id?: string | number;
+    is_active?: string | number | boolean;
+  };
+  summary: {
+    total_provinces: number;
+    active_provinces: number;
+    total_cities_count: number;
+    countries_count: number;
+    mapped_coordinates_count?: number;
+  };
 }
 
-export default function Index({ provinces, countries }: IndexProps) {
+export default function Index({
+  provinces = [],
+  countries = [],
+  filters = {},
+  summary = {
+    total_provinces: 0,
+    active_provinces: 0,
+    total_cities_count: 0,
+    countries_count: 0,
+    mapped_coordinates_count: 0,
+  },
+}: IndexProps) {
   useToastFromQuery();
+
   const pageProps = usePage().props as unknown as {
     auth: {
       user: any;
@@ -71,292 +105,405 @@ export default function Index({ provinces, countries }: IndexProps) {
     errors: Record<string, string>;
   };
 
-  const permissions = pageProps.auth.permissions;
+  const permissions = pageProps.auth?.permissions || [];
+  const canCreate =
+    Array.isArray(permissions) &&
+    (permissions.includes("edit areas") || permissions.includes("create provinces"));
 
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // form states
+  // Form states
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
-  const [country, setCountry] = useState<CountryOption | null>(null);
+  const [isActive, setIsActive] = useState(true);
+  const [country, setCountry] = useState<Option | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const countryOptions: Option[] = countries.map((c) => ({
+    value: c.id,
+    label: c.name,
+    code: c.code,
+  }));
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!country) return;
+    if (!country) {
+      toast.error("Please select a Country");
+      return;
+    }
+    if (!name.trim()) {
+      toast.error("Province name is required");
+      return;
+    }
+    if (!code.trim()) {
+      toast.error("Province code is required");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     const payload = {
-      name,
-      code,
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
       country_id: country.value,
-      latitude,
-      longitude,
+      latitude: latitude.trim() || null,
+      longitude: longitude.trim() || null,
+      is_active: isActive,
     };
 
     router.post("/provinces", payload, {
+      preserveScroll: true,
       onSuccess: () => {
         setOpenCreateDialog(false);
         setName("");
         setCode("");
         setLatitude("");
         setLongitude("");
+        setIsActive(true);
         setCountry(null);
+        toast.success("Province created successfully");
+      },
+      onError: (errs) => {
+        const msg = Object.values(errs)[0] || "Failed to create province";
+        toast.error(msg);
+      },
+      onFinish: () => {
+        setIsSubmitting(false);
       },
     });
   };
 
-  const canCreate = Array.isArray(permissions) && permissions.includes("create provinces");
+  // CSV Export utility
+  const handleExportCSV = () => {
+    if (!provinces.length) {
+      toast.info("No province data to export");
+      return;
+    }
 
-  // ✅ Map countries for react-select
-  const countryOptions: CountryOption[] = countries.map((c) => ({
-    value: c.id,
-    label: c.name,
-    code: c.code,
-  }));
+    const headers = [
+      "ID",
+      "Province Name",
+      "Code",
+      "Country",
+      "Cities Count",
+      "Latitude",
+      "Longitude",
+      "Status",
+      "Created By",
+      "Created At",
+    ];
+
+    const rows = provinces.map((p) => [
+      p.id,
+      `"${(p.name || "").replace(/"/g, '""')}"`,
+      `"${(p.code || "").replace(/"/g, '""')}"`,
+      `"${(p.country?.name || "").replace(/"/g, '""')}"`,
+      p.cities_count || 0,
+      p.latitude || "",
+      p.longitude || "",
+      p.is_active ? "Active" : "Inactive",
+      `"${(p.created_by_name || "").replace(/"/g, '""')}"`,
+      `"${(p.created_at || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `provinces_export_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success("Provinces export downloaded");
+  };
+
+  const customSelectStyles = {
+    control: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: "var(--background, #ffffff)",
+      borderColor: state.isFocused ? "var(--ring, #e8941a)" : "var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      minHeight: "42px",
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: "var(--ring, #e8941a)",
+      },
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      color: "var(--popover-foreground, #080706)",
+      borderColor: "var(--border, #e5e7eb)",
+      borderRadius: "0.5rem",
+      boxShadow:
+        "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+      zIndex: 9999,
+    }),
+    menuList: (base: any) => ({
+      ...base,
+      backgroundColor: "var(--popover, #ffffff)",
+      borderRadius: "0.5rem",
+      padding: "4px",
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? "var(--primary, #e8941a)"
+        : state.isFocused
+        ? "var(--accent, #f4f4f5)"
+        : "transparent",
+      color: state.isSelected
+        ? "var(--primary-foreground, #ffffff)"
+        : "var(--foreground, #080706)",
+      cursor: "pointer",
+      fontSize: "0.875rem",
+      padding: "8px 12px",
+      borderRadius: "0.375rem",
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: "var(--foreground, #080706)",
+      fontSize: "0.875rem",
+      fontWeight: 500,
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: "var(--muted-foreground, #71717a)",
+      fontSize: "0.875rem",
+    }),
+  };
 
   return (
     <>
-
-      <Head title="PROVINCES REGISTRY" />
+      <Head title="Provinces Management" />
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset className="bg-[#fafafa]">
+        <SidebarInset className="bg-background">
           <SiteHeader breadcrumbs={breadcrumbs} />
 
-          <div className="p-6 lg:p-10 space-y-10 max-w-[1600px] mx-auto">
-            {/* Command Bar */}
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/20 to-orange-600/20 rounded-sm blur transition duration-1000 group-hover:duration-200 opacity-0 group-hover:opacity-100" />
-              <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/80 backdrop-blur-xl border-2 border-orange-500/10 p-6 lg:p-8 rounded-sm shadow-2xl shadow-orange-500/5 transition-all hover:border-orange-500/20 select-none overflow-hidden">
-                <div className="flex items-start gap-6">
-                  <div className="relative">
-                    <div className="absolute -inset-2 bg-orange-600/20 rounded-sm blur-xl animate-pulse" />
-                    <div className="relative p-5 bg-orange-600 text-white rounded-sm shadow-2xl shadow-orange-600/40 border-b-4 border-orange-800/50 group-hover:scale-105 transition-transform duration-500">
-                      <Map className="w-8 h-8" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                      <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">
-                        PROVINCES
-                      </h1>
-                      <div className="px-2 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded-sm">
-                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">v2.0</span>
-                      </div>
-                    </div>
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] opacity-60 flex items-center gap-2">
-                      Manage provinces for each country.
-                    </p>
-                  </div>
+          <div className="p-4 md:p-6 lg:p-8 space-y-6 ">
+            {/* Top Enterprise Page Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
+                  <Map className="w-6 h-6" />
                 </div>
-
-                {/* Identity Console */}
-                <div className="flex flex-wrap items-center gap-4 lg:gap-8">
-                  <div className="flex items-center gap-4 px-6 py-3 bg-muted/30 border-2 border-border/40 rounded-sm group/item hover:border-orange-500/20 transition-all">
-                    <div className="p-2 bg-white rounded-sm shadow-sm border border-border group-hover/item:text-orange-600 transition-colors">
-                      <Globe className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">System Status</p>
-                      <p className="text-xs font-black text-foreground flex items-center gap-1.5 uppercase">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Operational
-                      </p>
-                    </div>
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                      Provinces & Regions
+                    </h1>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
+                      {summary.total_provinces} records
+                    </span>
                   </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Manage first-level administrative divisions, sovereign country links, and regional boundaries
+                  </p>
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-4 px-6 py-3 bg-muted/30 border-2 border-border/40 rounded-sm group/item hover:border-orange-500/20 transition-all">
-                    <div className="p-2 bg-white rounded-sm shadow-sm border border-border">
-                      <Database className="w-4 h-4 text-muted-foreground group-hover/item:text-orange-600 transition-colors" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Status</p>
-                      <p className="text-xs font-black text-foreground uppercase tracking-tight">{provinces.length} Active Provinces</p>
-                    </div>
-                  </div>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <Button
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3.5 gap-2 rounded-lg border-border text-foreground hover:bg-muted font-medium transition-all shadow-xs"
+                >
+                  <Download className="w-4 h-4 text-muted-foreground" />
+                  <span className="hidden sm:inline">Export CSV</span>
+                </Button>
 
+                {canCreate && (
                   <Button
                     onClick={() => setOpenCreateDialog(true)}
-                    disabled={!canCreate}
-                    className="bg-orange-600 hover:bg-orange-700 h-16 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 transition-all group border-b-4 border-orange-800/50"
+                    size="sm"
+                    className="h-10 px-4 gap-2 rounded-lg font-semibold shadow-sm transition-all"
                   >
-                    <Plus className="mr-3 w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
-                    Add Province
+                    <Plus className="w-4 h-4" />
+                    <span>Add Province</span>
                   </Button>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Data Console */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              {provinces.length === 0 ? (
-                <div className="h-[400px] flex flex-col items-center justify-center bg-white border-2 border-dashed border-orange-500/10 rounded-sm group hover:border-orange-500/20 transition-all">
-                  <div className="p-8 bg-orange-500/5 rounded-sm mb-6 group-hover:scale-110 transition-transform duration-500">
-                    <Plus className="w-12 h-12 text-orange-500/20" />
-                  </div>
-                  <h3 className="text-xl font-black text-foreground uppercase tracking-tighter mb-1">No Provinces Found</h3>
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 italic mb-8">No provinces have been added yet. Add a new province to get started.</p>
-                  <Button
-                    onClick={() => setOpenCreateDialog(true)}
-                    variant="outline"
-                    className="border-2 border-orange-500/20 hover:bg-orange-500/5 text-orange-600 font-black uppercase tracking-widest px-8 rounded-sm"
-                  >
-                    Add Province
-                  </Button>
-                </div>
-              ) : (
-                <DataTable data={provinces} countries={countries} />
-              )}
-            </motion.div>
+            {/* KPI Summary Metrics Grid */}
+            <ProvinceSummary summary={summary} />
+
+            {/* Live Filter Bar */}
+            <ProvinceFilters filters={filters} countries={countries} />
+
+            {/* Main Data Table */}
+            <div className="bg-card text-card-foreground rounded-xl border border-border/70 shadow-xs overflow-hidden">
+              <DataTable data={provinces} countries={countries} />
+            </div>
           </div>
         </SidebarInset>
       </SidebarProvider>
 
-      {/* Genesis Dialog (Create) */}
+      {/* Modern Create Province Dialog */}
       <Dialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}>
-        <DialogContent className="rounded-sm border-2 border-orange-500/20 p-0 overflow-hidden sm:max-w-[550px] bg-white shadow-2xl">
-          <div className="h-2 bg-orange-600 shadow-[0_0_15px_rgba(249,115,22,0.4)]" />
-          <div className="p-8 lg:p-10">
-            <DialogHeader className="mb-10 text-left">
-              <div className="flex items-center gap-5">
-                <div className="p-4 bg-orange-600 text-white rounded-sm shadow-xl shadow-orange-600/20 ring-4 ring-orange-500/10 -rotate-3 flex-shrink-0 transition-transform hover:rotate-0 duration-500">
-                  <Map className="w-8 h-8" />
-                </div>
-                <div>
-                  <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none mb-1">
-                    Add <span className="text-orange-500 italic">Province</span>
-                  </DialogTitle>
-                  <DialogDescription className="font-black text-orange-600 uppercase text-[10px] tracking-widest opacity-70">
-                    Create a new province entry.
-                  </DialogDescription>
-                </div>
+        <DialogContent className="rounded-xl border border-border sm:max-w-[540px] p-0 overflow-hidden bg-card text-card-foreground shadow-2xl">
+          <div className="px-6 pt-6 pb-4 border-b border-border/60 bg-muted/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                <Map className="w-5 h-5" />
               </div>
-            </DialogHeader>
+              <div>
+                <DialogTitle className="text-lg font-bold tracking-tight">
+                  Add New Province
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Register a primary administrative division under a sovereign country
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
-                    <Globe className="w-3 h-3" />
-                    Country
+          <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+            {/* Country Select */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                Country <span className="text-destructive">*</span>
+              </Label>
+              <Select<Option, false>
+                options={countryOptions}
+                value={country}
+                onChange={(opt) => setCountry(opt)}
+                placeholder="Select country..."
+                styles={customSelectStyles}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                formatOptionLabel={(option: Option) => (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {option.code && (
+                        <img
+                          src={`https://flagcdn.com/w20/${option.code.toLowerCase()}.png`}
+                          alt=""
+                          className="w-4 h-3 rounded-xs object-cover"
+                        />
+                      )}
+                      <span>{option.label}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {option.code}
+                    </span>
+                  </div>
+                )}
+              />
+            </div>
+
+            {/* Province Name & Code */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Province Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Punjab, Texas"
+                  className="h-10 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  Province Code <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. PB, TX"
+                  className="h-10 rounded-lg font-mono text-sm uppercase"
+                />
+              </div>
+            </div>
+
+            {/* Coordinates Section */}
+            <div className="p-3.5 rounded-lg border border-border/70 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-foreground">
+                  Geospatial Coordinates (Optional)
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">
+                    Latitude
                   </Label>
-                  <Select<CountryOption, false>
-                    options={countryOptions}
-                    value={country}
-                    onChange={(option: SingleValue<CountryOption>) => setCountry(option)}
-                    placeholder="SELECT COUNTRY..."
-                    className="technical-select"
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderRadius: '2px',
-                        border: '2px solid rgba(0,0,0,0.1)',
-                        '&:hover': { borderColor: 'rgba(249,115,22,0.4)' },
-                        boxShadow: 'none',
-                        height: '48px',
-                        fontSize: '12px',
-                        fontWeight: '900',
-                        textTransform: 'uppercase',
-                        backgroundColor: 'rgba(0,0,0,0.02)'
-                      })
-                    }}
-                    formatOptionLabel={(option: CountryOption) => (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={`https://flagcdn.com/w40/${option.code.toLowerCase()}.png`}
-                            alt={option.label}
-                            className="w-6 h-4 rounded-sm object-cover border border-orange-500/10 shadow-sm"
-                          />
-                          <span className="tracking-tight">{option.label}</span>
-                        </div>
-                        <span className="text-[10px] font-black text-orange-600/40 font-mono">#{option.code}</span>
-                      </div>
-                    )}
+                  <Input
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="31.1704"
+                    className="h-9 text-xs font-mono rounded-md bg-background"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2 col-span-2 sm:col-span-1">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Province Name
-                    </Label>
-                    <Input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Punjab"
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-black uppercase tracking-tight transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2 sm:col-span-1">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                      Short Code
-                    </Label>
-                    <Input
-                      required
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="e.g. PJ"
-                      className="h-12 border-2 border-border/40 focus:border-orange-500 rounded-sm bg-muted/20 font-mono font-black uppercase tracking-widest"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-orange-500/5 p-6 rounded-sm border-2 border-orange-500/10 space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-4 h-4 text-orange-600" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Location Info</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Latitude</Label>
-                      <Input
-                        value={latitude}
-                        onChange={(e) => setLatitude(e.target.value)}
-                        placeholder="30.3753"
-                        className="h-10 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Longitude</Label>
-                      <Input
-                        value={longitude}
-                        onChange={(e) => setLongitude(e.target.value)}
-                        placeholder="69.3451"
-                        className="h-10 border-2 border-border/20 focus:border-orange-500 rounded-sm bg-white font-mono text-xs"
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">
+                    Longitude
+                  </Label>
+                  <Input
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="72.7097"
+                    className="h-9 text-xs font-mono rounded-md bg-background"
+                  />
                 </div>
               </div>
+            </div>
 
-              <div className="pt-6 border-t-2 border-orange-500/10">
-                <DialogFooter className="gap-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-14 px-8 rounded-sm font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
-                    onClick={() => setOpenCreateDialog(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-orange-600 hover:bg-orange-700 h-14 px-10 rounded-sm font-black uppercase tracking-widest shadow-2xl shadow-orange-600/20 active:scale-95 group flex-1"
-                  >
-                    Save Province
-                  </Button>
-                </DialogFooter>
+            {/* Active Toggle */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold cursor-pointer">
+                  Operational Status
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Enable active designation for administrative mapping
+                </p>
               </div>
-            </form>
-          </div>
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-border/60 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-lg"
+                onClick={() => setOpenCreateDialog(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="h-10 rounded-lg px-6 font-semibold"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Creating..." : "Save Province"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

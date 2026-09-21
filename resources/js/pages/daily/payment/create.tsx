@@ -389,6 +389,7 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, [selectedAccount]);
 
   const [accountSearch, setAccountSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedPartyIndex, setSelectedPartyIndex] = useState<number>(0);
   const partyListRef = useRef<HTMLDivElement | null>(null);
   const [mobileAccOpen, setMobileAccOpen] = useState(false);
@@ -673,9 +674,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
 
   // Filtered Accounts
   const filteredAccounts = useMemo(() => {
-    if (!accountSearch) return accounts;
-    return accounts.filter(acc => acc.title.toLowerCase().includes(accountSearch.toLowerCase()));
-  }, [accounts, accountSearch]);
+    return accounts.filter(acc => {
+      const matchSearch = !accountSearch || acc.title.toLowerCase().includes(accountSearch.toLowerCase());
+      if (!matchSearch) return false;
+
+      const typeName = acc.account_type?.name?.toLowerCase() || "";
+      if (selectedCategory === "CUSTOMERS") return typeName.includes("customer");
+      if (selectedCategory === "SUPPLIERS") return typeName.includes("supplier");
+      if (selectedCategory === "BANKS") return typeName.includes("bank");
+      if (selectedCategory === "EQUITY / LIABILITIES") return typeName.includes("capital") || typeName.includes("drawing") || typeName.includes("amanat") || typeName.includes("reserve");
+      if (selectedCategory === "OTHERS") return !typeName.includes("customer") && !typeName.includes("supplier") && !typeName.includes("bank") && !typeName.includes("capital") && !typeName.includes("drawing") && !typeName.includes("amanat") && !typeName.includes("reserve");
+
+      return true;
+    });
+  }, [accounts, accountSearch, selectedCategory]);
 
   const handleAccountSelect = (id: number) => {
     setSelectedAccountId(id.toString());
@@ -683,10 +695,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     setDesktopAccOpen(false);
   };
 
-  // Reset party selection index when search or modal state changes
+  // Reset party selection index when search, category, or modal state changes
   useEffect(() => {
     setSelectedPartyIndex(0);
-  }, [accountSearch, desktopAccOpen]);
+  }, [accountSearch, selectedCategory, desktopAccOpen]);
 
   // Global Keyboard Shortcuts (F1 -> Add Split Method, F2 -> Party Dialog, F4 / Alt+M -> Multi Pay, Arrows -> Dialog Nav)
   useEffect(() => {
@@ -785,10 +797,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
           accTypeLower.includes('expanc') || 
           rawTypeStr === '4' || 
           rawTypeStr.includes('expense');
+        const isCapital = accTypeLower.includes('capital') || rawTypeStr === '9';
+        const isDrawings = accTypeLower.includes('drawing') || rawTypeStr === '8';
+        const isAmanat = accTypeLower.includes('amanat') || rawTypeStr === '17';
+        const isReserve = accTypeLower.includes('reserve') || rawTypeStr === '18';
 
-        if (isCustomer) {
+        if (isCustomer || isCapital || isAmanat || isReserve) {
           setPaymentType('RECEIPT');
-        } else if (isSupplier || isExpense) {
+        } else if (isSupplier || isExpense || isDrawings) {
           setPaymentType('PAYMENT');
         }
       }
@@ -1272,6 +1288,26 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                 <span className="text-[10px] font-mono font-normal text-zinc-400 lowercase">use ↑ ↓ to navigate, enter to select</span>
                               </DialogTitle>
                               <DialogDescription className="sr-only">Search and select a party account from the list</DialogDescription>
+                              
+                              {/* Category Filter Pills */}
+                              <div className="flex items-center gap-1.5 pt-3 pb-1 overflow-x-auto custom-scrollbar">
+                                {["ALL", "CUSTOMERS", "SUPPLIERS", "BANKS", "EQUITY / LIABILITIES", "OTHERS"].map((cat) => (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(cat)}
+                                    className={cn(
+                                      "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all border whitespace-nowrap",
+                                      selectedCategory === cat
+                                        ? `${t.btnBg} text-white shadow-sm border-transparent`
+                                        : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                    )}
+                                  >
+                                    {cat}
+                                  </button>
+                                ))}
+                              </div>
+
                               <div className="pt-2">
                                 <Input placeholder="SEARCH PARTY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} autoFocus className={`h-10 text-xs font-mono uppercase bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
                               </div>
@@ -1301,6 +1337,10 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                           if (name.includes("customer")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
                                           if (name.includes("supplier")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
                                           if (name.includes("bank")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black";
+                                          if (name.includes("capital")) return "bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold";
+                                          if (name.includes("drawing")) return "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-bold";
+                                          if (name.includes("amanat")) return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold";
+                                          if (name.includes("reserve")) return "bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold";
                                           return "text-zinc-400 dark:text-zinc-500 opacity-40";
                                         })()
                                       )}
@@ -1448,11 +1488,17 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
                                       </div>
                                       <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                                          {isBankAccountSelected ? "Bank Transaction Ready" : "No Active Invoices"}
+                                          {isBankAccountSelected
+                                            ? "Bank Transaction Ready"
+                                            : selectedAccount?.account_type?.name && ['capital', 'drawings', 'amanat payable', 'reserve'].includes(selectedAccount.account_type.name.toLowerCase())
+                                            ? `${selectedAccount.account_type.name} Transaction Ready`
+                                            : "No Active Invoices"}
                                         </div>
                                         <p className="text-[11px] text-zinc-400 font-bold max-w-[285px] mx-auto leading-relaxed">
                                           {isBankAccountSelected 
                                             ? `This transaction will be recorded directly as a ${paymentType === 'RECEIPT' ? 'withdrawal' : 'deposit'} for the selected Bank Account.`
+                                            : selectedAccount?.account_type?.name && ['capital', 'drawings', 'amanat payable', 'reserve'].includes(selectedAccount.account_type.name.toLowerCase())
+                                            ? `This transaction will be posted directly to ${selectedAccount.title} (${selectedAccount.account_type.name}) as a ${paymentType === 'RECEIPT' ? 'receipt (in)' : 'payment (out)'}.`
                                             : "This party has no outstanding invoices. Any payout posted will be registered as an advance / on-account credit."}
                                         </p>
                                       </div>

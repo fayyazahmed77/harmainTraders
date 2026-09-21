@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useForm, router } from "@inertiajs/react";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { DirtyStateDialog } from "@/components/dirty-state-dialog";
-import { CalendarIcon, Plus } from "lucide-react";
+import { CalendarIcon, Plus, Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -336,11 +336,11 @@ export default function Edit({
   // ---------- Inertia Form (Moved Up) ----------
   const { data, setData, post, processing, errors, transform, reset, clearErrors, setError, isDirty } = useForm<AccountForm>({
     ...account,
-    // ensure boolean types
-    purchase: Number(account.purchase) === 1,
-    cashbank: Number(account.cashbank) === 1,
-    sale: Number(account.sale) === 1,
-    status: Number(account.status) === 1,
+    // ensure boolean types and select if saved in DB or if account has corresponding transaction records
+    purchase: Boolean(account.purchase || account.has_purchases),
+    cashbank: Boolean(account.cashbank || account.has_cashbank),
+    sale: Boolean(account.sale || account.has_sales),
+    status: account.status !== undefined ? Boolean(account.status) : true,
     gst: account.gst ?? "",
     ntn: account.ntn ?? "",
     remarks: account.remarks ?? "",
@@ -849,35 +849,104 @@ export default function Edit({
 
                       <TechLabel label="Account Permissions" icon={UserCheck}>
                         <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: "purchase", label: "PURCHASE", color: "orange" },
-                            { id: "cashbank", label: "CASH/BANK", color: "green" },
-                            { id: "sale", label: "SALE", color: "blue" },
-                          ].map((opt) => (
-                            <label
-                              key={opt.id}
-                              htmlFor={opt.id}
+                          {/* PURCHASE */}
+                          <button
+                            type="button"
+                            onClick={() => onInputChange("purchase", !data.purchase)}
+                            className={cn(
+                              `flex flex-1 items-center gap-3 px-4 py-3 border ${PREMIUM_ROUNDING_MD} cursor-pointer transition-all duration-200 select-none text-left`,
+                              data.purchase
+                                ? "bg-orange-500/10 border-orange-500 shadow-sm shadow-orange-500/20"
+                                : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-70"
+                            )}
+                          >
+                            <div className="relative flex items-center justify-center pointer-events-none">
+                              <div
+                                className={cn(
+                                  "size-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-all",
+                                  data.purchase
+                                    ? "bg-orange-500 border-orange-500 text-white"
+                                    : "border-zinc-300 dark:border-zinc-600 bg-transparent"
+                                )}
+                              >
+                                {data.purchase && <Check className="size-3.5 stroke-[3]" />}
+                              </div>
+                            </div>
+                            <span
                               className={cn(
-                                `flex flex-1 items-center gap-3 px-4 py-3 border ${PREMIUM_ROUNDING_MD} cursor-pointer transition-all duration-300`,
-                                data[opt.id as keyof typeof data]
-                                  ? `bg-${opt.color}-500/10 border-${opt.color}-500 shadow-sm shadow-${opt.color}-500/20`
-                                  : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800 grayscale opacity-70"
+                                "text-[10px] font-black tracking-widest uppercase pointer-events-none",
+                                data.purchase ? "text-orange-600 dark:text-orange-400" : "text-zinc-500"
                               )}
                             >
-                              <div className="relative flex items-center justify-center">
-                                <Checkbox
-                                  id={opt.id}
-                                  checked={!!data[opt.id as keyof typeof data]}
-                                  onCheckedChange={(v) => onInputChange(opt.id as any, !!v)}
-                                  className={`border-zinc-300 dark:border-zinc-600 data-[state=checked]:bg-${opt.color}-500 data-[state=checked]:border-${opt.color}-500 shadow-none`}
-                                />
+                              PURCHASE
+                            </span>
+                          </button>
+
+                          {/* CASH/BANK */}
+                          <button
+                            type="button"
+                            onClick={() => onInputChange("cashbank", !data.cashbank)}
+                            className={cn(
+                              `flex flex-1 items-center gap-3 px-4 py-3 border ${PREMIUM_ROUNDING_MD} cursor-pointer transition-all duration-200 select-none text-left`,
+                              data.cashbank
+                                ? "bg-emerald-500/10 border-emerald-500 shadow-sm shadow-emerald-500/20"
+                                : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-70"
+                            )}
+                          >
+                            <div className="relative flex items-center justify-center pointer-events-none">
+                              <div
+                                className={cn(
+                                  "size-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-all",
+                                  data.cashbank
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : "border-zinc-300 dark:border-zinc-600 bg-transparent"
+                                )}
+                              >
+                                {data.cashbank && <Check className="size-3.5 stroke-[3]" />}
                               </div>
-                              <span className={cn(
-                                "text-[10px] font-black tracking-widest transition-colors",
-                                data[opt.id as keyof typeof data] ? `text-${opt.color}-600 dark:text-${opt.color}-400` : "text-zinc-500"
-                              )}>{opt.label}</span>
-                            </label>
-                          ))}
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[10px] font-black tracking-widest uppercase pointer-events-none",
+                                data.cashbank ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"
+                              )}
+                            >
+                              CASH/BANK
+                            </span>
+                          </button>
+
+                          {/* SALE */}
+                          <button
+                            type="button"
+                            onClick={() => onInputChange("sale", !data.sale)}
+                            className={cn(
+                              `flex flex-1 items-center gap-3 px-4 py-3 border ${PREMIUM_ROUNDING_MD} cursor-pointer transition-all duration-200 select-none text-left`,
+                              data.sale
+                                ? "bg-blue-500/10 border-blue-500 shadow-sm shadow-blue-500/20"
+                                : "bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-70"
+                            )}
+                          >
+                            <div className="relative flex items-center justify-center pointer-events-none">
+                              <div
+                                className={cn(
+                                  "size-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-all",
+                                  data.sale
+                                    ? "bg-blue-500 border-blue-500 text-white"
+                                    : "border-zinc-300 dark:border-zinc-600 bg-transparent"
+                                )}
+                              >
+                                {data.sale && <Check className="size-3.5 stroke-[3]" />}
+                              </div>
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[10px] font-black tracking-widest uppercase pointer-events-none",
+                                data.sale ? "text-blue-600 dark:text-blue-400" : "text-zinc-500"
+                              )}
+                            >
+                              SALE
+                            </span>
+                          </button>
                         </div>
                         {errors.purchase && <p className="text-[10px] text-rose-500 mt-2 font-bold uppercase tracking-tight">{errors.purchase}</p>}
                       </TechLabel>
