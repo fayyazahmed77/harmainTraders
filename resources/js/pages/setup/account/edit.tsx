@@ -677,21 +677,21 @@ export default function Edit({
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="flex flex-1 flex-col overflow-hidden bg-[#f0f2f5]/50 dark:bg-zinc-950/50">
           <div className="flex-1 overflow-y-auto custom-scrollbar pt-8 pb-32">
-            <div className=" mx-auto px-6">
-              <div className="mb-8">
-                <h1 className={`text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'} mb-2`}>
+            <div className="mx-auto px-3 sm:px-6 min-w-0">
+              <div className="mb-6 sm:mb-8">
+                <h1 className={`text-2xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'} mb-2`}>
                   EDIT <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-rose-500">ACCOUNT</span>
                 </h1>
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-700">Modify existing account parameters and preferences</p>
+                <p className="text-xs sm:text-sm font-medium text-zinc-500 dark:text-zinc-700">Modify existing account parameters and preferences</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
 
                 {/* TOP STATUS DECK */}
-                <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative`}>
+                <Card className={`p-4 sm:p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 items-start relative`}>
                   <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD && 'rounded-l-md'}`} />
 
-                  <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
+                  <div className="col-span-full md:col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
                     <div className="text-[10px] uppercase font-black tracking-widest text-zinc-700 dark:text-zinc-500 mb-2">Status</div>
                     <div className="flex flex-col gap-2">
                       <SignalBadge text={data.status ? "ACTIVE" : "INACTIVE"} type={data.status ? "green" : "red"} />
@@ -701,7 +701,7 @@ export default function Edit({
                     </div>
                   </div>
 
-                  <div className="col-span-11 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="col-span-full md:col-span-11 grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                     <TechLabel label="Registration Date" icon={CalendarDays} required error={errors.opening_date}>
                       <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
                         <PopoverTrigger asChild>
@@ -1360,7 +1360,7 @@ export default function Edit({
                 </div>
 
                 {/* STICKY ACTION FOOTER */}
-                <div className="fixed bottom-0 right-0 left-0 md:left-[244px] bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 p-4 px-8 z-40 flex items-center justify-between animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="fixed bottom-0 right-0 left-0 md:left-[244px] bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 p-3 px-4 sm:px-8 safe-pb z-40 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="flex items-center gap-4">
                     <div className="hidden md:flex flex-col">
                       <span className="text-[10px] uppercase font-black tracking-widest text-zinc-700">Current Scope</span>
@@ -1368,31 +1368,31 @@ export default function Edit({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-end">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => reset()}
-                      className={`h-11 px-6 border-zinc-200 dark:border-zinc-800 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all ${PREMIUM_ROUNDING_MD} flex items-center gap-2`}
+                      className={`flex-1 sm:flex-initial h-10 sm:h-11 px-3 sm:px-6 border-zinc-200 dark:border-zinc-800 font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all ${PREMIUM_ROUNDING_MD} flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm`}
                     >
-                      <RotateCcw size={16} />
-                      RESET Changes
+                      <RotateCcw size={15} />
+                      <span>RESET</span>
                     </Button>
                     <Button
                       type="submit"
                       disabled={processing || exactDuplicateExists}
-                      className={`h-11 px-10 ${ACCENT_GRADIENT} text-white font-black hover:opacity-90 transition-all ${PREMIUM_ROUNDING_MD} shadow-lg shadow-orange-500/20 flex items-center gap-2 border-0`}
+                      className={`flex-1 sm:flex-initial h-10 sm:h-11 px-4 sm:px-10 ${ACCENT_GRADIENT} text-white font-black hover:opacity-90 transition-all ${PREMIUM_ROUNDING_MD} shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 sm:gap-2 border-0 text-xs sm:text-sm`}
                     >
                       {processing ? (
                         <>
                           <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          UPDATING...
+                          <span>UPDATING...</span>
                         </>
                       ) : (
                         <>
-                          <Save size={16} />
+                          <Save size={15} />
                           <span>UPDATE ACCOUNT</span>
-                          <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
+                          <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
                         </>
                       )}
                     </Button>

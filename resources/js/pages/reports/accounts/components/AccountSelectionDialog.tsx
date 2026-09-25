@@ -51,11 +51,11 @@ export function AccountSelectionDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[95vw] lg:max-w-4xl p-0 overflow-hidden border-none shadow-2xl rounded-xl bg-white w-full">
-                <DialogHeader className="p-6 pb-4 bg-slate-900 text-white relative flex flex-col gap-0 border-none shadow-none">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[95vw] lg:max-w-4xl p-0 overflow-hidden border-none shadow-2xl rounded-xl bg-white max-h-[90dvh] flex flex-col">
+                <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 bg-slate-900 text-white relative flex flex-col gap-0 border-none shadow-none shrink-0">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-4 mb-3 sm:mb-4">
                         <div>
-                            <DialogTitle className="text-xl font-bold tracking-tight">Select Account</DialogTitle>
+                            <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight">Select Account</DialogTitle>
                             <p className="text-slate-400 text-xs mt-1 font-medium">Search and select an account to view its detailed ledger.</p>
                         </div>
                         <Badge variant="outline" className="w-fit text-[10px] border-slate-700 text-slate-400">
@@ -73,18 +73,17 @@ export function AccountSelectionDialog({
                         />
                     </div>
                 </DialogHeader>
-                <div className="p-0 flex-1 flex flex-col min-h-0 bg-slate-900">
-                    <div className="overflow-hidden flex-1 flex flex-col bg-slate-900">
-                        <div className="max-h-[600px] overflow-y-auto custom-scrollbar relative bg-white">
-                            <table className="w-full border-collapse table-fixed">
-                                <thead>
-                                    <tr className="border-none">
-                                        <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap w-[15%]">Code</th>
-                                        <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap w-[40%]">Name / Title</th>
-                                        <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap w-[20%]">Type</th>
-                                        <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-6 border-b border-slate-800 text-center align-middle whitespace-nowrap w-[25%]">Area / Sub Area</th>
-                                    </tr>
-                                </thead>
+                <div className="p-0 flex-1 flex flex-col min-h-0 bg-slate-900 overflow-hidden">
+                    <div className="overflow-x-auto touch-scroll-x overflow-y-auto custom-scrollbar flex-1 min-w-0 bg-white">
+                        <table className="w-full border-collapse min-w-[550px]">
+                            <thead>
+                                <tr className="border-none">
+                                    <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-3 md:px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap">Code</th>
+                                    <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-3 md:px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap">Name / Title</th>
+                                    <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-3 md:px-6 border-b border-slate-800 text-left align-middle whitespace-nowrap">Type</th>
+                                    <th className="sticky top-0 z-30 bg-slate-900 text-[10px] font-bold uppercase tracking-wider text-slate-400 h-10 px-3 md:px-6 border-b border-slate-800 text-center align-middle whitespace-nowrap">Area / Sub Area</th>
+                                </tr>
+                            </thead>
                                 <tbody className="bg-white">
                                     {(accountSearch === '' || 'all accounts'.includes(accountSearch.toLowerCase())) && (
                                         <tr 
@@ -173,7 +172,6 @@ export function AccountSelectionDialog({
                             </table>
                         </div>
                     </div>
-                </div>
             </DialogContent>
         </Dialog>
     );

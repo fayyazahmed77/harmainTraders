@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { router, usePage, Link } from "@inertiajs/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -382,13 +383,13 @@ export function DataTable({ data }: DataTableProps) {
       </Dialog>
 
       {/* ✅ Premium DataTable UI */}
-      <div className={cn(PREMIUM_ROUNDING, "overflow-hidden border border-zinc-200 dark:border-zinc-800/50 bg-white/70 dark:bg-black/20 backdrop-blur-xl shadow-inner")}>
-        <Table>
+      <div className={cn(PREMIUM_ROUNDING, "overflow-x-auto touch-scroll-x min-w-0 border border-zinc-200 dark:border-zinc-800/50 bg-white/70 dark:bg-black/20 backdrop-blur-xl shadow-inner")}>
+        <Table className="min-w-[700px]">
           <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-400 h-16 px-6">
+                  <TableHead key={header.id} className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-400 h-12 md:h-16 px-3 md:px-6">
                     <div
                       className={cn(
                         "flex items-center gap-2 select-none",
@@ -422,7 +423,7 @@ export function DataTable({ data }: DataTableProps) {
                     className="group border-b border-zinc-100 dark:border-zinc-900/50 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors relative"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="py-5 px-6 relative z-10">
+                      <TableCell key={cell.id} className="py-3 md:py-5 px-3 md:px-6 relative z-10">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}

@@ -31,8 +31,10 @@ import {
     BadgeInfo,
     ShieldCheck,
     PlusCircle,
-    RefreshCw
+    RefreshCw,
+    Filter
 } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
 import {
     Dialog,
     DialogContent,
@@ -66,11 +68,25 @@ const breadcrumbs: BreadcrumbItem[] = [
 // ───────────────────────────────────────────
 // Types
 // ───────────────────────────────────────────
+interface Company {
+    id: number;
+    title: string;
+}
+
 interface Item {
     id: number;
+    code?: string;
     title: string;
     short_name: string;
     company: string;
+    company_account?: {
+        id: number;
+        title: string;
+    } | null;
+    companyAccount?: {
+        id: number;
+        title: string;
+    } | null;
     trade_price: number;
     retail: number;
     packing_qty: number;
@@ -131,9 +147,23 @@ interface Firm {
     status?: number | boolean;
 }
 
-export default function OfferListing({ items, categories, accounts, messageLines, firms }: { items: Item[]; categories: Category[]; accounts: Account[]; messageLines?: MessageLine[]; firms: Firm[] }) {
+export default function OfferListing({ 
+    items, 
+    categories, 
+    accounts, 
+    messageLines, 
+    firms,
+    companies = []
+}: { 
+    items: Item[]; 
+    categories: Category[]; 
+    accounts: Account[]; 
+    messageLines?: MessageLine[]; 
+    firms: Firm[];
+    companies?: Company[];
+}) {
     const [date] = useState(new Date().toLocaleDateString('en-GB'));
-    const [selectedAccount, setSelectedAccount] = useState<string>("");
+    const [selectedAccount, setSelectedAccount] = useState<string>("0");
     
     const defaultFirm = useMemo(() => {
         return firms.find(f => f.defult === 1 || f.defult === true);
@@ -161,6 +191,133 @@ export default function OfferListing({ items, categories, accounts, messageLines
     // Item Registry Dialog State
     const [isRegistryOpen, setIsRegistryOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>("all");
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
+
+    // Helper: Category and Company name lookups
+    const getCategoryName = (catVal: string | number | undefined | null) => {
+        if (!catVal) return "Uncategorized";
+        const found = categories?.find(c => String(c.id) === String(catVal) || c.name.toLowerCase() === String(catVal).toLowerCase());
+        return found ? found.name : String(catVal);
+    };
+
+    const getCompanyName = (compVal: string | number | undefined | null) => {
+        if (!compVal) return "Unknown";
+        const valStr = String(compVal).trim();
+
+        // 1. Find in companies prop
+        const foundCompany = companies?.find(c => String(c.id) === valStr || c.title.toLowerCase() === valStr.toLowerCase());
+        if (foundCompany) return foundCompany.title;
+
+        // 2. Find in items with company_account
+        const itemWithCompany = items.find(it => String(it.company).trim() === valStr && (it.company_account?.title || (it as any).companyAccount?.title));
+        if (itemWithCompany) {
+            const title = itemWithCompany.company_account?.title || (itemWithCompany as any).companyAccount?.title;
+            if (title) return title;
+        }
+
+        // 3. Find in accounts prop
+        const foundAccount = accounts?.find(a => String(a.id) === valStr || a.title.toLowerCase() === valStr.toLowerCase());
+        if (foundAccount) return foundAccount.title;
+
+        return valStr;
+    };
+
+    // Build Searchable Company Options with item count: e.g. "Unilever (70)"
+    const companyOptions = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const titleMap: Record<string, string> = {};
+
+        // 1. Populate from companies prop
+        if (companies && companies.length > 0) {
+            companies.forEach(c => {
+                titleMap[String(c.id)] = c.title;
+            });
+        }
+
+        // 2. Populate from accounts prop
+        if (accounts && accounts.length > 0) {
+            accounts.forEach(a => {
+                if (!titleMap[String(a.id)]) {
+                    titleMap[String(a.id)] = a.title;
+                }
+            });
+        }
+
+        // 3. Populate from items (using company_account if attached) and count
+        items.forEach(it => {
+            const key = String(it.company || "").trim();
+            if (key) {
+                counts[key] = (counts[key] || 0) + 1;
+                const companyTitle = it.company_account?.title || (it as any).companyAccount?.title;
+                if (companyTitle && !titleMap[key]) {
+                    titleMap[key] = companyTitle;
+                }
+            }
+        });
+
+        const list: { label: string; value: string }[] = [];
+
+        Object.keys(counts).forEach(k => {
+            const name = titleMap[k] || getCompanyName(k);
+            list.push({
+                value: k,
+                label: `${name} (${counts[k]})`
+            });
+        });
+
+        list.sort((a, b) => a.label.localeCompare(b.label));
+
+        return [
+            { label: `All Companies (${items.length})`, value: "all" },
+            ...list
+        ];
+    }, [items, companies, accounts]);
+
+    // Build Searchable Category Options with item count: e.g. "Cosmetics (45)"
+    const categoryOptions = useMemo(() => {
+        const counts: Record<string, number> = {};
+        items.forEach(it => {
+            const key = String(it.category || "").trim();
+            if (key) {
+                counts[key] = (counts[key] || 0) + 1;
+            }
+        });
+
+        const list: { label: string; value: string }[] = [];
+        const processedKeys = new Set<string>();
+
+        if (categories && categories.length > 0) {
+            categories.forEach(c => {
+                const key = String(c.id);
+                const count = counts[key] || 0;
+                processedKeys.add(key);
+                if (count > 0) {
+                    list.push({
+                        value: key,
+                        label: `${c.name} (${count})`
+                    });
+                }
+            });
+        }
+
+        Object.keys(counts).forEach(k => {
+            if (!processedKeys.has(k) && counts[k] > 0) {
+                const name = getCategoryName(k);
+                list.push({
+                    value: k,
+                    label: `${name} (${counts[k]})`
+                });
+            }
+        });
+
+        list.sort((a, b) => a.label.localeCompare(b.label));
+
+        return [
+            { label: `All Categories (${items.length})`, value: "all" },
+            ...list
+        ];
+    }, [items, categories]);
 
     // Get the currently selected item details for the info panel
     const selectedItem = useMemo(() => {
@@ -249,18 +406,39 @@ export default function OfferListing({ items, categories, accounts, messageLines
     const [rows, setRows] = useState<RowData[]>([getEmptyRow()]);
 
     const filteredRegistryItems = useMemo(() => {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase().trim();
         return items.filter(it => {
             const availableStock = ((Number(it.stock_1) || 0) * (Number(it.packing_qty) || 1)) + (Number(it.stock_2) || 0);
             const hasStock = (it.stock_1 !== undefined || it.stock_2 !== undefined) ? availableStock > 0 : true;
-            return hasStock && (
+            if (!hasStock) return false;
+
+            // Company filter
+            if (selectedCompanyFilter && selectedCompanyFilter !== "all") {
+                const compStr = String(it.company || "").trim();
+                if (compStr !== selectedCompanyFilter) return false;
+            }
+
+            // Category filter
+            if (selectedCategoryFilter && selectedCategoryFilter !== "all") {
+                const catStr = String(it.category || "").trim();
+                if (catStr !== selectedCategoryFilter) return false;
+            }
+
+            if (!q) return true;
+
+            const compName = getCompanyName(it.company).toLowerCase();
+            const catName = getCategoryName(it.category).toLowerCase();
+
+            return (
                 it.title.toLowerCase().includes(q) || 
                 it.short_name?.toLowerCase().includes(q) ||
-                it.company?.toLowerCase().includes(q) ||
-                it.category?.toLowerCase().includes(q)
+                it.code?.toLowerCase().includes(q) ||
+                compName.includes(q) ||
+                catName.includes(q) ||
+                String(it.id).includes(q)
             );
         }).sort((a,b) => a.title.localeCompare(b.title));
-    }, [searchQuery, items]);
+    }, [searchQuery, items, selectedCompanyFilter, selectedCategoryFilter, companies, categories]);
 
     const handleSelectFromRegistry = (item: Item) => {
         const isSelected = rows.some(r => r.item_id === item.id);
@@ -479,7 +657,7 @@ export default function OfferListing({ items, categories, accounts, messageLines
             <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/50">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="p-6 lg:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+                <div className="p-3 sm:p-6 lg:p-10 space-y-6 sm:space-y-8 max-w-[1600px] mx-auto w-full min-w-0">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
                         <motion.div
@@ -721,9 +899,19 @@ export default function OfferListing({ items, categories, accounts, messageLines
                                                     onClick={() => row.item_id && setSelectedItemId(row.item_id)}
                                                 >
                                                     <td className="md:px-6 md:min-w-[300px] pb-2 md:pb-0 block md:table-cell">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{row.title || "No Item Selected"}</span>
-                                                            <span className="text-[10px] text-zinc-400 font-medium">{row.category_name}</span>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{row.title || "No Item Selected"}</span>
+                                                                <span className="text-[10px] text-zinc-400 font-medium">{row.category_name}</span>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 rounded-lg hover:bg-rose-500/10 text-rose-500 md:hidden shrink-0"
+                                                                onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
                                                         </div>
                                                     </td>
 
@@ -893,105 +1081,169 @@ export default function OfferListing({ items, categories, accounts, messageLines
                 </div>
 
                 <Dialog open={isRegistryOpen} onOpenChange={setIsRegistryOpen}>
-                    <DialogContent className="sm:max-w-[60vw] w-[60vw] p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[85vh]">
-                        <div className="p-6 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shrink-0">
-                            <DialogTitle className="text-2xl font-black uppercase tracking-widest flex items-center gap-3">
-                                <Box className="w-6 h-6 text-orange-500" /> Item Registry
-                            </DialogTitle>
-                            <DialogDescription className="text-zinc-400 font-bold uppercase text-[10px] tracking-[0.2em] mt-1">
-                                Selection Portal for Multi-Offer Sequence
-                            </DialogDescription>
+                    <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-4xl lg:max-w-5xl p-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col max-h-[90vh] max-h-[90dvh]">
+                        <div className="p-4 sm:p-6 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shrink-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <DialogTitle className="text-lg sm:text-2xl font-black uppercase tracking-widest flex items-center gap-2 sm:gap-3">
+                                        <Box className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 shrink-0" /> Item Registry
+                                    </DialogTitle>
+                                    <DialogDescription className="text-zinc-400 font-bold uppercase text-[9px] sm:text-[10px] tracking-[0.2em] mt-1">
+                                        Selection Portal for Multi-Offer Sequence
+                                    </DialogDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-md">
+                                        {filteredRegistryItems.length} of {items.length} Items
+                                    </span>
+                                    {(selectedCompanyFilter !== "all" || selectedCategoryFilter !== "all" || searchQuery) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setSelectedCompanyFilter("all");
+                                                setSelectedCategoryFilter("all");
+                                                setSearchQuery("");
+                                            }}
+                                            className="h-7 px-2 text-[10px] font-bold text-orange-400 hover:text-white hover:bg-orange-500/20 uppercase tracking-wider"
+                                        >
+                                            <RotateCcw className="h-3 w-3 mr-1" /> Reset
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
 
-                            <div className="mt-4 relative group">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-orange-500 transition-colors" size={18} />
+                            {/* Search Query Bar */}
+                            <div className="mt-3 relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-orange-500 transition-colors" size={16} />
                                 <Input
-                                    placeholder="Query by Title, ID, or Category..."
+                                    placeholder="Query by Title, Code, ID, Company, or Category..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10 h-12 bg-white/5 border-white/10 text-white placeholder:text-zinc-500 focus:ring-0 focus:bg-white/10 transition-all rounded-sm border-zinc-700 font-bold"
+                                    className="pl-9 sm:pl-10 h-10 sm:h-11 bg-white/5 border-white/10 text-white placeholder:text-zinc-500 focus:ring-0 focus:bg-white/10 transition-all rounded-sm border-zinc-700 font-bold text-xs sm:text-sm"
                                     autoFocus
                                 />
                             </div>
-                        </div>
 
-                        <div className="flex-1 overflow-auto min-h-0 bg-zinc-50/30 dark:bg-zinc-950/30">
-                            <div className="grid grid-cols-12 bg-zinc-100/50 dark:bg-zinc-900/50 px-6 py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
-                                <div className="col-span-4 text-[9px] font-black uppercase text-zinc-400 tracking-widest">Item Description</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Carton Price</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Loose Price</div>
-                                <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Scheme</div>
-                                <div className="col-span-2 text-right text-[9px] font-black uppercase text-zinc-400 tracking-widest">MRP (Retail)</div>
-                            </div>
+                            {/* Company & Category Searchable Dropdowns */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-3">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                        <Briefcase className="h-3 w-3 text-orange-500" />
+                                        Company ({companyOptions.length - 1})
+                                    </label>
+                                    <Combobox
+                                        options={companyOptions}
+                                        value={selectedCompanyFilter}
+                                        onChange={setSelectedCompanyFilter}
+                                        placeholder="All Companies"
+                                        searchPlaceholder="Search company..."
+                                        className="h-10 bg-white/10 dark:bg-white/10 border-white/15 text-white hover:bg-white/15 hover:border-orange-500/50 rounded-md text-xs font-bold justify-between"
+                                        popoverClassName="w-[--radix-popover-trigger-width] min-w-[260px] z-[9999]"
+                                        modal={false}
+                                    />
+                                </div>
 
-                            <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                                {filteredRegistryItems.map((item) => {
-                                    const isSelected = rows.some(r => r.item_id === item.id);
-                                    
-                                    const getPrices = () => {
-                                        if (offerType === "1") {
-                                            const cartonPrice = calculatePrice(item, null, Number(cartonPriceTier));
-                                            const loosePrice = calculatePrice(item, null, Number(loosePriceTier));
-                                            return { pack: cartonPrice, loose: loosePrice };
-                                        }
-                                        const marketPrice = calculatePrice(item, null, Number(marketPriceTier));
-                                        return { pack: marketPrice, loose: Math.round(marketPrice / (item.packing_qty || 1)) };
-                                    };
-                                    const prices = getPrices();
-                                    
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => handleSelectFromRegistry(item)}
-                                            className={`w-full text-left transition-all p-4 grid grid-cols-12 items-center gap-4 group ${
-                                                isSelected 
-                                                ? "bg-orange-500/10 dark:bg-orange-500/5 border-l-4 border-orange-500" 
-                                                : "hover:bg-zinc-100 dark:hover:bg-zinc-900 border-l-4 border-transparent"
-                                            }`}
-                                        >
-                                            <div className="col-span-4 flex items-center gap-3">
-                                                <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                                                    isSelected ? "bg-orange-500 border-orange-500 text-white" : "border-zinc-300 dark:border-zinc-700"
-                                                }`}>
-                                                    {isSelected && <Check size={12} strokeWidth={4} />}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className={`text-sm font-black uppercase tracking-tight ${isSelected ? "text-orange-600" : "text-zinc-700 dark:text-zinc-200"}`}>
-                                                        {item.title}
-                                                    </span>
-                                                    <span className="text-[10px] font-bold text-zinc-400 truncate">{item.company} | {item.category}</span>
-                                                </div>
-                                            </div>
-                                            <div className="col-span-2 text-center font-black tabular-nums text-zinc-600 dark:text-zinc-400">Rs {prices.pack.toLocaleString()}</div>
-                                            <div className="col-span-2 text-center font-black tabular-nums text-zinc-600 dark:text-zinc-400">Rs {prices.loose.toLocaleString()}</div>
-                                            <div className="col-span-2 text-center">
-                                                <span className="px-2 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-500/20">
-                                                    {(offerType === "2" ? item.scheme2 : item.scheme) || 'NO SCHEME'}
-                                                </span>
-                                            </div>
-                                            <div className="col-span-2 text-right font-black tabular-nums text-orange-600 dark:text-orange-500">Rs {item.retail.toLocaleString()}</div>
-                                        </button>
-                                    );
-                                })}
+                                <div className="space-y-1">
+                                    <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                        <Layers className="h-3 w-3 text-orange-500" />
+                                        Category ({categoryOptions.length - 1})
+                                    </label>
+                                    <Combobox
+                                        options={categoryOptions}
+                                        value={selectedCategoryFilter}
+                                        onChange={setSelectedCategoryFilter}
+                                        placeholder="All Categories"
+                                        searchPlaceholder="Search category..."
+                                        className="h-10 bg-white/10 dark:bg-white/10 border-white/15 text-white hover:bg-white/15 hover:border-orange-500/50 rounded-md text-xs font-bold justify-between"
+                                        popoverClassName="w-[--radix-popover-trigger-width] min-w-[260px] z-[9999]"
+                                        modal={false}
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <DialogFooter className="p-4 bg-zinc-50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center sm:justify-between shrink-0">
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        filteredRegistryItems.forEach(it => {
-                                            if (!rows.some(r => r.item_id === it.id)) handleSelectFromRegistry(it);
-                                        });
-                                    }}
-                                    className="h-10 text-[10px] font-black uppercase tracking-widest border-zinc-300 dark:border-zinc-700 hover:bg-orange-500 hover:text-white rounded-sm"
-                                >
-                                    Select All
-                                </Button>
+                        <div className="flex-1 overflow-x-auto touch-scroll-x overflow-y-auto custom-scrollbar min-h-0 bg-zinc-50/30 dark:bg-zinc-950/30">
+                            <div className="min-w-[650px]">
+                                <div className="grid grid-cols-12 bg-zinc-100/50 dark:bg-zinc-900/50 px-4 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
+                                    <div className="col-span-4 text-[9px] font-black uppercase text-zinc-400 tracking-widest">Item Description</div>
+                                    <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Carton Price</div>
+                                    <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Loose Price</div>
+                                    <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Scheme</div>
+                                    <div className="col-span-2 text-right text-[9px] font-black uppercase text-zinc-400 tracking-widest">MRP (Retail)</div>
+                                </div>
+
+                                <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
+                                    {filteredRegistryItems.map((item) => {
+                                        const isSelected = rows.some(r => r.item_id === item.id);
+                                        
+                                        const getPrices = () => {
+                                             if (offerType === "1") {
+                                                 const cartonPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                                                 const loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                                                 return { pack: cartonPrice, loose: loosePrice };
+                                             }
+                                             const marketPrice = calculatePrice(item, null, Number(marketPriceTier));
+                                             return { pack: marketPrice, loose: Math.round(marketPrice / (item.packing_qty || 1)) };
+                                         };
+                                         const prices = getPrices();
+                                         
+                                         return (
+                                             <button
+                                                 key={item.id}
+                                                 onClick={() => handleSelectFromRegistry(item)}
+                                                 className={`w-full text-left transition-all p-3 sm:p-4 grid grid-cols-12 items-center gap-2 sm:gap-4 group ${
+                                                     isSelected 
+                                                     ? "bg-orange-500/10 dark:bg-orange-500/5 border-l-4 border-orange-500" 
+                                                     : "hover:bg-zinc-100 dark:hover:bg-zinc-900 border-l-4 border-transparent"
+                                                 }`}
+                                             >
+                                                 <div className="col-span-4 flex items-center gap-2 sm:gap-3 min-w-0">
+                                                     <div className={`h-5 w-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${
+                                                         isSelected ? "bg-orange-500 border-orange-500 text-white" : "border-zinc-300 dark:border-zinc-700"
+                                                     }`}>
+                                                         {isSelected && <Check size={12} strokeWidth={4} />}
+                                                     </div>
+                                                     <div className="flex flex-col min-w-0">
+                                                         <span className={`text-xs sm:text-sm font-black uppercase tracking-tight truncate ${isSelected ? "text-orange-600" : "text-zinc-700 dark:text-zinc-200"}`}>
+                                                             {item.title}
+                                                         </span>
+                                                         <span className="text-[10px] font-bold text-zinc-400 truncate">
+                                                             {getCompanyName(item.company)} | {getCategoryName(item.category)}
+                                                         </span>
+                                                     </div>
+                                                 </div>
+                                                 <div className="col-span-2 text-center font-black tabular-nums text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">Rs {prices.pack.toLocaleString()}</div>
+                                                 <div className="col-span-2 text-center font-black tabular-nums text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">Rs {prices.loose.toLocaleString()}</div>
+                                                 <div className="col-span-2 text-center">
+                                                     <span className="px-1.5 sm:px-2 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-blue-500/20 truncate block">
+                                                         {(offerType === "2" ? item.scheme2 : item.scheme) || 'NO SCHEME'}
+                                                     </span>
+                                                 </div>
+                                                 <div className="col-span-2 text-right font-black tabular-nums text-xs sm:text-sm text-orange-600 dark:text-orange-500">Rs {item.retail.toLocaleString()}</div>
+                                             </button>
+                                         );
+                                     })}
+                                </div>
                             </div>
+                        </div>
+
+                        <DialogFooter className="p-3 sm:p-4 bg-zinc-50 dark:bg-zinc-950/20 border-t border-zinc-200 dark:border-zinc-800 flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 sm:gap-4 shrink-0">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    filteredRegistryItems.forEach(it => {
+                                        if (!rows.some(r => r.item_id === it.id)) handleSelectFromRegistry(it);
+                                    });
+                                }}
+                                className="h-10 text-[10px] font-black uppercase tracking-widest border-zinc-300 dark:border-zinc-700 hover:bg-orange-500 hover:text-white rounded-sm w-full sm:w-auto"
+                            >
+                                Select All
+                            </Button>
                             <Button
                                 onClick={() => setIsRegistryOpen(false)}
-                                className="h-10 px-8 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-orange-500 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest rounded-sm"
+                                className="h-10 px-8 bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-orange-500 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest rounded-sm w-full sm:w-auto"
                             >
                                 Proceed Selections
                             </Button>

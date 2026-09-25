@@ -35,17 +35,17 @@ export default function KpiCards({ kpis = [] }: KpiCardsProps) {
                 return (
                     <div
                         key={index}
-                        className="bg-card border border-border rounded-lg p-4 flex flex-col shadow-xs"
+                        className="bg-card border border-border rounded-lg p-3 sm:p-4 flex flex-col shadow-xs min-w-0"
                     >
                         <IconComponent size={18} className={`${colors.icon} mb-1.5`} />
-                        <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1">
+                        <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-1 truncate">
                             {kpi.title}
                         </span>
-                        <span className={`text-[20px] font-bold ${colors.value} leading-tight mb-1`}>
+                        <span className={`text-base sm:text-[20px] font-bold ${colors.value} leading-tight mb-1 truncate`}>
                             {kpi.value}
                         </span>
                         <div className="flex items-center gap-1">
-                            <span className={`text-[10px] ${kpi.subColor}`}>
+                            <span className={`text-[10px] ${kpi.subColor} truncate`}>
                                 {kpi.subLabel}
                             </span>
                         </div>

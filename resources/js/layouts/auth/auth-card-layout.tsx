@@ -20,7 +20,7 @@ export default function AuthCardLayout({
     description?: string;
 }>) {
     return (
-        <div className="relative flex min-h-svh flex-col items-center justify-center gap-6 overflow-hidden p-6 md:p-10">
+        <div className="relative flex min-h-screen min-h-dvh flex-col items-center justify-center gap-6 overflow-hidden p-4 sm:p-6 md:p-10 safe-pb">
             <video
                 autoPlay
                 loop
@@ -45,11 +45,11 @@ export default function AuthCardLayout({
                                 <AppLoginLogo className='w-50' />
                             </div>
                         </Link>
-                        <CardHeader className="px-10 pt-2 pb-0 text-center">
-                            <CardTitle className="text-xl">{title}</CardTitle>
+                        <CardHeader className="px-5 sm:px-10 pt-2 pb-0 text-center">
+                            <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
                             <CardDescription>{description}</CardDescription>
                         </CardHeader>
-                        <CardContent className="px-10 py-8">
+                        <CardContent className="px-5 sm:px-10 py-6 sm:py-8">
                             {children}
                         </CardContent>
                     </Card>

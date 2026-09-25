@@ -114,13 +114,13 @@ export default function GuestDashboard({ account, summary, unpaidBills, paidBill
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <Card className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-xl overflow-hidden relative">
+                        <Card className="p-4 sm:p-6 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-xl overflow-hidden relative">
                             <div className="absolute top-0 right-0 p-4 opacity-10">
                                 <Wallet size={120} />
                             </div>
                             <div className="relative z-10">
                                 <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-1">Current Balance</p>
-                                <h2 className="text-3xl font-black">{formatCurrency(summary.current_balance)}</h2>
+                                <h2 className="text-2xl sm:text-3xl font-black">{formatCurrency(summary.current_balance)}</h2>
                                 <div className="mt-4 flex items-center gap-2">
                                     <Badge className={`${summary.current_balance > 0 ? 'bg-orange-500' : 'bg-emerald-500'} border-none`}>
                                         {summary.current_balance > 0 ? 'Payable' : 'Advance'}
@@ -135,11 +135,11 @@ export default function GuestDashboard({ account, summary, unpaidBills, paidBill
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.1 }}
                     >
-                        <Card className="p-6 bg-white dark:bg-zinc-900 shadow-xl border-none flex flex-col justify-between">
+                        <Card className="p-4 sm:p-6 bg-white dark:bg-zinc-900 shadow-xl border-none flex flex-col justify-between">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-xs font-medium text-slate-500 dark:text-zinc-400 uppercase tracking-widest mb-1">Unpaid Invoices</p>
-                                    <h2 className="text-3xl font-black text-orange-600">{summary.unpaid_count}</h2>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-orange-600">{summary.unpaid_count}</h2>
                                 </div>
                                 <div className="p-3 bg-orange-50 dark:bg-orange-500/10 rounded-xl text-orange-600">
                                     <AlertCircle size={24} />

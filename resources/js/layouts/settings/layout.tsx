@@ -33,20 +33,20 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const currentPath = window.location.pathname;
 
     return (
-        <div className="px-4 py-6">
+        <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 max-w-7xl mx-auto">
             <Heading title="Settings" description="Manage your profile and account settings" />
 
-            <div className="flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav className="flex flex-col space-y-1 space-x-0">
+            <div className="flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:space-x-12 mt-4 sm:mt-6">
+                <aside className="w-full lg:w-48 shrink-0">
+                    <nav className="flex flex-row overflow-x-auto touch-scroll-x pb-1 lg:pb-0 gap-1.5 lg:gap-0 lg:flex-col lg:space-y-1">
                         {sidebarNavItems.map((item, index) => (
                             <Button
                                 key={`${item.href}-${index}`}
                                 size="sm"
                                 variant="ghost"
                                 asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': currentPath === item.href,
+                                className={cn('justify-center lg:justify-start shrink-0 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium', {
+                                    'bg-muted font-bold shadow-xs': currentPath === item.href,
                                 })}
                             >
                                 <Link href={item.href} prefetch>
@@ -57,10 +57,10 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     </nav>
                 </aside>
 
-                <Separator className="my-6 md:hidden" />
+                <Separator className="my-4 lg:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">{children}</section>
+                <div className="flex-1 md:max-w-2xl min-w-0">
+                    <section className="max-w-xl space-y-8 sm:space-y-12">{children}</section>
                 </div>
             </div>
         </div>

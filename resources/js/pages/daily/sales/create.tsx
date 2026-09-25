@@ -1276,11 +1276,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
               {/* Sticky Bottom Bar for Laptop/Responsive View (when Right Sidebar is hidden) */}
               {!showRightSidebar && (
-                <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 px-4 py-2.5 shadow-[0_-10px_30px_rgba(0,0,0,0.12)] transition-all duration-300">
-                  <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 py-2 sm:py-2.5 safe-pb shadow-[0_-10px_30px_rgba(0,0,0,0.12)] transition-all duration-300">
+                  <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-2 sm:gap-3">
                     
                     {/* 1. Left Section: Financial Summary & Inputs */}
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
                       {/* 1. Previous Balance / Advance */}
                       {previousBalance < 0 ? (
                         <div className="flex items-center gap-2.5 shrink-0">
@@ -1293,7 +1293,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-2 py-1 rounded-md shrink-0">
+                          <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 px-2 py-1 rounded-md shrink-0">
                             <Checkbox 
                               id="use-advance-sticky" 
                               checked={useAdvance} 
@@ -1311,7 +1311,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                             Prev Balance
                           </span>
                           <span className={cn(
-                            "text-sm font-bold font-mono leading-none",
+                            "text-xs sm:text-sm font-bold font-mono leading-none",
                             previousBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300"
                           )}>
                             Rs {previousBalance.toLocaleString()}
@@ -1333,9 +1333,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
                       {/* 3. Final Net Payable */}
                       <div className="flex flex-col shrink-0">
-                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net Payable</span>
-                        <span className="text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
-                          <span className="text-xs font-semibold mr-0.5">Rs</span>
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net</span>
+                        <span className="text-base sm:text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
+                          <span className="text-[10px] sm:text-xs font-semibold mr-0.5">Rs</span>
                           {totals.finalAmount.toLocaleString()}
                         </span>
                       </div>
@@ -1398,7 +1398,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                     </div>
 
                     {/* 2. Right Section: Checkout & Action Button */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                       {/* Instant Checkout Button */}
                       <Button
                         type="button"
@@ -1413,7 +1413,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                           }
                         }}
                         className={cn(
-                          "h-9 px-3 text-xs font-bold gap-2 transition-all",
+                          "h-8 sm:h-9 px-2 sm:px-3 text-xs font-bold gap-1 sm:gap-2 transition-all",
                           isPayNow ? "bg-orange-500 text-white border-orange-500 shadow-md" : "text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-orange-500"
                         )}
                       >
@@ -1428,10 +1428,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       <Button
                         onClick={handleSave}
                         disabled={processing}
-                        className={`h-9 px-6 ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5`}
+                        className={`h-8 sm:h-9 px-3 sm:px-6 ${ACCENT_GRADIENT} text-white font-black uppercase tracking-widest text-[11px] sm:text-xs shadow-lg shadow-orange-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1 sm:gap-1.5`}
                       >
-                        <span>{processing ? "Syncing..." : "Finalize Invoice"}</span>
-                        <kbd className="px-1 py-0.2 text-[8px] font-mono bg-white/20 rounded border border-white/30">F9</kbd>
+                        <span>{processing ? "Syncing..." : "Finalize"}</span>
+                        <kbd className="hidden sm:inline-block px-1 py-0.2 text-[8px] font-mono bg-white/20 rounded border border-white/30">F9</kbd>
                       </Button>
 
                       {/* Toggle Sidebar Button */}

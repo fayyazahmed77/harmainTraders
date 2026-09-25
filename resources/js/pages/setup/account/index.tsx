@@ -84,33 +84,33 @@ export default function AccountsPage({ accounts, summary, filters, cities, accou
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
-        <div className="mt-6 px-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div className="mt-4 sm:mt-6 px-3 sm:px-4 md:px-6 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
             <div>
-              <h1 className="text-3xl font-black tracking-tight mb-1 text-zinc-900 dark:text-white">Chart of Accounts</h1>
-              <p className="text-sm text-muted-foreground font-medium">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-1 text-zinc-900 dark:text-white">Chart of Accounts</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground font-medium">
                 Comprehensive financial overview and account management.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <a href="/account/bulk-upload/sample?format=xlsx" download>
-                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Export Excel
+                <Button variant="outline" size="sm" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Export Excel
                 </Button>
               </a>
               <a href="/account/bulk-upload/sample?format=csv" download>
-                <Button variant="outline" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
-                  <Download className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400" /> Export CSV
+                <Button variant="outline" size="sm" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Export CSV
                 </Button>
               </a>
               <Link href={route("account.bulk-upload")}>
-                <Button variant="outline" className="border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 font-semibold">
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-orange-500" /> Bulk Upload
+                <Button variant="outline" size="sm" className="border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 font-semibold">
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-orange-500" /> Bulk Upload
                 </Button>
               </Link>
               <Link href={route("account.create")}>
-                <Button className="bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold shadow-lg shadow-orange-500/20 dark:shadow-none transition-all hover:scale-105 active:scale-95">
-                  <Plus className="mr-2 h-5 w-5 stroke-[3px]" /> Add New Account
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold shadow-lg shadow-orange-500/20 dark:shadow-none transition-all hover:scale-105 active:scale-95">
+                  <Plus className="mr-1.5 h-4 w-4 stroke-[3px]" /> Add New Account
                 </Button>
               </Link>
             </div>

@@ -63,7 +63,7 @@ export default function InvoiceTable({
                 </div>
             </div>
 
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto touch-scroll-x flex-1">
                 <table className="w-full text-left border-collapse min-w-[500px]">
                     <thead>
                         <tr>

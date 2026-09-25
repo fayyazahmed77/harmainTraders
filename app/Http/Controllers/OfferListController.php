@@ -39,7 +39,9 @@ class OfferListController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $items = Items::whereRaw('(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0) > 0')->get();
+        $items = Items::with(['companyAccount:id,title'])
+            ->whereRaw('(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0) > 0')
+            ->get();
         $categories = ItemCategory::where('status', 'active')->get();
         $accounts = Account::select('id', 'title', 'item_category')->whereHas('accountType', function ($q) {
             $q->where('name', 'Customers');
@@ -52,12 +54,19 @@ class OfferListController extends Controller implements HasMiddleware
 
         $firms = Firm::where('status', 1)->get();
 
+        $companies = Account::select('id', 'title')->whereHas('accountType', function ($q) {
+            $q->where('name', 'Company');
+        })
+            ->orderBy('title')
+            ->get();
+
         return Inertia::render("daily/offerlist/create", [
             'items' => $items,
             'categories' => $categories,
             'accounts' => $accounts,
             'messageLines' => $messageLines,
             'firms' => $firms,
+            'companies' => $companies,
         ]);
     }
 

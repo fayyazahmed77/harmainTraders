@@ -83,16 +83,16 @@ export default function ItemsPage({ items, summary, filters, categories }: Props
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
 
-        <div className="mt-6 px-6">
-          <div className="flex items-center justify-between mb-3">
+        <div className="mt-4 sm:mt-6 px-3 sm:px-4 md:px-6 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-3">
             <div>
               <h1 className="text-2xl font-bold mb-1">Items List</h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Manage and view all your items.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <a href="/items/bulk-upload/sample?format=xlsx" download>
                 <Button variant="outline" size="sm" className="border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
                   <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Export Excel

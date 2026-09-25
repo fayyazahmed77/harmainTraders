@@ -85,7 +85,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                 <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
                     
                     {/* Date Block */}
-                    <div className="flex items-center gap-1 bg-surface-1/50 p-1 rounded-xl border border-border/50 flex-1 min-w-[300px]">
+                    <div className="flex items-center gap-1 bg-surface-1/50 p-1 rounded-xl border border-border/50 flex-1 min-w-0 w-full xl:w-auto xl:min-w-[260px]">
                         <div className="flex items-center gap-2 px-3 border-r border-border">
                              <CalendarIcon className="h-4 w-4 text-indigo-500" />
                         </div>
@@ -117,7 +117,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                     {/* Account Trigger */}
                     <button 
                         onClick={() => setIsAccountDialogOpen(true)}
-                        className="flex-1 min-w-[250px] group flex items-center gap-3 bg-surface-0 border border-border hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-500/10 p-1.5 rounded-xl transition-all text-left"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[220px] group flex items-center gap-3 bg-surface-0 border border-border hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-500/10 p-1.5 rounded-xl transition-all text-left"
                     >
                         <div className="h-9 w-9 bg-surface-1 rounded-lg flex items-center justify-center group-hover:bg-indigo-50 transition-colors">
                             <Wallet className="h-4 w-4 text-text-muted group-hover:text-indigo-500" />
@@ -134,7 +134,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                     {/* Report Trigger */}
                     <button 
                         onClick={() => setIsReportDialogOpen(true)}
-                        className="flex-1 min-w-[220px] group flex items-center gap-3 bg-text-primary border border-border/10 hover:opacity-90 p-1.5 rounded-xl transition-all text-left shadow-lg shadow-text-primary/10"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[200px] group flex items-center gap-3 bg-text-primary border border-border/10 hover:opacity-90 p-1.5 rounded-xl transition-all text-left shadow-lg shadow-text-primary/10"
                     >
                         <div className="h-9 w-9 bg-background/20 rounded-lg flex items-center justify-center">
                             <LayoutDashboard className="h-4 w-4 text-background/60" />
@@ -148,39 +148,41 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                         <Filter className="h-3.5 w-3.5 text-background/20 mr-2" />
                     </button>
 
-                    {/* Secondary Actions */}
-                    <div className="flex gap-2">
+                    {/* Secondary Actions & Execute Button */}
+                    <div className="flex items-center gap-2 w-full xl:w-auto">
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline"
+                                size="icon"
+                                onClick={onExportPdf}
+                                className="h-11 sm:h-12 w-11 sm:w-12 rounded-xl border-border hover:bg-surface-1 text-text-secondary shadow-sm transition-all"
+                                title="Download PDF"
+                            >
+                                <Download className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="outline"
+                                size="icon"
+                                onClick={onPrint}
+                                className="h-11 sm:h-12 w-11 sm:w-12 rounded-xl border-border hover:bg-surface-1 text-text-secondary shadow-sm transition-all"
+                                title="Print Report"
+                            >
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        {/* Run Button */}
                         <Button 
-                            variant="outline"
-                            size="icon"
-                            onClick={onExportPdf}
-                            className="h-12 w-12 rounded-xl border-border hover:bg-surface-1 text-text-secondary shadow-sm transition-all"
-                            title="Download PDF"
+                            onClick={onExecute}
+                            className="h-11 sm:h-12 xl:h-14 flex-1 xl:flex-none px-6 xl:px-10 justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl xl:rounded-2xl flex items-center gap-3 group transition-all duration-500 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_40px_rgba(79,70,229,0.6)] active:scale-[0.98] border-t border-white/20 relative overflow-hidden"
                         >
-                            <Download className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                            variant="outline"
-                            size="icon"
-                            onClick={onPrint}
-                            className="h-12 w-12 rounded-xl border-border hover:bg-surface-1 text-text-secondary shadow-sm transition-all"
-                            title="Print Report"
-                        >
-                            <Printer className="h-4 w-4" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 group-hover:from-indigo-400 group-hover:to-violet-600 transition-all duration-500" />
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-[radial-gradient(circle_at_center,_white_0%,_transparent_70%)] mix-blend-overlay transition-opacity duration-500" />
+                            <div className="absolute -inset-x-full h-full w-full bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-[30deg] group-hover:animate-[shimmer_2s_infinite] transition-all" />
+                            <Search className="h-4 sm:h-5 w-4 sm:w-5 relative z-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300" />
+                            <span className="font-display font-black uppercase tracking-widest relative z-10 text-xs sm:text-sm">Execute</span>
                         </Button>
                     </div>
-
-                    {/* Run Button */}
-                    <Button 
-                        onClick={onExecute}
-                        className="h-14 px-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl flex items-center gap-3 group transition-all duration-500 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_40px_rgba(79,70,229,0.6)] active:scale-[0.98] border-t border-white/20 relative overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 group-hover:from-indigo-400 group-hover:to-violet-600 transition-all duration-500" />
-                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-[radial-gradient(circle_at_center,_white_0%,_transparent_70%)] mix-blend-overlay transition-opacity duration-500" />
-                        <div className="absolute -inset-x-full h-full w-full bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-[30deg] group-hover:animate-[shimmer_2s_infinite] transition-all" />
-                        <Search className="h-5 w-5 relative z-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300" />
-                        <span className="font-display font-black uppercase tracking-widest relative z-10 text-sm">Execute</span>
-                    </Button>
                 </div>
             </Card>
 

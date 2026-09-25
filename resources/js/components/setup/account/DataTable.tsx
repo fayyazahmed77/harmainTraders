@@ -429,13 +429,13 @@ export function DataTable({ data }: DataTableProps) {
             </Dialog>
 
             {/* Data Table */}
-            <div className="rounded-xl border shadow-sm mb-3 overflow-x-auto bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/40 dark:shadow-none">
-                <Table>
+            <div className="rounded-xl border shadow-sm mb-3 overflow-x-auto touch-scroll-x min-w-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-xl shadow-zinc-200/40 dark:shadow-none">
+                <Table className="min-w-[800px]">
                     <TableHeader className="bg-gradient-to-r from-orange-400 to-orange-600 dark:from-orange-600 dark:to-orange-800 sticky top-0 z-10">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id} className="text-white font-black uppercase text-[10px] tracking-widest py-3 first:rounded-tl-lg last:rounded-tr-lg">
+                                    <TableHead key={header.id} className={`text-white font-black uppercase text-[10px] tracking-widest py-3 px-3 md:px-4 first:rounded-tl-lg last:rounded-tr-lg ${header.id === 'actions' ? 'sticky right-0 bg-orange-500 dark:bg-orange-700 z-20 shadow-[-4px_0_10px_rgba(0,0,0,0.1)]' : ''}`}>
                                         <div
                                             className={`flex items-center gap-1.5 cursor-pointer select-none group/head ${header.id === 'actions' ? 'justify-end pr-1' : ''}`}
                                             onClick={() => header.column.toggleSorting()}
@@ -459,7 +459,7 @@ export function DataTable({ data }: DataTableProps) {
                                     className="group hover:bg-orange-50/50 dark:hover:bg-zinc-800/50 transition-all duration-200 border-zinc-100 dark:border-zinc-800"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
+                                        <TableCell key={cell.id} className={cell.column.id === 'actions' ? 'sticky right-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xs z-10 py-2.5 px-3 md:px-4 shadow-[-4px_0_10px_rgba(0,0,0,0.05)]' : 'py-2.5 px-3 md:px-4'}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}

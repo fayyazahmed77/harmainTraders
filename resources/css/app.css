@@ -278,4 +278,47 @@
     .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: oklch(1 0 0 / 0.3);
     }
+
+    /* Mobile Viewport & Touch Optimization */
+    .min-h-dvh-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+    }
+    .h-dvh-screen {
+        height: 100vh;
+        height: 100dvh;
+    }
+    .safe-pb {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .safe-pt {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+    .touch-scroll-x {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+    }
+    .touch-scroll-y {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+    }
+    .responsive-page-padding {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    @media (min-width: 640px) {
+        .responsive-page-padding {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+    @media (min-width: 768px) {
+        .responsive-page-padding {
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+        }
+    }
 }
+

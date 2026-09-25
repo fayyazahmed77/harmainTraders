@@ -178,7 +178,7 @@ export function ParameterForm({
                 <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-1.5">
                     
                     {/* Date Range Selection matching Sales Reports */}
-                    <div className="flex-[1.5] min-w-[320px] flex items-center gap-1 bg-surface-1/50 p-1 rounded-sm border border-border/40">
+                    <div className="flex-[1.5] min-w-0 w-full xl:w-auto xl:min-w-[280px] flex items-center gap-1 bg-surface-1/50 p-1 rounded-sm border border-border/40">
                         <div className="flex items-center gap-2 px-3 border-r border-border/40">
                             <CalendarIcon className="h-4 w-4 text-emerald-600" />
                         </div>
@@ -210,7 +210,7 @@ export function ParameterForm({
                     {/* Item Selection Dialog Trigger (1) */}
                     <button 
                         onClick={() => setIsItemDialogOpen(true)}
-                        className="flex-1 min-w-[200px] group flex items-center gap-3 bg-surface-0/40 border border-border/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 p-1 rounded-sm transition-all text-left"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[200px] group flex items-center gap-3 bg-surface-0/40 border border-border/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 p-1 rounded-sm transition-all text-left"
                     >
                         <div className="h-9 w-9 bg-surface-1 rounded-sm flex items-center justify-center group-hover:bg-emerald-500/10 transition-all border border-border/10">
                             <Package className="h-4 w-4 text-text-muted group-hover:text-emerald-600" />
@@ -227,7 +227,7 @@ export function ParameterForm({
                     {/* Supplier Selection Dialog Trigger (2) */}
                     <button 
                         onClick={() => setIsAccountDialogOpen(true)}
-                        className="flex-1 min-w-[200px] group flex items-center gap-3 bg-surface-0/40 border border-border/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 p-1 rounded-sm transition-all text-left"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[200px] group flex items-center gap-3 bg-surface-0/40 border border-border/10 hover:border-emerald-500/50 hover:bg-emerald-500/5 p-1 rounded-sm transition-all text-left"
                     >
                         <div className="h-9 w-9 bg-surface-1 rounded-sm flex items-center justify-center group-hover:bg-emerald-500/10 transition-all border border-border/10">
                             <Building2 className="h-4 w-4 text-text-muted group-hover:text-emerald-600" />
@@ -244,7 +244,7 @@ export function ParameterForm({
                     {/* Report Type Dialog Trigger (3) */}
                     <button 
                         onClick={() => setIsReportDialogOpen(true)}
-                        className="flex-1 min-w-[220px] group flex items-center gap-3 bg-emerald-600 border border-emerald-700 hover:opacity-90 p-1 rounded-sm transition-all text-left shadow-lg"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[220px] group flex items-center gap-3 bg-emerald-600 border border-emerald-700 hover:opacity-90 p-1 rounded-sm transition-all text-left shadow-lg"
                     >
                         <div className="h-9 w-9 bg-white/20 rounded-sm flex items-center justify-center border border-white/10">
                             <Layers className="h-4 w-4 text-white" />
@@ -258,24 +258,26 @@ export function ParameterForm({
                         <Filter className="h-3 w-3 text-white/30 mr-2" />
                     </button>
 
-                    {/* Quick Filters Toggle */}
-                    <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                        className={cn("h-12 w-12 rounded-sm border border-border/10 hover:bg-emerald-600/10 hover:text-emerald-600 transition-all", isAdvancedOpen ? "bg-emerald-600/10 text-emerald-600" : "bg-surface-0/40")}
-                    >
-                        <Filter className="h-4 w-4" />
-                    </Button>
+                    {/* Quick Filters Toggle & Execute Button */}
+                    <div className="flex items-center gap-2 w-full xl:w-auto">
+                        <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                            className={cn("h-11 sm:h-12 w-11 sm:w-12 shrink-0 rounded-sm border border-border/10 hover:bg-emerald-600/10 hover:text-emerald-600 transition-all", isAdvancedOpen ? "bg-emerald-600/10 text-emerald-600" : "bg-surface-0/40")}
+                        >
+                            <Filter className="h-4 w-4" />
+                        </Button>
 
-                    {/* Execute Button */}
-                    <Button 
-                        onClick={onSearch}
-                        disabled={loading}
-                        className="h-12 px-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm font-black uppercase tracking-[0.2em] italic text-[11px] flex items-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
-                    >
-                        {loading ? <span className="animate-pulse">Analyzing...</span> : <><Search className="h-4 w-4" /> Execute</>}
-                    </Button>
+                        {/* Execute Button */}
+                        <Button 
+                            onClick={onSearch}
+                            disabled={loading}
+                            className="h-11 sm:h-12 flex-1 xl:flex-none px-6 xl:px-8 justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm font-black uppercase tracking-[0.2em] italic text-[11px] flex items-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
+                        >
+                            {loading ? <span className="animate-pulse">Analyzing...</span> : <><Search className="h-4 w-4" /> Execute</>}
+                        </Button>
+                    </div>
                 </div>
             </Card>
 

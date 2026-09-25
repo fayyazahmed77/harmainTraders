@@ -82,7 +82,7 @@ export default function View({ offer }: Props) {
             <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/50">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="p-6 lg:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+                <div className="p-3 sm:p-6 lg:p-10 space-y-6 sm:space-y-8 max-w-[1600px] mx-auto w-full min-w-0">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <motion.div
@@ -94,10 +94,10 @@ export default function View({ offer }: Props) {
                                 <Workflow className="h-3 w-3" />
                                 <span>Offer Details</span>
                             </div>
-                            <h1 className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                            <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
                                 Offer Details #{offer.id.toString().padStart(4, '0')}
                             </h1>
-                            <p className="text-sm text-zinc-500 font-medium">
+                            <p className="text-xs sm:text-sm text-zinc-500 font-medium">
                                 View details of this price offer.
                             </p>
                         </motion.div>
@@ -110,45 +110,45 @@ export default function View({ offer }: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() => router.visit('/offer-list')}
-                                className="w-full sm:w-auto rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-12 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+                                className="w-full sm:w-auto rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-11 sm:h-12 px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
                             >
                                 <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
                                 Back to List
                             </Button>
-                                <div className="flex flex-row gap-2 h-12">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => window.open(`/offer-list/${offer.id}/pdf?group_by=category`, '_blank')}
-                                        className="flex-1 sm:flex-none rounded-xl border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase tracking-widest px-4 h-full"
-                                    >
-                                        <LayoutGrid className="mr-2 h-4 w-4 shrink-0" /> Cat Print
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => window.open(`/offer-list/${offer.id}/pdf?group_by=company`, '_blank')}
-                                        className="flex-1 sm:flex-none rounded-xl border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase tracking-widest px-4 h-full"
-                                    >
-                                        <History className="mr-2 h-4 w-4 shrink-0" /> Com Print
-                                    </Button>
-                                     <Button
-                                         variant="outline"
-                                         onClick={() => {
-                                             if (confirm("Are you sure you want to recalculate and sync prices for all items in this offer using current Item Master prices?")) {
-                                                 router.post(`/offer-list/${offer.id}/sync-prices`);
-                                             }
-                                         }}
-                                         className="flex-1 sm:flex-none rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-[9px] font-black uppercase tracking-widest px-4 h-full transition-all"
-                                         title="Synchronize offer prices with Item Master setup"
-                                     >
-                                         <RefreshCw className="mr-1.5 h-3.5 w-3.5 shrink-0" /> Sync Prices
-                                     </Button>
-                                     <Button
-                                         onClick={() => window.location.href = `/offer-list/${offer.id}/download`}
-                                         className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-4 sm:px-6 h-full font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20"
-                                     >
-                                         <Download className="mr-2 h-4 w-4 hidden sm:block shrink-0" /> Download
-                                     </Button>
-                                 </div>
+                            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 h-auto sm:h-12 w-full sm:w-auto">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/offer-list/${offer.id}/pdf?group_by=category`, '_blank')}
+                                    className="rounded-xl border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase tracking-widest px-3 sm:px-4 h-11 sm:h-full"
+                                >
+                                    <LayoutGrid className="mr-1.5 sm:mr-2 h-3.5 w-3.5 shrink-0" /> Cat Print
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/offer-list/${offer.id}/pdf?group_by=company`, '_blank')}
+                                    className="rounded-xl border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase tracking-widest px-3 sm:px-4 h-11 sm:h-full"
+                                >
+                                    <History className="mr-1.5 sm:mr-2 h-3.5 w-3.5 shrink-0" /> Com Print
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        if (confirm("Are you sure you want to recalculate and sync prices for all items in this offer using current Item Master prices?")) {
+                                            router.post(`/offer-list/${offer.id}/sync-prices`);
+                                        }
+                                    }}
+                                    className="rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500 hover:text-white text-[9px] font-black uppercase tracking-widest px-3 sm:px-4 h-11 sm:h-full transition-all"
+                                    title="Synchronize offer prices with Item Master setup"
+                                >
+                                    <RefreshCw className="mr-1.5 h-3.5 w-3.5 shrink-0" /> Sync Prices
+                                </Button>
+                                <Button
+                                    onClick={() => window.location.href = `/offer-list/${offer.id}/download`}
+                                    className="bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-3 sm:px-6 h-11 sm:h-full font-black text-[10px] sm:text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/20"
+                                >
+                                    <Download className="mr-1.5 sm:mr-2 h-3.5 sm:h-4 w-3.5 sm:w-4 shrink-0" /> Download
+                                </Button>
+                            </div>
                         </motion.div>
                     </div>
 
@@ -226,7 +226,7 @@ export default function View({ offer }: Props) {
                                     </div>
 
                                     <Card className="border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
-                                        <div className="overflow-x-auto w-full">
+                                        <div className="overflow-x-auto touch-scroll-x w-full">
                                             <table className="w-full text-left border-collapse flex flex-col md:table">
                                                 <thead className="hidden md:table-header-group">
                                                     <tr className="border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">

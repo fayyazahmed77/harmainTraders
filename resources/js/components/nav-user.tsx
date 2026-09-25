@@ -55,21 +55,20 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-transparent hover:text-sidebar-foreground focus-visible:ring-0"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-transparent hover:text-sidebar-foreground focus-visible:ring-0 p-1 sm:p-2 h-auto"
             >
               <Avatar className="h-8 w-8 rounded-full border">
                 <AvatarImage src={user.avatar || '/storage/img/user.jpg'} alt={user.name} />
                 <AvatarFallback className="rounded-full">CN</AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="grid flex-1 text-left text-sm leading-tight hidden sm:grid">
                 <span className="truncate font-medium">{user.name}</span>
-
               </div>
-              <ChevronDown className="ml-auto size-4" />
+              <ChevronDown className="ml-auto size-4 hidden sm:block" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 max-w-[calc(100vw-2rem)] rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}

@@ -759,14 +759,14 @@ export default function Create({
       <SidebarInset>
         <SiteHeader breadcrumbs={breadcrumbs} />
         <div className="flex flex-1 flex-col">
-          <main className="flex-1 overflow-auto p-4 md:p-6 flex flex-col gap-6">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 flex flex-col gap-4 sm:gap-6 min-w-0">
             <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* TOP STATUS DECK */}
               <Card className={`p-5 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative`}>
                 <div className={`absolute top-0 left-0 w-1.5 h-full ${ACCENT_GRADIENT} ${PREMIUM_ROUNDING_MD && 'rounded-l-md'}`} />
 
-                <div className="col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
+                <div className="col-span-full md:col-span-1 border-b pb-4 md:pb-0 md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-center">
                   <div className="text-[10px] uppercase font-black tracking-widest text-zinc-700 dark:text-zinc-500 mb-2">Status</div>
                   <div className="flex flex-col gap-2">
                     {data.status && <SignalBadge text="ACTIVE" type="green" />}
@@ -776,7 +776,7 @@ export default function Create({
                   </div>
                 </div>
 
-                <div className="col-span-11 grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="col-span-full md:col-span-11 grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
                   <div className="md:col-span-4">
                     <TechLabel label="Registration Date" icon={CalendarDays} required>
                       <Popover open={openingOpen} onOpenChange={setOpeningOpen}>
@@ -1388,12 +1388,12 @@ export default function Create({
               </div>
 
               {/* ACTION FOOTER */}
-              <div className={`p-4 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} shadow-lg sticky bottom-4 z-30 flex justify-between items-center`}>
-                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+              <div className={`p-3 sm:p-4 ${PREMIUM_GRADIENT} border border-zinc-200 dark:border-zinc-800 ${PREMIUM_ROUNDING_MD} shadow-lg sticky bottom-2 sm:bottom-4 z-30 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 sm:gap-3`}>
+                <div className="hidden sm:flex text-[10px] font-black uppercase tracking-widest text-zinc-500 items-center gap-2">
                   <CheckCircle2 size={14} className="text-orange-500" />
                   Account Identity Registry
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     type="button"
@@ -1421,15 +1421,15 @@ export default function Create({
                       setFocusedSuggestionIndex(-1);
                       setAvailabilityStatus("none");
                     }}
-                    className={`h-11 px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}
+                    className={`flex-1 sm:flex-initial h-10 sm:h-11 px-4 sm:px-6 ${PREMIUM_ROUNDING_MD} font-black text-[10px] uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-white border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`}
                   >
                     Reset Form
                   </Button>
-                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`h-11 px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD} flex items-center gap-2`}>
+                  <Button type="submit" disabled={processing || exactDuplicateExists} className={`flex-1 sm:flex-initial h-10 sm:h-11 px-6 sm:px-8 ${SIGNAL_ORANGE} transition-all font-black text-[10px] uppercase tracking-widest ${PREMIUM_ROUNDING_MD} flex items-center justify-center gap-2`}>
                     {processing ? "Saving..." : (
                       <>
                         <span>Create Account</span>
-                        <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
+                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white/20 text-white rounded border border-white/30">F9</kbd>
                       </>
                     )}
                   </Button>

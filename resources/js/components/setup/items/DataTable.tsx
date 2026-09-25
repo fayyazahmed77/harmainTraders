@@ -294,13 +294,13 @@ export function DataTable({ data }: DataTableProps) {
             </Dialog>
 
             {/* ✅ Table */}
-            <div className="rounded-md border shadow-sm mb-3 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none">
-                <Table>
+            <div className="rounded-md border shadow-sm mb-3 overflow-x-auto touch-scroll-x min-w-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-md shadow-zinc-200/50 dark:shadow-none">
+                <Table className="min-w-[750px]">
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         {table.getHeaderGroups().map((hg) => (
                             <TableRow key={hg.id}>
                                 {hg.headers.map((header) => (
-                                    <TableHead key={header.id}>
+                                    <TableHead key={header.id} className={header.id === 'actions' ? 'sticky right-0 bg-muted z-20 px-3 md:px-4 shadow-[-4px_0_10px_rgba(0,0,0,0.05)]' : 'px-3 md:px-4'}>
                                         <div
                                             className="flex items-center gap-1 cursor-pointer"
                                             onClick={() => header.column.toggleSorting()}
@@ -320,7 +320,7 @@ export function DataTable({ data }: DataTableProps) {
                             table.getRowModel().rows.map((row) => (
                                 <TableRow key={row.id}>
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
+                                        <TableCell key={cell.id} className={cell.column.id === 'actions' ? 'sticky right-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xs z-10 py-2.5 px-3 md:px-4 shadow-[-4px_0_10px_rgba(0,0,0,0.05)]' : 'py-2.5 px-3 md:px-4'}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -337,7 +337,7 @@ export function DataTable({ data }: DataTableProps) {
                 </Table>
 
                 {/* ✅ Pagination */}
-                <div className="flex items-center justify-between px-4 py-3 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t">
                     <div className="flex items-center gap-2">
                         <Label>Rows per page:</Label>
                         <Select

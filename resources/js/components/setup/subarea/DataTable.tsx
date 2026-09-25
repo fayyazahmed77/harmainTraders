@@ -105,6 +105,8 @@ interface Subarea {
   created_by_name?: string;
   created_by_avatar?: string;
   created_at: string;
+  longitude: string;
+  latitude: string;
 }
 
 interface Area {
@@ -687,14 +689,14 @@ export function DataTable({ subareas, areas, cities, provinces, countries }: Dat
       </Dialog>
 
       {/* Data Table Container */}
-      <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
+      <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden min-w-0">
+        <div className="overflow-x-auto touch-scroll-x">
+          <Table className="min-w-[650px]">
             <TableHeader className="bg-muted/50 border-b">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="px-6 py-3 h-auto">
+                    <TableHead key={header.id} className="px-3 md:px-6 py-3 h-auto">
                       <div
                         onClick={() => header.column.toggleSorting()}
                         className="flex items-center gap-2 cursor-pointer select-none group/header"
@@ -725,7 +727,7 @@ export function DataTable({ subareas, areas, cities, provinces, countries }: Dat
                       className="border-b hover:bg-muted/30 transition-colors"
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="px-6 py-3.5 align-middle">
+                        <TableCell key={cell.id} className="px-3 md:px-6 py-2.5 md:py-3.5 align-middle">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}

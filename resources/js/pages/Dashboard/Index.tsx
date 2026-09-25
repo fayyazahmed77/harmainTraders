@@ -143,26 +143,26 @@ export default function DashboardPage({ dailySummary, stats, orderChartData, fun
             <AppSidebar variant="inset" />
             <SidebarInset>
                 <SiteHeader />
-                <div className="flex flex-1 flex-col p-4 md:p-6 space-y-6 bg-gray-50 dark:bg-gray-950">
+                <div className="flex flex-1 flex-col p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-gray-50 dark:bg-gray-950 min-w-0">
 
                     {/* Daily Summary Strip */}
                     <DailySummaryStrip dailySummary={dailySummary} />
 
                     {/* Top Stat Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         {statCards.map((card, index) => (
                             <Card key={index} className="relative overflow-hidden border-gray-200 p-0 dark:border-gray-800">
-                                <CardContent className="p-6">
+                                <CardContent className="p-4 sm:p-6">
                                     <div className="flex items-start justify-between mb-4">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{card.title}</p>
-                                            <h3 className="text-2xl font-bold text-sidebar-primary mt-1">{card.value}</h3>
+                                        <div className="min-w-0 flex-1 mr-2">
+                                            <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">{card.title}</p>
+                                            <h3 className="text-xl sm:text-2xl font-bold text-sidebar-primary mt-1 truncate">{card.value}</h3>
                                         </div>
-                                        <div className="p-2 bg-sidebar-primary/10 rounded-lg">
+                                        <div className="p-2 bg-sidebar-primary/10 rounded-lg shrink-0">
                                             <card.icon className="w-5 h-5 text-sidebar-primary" />
                                         </div>
                                     </div>
-                                    <div className="h-16 -mx-6 -mb-6">
+                                    <div className="h-16 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
                                         <ResponsiveContainer width="100%" height="100%">
                                             {card.type === "area" ? (
                                                 <AreaChart data={card.chartData}>
@@ -181,26 +181,26 @@ export default function DashboardPage({ dailySummary, stats, orderChartData, fun
                     </div>
 
                     {/* Main Content Row */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
 
                         {/* Order Chart */}
                         <Card className="lg:col-span-2 border-gray-200 dark:border-gray-800">
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base font-semibold">Weekly Sales Volume</CardTitle>
+                                    <CardTitle className="text-sm sm:text-base font-semibold">Weekly Sales Volume</CardTitle>
                                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => router.get(route('sale.index'))}>
                                         WEEKLY <ChevronDown className="w-3 h-3 ml-1" />
                                     </Button>
                                 </div>
-                                <p className="text-xs text-sidebar-primary mt-2">Sales activity for the last 7 days</p>
+                                <p className="text-xs text-sidebar-primary mt-1 sm:mt-2">Sales activity for the last 7 days</p>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-64">
+                                <div className="h-56 sm:h-64">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={orderChartData} margin={{ top: 20, right: 10, bottom: 5, left: -20 }}>
+                                        <BarChart data={orderChartData} margin={{ top: 20, right: 10, bottom: 5, left: -25 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                                            <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                                            <YAxis tick={{ fontSize: 10 }} />
+                                            <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                                            <YAxis tick={{ fontSize: 9 }} width={30} />
                                             <Tooltip />
                                             <Bar dataKey="orders" fill="#f97316" radius={[4, 4, 0, 0]} label={{ position: 'top', fontSize: 10 }} />
                                         </BarChart>

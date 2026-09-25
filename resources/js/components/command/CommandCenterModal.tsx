@@ -187,7 +187,7 @@ export function CommandCenterModal({ open, onOpenChange, isMac }: CommandCenterM
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="p-0 overflow-hidden sm:max-w-4xl lg:max-w-5xl w-full bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-2xl rounded-2xl gap-0"
+                className="p-0 overflow-hidden w-[calc(100vw-1.5rem)] sm:max-w-4xl lg:max-w-5xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-2xl rounded-2xl gap-0 max-h-[85vh] max-h-[85dvh] flex flex-col"
                 aria-describedby="command-center-description"
             >
                 <DialogTitle className="sr-only">Global Command Center</DialogTitle>
@@ -196,7 +196,7 @@ export function CommandCenterModal({ open, onOpenChange, isMac }: CommandCenterM
                 </p>
 
                 {/* Top Search Input Box */}
-                <div className="flex items-center px-4 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 gap-3">
+                <div className="flex items-center px-4 py-3.5 border-b border-neutral-100 dark:border-neutral-800/80 gap-3 shrink-0">
                     <Search className="w-5 h-5 text-orange-500 shrink-0" />
                     <input
                         type="text"
@@ -220,7 +220,7 @@ export function CommandCenterModal({ open, onOpenChange, isMac }: CommandCenterM
                 {/* Results List */}
                 <div
                     ref={listRef}
-                    className="max-h-[380px] overflow-y-auto p-2 space-y-4 custom-scrollbar"
+                    className="max-h-[380px] sm:max-h-[420px] overflow-y-auto p-2 space-y-4 custom-scrollbar touch-scroll-y flex-1"
                 >
                     {flatResults.length === 0 ? (
                         <div className="py-12 text-center text-neutral-400 dark:text-neutral-500">
@@ -315,8 +315,8 @@ export function CommandCenterModal({ open, onOpenChange, isMac }: CommandCenterM
                 </div>
 
                 {/* Footer hints */}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-neutral-50 dark:bg-neutral-900/90 border-t border-neutral-100 dark:border-neutral-800 text-[11px] text-neutral-400 dark:text-neutral-500">
-                    <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-neutral-50 dark:bg-neutral-900/90 border-t border-neutral-100 dark:border-neutral-800 text-[11px] text-neutral-400 dark:text-neutral-500 shrink-0">
+                    <div className="hidden sm:flex items-center gap-4">
                         <span className="flex items-center gap-1">
                             <kbd className="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-bold">
                                 ↑
@@ -340,8 +340,13 @@ export function CommandCenterModal({ open, onOpenChange, isMac }: CommandCenterM
                         </span>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-1.5 text-neutral-400 font-medium">
-                        <CommandIcon className="w-3 h-3 text-orange-500" /> Harmain Command Center
+                    <div className="flex sm:hidden items-center gap-1.5 text-neutral-500 font-medium">
+                        <span>Tap command to select</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-neutral-400 font-medium ml-auto">
+                        <CommandIcon className="w-3 h-3 text-orange-500" />
+                        <span className="hidden xs:inline">Harmain Command Center</span>
                     </div>
                 </div>
             </DialogContent>

@@ -38,14 +38,14 @@ export default function CounterDashboard({
     return (
         <AppLayout breadcrumbs={[{ title: 'Counter Dashboard', href: '/salesman/dashboard' }]}>
             <Head title="Counter Dashboard - Haramain Traders" />
-            <div className="flex flex-1 flex-col p-4 md:p-6 gap-3 bg-gray-50 dark:bg-gray-950 text-foreground font-sans">
+            <div className="flex flex-1 flex-col p-3 sm:p-4 md:p-6 gap-3 bg-gray-50 dark:bg-gray-950 text-foreground font-sans min-w-0">
                 <div className="mx-auto w-full flex flex-col gap-3">
                     
                     {/* KPI Row */}
                     <KpiCards kpis={kpis} />
                     
                     {/* Invoice + Payment Panel Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_290px] gap-3">
                         <InvoiceTable 
                             todayInvoices={todayInvoices} 
                             weekInvoices={weekInvoices} 
@@ -61,7 +61,7 @@ export default function CounterDashboard({
                     <HourlySalesChart hourlyData={hourlyData} />
                     
                     {/* Bottom Row - 3 equal columns */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <TopProductsPanel topProducts={topProducts} />
                         <QuickActionsAlerts alerts={alerts} />
                         <ShiftSummaryPanel shiftSummary={shiftSummary} />

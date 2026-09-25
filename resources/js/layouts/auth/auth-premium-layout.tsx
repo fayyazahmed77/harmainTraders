@@ -13,9 +13,9 @@ interface AuthPremiumLayoutProps {
 
 export default function AuthPremiumLayout({ children, title, description }: PropsWithChildren<AuthPremiumLayoutProps>) {
     return (
-        <div className="h-screen w-full text-zinc-900 lg:grid lg:grid-cols-[40%_60%] overflow-hidden bg-white">
+        <div className="min-h-screen min-h-dvh h-screen lg:h-dvh w-full text-zinc-900 lg:grid lg:grid-cols-[40%_60%] overflow-hidden bg-white">
             {/* Left Column - Login Form 40% */} 
-            <div className="relative flex h-full flex-col justify-between px-5 py-5 sm:px-10 sm:py-6 lg:px-12 lg:py-8 xl:px-16 overflow-y-auto custom-scrollbar">
+            <div className="relative flex h-full flex-col justify-between px-4 sm:px-10 py-4 sm:py-6 lg:px-12 lg:py-8 xl:px-16 overflow-y-auto touch-scroll-y custom-scrollbar safe-pb">
                 <div className="flex flex-1 flex-col justify-center py-2 sm:py-4 lg:py-6">
                     <div className="mx-auto w-full max-w-md space-y-4 sm:space-y-6">
                         {/* Form Container */}

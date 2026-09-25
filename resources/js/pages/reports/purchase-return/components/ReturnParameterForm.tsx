@@ -170,7 +170,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                 <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
                     
                     {/* Compact Inline Date Range */}
-                    <div className="flex items-center gap-1 bg-surface-1/50 p-1 rounded-sm border border-border/40 flex-1 min-w-[320px]">
+                    <div className="flex items-center gap-1 bg-surface-1/50 p-1 rounded-sm border border-border/40 flex-1 min-w-0 w-full xl:w-auto xl:min-w-[280px]">
                         <div className="flex items-center gap-2 px-3 border-r border-border/40">
                              <CalendarIcon className="h-4 w-4 text-rose-500" />
                         </div>
@@ -202,7 +202,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                     {/* Account Selector (Supplier) */}
                     <button 
                         onClick={() => setIsAccountDialogOpen(true)}
-                        className="flex-1 min-w-[220px] group flex items-center gap-3 bg-surface-1/30 border border-border/40 hover:border-rose-500/50 hover:bg-rose-500/5 p-1.5 rounded-sm transition-all text-left"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[200px] group flex items-center gap-3 bg-surface-1/30 border border-border/40 hover:border-rose-500/50 hover:bg-rose-500/5 p-1.5 rounded-sm transition-all text-left"
                     >
                         <div className="h-9 w-9 bg-surface-1 rounded-sm flex items-center justify-center group-hover:bg-rose-500/10 transition-all border border-border/10">
                             <Wallet className="h-4 w-4 text-text-muted group-hover:text-rose-500" />
@@ -219,7 +219,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                     {/* Item Selector */}
                     <button 
                         onClick={() => setIsItemDialogOpen(true)}
-                        className="flex-1 min-w-[220px] group flex items-center gap-3 bg-surface-1/30 border border-border/40 hover:border-rose-500/50 hover:bg-rose-500/5 p-1.5 rounded-sm transition-all text-left"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[200px] group flex items-center gap-3 bg-surface-1/30 border border-border/40 hover:border-rose-500/50 hover:bg-rose-500/5 p-1.5 rounded-sm transition-all text-left"
                     >
                         <div className="h-9 w-9 bg-surface-1 rounded-sm flex items-center justify-center group-hover:bg-rose-500/10 transition-all border border-border/10">
                             <Package className="h-4 w-4 text-text-muted group-hover:text-rose-500" />
@@ -236,7 +236,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                     {/* Report Selection Trigger */}
                     <button 
                         onClick={() => setIsReportDialogOpen(true)}
-                        className="flex-1 min-w-[240px] group flex items-center gap-3 bg-text-primary border border-text-primary/10 hover:opacity-90 p-1.5 rounded-sm transition-all text-left shadow-lg"
+                        className="flex-1 min-w-0 w-full xl:w-auto xl:min-w-[220px] group flex items-center gap-3 bg-text-primary border border-text-primary/10 hover:opacity-90 p-1.5 rounded-sm transition-all text-left shadow-lg"
                     >
                         <div className="h-9 w-9 bg-background/20 rounded-sm flex items-center justify-center border border-background/10">
                             <LayoutDashboard className="h-3.5 w-3.5 text-background" />
@@ -253,7 +253,7 @@ export function ReturnParameterForm({ data, setData, bootstrap, onExecute }: Ret
                     {/* Execute Primary Button */}
                     <Button 
                         onClick={onExecute}
-                        className="h-14 px-8 bg-rose-600 hover:bg-rose-500 text-white rounded-sm flex items-center gap-3 group transition-all duration-300 shadow-lg shadow-rose-500/20 active:scale-[0.98] border border-white/10 relative overflow-hidden shrink-0"
+                        className="h-11 sm:h-12 xl:h-14 w-full xl:w-auto px-6 xl:px-8 justify-center bg-rose-600 hover:bg-rose-500 text-white rounded-sm flex items-center gap-3 group transition-all duration-300 shadow-lg shadow-rose-500/20 active:scale-[0.98] border border-white/10 relative overflow-hidden shrink-0"
                     >
                         <Search className="h-4 w-4 relative z-10 group-hover:scale-110 transition-transform" />
                         <span className="font-black uppercase tracking-widest relative z-10 text-xs">Execute</span>

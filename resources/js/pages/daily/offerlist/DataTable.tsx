@@ -58,11 +58,11 @@ import {
 } from "@/components/ui/dialog";
 import { AlertCircle } from "lucide-react";
 
-interface Offer {
+export interface Offer {
     id: number;
     date: string;
     offertype: string;
-    is_live: boolean;
+    is_live?: boolean;
     account: {
         id: number;
         title: string;
@@ -225,13 +225,13 @@ export default function DataTable({ data }: DataTableProps) {
         },
         {
             id: "actions",
-            header: () => <div className="text-right">Actions</div>,
+            header: () => <div className="text-right sticky right-0 bg-zinc-50/95 dark:bg-zinc-950/95 px-2">Actions</div>,
             enableHiding: false,
             cell: ({ row }) => {
                 const offer = row.original;
 
                 return (
-                    <div className="text-right">
+                    <div className="text-right sticky right-0 bg-white/95 dark:bg-zinc-900/95 px-2 backdrop-blur-xs shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg hover:bg-orange-500/10 group transition-colors">
@@ -346,9 +346,9 @@ export default function DataTable({ data }: DataTableProps) {
 
     return (
         <>
-            <div className="w-full space-y-4">
-                <div className="overflow-x-auto custom-scrollbar rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md shadow-inner">
-                    <Table>
+            <div className="w-full space-y-4 min-w-0">
+                <div className="overflow-x-auto touch-scroll-x custom-scrollbar min-w-0 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md shadow-inner">
+                    <Table className="min-w-[700px]">
                         <TableHeader>
                             <TableRow className="hover:bg-transparent border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">
                                 {table.getHeaderGroups().map((headerGroup) => (
@@ -484,7 +484,7 @@ export default function DataTable({ data }: DataTableProps) {
 
             {/* Premium Deletion Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] rounded-3xl border-zinc-200 dark:border-zinc-800 p-0 overflow-hidden shadow-2xl">
+                <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[425px] rounded-2xl sm:rounded-3xl border-zinc-200 dark:border-zinc-800 p-0 overflow-hidden shadow-2xl">
                     <div className="bg-rose-500/10 p-8 flex flex-col items-center text-center space-y-4">
                         <div className="h-16 w-16 rounded-full bg-rose-500 flex items-center justify-center shadow-lg shadow-rose-500/30 animate-pulse">
                             <AlertCircle className="h-8 w-8 text-white" />

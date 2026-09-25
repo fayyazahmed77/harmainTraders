@@ -53,11 +53,11 @@ export function ReportSectionDialog({ open, onOpenChange, onSelect, currentRepor
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[95vw] lg:max-w-4xl p-0 overflow-hidden border-none shadow-2xl rounded-xl bg-white w-full">
-                <DialogHeader className="p-6 pb-4 bg-slate-900 text-white relative flex flex-col gap-0 border-none shadow-none">
+            <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[95vw] lg:max-w-4xl p-0 overflow-hidden border-none shadow-2xl rounded-xl bg-white max-h-[90vh] max-h-[90dvh] flex flex-col">
+                <DialogHeader className="p-4 sm:p-6 pb-4 bg-slate-900 text-white relative flex flex-col gap-0 border-none shadow-none shrink-0">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <DialogTitle className="text-xl font-bold tracking-tight">Report Intelligence</DialogTitle>
+                            <DialogTitle className="text-lg sm:text-xl font-bold tracking-tight">Report Intelligence</DialogTitle>
                             <p className="text-slate-400 text-xs mt-1 font-medium">Select a specialized report module to analyze your business metrics.</p>
                         </div>
                         <Badge variant="outline" className="w-fit text-[10px] border-slate-700 text-slate-400">
@@ -74,8 +74,8 @@ export function ReportSectionDialog({ open, onOpenChange, onSelect, currentRepor
                         />
                     </div>
                 </DialogHeader>
-                <div className="p-6 bg-slate-50/50 min-h-[400px]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-4 sm:p-6 bg-slate-50/50 flex-1 overflow-y-auto touch-scroll-y custom-scrollbar min-h-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {filteredReports.map((report, index) => (
                             <motion.div
                                 key={report.id}

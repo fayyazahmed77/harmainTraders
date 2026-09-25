@@ -31,8 +31,8 @@ export default function HourlySalesChart({ hourlyData = [] }: HourlySalesChartPr
     };
 
     return (
-        <div className="bg-card border border-border rounded-lg p-4 col-span-full shadow-xs">
-            <div className="flex justify-between items-start mb-4">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 col-span-full shadow-xs min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                 <div>
                     <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
                         <IconChartBar size={14} className="text-orange-500" />
@@ -42,7 +42,7 @@ export default function HourlySalesChart({ hourlyData = [] }: HourlySalesChartPr
                 </div>
                 
                 {/* Custom HTML Legend */}
-                <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-3 sm:gap-4 text-[11px] text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                         <div className="w-[9px] h-[9px] bg-[#e07b1a] rounded-sm"></div>
                         <span>Sales</span>
@@ -54,11 +54,11 @@ export default function HourlySalesChart({ hourlyData = [] }: HourlySalesChartPr
                 </div>
             </div>
 
-            <div className="h-[170px] w-full">
+            <div className="h-[170px] w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={hourlyData}
-                        margin={{ top: 5, right: 0, left: -20, bottom: 0 }}
+                        margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
                         barSize={14}
                         barCategoryGap="30%"
                     >

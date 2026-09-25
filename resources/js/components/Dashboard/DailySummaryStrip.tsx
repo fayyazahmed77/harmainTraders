@@ -107,20 +107,22 @@ const DailySummaryStrip: React.FC<DailySummaryStripProps> = ({ dailySummary }) =
     };
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 mb-6">
             {stats.map((stat, index) => (
                 <Card 
                     key={index} 
-                    className="border-gray-200 dark:border-gray-800 overflow-hidden relative"
+                    className={`border-gray-200 dark:border-gray-800 overflow-hidden relative ${
+                        index === 4 ? 'col-span-2 sm:col-span-1 lg:col-span-1' : ''
+                    }`}
                 >
-                    <CardContent className="p-3 relative z-10">
+                    <CardContent className="p-2.5 sm:p-3 relative z-10">
                         <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                            <div className="space-y-0.5 min-w-0">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 truncate">
                                     {stat.label}
                                 </p>
                                 <h3 
-                                    className="text-lg font-black leading-none"
+                                    className="text-base sm:text-lg font-black leading-none truncate"
                                     style={{ color: stat.color }}
                                 >
                                     {stat.isCurrency ? formatCurrency(stat.value) : stat.value}
