@@ -99,6 +99,7 @@ class AccountBulkUploadService
             $typeNameVal = $this->getValue($row, $headerMap, 'type_name');
             $catNameVal = $this->getValue($row, $headerMap, 'category_name');
             $openingBalVal = $this->getValue($row, $headerMap, 'opening_balance', '0');
+            $openingBalTypeVal = strtoupper(trim((string)$this->getValue($row, $headerMap, 'opening_balance_type', '')));
             $creditLimitVal = $this->getValue($row, $headerMap, 'credit_limit');
             $agingDaysVal = $this->getValue($row, $headerMap, 'aging_days', '0');
             $itemCategoryVal = $this->getValue($row, $headerMap, 'item_category');
@@ -285,6 +286,10 @@ class AccountBulkUploadService
                 $errorCount++;
             }
 
+            if (!in_array($openingBalTypeVal, ['DR', 'CR'])) {
+                $openingBalTypeVal = ($isSupplier || in_array(strtolower($typeName ?? ''), ['capital', 'amanat payable', 'reserve'])) ? 'CR' : 'DR';
+            }
+
             $parsedRows[] = [
                 'row_number' => $rowNumber,
                 'title' => $title,
@@ -293,7 +298,8 @@ class AccountBulkUploadService
                 'type_name' => $typeName,
                 'category_id' => $categoryId,
                 'category_name' => $categoryName,
-                'opening_balance' => is_numeric($openingBalVal) ? (float)$openingBalVal : 0,
+                'opening_balance' => is_numeric($openingBalVal) ? abs((float)$openingBalVal) : 0,
+                'opening_balance_type' => $openingBalTypeVal,
                 'credit_limit' => is_numeric($creditLimitVal) ? (float)$creditLimitVal : 99999999,
                 'aging_days' => is_numeric($agingDaysVal) ? (int)$agingDaysVal : 0,
                 'item_category' => is_numeric($itemCategoryVal) ? (int)$itemCategoryVal : null,
@@ -365,6 +371,7 @@ class AccountBulkUploadService
                     'type' => $row['type_id'],
                     'category' => $row['category_id'] ?? null,
                     'opening_balance' => $row['opening_balance'] ?? 0,
+                    'opening_balance_type' => $row['opening_balance_type'] ?? 'DR',
                     'credit_limit' => $row['credit_limit'] ?? 99999999,
                     'aging_days' => $row['aging_days'] ?? 0,
                     'item_category' => $row['item_category'] ?? null,
@@ -427,6 +434,8 @@ class AccountBulkUploadService
                 $mapping['category_name'] = $colIndex;
             } elseif (in_array($h, ['opening_balance', 'balance', 'open_bal'])) {
                 $mapping['opening_balance'] = $colIndex;
+            } elseif (in_array($h, ['opening_balance_type', 'ob_type', 'balance_type', 'dr_cr', 'opening_balance_type_drcr'])) {
+                $mapping['opening_balance_type'] = $colIndex;
             } elseif (in_array($h, ['credit_limit', 'limit'])) {
                 $mapping['credit_limit'] = $colIndex;
             } elseif (in_array($h, ['aging_days', 'aging'])) {

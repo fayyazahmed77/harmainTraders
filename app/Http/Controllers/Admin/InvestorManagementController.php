@@ -83,6 +83,7 @@ class InvestorManagementController extends Controller
                 'type' => 9,
                 'status' => true,
                 'opening_balance' => (float)($request->initial_capital ?? 0),
+                'opening_balance_type' => 'CR',
                 'opening_date' => now(),
             ]);
 

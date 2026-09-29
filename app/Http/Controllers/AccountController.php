@@ -80,12 +80,19 @@ class AccountController extends Controller implements HasMiddleware
             return $account->accountType && $account->accountType->name === 'Supplier';
         });
 
-        $receivables = \App\Models\Sales::sum('remaining_amount')
-            - \App\Models\SalesReturn::sum('remaining_amount')
-            + $customers->where('opening_balance', '>', 0)->sum('opening_balance');
-        $payables = \App\Models\Purchase::sum('remaining_amount')
-            - \App\Models\PurchaseReturn::sum('remaining_amount')
-            + $suppliers->where('opening_balance', '>', 0)->sum('opening_balance');
+        // Correctly compute receivables and payables using the same ledger formula
+        // as the per-account balance (via PaymentAccountingService / getSignedOpeningBalance)
+        $receivables = 0;
+        foreach ($customers as $customer) {
+            $bal = \App\Services\PaymentAccountingService::getCustomerCurrentBalance($customer);
+            if ($bal > 0) $receivables += $bal; // Only DR balances count as receivable
+        }
+
+        $payables = 0;
+        foreach ($suppliers as $supplier) {
+            $bal = \App\Services\PaymentAccountingService::getSupplierCurrentBalance($supplier);
+            if ($bal > 0) $payables += $bal; // Only CR balances count as payable
+        }
 
         $summary = [
             'total_accounts' => $accounts->count(),
@@ -157,8 +164,9 @@ class AccountController extends Controller implements HasMiddleware
             'purchase' => 'nullable|boolean',
             'cashbank' => 'nullable|boolean',
             'sale' => 'nullable|boolean',
-            'opening_balance' => 'nullable|numeric',
-            'address1' => 'nullable|string|max:255',
+            'opening_balance'      => 'nullable|numeric|min:0',
+            'opening_balance_type' => 'nullable|in:DR,CR',
+            'address1'             => 'nullable|string|max:255',
             'address2' => 'nullable|string|max:255',
             'telephone1' => 'nullable|string|max:50',
             'telephone2' => 'nullable|string|max:50',
@@ -310,8 +318,9 @@ class AccountController extends Controller implements HasMiddleware
             'purchase' => 'nullable|boolean',
             'cashbank' => 'nullable|boolean',
             'sale' => 'nullable|boolean',
-            'opening_balance' => 'nullable|numeric',
-            'address1' => 'nullable|string|max:255',
+            'opening_balance'      => 'nullable|numeric|min:0',
+            'opening_balance_type' => 'nullable|in:DR,CR',
+            'address1'             => 'nullable|string|max:255',
             'address2' => 'nullable|string|max:255',
             'telephone1' => 'nullable|string|max:50',
             'telephone2' => 'nullable|string|max:50',
@@ -554,6 +563,18 @@ class AccountController extends Controller implements HasMiddleware
     }
     public function destroy(Account $account)
     {
+        // Guard: prevent deletion if account has any linked transactions
+        $hasSales     = \App\Models\Sales::where('customer_id', $account->id)->exists();
+        $hasPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->exists();
+        $hasPayments  = \App\Models\Payment::where('account_id', $account->id)
+                            ->orWhere('payment_account_id', $account->id)
+                            ->exists();
+
+        if ($hasSales || $hasPurchases || $hasPayments) {
+            return redirect()->route('account.index')
+                ->with('error', 'Cannot delete this account because it has linked transactions (Sales, Purchases, or Payments). Deactivate it instead.');
+        }
+
         $account->delete();
         return redirect()->route('account.index')
             ->with('success', 'Account deleted successfully!');

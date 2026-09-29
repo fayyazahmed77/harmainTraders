@@ -44,6 +44,7 @@ interface Account {
     cashbank: boolean;
     sale: boolean;
     opening_balance: number;
+    opening_balance_type?: 'DR' | 'CR';
     opening_date: string | null;
     address1: string | null;
     address2: string | null;
@@ -428,8 +429,11 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 <CardContent className="space-y-4">
                                     <div>
                                         <div className="text-xs text-zinc-700 uppercase mb-1">Opening Balance</div>
-                                        <div className="text-2xl font-bold text-primary">
-                                            {formatCurrency(account.opening_balance)}
+                                        <div className="text-2xl font-bold text-primary flex items-center gap-2">
+                                            <span>{formatCurrency(account.opening_balance)}</span>
+                                            <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                                                {account.opening_balance_type || 'DR'}
+                                            </span>
                                         </div>
                                     </div>
                                     {financial_summary?.current_balance !== undefined && (() => {

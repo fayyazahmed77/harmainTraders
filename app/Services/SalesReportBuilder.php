@@ -637,7 +637,7 @@ class SalesReportBuilder
             DB::raw("(SELECT COALESCE(SUM(discount), 0) FROM payments WHERE account_id = accounts.id AND type = 'RECEIPT' AND date BETWEEN '$fromDate' AND '$toDate' AND (cheque_status IS NULL OR cheque_status != 'Canceled')) as discount"),
             DB::raw("(SELECT COALESCE(SUM(amount), 0) FROM payments WHERE account_id = accounts.id AND type = 'RECEIPT' AND date BETWEEN '$fromDate' AND '$toDate' AND (cheque_status IS NULL OR cheque_status != 'Canceled')) as received"),
             DB::raw("
-                CAST(accounts.opening_balance AS DECIMAL(15,2)) + 
+                (CASE WHEN accounts.opening_balance_type = 'CR' THEN -CAST(COALESCE(accounts.opening_balance, 0) AS DECIMAL(15,2)) ELSE CAST(COALESCE(accounts.opening_balance, 0) AS DECIMAL(15,2)) END) + 
                 COALESCE((SELECT SUM(net_total) FROM sales WHERE customer_id = accounts.id), 0) + 
                 COALESCE((SELECT SUM(amount + discount) FROM payments WHERE account_id = accounts.id AND type = 'PAYMENT' AND (cheque_status IS NULL OR cheque_status != 'Canceled')), 0) - 
                 COALESCE((SELECT SUM(net_total) FROM sales_returns WHERE customer_id = accounts.id), 0) - 

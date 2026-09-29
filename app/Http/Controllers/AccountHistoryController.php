@@ -100,6 +100,7 @@ class AccountHistoryController extends Controller implements HasMiddleware
 
     public function getBankStatement(Request $request, Account $account)
     {
+        $account->loadMissing('accountType');
         $perPage = 20;
         $page = (int) $request->get('page', 1);
 
@@ -150,9 +151,9 @@ class AccountHistoryController extends Controller implements HasMiddleware
                 ) as net_sum", [$account->id, $account->id])
                 ->value('net_sum') ?? 0;
 
-            $runningBalance = (float)$account->opening_balance + (float)$olderSum;
+            $runningBalance = $account->getSignedOpeningBalance() + (float)$olderSum;
         } else {
-            $runningBalance = (float)$account->opening_balance;
+            $runningBalance = $account->getSignedOpeningBalance();
         }
 
         // Loop forward to compute the running balance and format each item

@@ -440,7 +440,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent
                     onKeyDown={handleKeyDown}
-                    className={`max-w-[99vw] sm:max-w-none p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col h-[90vh] transition-all duration-300 ${
+                    className={`w-full max-w-full h-full h-[100dvh] max-h-[100dvh] top-0 left-0 translate-x-0 translate-y-0 rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-2xl sm:max-w-none p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col transition-all duration-300 ${
                         selectedItemForQty ? 'md:max-w-7xl md:w-[1280px]' : 'md:max-w-5xl md:w-[980px]'
                     }`}
                 >
@@ -495,7 +495,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                             </div>
 
                             {/* Table Body Rows */}
-                            <div className={`flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-100 dark:divide-zinc-800/60 ${selectedItemForQty ? 'pb-20' : ''}`}>
+                            <div className={`flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-100 dark:divide-zinc-800/60 ${selectedItemForQty ? 'pb-44 sm:pb-24' : ''}`}>
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const stock = toNumber(item.total_stock_pcs);
                                     const packing = toNumber(item.packing_qty || 1);
@@ -579,7 +579,12 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-zinc-400">#{item.id} | Active Rate: Rs {tpVal.toFixed(2)} | Stock: {stock}</div>
+                                                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
+                                                        <span>#{item.id} |</span>
+                                                        <span>Active Rate: <span className="font-bold text-orange-600 dark:text-orange-400">Rs {tpVal.toFixed(2)}</span> |</span>
+                                                        <span>Trade Price: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {toNumber(item.trade_price).toFixed(2)}</span> |</span>
+                                                        <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-bold text-rose-500"}>{stock}</span></span>
+                                                    </div>
                                                 </div>
                                                 <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
                                                     {isSelected ? <Check size={14} /> : <Plus size={14} />}
@@ -602,98 +607,116 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         initial={{ y: "100%", opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         exit={{ y: "100%", opacity: 0 }}
-                                        className="absolute inset-x-0 bottom-0 py-3.5 px-6 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 border-orange-500 shadow-[0_-20px_50px_rgba(0,0,0,0.25)] flex flex-wrap items-center justify-between gap-4 z-[100]"
+                                        className="absolute inset-x-0 bottom-0 p-3 sm:py-3.5 sm:px-6 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 border-orange-500 shadow-[0_-20px_50px_rgba(0,0,0,0.25)] flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4 z-[100]"
                                     >
-                                        <div className="flex-1 min-w-0 max-w-[280px]">
-                                            <h3 className="text-lg font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tight italic">
-                                                {selectedItemForQty.title}
-                                            </h3>
+                                        <div className="flex items-center justify-between w-full md:w-auto min-w-0 md:max-w-[280px]">
+                                            <div className="flex flex-col min-w-0">
+                                                <h3 className="text-sm sm:text-lg font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tight italic">
+                                                    {selectedItemForQty.title}
+                                                </h3>
+                                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono sm:hidden truncate">
+                                                    TP: Rs {toNumber(selectedItemForQty.trade_price).toFixed(2)} | Rate: Rs {dialogRate}
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedItemForQty(null)}
+                                                className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                                                title="Close input panel"
+                                            >
+                                                <X size={18} />
+                                            </button>
                                         </div>
 
-                                        <div className="flex gap-2.5 p-1 items-end shrink-0">
-                                            <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Full Units</span>
-                                                <Input
-                                                    ref={fullInputRef}
-                                                    type="number"
-                                                    value={dialogFull || ""}
-                                                    onChange={e => setDialogFull(toNumber(e.target.value))}
-                                                    onKeyDown={handleFullKeyDown}
-                                                    className="w-20 sm:w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono"
-                                                />
-                                            </div>
-
-                                            {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
-                                                <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                                                    <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Loose Pcs</span>
+                                        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-2.5 w-full md:w-auto">
+                                            {/* Inputs row */}
+                                            <div className="flex items-end gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto">
+                                                <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                                    <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Full Units</span>
                                                     <Input
-                                                        ref={pcsInputRef}
+                                                        ref={fullInputRef}
                                                         type="number"
-                                                        value={dialogPcs || ""}
-                                                        onChange={e => setDialogPcs(toNumber(e.target.value))}
-                                                        onKeyDown={handlePcsKeyDown}
-                                                        className="w-20 sm:w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono"
+                                                        value={dialogFull || ""}
+                                                        onChange={e => setDialogFull(toNumber(e.target.value))}
+                                                        onKeyDown={handleFullKeyDown}
+                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                                     />
                                                 </div>
-                                            )}
 
-                                            <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">B. Full</span>
-                                                <Input
-                                                    ref={bFullInputRef}
-                                                    type="number"
-                                                    value={dialogBonusFull || ""}
-                                                    onChange={e => setDialogBonusFull(toNumber(e.target.value))}
-                                                    onKeyDown={handleBFullKeyDown}
-                                                    className="w-20 sm:w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono"
-                                                />
-                                            </div>
+                                                {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
+                                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial animate-in fade-in slide-in-from-bottom-2">
+                                                        <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Loose Pcs</span>
+                                                        <Input
+                                                            ref={pcsInputRef}
+                                                            type="number"
+                                                            value={dialogPcs || ""}
+                                                            onChange={e => setDialogPcs(toNumber(e.target.value))}
+                                                            onKeyDown={handlePcsKeyDown}
+                                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
+                                                        />
+                                                    </div>
+                                                )}
 
-                                            {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
-                                                <div className="flex flex-col gap-1 items-center animate-in fade-in slide-in-from-bottom-2">
-                                                    <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">B. PCS</span>
+                                                <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                                    <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">B. Full</span>
                                                     <Input
-                                                        ref={bPcsInputRef}
+                                                        ref={bFullInputRef}
                                                         type="number"
-                                                        value={dialogBonusPcs || ""}
-                                                        onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
-                                                        onKeyDown={handleBPcsKeyDown}
-                                                        className="w-20 sm:w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono"
+                                                        value={dialogBonusFull || ""}
+                                                        onChange={e => setDialogBonusFull(toNumber(e.target.value))}
+                                                        onKeyDown={handleBFullKeyDown}
+                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
                                                     />
                                                 </div>
-                                            )}
 
-                                            <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Rate (Rs)</span>
-                                                <Input
-                                                    ref={rateInputRef}
-                                                    type="number"
-                                                    value={dialogRate || ""}
-                                                    onChange={e => setDialogRate(toNumber(e.target.value))}
-                                                    onKeyDown={handleRateKeyDown}
-                                                    className="w-20 sm:w-24 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all font-mono"
-                                                />
+                                                {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
+                                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial animate-in fade-in slide-in-from-bottom-2">
+                                                        <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">B. PCS</span>
+                                                        <Input
+                                                            ref={bPcsInputRef}
+                                                            type="number"
+                                                            value={dialogBonusPcs || ""}
+                                                            onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
+                                                            onKeyDown={handleBPcsKeyDown}
+                                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                                    <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Rate (Rs)</span>
+                                                    <Input
+                                                        ref={rateInputRef}
+                                                        type="number"
+                                                        value={dialogRate || ""}
+                                                        onChange={e => setDialogRate(toNumber(e.target.value))}
+                                                        onKeyDown={handleRateKeyDown}
+                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all font-mono px-1"
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-1 items-center flex-1 min-w-[50px] sm:flex-initial">
+                                                    <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Disc (%)</span>
+                                                    <Input
+                                                        ref={discountInputRef}
+                                                        type="number"
+                                                        value={dialogDiscount || ""}
+                                                        onChange={e => setDialogDiscount(toNumber(e.target.value))}
+                                                        onKeyDown={handleDiscountKeyDown}
+                                                        className="w-full sm:w-20 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all font-mono px-1"
+                                                    />
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-col gap-1 items-center">
-                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-wider">Disc (%)</span>
-                                                <Input
-                                                    ref={discountInputRef}
-                                                    type="number"
-                                                    value={dialogDiscount || ""}
-                                                    onChange={e => setDialogDiscount(toNumber(e.target.value))}
-                                                    onKeyDown={handleDiscountKeyDown}
-                                                    className="w-16 sm:w-20 h-10 text-center text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all font-mono"
-                                                />
-                                            </div>
-
+                                            {/* Add button - full width on mobile, inline on desktop */}
                                             <Button
                                                 ref={addButtonRef}
                                                 onClick={handleCommit}
                                                 onKeyDown={handleAddButtonKeyDown}
-                                                className="h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all ml-2"
+                                                className="w-full sm:w-auto h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all shrink-0 flex items-center justify-center gap-1.5"
                                             >
-                                                Add
+                                                <Plus size={16} className="stroke-[3]" />
+                                                Add Item
                                             </Button>
                                         </div>
                                     </motion.div>

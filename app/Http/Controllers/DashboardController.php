@@ -198,7 +198,7 @@ class DashboardController extends Controller
         $getFunds = function($ids) {
             if ($ids->isEmpty()) return 0;
             
-            $accounts = Account::whereIn('id', $ids)->get(['id', 'opening_balance']);
+            $accounts = Account::with('accountType')->whereIn('id', $ids)->get();
             
             $totalInByAccount = Payment::whereIn('payment_account_id', $ids)
                 ->where('type', 'RECEIPT')
@@ -226,7 +226,7 @@ class DashboardController extends Controller
 
             $sum = 0;
             foreach ($accounts as $account) {
-                $opening = (float)$account->opening_balance;
+                $opening = $account->getSignedOpeningBalance();
                 $in = (float)($totalInByAccount[$account->id] ?? 0);
                 $out = (float)($totalOutByAccount[$account->id] ?? 0);
                 $balance = $opening + $in - $out;

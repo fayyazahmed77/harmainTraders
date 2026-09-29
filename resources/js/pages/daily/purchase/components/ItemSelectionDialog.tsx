@@ -376,7 +376,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent 
                 onKeyDown={handleKeyDown}
-                className={`max-w-[99vw] sm:max-w-none p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col h-[90vh] transition-all duration-300 ${
+                className={`w-full max-w-full h-full h-[100dvh] max-h-[100dvh] top-0 left-0 translate-x-0 translate-y-0 rounded-none sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-[90vh] sm:max-h-[90vh] sm:rounded-2xl sm:max-w-none p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 border-none shadow-2xl flex flex-col transition-all duration-300 ${
                     selectedItemForQty ? 'md:max-w-7xl md:w-[1250px]' : 'md:max-w-5xl md:w-[980px]'
                 }`}
             >
@@ -421,7 +421,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 <div className="col-span-2 text-right text-[9px] font-black uppercase tracking-wider text-zinc-700">System Inventory</div>
                             </div>
 
-                            <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                            <div className={`divide-y divide-zinc-100 dark:divide-zinc-800/60 ${selectedItemForQty ? 'pb-40 md:pb-0' : ''}`}>
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const tradePrice = toNumber(item.trade_price);
                                     const avgPurchPrice = item.has_purchases && toNumber(item.avg_purchase_rate) > 0 ? toNumber(item.avg_purchase_rate) : 0;
@@ -480,8 +480,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
 
                                             {/* Mobile View Item */}
                                             <div className="md:hidden flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex flex-col min-w-0 pr-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
                                                         {isSelected && (
                                                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
@@ -489,9 +489,14 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-zinc-400">#{item.id} | TP: {tradePrice}</div>
+                                                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
+                                                        <span>#{item.id} |</span>
+                                                        <span>Avg Price: <span className="font-bold text-orange-600 dark:text-orange-400">{avgPurchPrice > 0 ? `Rs ${avgPurchPrice.toFixed(2)}` : 'New'}</span> |</span>
+                                                        <span>Trade: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {tradePrice.toFixed(2)}</span> |</span>
+                                                        <span>Stock: <span className={item.stock_1 ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-rose-500'}>{item.stock_1 || 0}</span></span>
+                                                    </div>
                                                 </div>
-                                                <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
+                                                <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 shrink-0 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
                                                     {isSelected ? <Check size={14} /> : <Plus size={14} />}
                                                 </div>
                                             </div>
@@ -507,122 +512,131 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                         </div>
 
                         {/* Bottom Dock: Either Sync Node Bar OR Footer Status Bar (Displayed One At A Time) */}
+                        <AnimatePresence>
                         {selectedItemForQty ? (
                             <motion.div
-                                initial={{ y: 20, opacity: 0 }}
+                                initial={{ y: "100%", opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
-                                exit={{ y: 20, opacity: 0 }}
-                                className="p-3 bg-white dark:bg-zinc-900 border-t-2 border-orange-500 flex flex-wrap items-center justify-between gap-3 shadow-xl shrink-0 z-20"
+                                exit={{ y: "100%", opacity: 0 }}
+                                className="absolute inset-x-0 bottom-0 p-3 sm:py-3.5 sm:px-4 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 border-orange-500 shadow-[0_-20px_50px_rgba(0,0,0,0.25)] flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 z-[100]"
                             >
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
-                                    <span className="text-xs font-black uppercase tracking-wide truncate max-w-[180px]">
-                                        {selectedItemForQty.title}
-                                    </span>
+                                <div className="flex items-center justify-between w-full md:w-auto min-w-0 md:max-w-[220px]">
+                                    <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping shrink-0" />
+                                            <span className="text-xs sm:text-sm font-black uppercase tracking-wide truncate leading-tight italic">
+                                                {selectedItemForQty.title}
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono sm:hidden truncate mt-0.5">
+                                            TP: Rs {toNumber(selectedItemForQty.trade_price).toFixed(2)} | Rate: Rs {dialogRate}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedItemForQty(null);
+                                            setTimeout(() => searchInputRef.current?.focus(), 50);
+                                        }}
+                                        className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                                        title="Close input panel"
+                                    >
+                                        <X size={18} />
+                                    </button>
                                 </div>
 
-                                 <div className="flex gap-2 items-end overflow-x-auto no-scrollbar">
-                                    <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Full</span>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-2.5 w-full md:w-auto">
+                                 <div className="flex gap-1.5 sm:gap-2 items-end overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto">
+                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                        <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Full</span>
                                         <Input
                                             ref={fullInputRef}
                                             type="number"
                                             value={dialogFull || ""}
                                             onChange={e => setDialogFull(toNumber(e.target.value))}
                                             onKeyDown={handleFullKeyDown}
-                                            className="w-24 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
+                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                         />
                                     </div>
 
                                     {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
-                                        <div className="flex flex-col gap-0.5 items-center">
-                                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Pcs</span>
+                                        <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial animate-in fade-in slide-in-from-bottom-2">
+                                            <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Pcs</span>
                                             <Input
                                                 ref={pcsInputRef}
                                                 type="number"
                                                 value={dialogPcs || ""}
                                                 onChange={e => setDialogPcs(toNumber(e.target.value))}
                                                 onKeyDown={handlePcsKeyDown}
-                                                className="w-24 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 transition-all"
+                                                className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                             />
                                         </div>
                                     )}
 
-                                    <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest">B.Full</span>
+                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                        <span className="text-[8px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider truncate w-full text-center">B.Full</span>
                                         <Input
                                             ref={bFullInputRef}
                                             type="number"
                                             value={dialogBonusFull || ""}
                                             onChange={e => setDialogBonusFull(toNumber(e.target.value))}
                                             onKeyDown={handleBFullKeyDown}
-                                            className="w-24 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
+                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
                                         />
                                     </div>
 
                                     {toNumber(selectedItemForQty.packing_qty || 1) > 1 && (
-                                        <div className="flex flex-col gap-0.5 items-center">
-                                            <span className="text-[8px] font-black text-amber-700 uppercase tracking-widest">B.Pcs</span>
+                                        <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial animate-in fade-in slide-in-from-bottom-2">
+                                            <span className="text-[8px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider truncate w-full text-center">B.Pcs</span>
                                             <Input
                                                 ref={bPcsInputRef}
                                                 type="number"
                                                 value={dialogBonusPcs || ""}
                                                 onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
                                                 onKeyDown={handleBPcsKeyDown}
-                                                className="w-24 h-8 text-center text-sm font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 text-amber-600 focus:ring-amber-500 transition-all"
+                                                className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-amber-200 dark:border-amber-800/30 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
                                             />
                                         </div>
                                     )}
 
-                                    <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Rate (Rs)</span>
+                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
+                                        <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Rate (Rs)</span>
                                         <Input
                                             ref={rateInputRef}
                                             type="number"
                                             value={dialogRate || ""}
                                             onChange={e => setDialogRate(toNumber(e.target.value))}
                                             onKeyDown={handleRateKeyDown}
-                                            className="w-28 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
+                                            className="w-full sm:w-28 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                         />
                                     </div>
 
-                                    <div className="flex flex-col gap-0.5 items-center">
-                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Disc (%)</span>
+                                    <div className="flex flex-col gap-1 items-center flex-1 min-w-[50px] sm:flex-initial">
+                                        <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Disc (%)</span>
                                         <Input
                                             ref={discountInputRef}
                                             type="number"
                                             value={dialogDiscount || ""}
                                             onChange={e => setDialogDiscount(toNumber(e.target.value))}
                                             onKeyDown={handleDiscountKeyDown}
-                                            className="w-20 h-8 text-center text-sm font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all"
+                                            className="w-full sm:w-20 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                         />
                                     </div>
+                                </div>
 
                                     <Button
                                         ref={syncButtonRef}
                                         onClick={handleCommit}
                                         onKeyDown={handleSyncButtonKeyDown}
-                                        className="h-8 px-4 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-md active:scale-95 transition-all ml-1"
+                                        className="w-full sm:w-auto h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all shrink-0 flex items-center justify-center gap-1.5"
                                     >
+                                        <Plus size={16} className="stroke-[3]" />
                                         Sync Node
-                                    </Button>
-
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setSelectedItemForQty(null);
-                                            setTimeout(() => searchInputRef.current?.focus(), 50);
-                                        }}
-                                        className="h-8 px-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                                        title="Cancel Selection"
-                                    >
-                                        <X size={16} />
                                     </Button>
                                 </div>
                             </motion.div>
                         ) : (
-                            /* Default Footer Status Bar */
+                             /* Default Footer Status Bar */
                             <div className="p-3 bg-zinc-100 dark:bg-zinc-900 flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 text-[9px] font-black uppercase text-zinc-400 tracking-widest shrink-0">
                                 <span>Showing {filteredItems.length} entries (Use ↑ ↓ Enter)</span>
                                 <div className="flex gap-2">
@@ -631,6 +645,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 </div>
                             </div>
                         )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Right Column: Redesigned Dual-Theme ERP Right Panel */}
@@ -641,7 +656,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 animate={{ x: 0, opacity: 1 }}
                                 exit={{ x: 300, opacity: 0 }}
                                 transition={{ type: "spring", damping: 26, stiffness: 260 }}
-                                className="w-full lg:w-[320px] xl:w-[340px] shrink-0 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 flex flex-col p-3.5 gap-3 overflow-y-auto z-20 shadow-xl relative"
+                                className="hidden md:flex w-full lg:w-[320px] xl:w-[340px] shrink-0 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 flex-col p-3.5 gap-3 overflow-y-auto z-20 shadow-xl relative"
                             >
                                 {/* Header Card */}
                                 <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-zinc-800 dark:to-zinc-900 border border-orange-600/30 dark:border-zinc-700/80 rounded-xl shadow-md flex flex-col gap-2 relative overflow-hidden text-white">

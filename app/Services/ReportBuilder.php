@@ -270,15 +270,16 @@ class ReportBuilder
         }
 
         return [
-            'opening_balance' => (float)$openingBalance,
-            'page_start_balance' => (float)$pageStartBalance,
-            'total_debit' => $totalDebit,
-            'total_credit' => $totalCredit,
-            'closing_balance' => (float)$closingBalance,
-            'balance_type' => $orientation,
-            'data' => $transactions,
-            'from_date' => $fromDate,
-            'to_date' => $toDate
+            'opening_balance'      => (float)$openingBalance,
+            'opening_balance_type' => $orientation === 'cr' ? ($openingBalance >= 0 ? 'CR' : 'DR') : ($openingBalance >= 0 ? 'DR' : 'CR'),
+            'page_start_balance'   => (float)$pageStartBalance,
+            'total_debit'          => $totalDebit,
+            'total_credit'         => $totalCredit,
+            'closing_balance'      => (float)$closingBalance,
+            'balance_type'         => $orientation,
+            'data'                 => $transactions,
+            'from_date'            => $fromDate,
+            'to_date'              => $toDate,
         ];
     }    public function accountDetailLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50, $params = [])
     {
@@ -383,7 +384,7 @@ class ReportBuilder
     private function calculateOpeningBalance($accountId, $date, $orientation = 'dr', $params = [])
     {
         $account = Account::find($accountId);
-        $manualOpening = $account->opening_balance ?? 0;
+        $manualOpening = $account->getSignedOpeningBalance();
         
         // Sum all transactions before $date
         $salesQuery = Sales::where('customer_id', $accountId)->where('date', '<', $date);
@@ -1750,53 +1751,58 @@ class ReportBuilder
     private function calculateTrialBalanceTotals($toDate)
     {
         $toDate = $toDate ?? date('Y-m-d');
-        
-        $accounts = Account::select('id', 'opening_balance', 'purchase')->get();
-        
+
+        // Load accountType so getSignedOpeningBalance() can resolve CR-normal check
+        $accounts = Account::with('accountType')->get();
+
         $sales = Sales::where('date', '<=', $toDate)->groupBy('customer_id')->selectRaw('customer_id, SUM(net_total) as total')->pluck('total', 'customer_id');
         $purchases = Purchase::where('date', '<=', $toDate)->groupBy('supplier_id')->selectRaw('supplier_id, SUM(net_total) as total')->pluck('total', 'supplier_id');
-        $payments = Payment::where('date', '<=', $toDate)->groupBy('account_id')
-            ->selectRaw('account_id, 
-                SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts, 
-                SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
+
+        // Include discount to match aggregateAccountBalances() formula
+        $payments = Payment::where('date', '<=', $toDate)
+            ->where('cheque_status', '!=', 'Canceled')
+            ->groupBy('account_id')
+            ->selectRaw('account_id,
+                SUM(CASE WHEN type = "RECEIPT" THEN (amount + discount) ELSE 0 END) as receipts,
+                SUM(CASE WHEN type = "PAYMENT" THEN (amount + discount) ELSE 0 END) as payments')
             ->get()->keyBy('account_id');
-            
+
         $salesReturns = SalesReturn::where('date', '<=', $toDate)->groupBy('customer_id')->selectRaw('customer_id, SUM(net_total) as total')->pluck('total', 'customer_id');
         $purchaseReturns = PurchaseReturn::where('date', '<=', $toDate)->groupBy('supplier_id')->selectRaw('supplier_id, SUM(net_total) as total')->pluck('total', 'supplier_id');
-        
+
         $totalDR = 0;
         $totalCR = 0;
-        
+
         foreach ($accounts as $acc) {
             $id = $acc->id;
-            
-            // Correct debit/credit logic and column mapping based on account type
+
             if (in_array($acc->type, [1, 2, 14])) {
-                // Bank/Cash logic - Use payment_account_id
+                // Bank/Cash: use payment_account_id column
                 $payStats = DB::table('payments')->where('payment_account_id', $id)
                     ->where('date', '<=', $toDate)
-                    ->selectRaw('SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts, 
+                    ->where('cheque_status', '!=', 'Canceled')
+                    ->selectRaw('SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts,
                                  SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
                     ->first();
-                $debit = $payStats->receipts ?? 0;
+                $debit  = $payStats->receipts ?? 0;
                 $credit = $payStats->payments ?? 0;
             } else {
-                // Customer/Supplier logic - Use account_id (already in $payments variable from above)
-                $debit = ($sales->get($id) ?? 0) + ($payments->get($id)->payments ?? 0) + ($purchaseReturns->get($id) ?? 0);
+                // Customer/Supplier/Other: use account_id
+                $debit  = ($sales->get($id) ?? 0) + ($payments->get($id)->payments ?? 0) + ($purchaseReturns->get($id) ?? 0);
                 $credit = ($purchases->get($id) ?? 0) + ($payments->get($id)->receipts ?? 0) + ($salesReturns->get($id) ?? 0);
             }
 
-            
-            if ($acc->purchase == 1) {
-                $bal = $acc->opening_balance + ($credit - $debit);
+            $signedOb = $acc->getSignedOpeningBalance();
+
+            if ($acc->purchase == 1) { // CR-normal (Supplier)
+                $bal = $signedOb + ($credit - $debit);
                 if ($bal >= 0) $totalCR += $bal; else $totalDR += abs($bal);
             } else {
-                $bal = $acc->opening_balance + ($debit - $credit);
+                $bal = $signedOb + ($debit - $credit);
                 if ($bal >= 0) $totalDR += $bal; else $totalCR += abs($bal);
             }
-
         }
-        
+
         return ['dr' => $totalDR, 'cr' => $totalCR];
     }
 
@@ -1951,7 +1957,7 @@ class ReportBuilder
         $fromDate = $fromDate ?? date('Y-m-d', strtotime('-30 days'));
         $toDate = $toDate ?? date('Y-m-d');
 
-        $query = Payment::with(['account', 'paymentAccount'])
+        $query = Payment::with(['account.accountType', 'paymentAccount'])
             ->where('type', $type)
             ->whereBetween('date', [$fromDate, $toDate]);
 
@@ -2023,10 +2029,17 @@ class ReportBuilder
             
             $net = 0;
             if ($accId && isset($partyBalances[$accId])) {
-                $opening = (float)($p->account->opening_balance ?? 0);
-                // Calculate Net Balance: Opening + Net Debit - Net Credit
+                // Use signed opening balance so DR/CR type is respected
+                $opening = $p->account ? $p->account->getSignedOpeningBalance() : 0.0;
                 $balData = $partyBalances[$accId];
-                $net = $opening + $balData['dr'] - $balData['cr'];
+                // Determine orientation from account purchase flag
+                if ($p->account && $p->account->purchase) {
+                    // CR-normal (Supplier): CR - DR gives positive payable balance
+                    $net = $opening + $balData['cr'] - $balData['dr'];
+                } else {
+                    // DR-normal (Customer): DR - CR gives positive receivable balance
+                    $net = $opening + $balData['dr'] - $balData['cr'];
+                }
             }
 
             return [
@@ -2191,20 +2204,22 @@ class ReportBuilder
                 $payStatsOpen = $openAssetPayments->get($id);
                 $openDrRaw = $payStatsOpen->receipts ?? 0;
                 $openCrRaw = $payStatsOpen->payments ?? 0;
-                
-                $openBal = $acc->opening_balance + ($openDrRaw - $openCrRaw);
+
+                $openBal = $acc->getSignedOpeningBalance() + ($openDrRaw - $openCrRaw);
                 $openDr = $openBal >= 0 ? $openBal : 0;
                 $openCr = $openBal < 0 ? abs($openBal) : 0;
             } else {
                 $openDrRaw = (float)($openSales[$id] ?? 0) + (float)($openPaymentsPaid[$id] ?? 0) + (float)($openPurchaseReturns[$id] ?? 0);
                 $openCrRaw = (float)($openPurchases[$id] ?? 0) + (float)($openPaymentsRec[$id] ?? 0) + (float)($openSalesReturns[$id] ?? 0);
-                
-                if ($acc->purchase == 1) { // Payable oriented
-                    $openBal = $acc->opening_balance + ($openCrRaw - $openDrRaw);
+
+                $signedOb = $acc->getSignedOpeningBalance();
+
+                if ($acc->purchase == 1) { // CR-normal (Supplier)
+                    $openBal = $signedOb + ($openCrRaw - $openDrRaw);
                     $openDr = $openBal < 0 ? abs($openBal) : 0;
                     $openCr = $openBal >= 0 ? $openBal : 0;
-                } else { // Receivable oriented
-                    $openBal = $acc->opening_balance + ($openDrRaw - $openCrRaw);
+                } else { // DR-normal (Customer / Other)
+                    $openBal = $signedOb + ($openDrRaw - $openCrRaw);
                     $openDr = $openBal >= 0 ? $openBal : 0;
                     $openCr = $openBal < 0 ? abs($openBal) : 0;
                 }
@@ -2330,11 +2345,12 @@ class ReportBuilder
             
             if (!$excludeAssets && in_array($acc->type, [1, 2, 14])) {
                 $payStats = $assetPayments->get($id);
-                // Receiving money to cash means Dr.
+                // Receiving money to cash/bank means DR (asset increases)
                 $dr = $payStats->receipts ?? 0;
                 $cr = $payStats->payments ?? 0;
-                
-                $bal = $acc->opening_balance + ($dr - $cr);
+
+                // getSignedOpeningBalance() returns positive for DR-type OB on asset accounts
+                $bal = $acc->getSignedOpeningBalance() + ($dr - $cr);
                 if ($bal >= 0) {
                     $debit = $bal; $credit = 0;
                 } else {
@@ -2343,14 +2359,19 @@ class ReportBuilder
             } else {
                 $dr = (float)($sales[$id] ?? 0) + (float)($paymentsPaid[$id] ?? 0) + (float)($purchaseReturns[$id] ?? 0);
                 $cr = (float)($purchases[$id] ?? 0) + (float)($paymentsRec[$id] ?? 0) + (float)($salesReturns[$id] ?? 0);
-                
-                if ($acc->purchase == 1) { // Payable oriented
-                    $bal = $acc->opening_balance + ($cr - $dr);
-                    if ($bal >= 0) { $debit = 0; $credit = $bal; } 
+
+                // getSignedOpeningBalance():
+                //   Suppliers: returns +OB for CR-type, -OB for DR-type
+                //   Customers: returns +OB for DR-type, -OB for CR-type
+                $signedOb = $acc->getSignedOpeningBalance();
+
+                if ($acc->purchase == 1) { // CR-normal (Supplier)
+                    $bal = $signedOb + ($cr - $dr);
+                    if ($bal >= 0) { $debit = 0; $credit = $bal; }
                     else { $debit = abs($bal); $credit = 0; }
-                } else { // Receivable oriented
-                    $bal = $acc->opening_balance + ($dr - $cr);
-                    if ($bal >= 0) { $debit = $bal; $credit = 0; } 
+                } else { // DR-normal (Customer / Other)
+                    $bal = $signedOb + ($dr - $cr);
+                    if ($bal >= 0) { $debit = $bal; $credit = 0; }
                     else { $debit = 0; $credit = abs($bal); }
                 }
             }

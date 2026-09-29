@@ -985,7 +985,7 @@ class PaymentController extends Controller implements HasMiddleware
             if ($type === 'customers') {
                 $totalSalesVal = (float) $account->sales()->sum('net_total') - (float) $account->sales()->sum('extra_discount');
                 $totalReturnsVal = (float) $account->salesReturns()->sum('net_total') - (float) $account->salesReturns()->sum('extra_discount');
-                $totalSalesOrPurchases = $totalSalesVal - $totalReturnsVal + (float) $account->opening_balance;
+                $totalSalesOrPurchases = $totalSalesVal - $totalReturnsVal + $account->getSignedOpeningBalance();
 
                 $totalDiscountVal = (float) $account->partyPayments()->where('type', 'RECEIPT')
                     ->where(function($q) {
@@ -1017,7 +1017,7 @@ class PaymentController extends Controller implements HasMiddleware
             } elseif ($type === 'supplier') {
                 $totalPurchasesVal = (float) $account->purchases()->sum('net_total') - (float) $account->purchases()->sum('extra_discount');
                 $totalReturnsVal = (float) $account->purchaseReturns()->sum('net_total') - (float) $account->purchaseReturns()->sum('extra_discount');
-                $totalSalesOrPurchases = $totalPurchasesVal - $totalReturnsVal + (float) $account->opening_balance;
+                $totalSalesOrPurchases = $totalPurchasesVal - $totalReturnsVal + $account->getSignedOpeningBalance();
 
                 $totalDiscountVal = (float) $account->partyPayments()->where('type', 'PAYMENT')
                     ->where(function($q) {
@@ -1065,7 +1065,7 @@ class PaymentController extends Controller implements HasMiddleware
                         $totalReceivedOrPaid += ($paymentObj->amount + $paymentObj->discount);
                     }
                 }
-                $totalSalesOrPurchases = (float)$account->opening_balance;
+                $totalSalesOrPurchases = $account->getSignedOpeningBalance();
                 $totalBalance = $netLedgerBalance;
             } elseif ($type === 'drawings') {
                 $paymentsQuery = $account->partyPayments()->where('type', 'PAYMENT')
@@ -1087,7 +1087,7 @@ class PaymentController extends Controller implements HasMiddleware
                         $totalReceivedOrPaid += ($paymentObj->amount + $paymentObj->discount);
                     }
                 }
-                $totalSalesOrPurchases = (float)$account->opening_balance;
+                $totalSalesOrPurchases = $account->getSignedOpeningBalance();
                 $totalBalance = $netLedgerBalance;
             } elseif (in_array($type, ['bank', 'cash', 'cheque in hand'])) {
                 $baseQuery = $account->financialPayments()

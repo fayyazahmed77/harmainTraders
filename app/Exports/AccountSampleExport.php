@@ -35,6 +35,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
                     'type_name' => 'Customers',
                     'category_name' => '',
                     'opening_balance' => '0.00',
+                    'opening_balance_type' => 'DR',
                     'credit_limit' => '500000.00',
                     'aging_days' => '30',
                     'item_category' => '1',
@@ -72,6 +73,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
                     'type_name' => 'Supplier',
                     'category_name' => 'Pharma Manufacturer',
                     'opening_balance' => '0.00',
+                    'opening_balance_type' => 'CR',
                     'credit_limit' => '0.00',
                     'aging_days' => '45',
                     'item_category' => '',
@@ -123,6 +125,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
                 'type_name' => $typeRel ? $typeRel->name : ($acc->type ?? ''),
                 'category_name' => $catRel ? $catRel->name : ($acc->category ?? ''),
                 'opening_balance' => (string)($acc->opening_balance ?? '0.00'),
+                'opening_balance_type' => (string)($acc->opening_balance_type ?? 'DR'),
                 'credit_limit' => (string)($acc->credit_limit ?? '0.00'),
                 'aging_days' => (string)($acc->aging_days ?? '0'),
                 'item_category' => $acc->item_category !== null ? (string)$acc->item_category : '',
@@ -165,6 +168,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
             'Account Type*',
             'Category Name',
             'Opening Balance',
+            'Opening Balance Type (DR/CR)',
             'Credit Limit',
             'Aging Days',
             'Item Category (1-7)',
@@ -206,36 +210,37 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
             'C' => 18, // Account Type
             'D' => 20, // Category Name
             'E' => 16, // Opening Balance
-            'F' => 16, // Credit Limit
-            'G' => 12, // Aging Days
-            'H' => 18, // Item Category
-            'I' => 22, // Salesman Name
-            'J' => 20, // Booker Name
-            'K' => 16, // Country
-            'L' => 16, // Province
-            'M' => 16, // City
-            'N' => 16, // Area
-            'O' => 16, // Sub-Area
-            'P' => 30, // Address 1
-            'Q' => 25, // Address 2
-            'R' => 16, // Mobile
-            'S' => 16, // Telephone 1
-            'T' => 16, // Telephone 2
-            'U' => 14, // Fax
-            'V' => 18, // GST
-            'W' => 16, // NTN
-            'X' => 18, // CNIC
-            'Y' => 16, // Opening Date
-            'Z' => 16, // FBR Date
-            'AA' => 20, // Note Head
-            'AB' => 25, // Remarks
-            'AC' => 20, // Regards
-            'AD' => 12, // ATS %
-            'AE' => 14, // ATS Type
-            'AF' => 16, // Purchase
-            'AG' => 16, // Cashbank
-            'AH' => 15, // Sale
-            'AI' => 15, // Status
+            'F' => 18, // Opening Balance Type
+            'G' => 16, // Credit Limit
+            'H' => 12, // Aging Days
+            'I' => 18, // Item Category
+            'J' => 22, // Salesman Name
+            'K' => 20, // Booker Name
+            'L' => 16, // Country
+            'M' => 16, // Province
+            'N' => 16, // City
+            'O' => 16, // Area
+            'P' => 16, // Sub-Area
+            'Q' => 30, // Address 1
+            'R' => 25, // Address 2
+            'S' => 16, // Mobile
+            'T' => 16, // Telephone 1
+            'U' => 16, // Telephone 2
+            'V' => 14, // Fax
+            'W' => 18, // GST
+            'X' => 16, // NTN
+            'Y' => 18, // CNIC
+            'Z' => 16, // Opening Date
+            'AA' => 16, // FBR Date
+            'AB' => 20, // Note Head
+            'AC' => 25, // Remarks
+            'AD' => 20, // Regards
+            'AE' => 12, // ATS %
+            'AF' => 14, // ATS Type
+            'AG' => 16, // Purchase
+            'AH' => 16, // Cashbank
+            'AI' => 15, // Sale
+            'AJ' => 15, // Status
         ];
     }
 
@@ -244,7 +249,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
         $highestRow = max($sheet->getHighestRow(), 3);
 
         // Header Row Styling
-        $sheet->getStyle('A1:AI1')->applyFromArray([
+        $sheet->getStyle('A1:AJ1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -264,7 +269,7 @@ class AccountSampleExport implements FromCollection, WithHeadings, WithStyles, W
         $sheet->getRowDimension(1)->setRowHeight(28);
 
         // Data rows styling
-        $sheet->getStyle("A2:AI{$highestRow}")->applyFromArray([
+        $sheet->getStyle("A2:AJ{$highestRow}")->applyFromArray([
             'font' => ['name' => 'Calibri', 'size' => 10],
             'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
         ]);

@@ -72,7 +72,10 @@ class PaymentAccountingService
             $totalPaymentsSettlement += self::getRecognizedNetSettlement($p);
         }
 
-        return (float)$account->opening_balance + $totalSales + $totalPaymentsSettlement - $totalReturns - $totalReceiptsSettlement;
+        // getSignedOpeningBalance() returns:
+        //   +OB if customer has DR opening (money owed to us) → adds to balance
+        //   -OB if customer has CR opening (advance received) → reduces balance
+        return $account->getSignedOpeningBalance() + $totalSales + $totalPaymentsSettlement - $totalReturns - $totalReceiptsSettlement;
     }
 
     /**
@@ -103,7 +106,10 @@ class PaymentAccountingService
             $totalReceiptsSettlement += self::getRecognizedNetSettlement($r);
         }
 
-        return (float)$account->opening_balance + $totalPurchases + $totalReceiptsSettlement - $totalReturns - $totalPaymentsSettlement;
+        // getSignedOpeningBalance() returns:
+        //   +OB if supplier has CR opening (money we owe supplier) → adds to balance
+        //   -OB if supplier has DR opening (advance paid to supplier) → reduces balance
+        return $account->getSignedOpeningBalance() + $totalPurchases + $totalReceiptsSettlement - $totalReturns - $totalPaymentsSettlement;
     }
 
     /**

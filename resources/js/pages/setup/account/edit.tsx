@@ -40,8 +40,10 @@ import {
   Globe2,
   Flag,
   Save,
-  RotateCcw
+  RotateCcw,
+  Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppearance } from "@/hooks/use-appearance";
 
 const PREMIUM_ROUNDING_MD = "rounded-xl";
@@ -121,6 +123,7 @@ interface AccountForm {
   cashbank: boolean;
   sale: boolean;
   opening_balance: string | number;
+  opening_balance_type?: string;
   address1: string;
   address2: string;
   telephone1: string;
@@ -164,6 +167,86 @@ interface EditProps {
   accountTypes: any[];
   accountCategories: any[];
 }
+
+const getDrCrHelp = (typeName?: string) => {
+  const t = (typeName || "").toLowerCase();
+
+  if (t.includes("customer")) {
+    return {
+      dr: {
+        title: "DR — Customer Receivable (Normal)",
+        desc: "Customer owes this amount to the business from previous sales/invoices. Increases total receivables.",
+      },
+      cr: {
+        title: "CR — Customer Advance (Credit)",
+        desc: "Customer has already paid in advance or has an overpayment credit with you. Treated as a customer credit/advance.",
+      },
+    };
+  }
+
+  if (t.includes("supplier")) {
+    return {
+      dr: {
+        title: "DR — Supplier Advance (Debit)",
+        desc: "You have already paid this amount in advance to the supplier. Treated as an advance debit.",
+      },
+      cr: {
+        title: "CR — Supplier Payable (Normal)",
+        desc: "You owe this amount to the supplier for previous purchases. Increases total payables.",
+      },
+    };
+  }
+
+  if (t.includes("bank") || t.includes("cash") || t.includes("cheque")) {
+    return {
+      dr: {
+        title: "DR — Available Funds (Normal)",
+        desc: "Positive liquid funds currently held in this cash/bank account. Treated as an active asset.",
+      },
+      cr: {
+        title: "CR — Bank Overdraft / Negative (Liability)",
+        desc: "Account is in an overdraft or deficit condition. Treated as a short-term liability owed to the bank.",
+      },
+    };
+  }
+
+  if (t.includes("capital") || t.includes("reserve") || t.includes("amanat")) {
+    return {
+      dr: {
+        title: "DR — Capital Deficit (Debit)",
+        desc: "Deficit balance or negative equity adjustment against invested capital.",
+      },
+      cr: {
+        title: "CR — Invested Capital / Equity (Normal)",
+        desc: "Capital invested into the business by the owner/investor, or trust payable. Treated as equity/liability.",
+      },
+    };
+  }
+
+  if (t.includes("drawing")) {
+    return {
+      dr: {
+        title: "DR — Owner Drawings (Normal)",
+        desc: "Funds withdrawn from the business by the owner for personal use.",
+      },
+      cr: {
+        title: "CR — Drawings Reimbursement",
+        desc: "Funds returned by owner to offset previous drawings.",
+      },
+    };
+  }
+
+  return {
+    dr: {
+      title: "DR — Debit Balance",
+      desc: "Asset, money receivable, or positive balance owed to you.",
+    },
+    cr: {
+      title: "CR — Credit Balance",
+      desc: "Liability, money payable, or obligation owed by you to others.",
+    },
+  };
+};
 
 export default function Edit({
   account,
@@ -254,6 +337,7 @@ export default function Edit({
   const isCustomer = accountType?.label === "Customers";
   const isSupplier = accountType?.label === "Supplier";
   const isCompany = accountType?.label === "Company";
+  const drCrHelp = getDrCrHelp(accountType?.label);
 
   const { appearance } = useAppearance();
   const isDark = appearance === 'dark' || (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -349,6 +433,7 @@ export default function Edit({
     category: account.category ?? "",
     cnic: account.cnic ?? "",
     opening_balance: account.opening_balance ?? "",
+    opening_balance_type: account.opening_balance_type ?? "DR",
     address1: account.address1 ?? "",
     address2: account.address2 ?? "",
     telephone1: account.telephone1 ?? "",
@@ -746,7 +831,12 @@ export default function Edit({
                         value={accountType}
                         onChange={(opt) => {
                           setAccountType(opt as Option);
-                          setData("type", opt ? String((opt as Option).value) : "");
+                          const isCreditNormal = (opt as Option)?.label === "Supplier" || ["Capital", "Amanat Payable", "Reserve"].includes((opt as Option)?.label || "");
+                          setData((prev: any) => ({
+                            ...prev,
+                            type: opt ? String((opt as Option).value) : "",
+                            opening_balance_type: prev.opening_balance_type || (isCreditNormal ? "CR" : "DR"),
+                          }));
                         }}
                         options={accountTypeOptions}
                         placeholder="Select type"
@@ -960,15 +1050,77 @@ export default function Edit({
 
                       <div className="grid grid-cols-2 gap-4">
                         <TechLabel label="Opening Balance" icon={Building2} required error={errors.opening_balance}>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              value={data.opening_balance}
-                              onChange={(e) => onInputChange("opening_balance", e.target.value)}
-                              placeholder="0"
-                              className={`h-10 pl-8 font-mono font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
-                            />
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700 font-bold text-xs">PKR</span>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={data.opening_balance}
+                                onChange={(e) => onInputChange("opening_balance", e.target.value)}
+                                placeholder="0"
+                                className={`h-10 pl-8 font-mono font-bold text-sm bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`}
+                              />
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-700 font-bold text-xs">PKR</span>
+                            </div>
+                            <div className="flex rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => onInputChange("opening_balance_type", "DR")}
+                                    className={cn(
+                                      "px-2.5 py-1 text-xs font-bold rounded transition-all cursor-pointer",
+                                      (data.opening_balance_type || "DR") === "DR"
+                                        ? "bg-blue-600 text-white shadow-sm"
+                                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                    )}
+                                  >
+                                    DR
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-xs p-2.5 bg-zinc-900 text-white border border-zinc-700 shadow-xl z-50">
+                                  <p className="font-bold text-blue-400 mb-0.5">{drCrHelp.dr.title}</p>
+                                  <p className="text-[11px] leading-snug text-zinc-300">{drCrHelp.dr.desc}</p>
+                                </TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => onInputChange("opening_balance_type", "CR")}
+                                    className={cn(
+                                      "px-2.5 py-1 text-xs font-bold rounded transition-all cursor-pointer",
+                                      data.opening_balance_type === "CR"
+                                        ? "bg-amber-600 text-white shadow-sm"
+                                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                    )}
+                                  >
+                                    CR
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-xs p-2.5 bg-zinc-900 text-white border border-zinc-700 shadow-xl z-50">
+                                  <p className="font-bold text-amber-400 mb-0.5">{drCrHelp.cr.title}</p>
+                                  <p className="text-[11px] leading-snug text-zinc-300">{drCrHelp.cr.desc}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+
+                          {/* Real-time contextual guide beneath Opening Balance input */}
+                          <div className="mt-1 text-[11px] font-medium leading-tight">
+                            {(data.opening_balance_type || "DR") === "DR" ? (
+                              <span className="text-blue-600 dark:text-blue-400 flex items-start gap-1">
+                                <Info size={12} className="shrink-0 mt-0.5" />
+                                <span>{drCrHelp.dr.desc}</span>
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400 flex items-start gap-1">
+                                <Info size={12} className="shrink-0 mt-0.5" />
+                                <span>{drCrHelp.cr.desc}</span>
+                              </span>
+                            )}
                           </div>
                         </TechLabel>
                         <TechLabel label="Credit Limit" icon={ShieldCheck} required={isCustomer} error={errors.credit_limit}>

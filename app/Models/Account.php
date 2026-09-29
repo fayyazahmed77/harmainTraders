@@ -18,6 +18,7 @@ class Account extends Model
         'cashbank',
         'sale',
         'opening_balance',
+        'opening_balance_type',
         'address1',
         'address2',
         'telephone1',
@@ -53,13 +54,51 @@ class Account extends Model
     protected $appends = ['current_balance', 'guest_link', 'image_url'];
 
     protected $casts = [
-        'purchase' => 'boolean',
-        'cashbank' => 'boolean',
-        'sale' => 'boolean',
-        'status' => 'boolean',
-        'opening_balance' => 'decimal:2',
-        'credit_limit' => 'decimal:2',
+        'purchase'             => 'boolean',
+        'cashbank'             => 'boolean',
+        'sale'                 => 'boolean',
+        'status'               => 'boolean',
+        'opening_balance'      => 'decimal:2',
+        'opening_balance_type' => 'string',
+        'credit_limit'         => 'decimal:2',
     ];
+
+    /**
+     * Return the algebraically signed opening balance for use in ledger formulas.
+     *
+     * Convention used across ALL balance calculations:
+     *   - Positive value  → increases the account's natural balance
+     *   - Negative value  → decreases the account's natural balance
+     *
+     * DR-normal accounts (Customers, Cash, Bank, Expense, Drawings …):
+     *   DR opening_balance_type → +OB   (money owed to us / asset)
+     *   CR opening_balance_type → -OB   (advance received / liability)
+     *
+     * CR-normal accounts (Suppliers, Capital, Reserve, Amanat …):
+     *   CR opening_balance_type → +OB   (money owed by us)
+     *   DR opening_balance_type → -OB   (advance paid / debit balance)
+     */
+    public function getSignedOpeningBalance(): float
+    {
+        $raw  = (float) ($this->opening_balance ?? 0);
+        $type = strtoupper($this->opening_balance_type ?? 'DR');
+
+        // CR-normal accounts: Supplier, Capital, Reserve, Amanat Payable
+        $isCrNormal = $this->purchase == 1
+            || in_array($this->type, [9, 17, 18]) // Capital / Reserve / Amanat types
+            || in_array(strtolower($this->accountType->name ?? ''), ['capital', 'amanat payable', 'reserve']);
+
+        if ($isCrNormal) {
+            // Positive stored value + CR type = normal supplier/capital balance (+)
+            // Positive stored value + DR type = advance paid / debit balance (-)
+            return $type === 'CR' ? $raw : -$raw;
+        }
+
+        // DR-normal accounts (customers, cash, bank, expense, drawings, other)
+        // Positive stored value + DR type = normal receivable / asset (+)
+        // Positive stored value + CR type = advance received / credit balance (-)
+        return $type === 'DR' ? $raw : -$raw;
+    }
 
     public function scopeActive($query)
     {
@@ -166,7 +205,7 @@ class Account extends Model
             $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')->sum('amount');
             $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')->sum('amount');
 
-            return (float)$this->opening_balance + $totalIn - $totalOut;
+            return $this->getSignedOpeningBalance() + $totalIn - $totalOut;
         } elseif (in_array($type, ['bank', 'cash'])) {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {
@@ -194,7 +233,7 @@ class Account extends Model
 
             $partyOut = (clone $partyQuery)->where('type', 'RECEIPT')->sum('amount');
             
-            return (float)$this->opening_balance + $totalIn - $totalOut + $partyIn - $partyOut;
+            return $this->getSignedOpeningBalance() + $totalIn - $totalOut + $partyIn - $partyOut;
         } elseif (in_array($type, ['expense', 'other'])) {
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {
@@ -206,7 +245,7 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return (float)$this->opening_balance + $totalPayments - $totalReceipts;
+            return $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
         } elseif (in_array($type, ['capital', 'amanat payable', 'reserve']) || in_array($this->type, [9, 17, 18])) {
             $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
                 ->where(function($q) {
@@ -218,7 +257,7 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return (float)$this->opening_balance + $totalReceipts - $totalPayments;
+            return $this->getSignedOpeningBalance() + $totalReceipts - $totalPayments;
         } elseif ($type === 'drawings' || $this->type == 8) {
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {
@@ -230,10 +269,10 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return (float)$this->opening_balance + $totalPayments - $totalReceipts;
+            return $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
         }
         
-        return (float)$this->opening_balance;
+        return $this->getSignedOpeningBalance();
     }
 
     public function assignedCompanies()
