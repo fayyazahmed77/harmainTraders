@@ -86,6 +86,7 @@ export function DueBillsReportView({
                                                 <th className="px-3 py-2 border-r border-border w-[80px] text-center">Status</th>
                                                 <th className="px-4 py-2 border-r border-border w-[100px] text-center">Due Date</th>
                                                 <th className="px-3 py-2 border-r border-border w-[60px] text-center">Days</th>
+                                                <th className="px-4 py-2 border-r border-border text-right w-[110px]">Opening Balance</th>
                                                 <th className="px-4 py-2 border-r border-border text-right w-[100px]">Bill Amt</th>
                                                 <th className="px-4 py-2 border-r border-border text-right w-[100px]">Paid</th>
                                                 <th className="px-4 py-2 border-r border-border text-right w-[100px]">Remaining</th>
@@ -110,6 +111,9 @@ export function DueBillsReportView({
                                                     </td>
                                                     <td className="px-4 py-2 text-center tabular-nums text-text-muted border-r border-border/10">{format(new Date(row.due_date), 'dd MMM yy').toUpperCase()}</td>
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
+                                                    <td className="px-4 py-2 text-right tabular-nums text-text-secondary border-r border-border/10">
+                                                        {i === 0 ? (row.opening_balance ? `${formatCurrency(row.opening_balance)}${row.opening_balance_type === 'CR' ? ' CR' : ''}` : '0') : '—'}
+                                                    </td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.paid)}</td>
                                                     <td className={cn(
@@ -128,7 +132,7 @@ export function DueBillsReportView({
                                                 <td colSpan={2} className="px-4 py-2 font-black tabular-nums border-r border-border">{formatCurrency(summary.party_due_amount)}</td>
                                                 <td className="px-4 py-2 font-black text-text-muted uppercase text-[10px] border-r border-border text-right">Credit Days</td>
                                                 <td className="px-4 py-2 font-black tabular-nums border-r border-border text-right">{summary.credit_days}</td>
-                                                <td className="px-4 py-2 font-black text-text-muted uppercase text-[10px] bg-card border-l-4 border-l-border text-right">
+                                                <td colSpan={3} className="px-4 py-2 font-black text-text-muted uppercase text-[10px] bg-card border-l-4 border-l-border text-right">
                                                     Limit: {summary.credit_limit > 0 ? formatCurrency(summary.credit_limit) : '**********'}
                                                 </td>
                                             </tr>

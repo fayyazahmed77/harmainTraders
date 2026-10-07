@@ -181,14 +181,15 @@ if (file_exists($logo_path)) {
             <table class="ledger">
                 <thead>
                     <tr>
-                        <th width="10%">Date</th>
+                        <th width="9%">Date</th>
                         <th width="8%">Voucher #</th>
-                        <th width="30%">Party Name</th>
-                        <th width="8%">Status</th>
-                        <th width="10%">Due Date</th>
+                        <th width="24%">Party Name</th>
+                        <th width="7%">Status</th>
+                        <th width="9%">Due Date</th>
                         <th width="5%">Days</th>
-                        <th width="10%">Bill Amt</th>
-                        <th width="10%">Paid</th>
+                        <th width="10%">Opening Balance</th>
+                        <th width="9%">Bill Amt</th>
+                        <th width="9%">Paid</th>
                         <th width="10%">Remaining</th>
                         <th width="10%">Balance</th>
                     </tr>
@@ -213,6 +214,7 @@ if (file_exists($logo_path)) {
                         @endif
                         <td class="text-center">{{ strtoupper(date('d-M-y', strtotime($bill['due_date']))) }}</td>
                         <td class="text-center">{{ $bill['days'] }}</td>
+                        <td class="text-right">{{ $loop->first ? (isset($bill['opening_balance']) && $bill['opening_balance'] > 0 ? formatNum($bill['opening_balance']) . (($bill['opening_balance_type'] ?? '') === 'CR' ? ' CR' : '') : '0') : '—' }}</td>
                         <td class="text-right">{{ formatNum($bill['bill_amt']) }}</td>
                         <td class="text-right">{{ formatNum($bill['paid']) }}</td>
                         <td class="text-right">{{ formatNum($bill['remaining']) }}</td>

@@ -175,6 +175,8 @@ class StockReportBuilder
             'items.packing_qty',
             'items.retail',
             'items.trade_price as base_tp',
+            'items.stock_1 as opening_stock',
+            'items.stock_2 as opening_stock_pcs',
             DB::raw('COALESCE(p.total, 0) + COALESCE(sr.total, 0) as in_qty'),
             DB::raw('COALESCE(s.total, 0) + COALESCE(pr.total, 0) as out_qty'),
             DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
@@ -191,21 +193,39 @@ class StockReportBuilder
             $row = (array)$row;
             
             // Apply Valuation Logic
-            $row['rate'] = ($filters['valuation'] === 'average') ? $row['avg_rate'] : $row['last_rate'];
+            if ($filters['valuation'] === 'average') {
+                $row['rate'] = $row['avg_rate'];
+            } elseif ($filters['valuation'] === 'opening_stock') {
+                $row['rate'] = $row['base_tp'];
+            } else {
+                $row['rate'] = $row['last_rate'];
+            }
             if (!$row['rate'] || $row['rate'] == 0) $row['rate'] = $row['base_tp'];
 
-            $row['amount'] = ($row['balance_qty'] / ($row['packing_qty'] ?: 1)) * $row['rate'];
+            if ($filters['valuation'] === 'opening_stock') {
+                $packing = max(1, intval($row['packing_qty'] ?? 1));
+                $opFull = floatval($row['opening_stock'] ?? 0);
+                $opPcs = floatval($row['opening_stock_pcs'] ?? 0);
+                $row['amount'] = ($opFull * floatval($row['rate'])) + ($packing > 0 ? ($opPcs / $packing) * floatval($row['rate']) : 0);
+            } else {
+                $row['amount'] = ($row['balance_qty'] / ($row['packing_qty'] ?: 1)) * $row['rate'];
+            }
             
             return $row;
         });
 
         // Apply Calculation Filters
         if (!$filters['all']) {
+            $isOpeningValuation = ($filters['valuation'] === 'opening_stock');
             if ($filters['remove_zero']) {
-                $data = $data->filter(fn($r) => floatval($r['balance_qty']) != 0);
+                $data = $data->filter(fn($r) => $isOpeningValuation 
+                    ? (floatval($r['opening_stock']) != 0 || floatval($r['opening_stock_pcs']) != 0) 
+                    : floatval($r['balance_qty']) != 0);
             }
             if ($filters['show_zero']) {
-                $data = $data->filter(fn($r) => floatval($r['balance_qty']) == 0);
+                $data = $data->filter(fn($r) => $isOpeningValuation 
+                    ? (floatval($r['opening_stock']) == 0 && floatval($r['opening_stock_pcs']) == 0) 
+                    : floatval($r['balance_qty']) == 0);
             }
             if ($filters['reorder_level']) {
                 $data = $data->filter(fn($r) => floatval($r['balance_qty']) < (floatval($r['reorder_level'] ?? 0)));
@@ -336,13 +356,22 @@ class StockReportBuilder
             $account = DB::table('accounts')->where('id', $filters['party_id'])->first();
             $accountType = $account->type ?? null;
             
-            if ($accountType == 3 || (!empty($account->sale))) {
+            $hasSale = ($accountType == 3 || (!empty($account->sale)));
+            $hasPurchase = ($accountType == 6 || (!empty($account->purchase)));
+
+            if ($hasSale && $hasPurchase) {
+                // Multi-role: include both sales and purchases
+                $sales->where('sales.customer_id', $filters['party_id']);
+                $saleReturns->where('sales_returns.customer_id', $filters['party_id']);
+                $purchases->where('purchases.supplier_id', $filters['party_id']);
+                $purchaseReturns->where('purchase_returns.supplier_id', $filters['party_id']);
+            } elseif ($hasSale) {
                 // Customer: filter sales and sale returns only
                 $sales->where('sales.customer_id', $filters['party_id']);
                 $saleReturns->where('sales_returns.customer_id', $filters['party_id']);
                 $purchases->whereRaw('1=0');
                 $purchaseReturns->whereRaw('1=0');
-            } elseif ($accountType == 6 || (!empty($account->purchase))) {
+            } elseif ($hasPurchase) {
                 // Supplier: filter purchases and purchase returns only
                 $purchases->where('purchases.supplier_id', $filters['party_id']);
                 $purchaseReturns->where('purchase_returns.supplier_id', $filters['party_id']);
@@ -497,9 +526,20 @@ class StockReportBuilder
     {
         $data = $this->summary($toDate, $filters);
         
-        $available = array_filter($data, function($row) {
-            return $row['balance_qty'] > 0;
-        });
+        $isOpeningStock = (($filters['valuation'] ?? '') === 'opening_stock');
+
+        if ($isOpeningStock) {
+            $available = array_filter($data, function($row) use ($filters) {
+                if (!empty($filters['show_zero'])) {
+                    return true;
+                }
+                return (floatval($row['opening_stock'] ?? 0) > 0) || (floatval($row['opening_stock_pcs'] ?? 0) > 0);
+            });
+        } else {
+            $available = array_filter($data, function($row) {
+                return $row['balance_qty'] > 0;
+            });
+        }
 
         if (empty($available)) return [];
 
@@ -518,14 +558,24 @@ class StockReportBuilder
             ->get()
             ->keyBy('item_id');
 
-        return array_values(array_map(function($row) use ($lastPurchases) {
+        return array_values(array_map(function($row) use ($lastPurchases, $isOpeningStock) {
             $lp = $lastPurchases->get($row['id']);
             $row['last_purchase_price'] = $lp ? $lp->last_purchase_price : 0;
             $row['last_supplier_name'] = $lp ? $lp->last_supplier_name : 'N/A';
             
             $packingQty = $row['packing_qty'] ?: 1;
-            $row['full_qty'] = floor($row['balance_qty'] / $packingQty);
-            $row['pcs_qty'] = $row['balance_qty'] % $packingQty;
+
+            if ($isOpeningStock) {
+                $opFull = floatval($row['opening_stock'] ?? 0);
+                $opPcs = floatval($row['opening_stock_pcs'] ?? 0);
+                $row['full_qty'] = $opFull;
+                $row['pcs_qty'] = $opPcs;
+                $row['balance_qty'] = ($opFull * $packingQty) + $opPcs;
+                $row['amount'] = ($opFull * floatval($row['rate'])) + ($packingQty > 0 ? ($opPcs / $packingQty) * floatval($row['rate']) : 0);
+            } else {
+                $row['full_qty'] = floor($row['balance_qty'] / $packingQty);
+                $row['pcs_qty'] = $row['balance_qty'] % $packingQty;
+            }
             
             return $row;
         }, $available));

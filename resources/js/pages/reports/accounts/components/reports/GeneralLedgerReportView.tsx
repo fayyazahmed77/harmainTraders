@@ -53,7 +53,7 @@ export function GeneralLedgerReportView({
 
     const renderBalance = (bal: number, orient: string) => {
         const numBal = Number(bal);
-        if (Math.abs(numBal) < 0.01) return 'CR';
+        if (Math.abs(numBal) < 0.01) return '0';
         const formatted = formatCurrency(Math.abs(numBal));
         const orientation = numBal > 0 ? orient.toUpperCase() : (orient === 'cr' ? 'DR' : 'CR');
         return `${formatted} ${orientation}`;

@@ -38,7 +38,11 @@ import {
     Phone,
     ChevronDown,
     ArrowRight,
-    Star
+    Star,
+    ArrowDownLeft,
+    ArrowUpRight,
+    Wallet,
+    Receipt
 } from "lucide-react";
 
 interface DashboardProps {
@@ -58,7 +62,11 @@ interface DashboardProps {
         totalOrdersMonth: number;
         cancelledOrdersMonth: number;
         currentMonthName: string;
+        totalReceivable?: number;
+        totalPayable?: number;
     };
+    totalReceivable?: number;
+    totalPayable?: number;
     orderChartData: { day: string, orders: number }[];
     fundsData: { name: string, value: number, color: string }[];
     salesRecoveries: {
@@ -75,7 +83,7 @@ interface DashboardProps {
     recentTransactions: { date: string, paymentVia: string, status: "Success" | "Failed" | "Pending", amount: number, party: string }[];
 }
 
-export default function DashboardPage({ dailySummary, stats, orderChartData, fundsData, salesRecoveries, postDateCheques, stockItems, stockSummary, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
+export default function DashboardPage({ dailySummary, stats, totalReceivable, totalPayable, orderChartData, fundsData, salesRecoveries, postDateCheques, stockItems, stockSummary, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
@@ -147,6 +155,87 @@ export default function DashboardPage({ dailySummary, stats, orderChartData, fun
 
                     {/* Daily Summary Strip */}
                     <DailySummaryStrip dailySummary={dailySummary} />
+
+                    {/* Financial Position: Total Receivable & Total Payable */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {/* Total Receivable Card */}
+                        <Card className="relative overflow-hidden border-emerald-200/80 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-500/10 via-white to-white dark:from-emerald-950/25 dark:via-zinc-900 dark:to-zinc-900 shadow-sm hover:shadow-md transition-all group">
+                            <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform" />
+                            <CardContent className="p-4 sm:p-5 relative z-10">
+                                <div className="flex items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+                                            <p className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                                Total Receivable
+                                            </p>
+                                        </div>
+                                        <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
+                                            {formatCurrency(stats.totalReceivable ?? totalReceivable ?? 0)}
+                                        </h3>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+                                            Net customer balance to be collected
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400 shrink-0 ml-3">
+                                        <ArrowDownLeft className="w-6 h-6" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                                        <Wallet className="w-3.5 h-3.5" /> Customer Ledger Inflow
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.get('/reports?report=receivable')}
+                                        className="text-xs font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/10 h-7 px-2.5 rounded-lg"
+                                    >
+                                        View Report <ArrowRight className="w-3 h-3 ml-1" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Total Payable Card */}
+                        <Card className="relative overflow-hidden border-rose-200/80 dark:border-rose-900/40 bg-gradient-to-br from-rose-500/10 via-white to-white dark:from-rose-950/25 dark:via-zinc-900 dark:to-zinc-900 shadow-sm hover:shadow-md transition-all group">
+                            <div className="absolute top-0 right-0 w-36 h-36 bg-rose-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform" />
+                            <CardContent className="p-4 sm:p-5 relative z-10">
+                                <div className="flex items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
+                                            <p className="text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                                                Total Payable
+                                            </p>
+                                        </div>
+                                        <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
+                                            {formatCurrency(stats.totalPayable ?? totalPayable ?? 0)}
+                                        </h3>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+                                            Net supplier balance to be paid
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-rose-500/10 dark:bg-rose-500/20 rounded-2xl text-rose-600 dark:text-rose-400 shrink-0 ml-3">
+                                        <ArrowUpRight className="w-6 h-6" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-rose-100 dark:border-rose-900/30 flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                                        <Receipt className="w-3.5 h-3.5" /> Supplier Ledger Outflow
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.get('/reports?report=payable')}
+                                        className="text-xs font-bold text-rose-700 hover:text-rose-800 dark:text-rose-400 hover:bg-rose-500/10 h-7 px-2.5 rounded-lg"
+                                    >
+                                        View Report <ArrowRight className="w-3 h-3 ml-1" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     {/* Top Stat Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

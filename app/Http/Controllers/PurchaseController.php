@@ -15,6 +15,7 @@ use App\Models\Chequebook;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\Rule;
 
 
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -99,12 +100,8 @@ class PurchaseController extends Controller implements HasMiddleware
         ];
 
         // Suppliers for Filter
-        // We can reuse Account with Type 'Supplier'.
-        $suppliers = Account::with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->where('name', 'Supplier');
-            })
-            ->select('id', 'title') // Assuming 'title' is name
+        $suppliers = Account::eligibleForPurchase()
+            ->select('id', 'title')
             ->get();
 
         return Inertia::render("daily/purchase/index", [
@@ -164,12 +161,9 @@ class PurchaseController extends Controller implements HasMiddleware
                 return $item;
             });
 
-        $accounts = Account::active()
+        $accounts = Account::eligibleForPurchase()
             ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id')
             ->with(['accountType:id,name', 'accountCategory:id,name'])
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Supplier','indirect expense']);
-            })
             ->get();
 
         $salemans = Saleman::select('id', 'name', 'code')->get();
@@ -189,12 +183,10 @@ class PurchaseController extends Controller implements HasMiddleware
 
         $firms = Firm::select('id', 'name', 'defult')->get();
 
-        $paymentAccounts = Account::active()
+        $paymentAccounts = Account::eligibleForCashBank()
             ->select('id', 'title', 'type', 'code')
             ->with('accountType:id,name')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-            })->get();
+            ->get();
 
         $customerCheques = Payment::where('type', 'RECEIPT')
             ->where('payment_method', 'Cheque')
@@ -225,7 +217,15 @@ class PurchaseController extends Controller implements HasMiddleware
             'date'            => 'required|date',
             'invoice'         => 'required|string',
             'code'            => 'nullable|string',
-            'supplier_id'     => 'required|integer',
+            'supplier_id'     => [
+                'required',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($q) {
+                    $q->where('purchase', 1)->where(function ($sub) {
+                        $sub->where('status', 1)->orWhere('status', true)->orWhereNull('status');
+                    });
+                }),
+            ],
             'salesman_id'     => 'nullable|integer',
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
@@ -550,11 +550,8 @@ class PurchaseController extends Controller implements HasMiddleware
 
             return $item;
         });
-        $accounts = Account::active()
+        $accounts = Account::eligibleForPurchase()
             ->with(['accountType', 'accountCategory'])
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Supplier','indirect expense']);
-            })
             ->get();
         $salemans = Saleman::get();
         $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
@@ -564,9 +561,7 @@ class PurchaseController extends Controller implements HasMiddleware
         $firms = Firm::select('id', 'name', 'defult')->get();
 
         // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
-        $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
-            $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-        })->get();
+        $paymentAccounts = Account::eligibleForCashBank()->with('accountType')->get();
 
         $customerCheques = Payment::where('type', 'RECEIPT')
             ->where('payment_method', 'Cheque')
@@ -597,7 +592,15 @@ class PurchaseController extends Controller implements HasMiddleware
             'date'            => 'required|date',
             'invoice'         => 'required|string',
             'code'            => 'nullable|string',
-            'supplier_id'     => 'required|integer',
+            'supplier_id'     => [
+                'required',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($q) {
+                    $q->where('purchase', 1)->where(function ($sub) {
+                        $sub->where('status', 1)->orWhere('status', true)->orWhereNull('status');
+                    });
+                }),
+            ],
             'salesman_id'     => 'nullable|integer',
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',

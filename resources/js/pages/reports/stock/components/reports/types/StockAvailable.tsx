@@ -12,11 +12,12 @@ export default function StockAvailable({ data, formatCurrency, params }: Props) 
     if (!data.length) return null;
 
     const totals = data.reduce((acc, row) => ({
+        opening: acc.opening + Number(row.opening_stock || 0),
         balance: acc.balance + Number(row.balance_qty || 0),
         amount: acc.amount + Number(row.amount || 0),
         full: acc.full + Number(row.full_qty || 0),
         pcs: acc.pcs + Number(row.pcs_qty || 0),
-    }), { balance: 0, amount: 0, full: 0, pcs: 0 });
+    }), { opening: 0, balance: 0, amount: 0, full: 0, pcs: 0 });
 
     return (
         <>
@@ -29,6 +30,7 @@ export default function StockAvailable({ data, formatCurrency, params }: Props) 
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Retail</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">L.P.P</TableHead>
                     <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic">Last Supplier</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Op. Stock</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Full</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">PCS</TableHead>
                     <TableHead className="py-4 px-6 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Balance</TableHead>
@@ -67,6 +69,9 @@ export default function StockAvailable({ data, formatCurrency, params }: Props) 
                                 {row.last_supplier_name}
                             </span>
                         </TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 text-[11px] tabular-nums">
+                            {Number(row.opening_stock || 0).toLocaleString()}
+                        </TableCell>
                         <TableCell className="py-4 px-4 text-right font-black text-text-primary text-[11px] tabular-nums">
                             {row.full_qty}
                         </TableCell>
@@ -83,6 +88,9 @@ export default function StockAvailable({ data, formatCurrency, params }: Props) 
                 <TableRow>
                     <TableCell colSpan={7} className="py-4 px-6 text-right text-[10px] uppercase tracking-widest text-text-muted">
                         Inventory Matrix Totals
+                    </TableCell>
+                    <TableCell className="py-4 px-4 text-right text-[11px] text-indigo-600 tabular-nums font-black">
+                        {totals.opening.toLocaleString()}
                     </TableCell>
                     <TableCell className="py-4 px-4 text-right text-[11px] text-text-primary tabular-nums">
                         {totals.full.toLocaleString()}

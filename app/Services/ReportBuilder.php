@@ -38,9 +38,10 @@ class ReportBuilder
         // 0. Fetch Account and determine type
         $account = Account::findOrFail($accountId);
         // orientation: 'dr' for Customers (Receivables), 'cr' for Suppliers (Payables)
-        // If it's both, we default to 'dr' or base it on the primary flag. 
-        // Here we'll use 'cr' if it's marked as purchase=1.
-        $orientation = $account->purchase == 1 ? 'cr' : 'dr';
+        $type = strtolower($account->accountType->name ?? '');
+        $isCreditNormal = in_array($type, ['supplier', 'capital', 'amanat payable', 'reserve'])
+            || in_array((int)$account->type, [6, 9, 17, 18]);
+        $orientation = $isCreditNormal ? 'cr' : 'dr';
 
         // 1. Calculate Opening Balance before $fromDate
         $openingBalance = $this->calculateOpeningBalance($accountId, $fromDate, $orientation, $params);
@@ -1120,9 +1121,11 @@ class ReportBuilder
         $accounts = $query->get();
 
         $data = $accounts->map(function ($account) use ($toDate, $filters) {
-            // Determine the orientation (Customer=dr, Supplier=cr)
-            // Priority: if sale=1, treat as Customer (dr)
-            $orientation = $account->sale == 1 ? 'dr' : 'cr';
+            // Determine the orientation (Customer=dr, Supplier=cr) based on account type
+            $accType = strtolower($account->accountType->name ?? '');
+            $isCrNormal = in_array($accType, ['supplier', 'capital', 'amanat payable', 'reserve'])
+                || in_array((int)$account->type, [6, 9, 17, 18]);
+            $orientation = $isCrNormal ? 'cr' : 'dr';
             
             $netBalance = $this->calculateOpeningBalance($account->id, date('Y-m-d', strtotime($toDate . ' +1 day')), $orientation, $filters);
 
@@ -1373,20 +1376,69 @@ class ReportBuilder
         foreach ($grouped as $customerId => $customerBills) {
             $sortedBills = $customerBills->sortBy('date')->values();
             
+            // Calculate opening balance for this customer
+            $customerAccount = Account::find($customerId);
+            $customerOpeningBalance = 0.0;
+            $customerOpeningBalanceType = 'DR';
+            if ($customerAccount) {
+                $signed = $customerAccount->getSignedOpeningBalance();
+                $customerOpeningBalance = abs($signed);
+                $customerOpeningBalanceType = $signed >= 0 ? 'DR' : 'CR';
+            }
+
             $cumulativeBalance = 0;
             $partyUnDueAmount = 0;
             $partyDueAmount = 0;
             
+            $remainingCrAdvance = ($customerOpeningBalanceType === 'CR') ? $customerOpeningBalance : 0.0;
+
+            if ($customerOpeningBalanceType === 'DR' && $customerOpeningBalance > 0) {
+                $partyDueAmount += $customerOpeningBalance;
+            }
+
             foreach ($sortedBills as $index => $bill) {
-                $rem = $bill['remaining'];
-                $cumulativeBalance += $rem;
+                $originalRem = (float)$bill['remaining'];
                 
+                if ($customerOpeningBalanceType === 'DR') {
+                    // Apply DR opening balance to the first bill's remaining and starting balance
+                    if ($index === 0) {
+                        $rem = $originalRem + $customerOpeningBalance;
+                        $cumulativeBalance = $rem;
+                    } else {
+                        $rem = $originalRem;
+                        $cumulativeBalance += $rem;
+                    }
+                } else {
+                    // CR opening balance (advance payment): offset against bills
+                    if ($remainingCrAdvance > 0) {
+                        $offset = min(max(0.0, $originalRem), $remainingCrAdvance);
+                        $rem = $originalRem - $offset;
+                        $remainingCrAdvance -= $offset;
+                    } else {
+                        $rem = $originalRem;
+                    }
+
+                    if ($index === 0) {
+                        $cumulativeBalance = $rem - $remainingCrAdvance;
+                    } else {
+                        $cumulativeBalance += $rem;
+                    }
+                }
+
+                $bill['remaining'] = $rem;
                 $bill['balance'] = $cumulativeBalance;
                 
+                // Attach opening balance to bills of this customer's group
+                $bill['opening_balance'] = $customerOpeningBalance;
+                $bill['opening_balance_type'] = $customerOpeningBalanceType;
+                $bill['is_first_for_customer'] = ($index === 0);
+
+                // Calculate due vs undue amounts
+                $billPortion = ($customerOpeningBalanceType === 'CR') ? $rem : $originalRem;
                 if ($bill['days'] > 0) {
-                    $partyDueAmount += $rem;
+                    $partyDueAmount += $billPortion;
                 } else {
-                    $partyUnDueAmount += $rem;
+                    $partyUnDueAmount += $billPortion;
                 }
                 
                 $finalData[] = $bill;
@@ -1400,6 +1452,8 @@ class ReportBuilder
                     'party_due_amount' => $partyDueAmount,
                     'credit_days' => $finalData[$lastIndex]['credit_days'],
                     'credit_limit' => $finalData[$lastIndex]['credit_limit'],
+                    'opening_balance' => $customerOpeningBalance,
+                    'opening_balance_type' => $customerOpeningBalanceType,
                 ];
             }
         }
@@ -1794,7 +1848,10 @@ class ReportBuilder
 
             $signedOb = $acc->getSignedOpeningBalance();
 
-            if ($acc->purchase == 1) { // CR-normal (Supplier)
+            $isCrNormal = in_array((int)$acc->type, [6, 9, 17, 18])
+                || in_array(strtolower($acc->accountType->name ?? ''), ['supplier', 'capital', 'amanat payable', 'reserve']);
+
+            if ($isCrNormal) { // CR-normal (Supplier)
                 $bal = $signedOb + ($credit - $debit);
                 if ($bal >= 0) $totalCR += $bal; else $totalDR += abs($bal);
             } else {
@@ -2032,8 +2089,12 @@ class ReportBuilder
                 // Use signed opening balance so DR/CR type is respected
                 $opening = $p->account ? $p->account->getSignedOpeningBalance() : 0.0;
                 $balData = $partyBalances[$accId];
-                // Determine orientation from account purchase flag
-                if ($p->account && $p->account->purchase) {
+                // Determine orientation from account type
+                $accType = strtolower($p->account?->accountType?->name ?? '');
+                $isCrNormal = in_array($accType, ['supplier', 'capital', 'amanat payable', 'reserve'])
+                    || in_array((int)($p->account?->type ?? 0), [6, 9, 17, 18]);
+
+                if ($isCrNormal) {
                     // CR-normal (Supplier): CR - DR gives positive payable balance
                     $net = $opening + $balData['cr'] - $balData['dr'];
                 } else {
@@ -2214,7 +2275,10 @@ class ReportBuilder
 
                 $signedOb = $acc->getSignedOpeningBalance();
 
-                if ($acc->purchase == 1) { // CR-normal (Supplier)
+                $isCrNormal = in_array((int)$acc->type, [6, 9, 17, 18])
+                    || in_array(strtolower($acc->accountType->name ?? ''), ['supplier', 'capital', 'amanat payable', 'reserve']);
+
+                if ($isCrNormal) { // CR-normal (Supplier)
                     $openBal = $signedOb + ($openCrRaw - $openDrRaw);
                     $openDr = $openBal < 0 ? abs($openBal) : 0;
                     $openCr = $openBal >= 0 ? $openBal : 0;
@@ -2236,7 +2300,7 @@ class ReportBuilder
             }
 
             // 3. Calculate Closing Balance
-            if (in_array($acc->type, [1, 2, 14]) || $acc->purchase != 1) { // Debit oriented
+            if (! $isCrNormal) { // Debit oriented
                 $closeBal = $openDr - $openCr + $periodDr - $periodCr;
                 $closeDr = $closeBal >= 0 ? $closeBal : 0;
                 $closeCr = $closeBal < 0 ? abs($closeBal) : 0;
@@ -2365,7 +2429,10 @@ class ReportBuilder
                 //   Customers: returns +OB for DR-type, -OB for CR-type
                 $signedOb = $acc->getSignedOpeningBalance();
 
-                if ($acc->purchase == 1) { // CR-normal (Supplier)
+                $isCrNormal = in_array((int)$acc->type, [6, 9, 17, 18])
+                    || in_array(strtolower($acc->accountType->name ?? ''), ['supplier', 'capital', 'amanat payable', 'reserve']);
+
+                if ($isCrNormal) { // CR-normal (Supplier)
                     $bal = $signedOb + ($cr - $dr);
                     if ($bal >= 0) { $debit = 0; $credit = $bal; }
                     else { $debit = abs($bal); $credit = 0; }

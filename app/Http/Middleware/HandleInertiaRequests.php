@@ -65,7 +65,7 @@ class HandleInertiaRequests extends Middleware
                 },
             ],
             'ziggy' => fn(): array => [
-                ...(new Ziggy)->toArray(),
+                ...\Illuminate\Support\Facades\Cache::remember('ziggy_routes', 3600, fn() => (new Ziggy)->toArray()),
                 'location' => $request->url(),
             ],
             'sidebarOpen' => $request->cookie('sidebar_state') === 'true',

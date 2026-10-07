@@ -200,7 +200,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
     const handleItemClick = (item: Item) => {
         setSelectedItemForQty(item);
 
-        const existing = currentRows.find(r => r.item_id === item.id);
+        const existing = currentRows.find(r => Number(r.item_id) === Number(item.id));
 
         let tpVal = toNumber(item.trade_price);
         if (customerCategory && customerCategory !== "1") {
@@ -501,7 +501,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     const packing = toNumber(item.packing_qty || 1);
                                     const full = Math.floor(stock / packing);
                                     const pcs = stock % packing;
-                                    const isSelected = currentRows.some(r => r.item_id === item.id);
+                                    const isSelected = currentRows.some(r => Number(r.item_id) === Number(item.id));
                                     const isFocused = idx === selectedIndex;
 
                                     let tpVal = toNumber(item.trade_price);

@@ -1220,7 +1220,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
                               </div>
                               <div className="col-span-1">
-                                <div className="text-right font-mono text-[10px] text-zinc-400 bg-zinc-50 dark:bg-zinc-900 h-8 flex items-center justify-end px-1 border border-zinc-100 dark:border-zinc-800 rounded">
+                                <div className="text-right font-mono text-[11px] text-zinc-900 bg-zinc-10 dark:bg-zinc-900 h-8 flex items-center justify-end px-1 border border-zinc-100 dark:border-zinc-800 rounded">
                                   {(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
                                 </div>
                               </div>
@@ -1679,7 +1679,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             customerCategory={customerCategory}
             currentRows={rows}
             onAddUpdate={(item, data) => {
-              const existingRow = rows.find(r => r.item_id === item.id);
+              const existingRow = rows.find(r => Number(r.item_id) === Number(item.id));
               if (existingRow) {
                 updateRow(existingRow.id, data);
               } else {
@@ -1688,16 +1688,17 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                   const newItem = {
                     id: newRowId,
                     item_id: item.id,
-                    ...data,
                     taxPercent: toNumber(item.gst_percent),
-                    discPercent: toNumber(item.discount),
                     trade_price: toNumber(item.trade_price),
                     amount: 0,
+                    ...data,
+                    discPercent: data.discPercent !== undefined ? toNumber(data.discPercent) : toNumber(item.discount),
                   };
                   if (prev.length === 1 && prev[0].item_id === null) return [newItem];
                   return [...prev, newItem];
                 });
               }
+              setSelectedItemId(item.id);
             }}
           />
 

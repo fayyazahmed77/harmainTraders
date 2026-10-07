@@ -11,6 +11,7 @@
             <th class="price-col">Retail</th>
             <th class="price-col">L.P.P</th>
             <th>Last Supplier</th>
+            <th class="qty-col">Op. Stock</th>
             <th class="qty-col">Full</th>
             <th class="qty-col">PCS</th>
             <th style="width: 50px;">Balance</th>
@@ -18,12 +19,14 @@
     </thead>
     <tbody>
         @php
+            $totalOpening = 0;
             $totalBalance = 0;
             $totalFull = 0;
             $totalPCS = 0;
         @endphp
         @foreach($data as $idx => $row)
             @php
+                $totalOpening += ($row['opening_stock'] ?? 0);
                 $totalBalance += $row['balance_qty'];
                 $totalFull += $row['full_qty'];
                 $totalPCS += $row['pcs_qty'];
@@ -51,6 +54,7 @@
                         </div>
                     @endif
                 </td>
+                <td class="text-right bold tabular-nums" style="color: #4f46e5;">{{ number_format($row['opening_stock'] ?? 0, 0) }}</td>
                 <td class="text-right bold tabular-nums">{{ $row['full_qty'] }}</td>
                 <td class="text-right bold tabular-nums">{{ $row['pcs_qty'] }}</td>
                 <td class="text-right bold tabular-nums" style="color: #059669;">
@@ -62,6 +66,7 @@
     <tfoot>
         <tr style="background-color: #f9fafb; font-weight: bold; border-top: 2px solid #059669;">
             <td colspan="7" class="text-right" style="font-size: 8px;">TOTAL INVENTORY MATRIX</td>
+            <td class="text-right tabular-nums" style="color: #4f46e5;">{{ number_format($totalOpening, 0) }}</td>
             <td class="text-right tabular-nums">{{ number_format($totalFull, 0) }}</td>
             <td class="text-right tabular-nums">{{ number_format($totalPCS, 0) }}</td>
             <td class="text-right tabular-nums" style="color: #059669;">{{ number_format($totalBalance, 0) }}</td>

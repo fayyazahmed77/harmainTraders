@@ -18,6 +18,7 @@ use App\Models\CustomerCredit;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\Rule;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -91,9 +92,7 @@ class SalesController extends Controller implements HasMiddleware
         ];
 
         // Get Customers for Filter
-        $customers = Account::whereHas('accountType', function ($q) {
-            $q->where('name', 'Customers');
-        })->select('id', 'title')->get();
+        $customers = Account::eligibleForSale()->select('id', 'title')->get();
 
         return Inertia::render("daily/sales/index", [
             'sales' => $sales,
@@ -105,12 +104,9 @@ class SalesController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $accounts = Account::active()
+        $accounts = Account::eligibleForSale()
             ->select('id', 'code', 'title', 'type', 'city_id', 'area_id', 'saleman_id', 'item_category')
             ->with('accountType:id,name')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers','indirect expense']);
-            })
             ->get();
 
         $salemans = Saleman::select('id', 'name', 'code', 'commission_percentage')->get();
@@ -201,8 +197,15 @@ class SalesController extends Controller implements HasMiddleware
             'date'            => 'required|date',
             // 'invoice' is generated server-side — not validated from client input
             'code'            => 'nullable|string',
-            'type'            => 'nullable|string',
-            'customer_id'     => 'required|integer', // Assuming passed
+            'customer_id'     => [
+                'required',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($q) {
+                    $q->where('sale', 1)->where(function ($sub) {
+                        $sub->where('status', 1)->orWhere('status', true)->orWhereNull('status');
+                    });
+                }),
+            ],
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',
@@ -578,11 +581,8 @@ class SalesController extends Controller implements HasMiddleware
         // Flag: does this sale already have a CustomerCredit allocation applied?
         $sale->has_advance_allocated = SalesReturnAllocation::where('sale_id', $id)->exists();
 
-        $accounts = Account::active()
+        $accounts = Account::eligibleForSale()
             ->with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers','indirect expense']);
-            })
             ->get();
         $salemans = Saleman::get();
         // Historical average stats for items
@@ -656,6 +656,15 @@ class SalesController extends Controller implements HasMiddleware
     {
         $request->validate([
             'date'            => 'required|date',
+            'customer_id'     => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($q) {
+                    $q->where('sale', 1)->where(function ($sub) {
+                        $sub->where('status', 1)->orWhere('status', true)->orWhereNull('status');
+                    });
+                }),
+            ],
             'no_of_items'     => 'required|integer',
             'gross_total'     => 'required|numeric',
             'discount_total'  => 'required|numeric',

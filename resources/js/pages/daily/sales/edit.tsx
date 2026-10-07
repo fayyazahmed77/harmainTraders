@@ -1640,16 +1640,17 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                     const newItem = {
                       id: newRowId,
                       item_id: item.id,
-                      ...data,
                       taxPercent: toNumber(item.gst_percent),
-                      discPercent: toNumber(item.discount),
                       trade_price: toNumber(item.trade_price),
                       amount: 0,
+                      ...data,
+                      discPercent: data.discPercent !== undefined ? toNumber(data.discPercent) : toNumber(item.discount),
                     };
                     if (prev.length === 1 && prev[0].item_id === null) return [newItem];
                     return [...prev, newItem];
                   });
                 }
+                setSelectedItemId(item.id);
               }}
             />
 

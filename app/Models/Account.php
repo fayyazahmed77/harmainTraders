@@ -51,7 +51,7 @@ class Account extends Model
         'guest_token',
     ];
 
-    protected $appends = ['current_balance', 'guest_link', 'image_url'];
+    protected $appends = ['guest_link', 'image_url'];
 
     protected $casts = [
         'purchase'             => 'boolean',
@@ -84,9 +84,11 @@ class Account extends Model
         $type = strtoupper($this->opening_balance_type ?? 'DR');
 
         // CR-normal accounts: Supplier, Capital, Reserve, Amanat Payable
-        $isCrNormal = $this->purchase == 1
-            || in_array($this->type, [9, 17, 18]) // Capital / Reserve / Amanat types
-            || in_array(strtolower($this->accountType->name ?? ''), ['capital', 'amanat payable', 'reserve']);
+        // NOTE: $this->purchase is an OPERATIONAL flag (controls form access), not an accounting classification.
+        // CR-normality must be determined by account type ONLY.
+        $accountTypeName = strtolower($this->accountType->name ?? '');
+        $isCrNormal = in_array($this->type, [9, 17, 18]) // Capital / Reserve / Amanat type IDs
+            || in_array($accountTypeName, ['supplier', 'capital', 'amanat payable', 'reserve']);
 
         if ($isCrNormal) {
             // Positive stored value + CR type = normal supplier/capital balance (+)
@@ -107,6 +109,36 @@ class Account extends Model
               ->orWhere('status', 1)
               ->orWhereNull('status');
         });
+    }
+
+    public function scopeEligibleForSale($query)
+    {
+        return \App\Services\AccountEligibilityService::forSale($query);
+    }
+
+    public function scopeEligibleForPurchase($query)
+    {
+        return \App\Services\AccountEligibilityService::forPurchase($query);
+    }
+
+    public function scopeEligibleForCashBank($query)
+    {
+        return \App\Services\AccountEligibilityService::forCashBank($query);
+    }
+
+    public function isEligibleForSale(): bool
+    {
+        return \App\Services\AccountEligibilityService::isEligibleForSale($this);
+    }
+
+    public function isEligibleForPurchase(): bool
+    {
+        return \App\Services\AccountEligibilityService::isEligibleForPurchase($this);
+    }
+
+    public function isEligibleForCashBank(): bool
+    {
+        return \App\Services\AccountEligibilityService::isEligibleForCashBank($this);
     }
 
     public function accountCategory()
@@ -191,8 +223,23 @@ class Account extends Model
     public function getCurrentBalanceAttribute()
     {
         $type = strtolower($this->accountType->name ?? '');
-        
-        if ($type === 'customers') {
+
+        // Ensure purchase and sale flags are checked even if partial SQL select was used
+        if (!array_key_exists('purchase', $this->attributes) || !array_key_exists('sale', $this->attributes)) {
+            $flags = \Illuminate\Support\Facades\DB::table('accounts')->where('id', $this->id)->select('purchase', 'sale')->first();
+            $hasPurchase = (bool)($flags?->purchase ?? 0);
+            $hasSale = (bool)($flags?->sale ?? 0);
+        } else {
+            $hasPurchase = (bool)$this->purchase;
+            $hasSale = (bool)$this->sale;
+        }
+
+        $isMultiRole = ($hasPurchase && $hasSale);
+
+        if ($isMultiRole) {
+            $net = \App\Services\PaymentAccountingService::getPartyNetBalance($this);
+            return $type === 'supplier' ? ($net['total_cr'] - $net['total_dr']) : ($net['total_dr'] - $net['total_cr']);
+        } elseif ($type === 'customers') {
             return \App\Services\PaymentAccountingService::getCustomerCurrentBalance($this);
         } elseif ($type === 'supplier') {
             return \App\Services\PaymentAccountingService::getSupplierCurrentBalance($this);

@@ -144,4 +144,66 @@ class PaymentAccountingService
 
         return 0.0;
     }
+
+    /**
+     * Calculate Unified Net Party Balance for Multi-Role or Cross-Module Accounts.
+     * Follows standard double-entry principles:
+     *   Debits (DR):
+     *     - DR Opening Balance (money owed to us)
+     *     - Sales (Invoices owed by customer)
+     *     - Payments made TO party (Debit party)
+     *     - Purchase Returns
+     *   Credits (CR):
+     *     - CR Opening Balance (money owed by us / advance received)
+     *     - Purchases (Bills owed to supplier)
+     *     - Receipts received FROM party (Credit party)
+     *     - Sales Returns
+     */
+    public static function getPartyNetBalance(Account $account): array
+    {
+        $totalSales = (float)$account->sales()->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
+        $totalSalesReturns = (float)$account->salesReturns()->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
+
+        $totalPurchases = (float)$account->purchases()->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
+        $totalPurchaseReturns = (float)$account->purchaseReturns()->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
+
+        $receipts = $account->partyPayments()->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })->with('allocations')->get();
+
+        $totalReceiptsSettlement = 0.0;
+        foreach ($receipts as $r) {
+            $totalReceiptsSettlement += self::getRecognizedNetSettlement($r);
+        }
+
+        $payments = $account->partyPayments()->where('type', 'PAYMENT')
+            ->where('is_return_refund', false)
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })->with('allocations')->get();
+
+        $totalPaymentsSettlement = 0.0;
+        foreach ($payments as $p) {
+            $totalPaymentsSettlement += self::getRecognizedNetSettlement($p);
+        }
+
+        $rawOB = (float)($account->opening_balance ?? 0);
+        $obType = strtoupper($account->opening_balance_type ?? 'DR');
+        $obDR = $obType === 'DR' ? $rawOB : 0.0;
+        $obCR = $obType === 'CR' ? $rawOB : 0.0;
+
+        $totalDR = $obDR + $totalSales + $totalPaymentsSettlement + $totalPurchaseReturns;
+        $totalCR = $obCR + $totalPurchases + $totalReceiptsSettlement + $totalSalesReturns;
+
+        $netDiff = $totalDR - $totalCR;
+
+        return [
+            'total_dr'        => $totalDR,
+            'total_cr'        => $totalCR,
+            'net_balance'     => abs($netDiff),
+            'signed_balance'  => $netDiff,
+            'orientation'     => $netDiff >= 0 ? 'DR' : 'CR',
+        ];
+    }
 }

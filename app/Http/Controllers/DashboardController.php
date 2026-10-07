@@ -190,59 +190,53 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Available Funds Distribution (Calculated dynamically)
-        $bankIds   = Account::where('type', 2)->pluck('id');
-        $cashIds   = Account::where('type', 1)->pluck('id');
-        $chequeIds = Account::where('type', 14)->pluck('id');
+        // Available Funds Distribution (Calculated dynamically via single-pass aggregate)
+        $assetAccounts = Account::with('accountType')->whereIn('type', [1, 2, 14])->get();
+        $allAssetIds = $assetAccounts->pluck('id')->toArray();
 
-        $getFunds = function($ids) {
-            if ($ids->isEmpty()) return 0;
-            
-            $accounts = Account::with('accountType')->whereIn('id', $ids)->get();
-            
-            $totalInByAccount = Payment::whereIn('payment_account_id', $ids)
-                ->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('cheque_status')
-                      ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
-                })
-                ->groupBy('payment_account_id')
-                ->selectRaw('payment_account_id, SUM(amount) as total')
-                ->pluck('total', 'payment_account_id');
+        $totalInByAccount = empty($allAssetIds) ? collect() : Payment::whereIn('payment_account_id', $allAssetIds)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                  ->orWhereNull('cheque_status')
+                  ->orWhere('cheque_status', '')
+                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+            })
+            ->groupBy('payment_account_id')
+            ->selectRaw('payment_account_id, SUM(amount) as total')
+            ->pluck('total', 'payment_account_id');
 
-            $totalOutByAccount = Payment::whereIn('payment_account_id', $ids)
-                ->where('type', 'PAYMENT')
-                ->where(function($q) {
-                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('cheque_status')
-                      ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
-                })
-                ->groupBy('payment_account_id')
-                ->selectRaw('payment_account_id, SUM(amount) as total')
-                ->pluck('total', 'payment_account_id');
+        $totalOutByAccount = empty($allAssetIds) ? collect() : Payment::whereIn('payment_account_id', $allAssetIds)
+            ->where('type', 'PAYMENT')
+            ->where(function($q) {
+                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                  ->orWhereNull('cheque_status')
+                  ->orWhere('cheque_status', '')
+                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Pending']);
+            })
+            ->groupBy('payment_account_id')
+            ->selectRaw('payment_account_id, SUM(amount) as total')
+            ->pluck('total', 'payment_account_id');
 
+        $calculateFundsForType = function($typeId) use ($assetAccounts, $totalInByAccount, $totalOutByAccount) {
             $sum = 0;
-            foreach ($accounts as $account) {
+            foreach ($assetAccounts->where('type', $typeId) as $account) {
                 $opening = $account->getSignedOpeningBalance();
                 $in = (float)($totalInByAccount[$account->id] ?? 0);
                 $out = (float)($totalOutByAccount[$account->id] ?? 0);
                 $balance = $opening + $in - $out;
-                
+
                 if ($balance > 0) {
                     $sum += $balance;
                 }
             }
-
             return $sum;
         };
 
         $fundsData = [
-            ['name' => 'Bank',   'value' => $getFunds($bankIds),   'color' => '#4a9ede'],
-            ['name' => 'Cash',   'value' => $getFunds($cashIds),   'color' => '#4caf7a'],
-            ['name' => 'Cheque', 'value' => $getFunds($chequeIds), 'color' => '#e07b1a'],
+            ['name' => 'Bank',   'value' => $calculateFundsForType(2),   'color' => '#4a9ede'],
+            ['name' => 'Cash',   'value' => $calculateFundsForType(1),   'color' => '#4caf7a'],
+            ['name' => 'Cheque', 'value' => $calculateFundsForType(14),  'color' => '#e07b1a'],
         ];
 
         // FEATURE 3: Sales & Recoveries Datasets
@@ -275,42 +269,89 @@ class DashboardController extends Controller
             ];
         });
 
-        // Weekly (Last 4 Weeks)
+        // Weekly (Last 4 Weeks - single window aggregate)
         $weeks = collect(range(3, 0))->map(fn($i) => [
             'start' => Carbon::now()->subWeeks($i)->startOfWeek(),
             'end' => Carbon::now()->subWeeks($i)->endOfWeek(),
             'label' => 'W' . (4 - $i)
         ]);
-        $salesRecoveries['weekly'] = $weeks->map(fn($w) => [
-            'label' => $w['label'],
-            'sales' => (float)Sales::whereBetween('date', [$w['start'], $w['end']])->sum('net_total'),
-            'recoveries' => (float)Payment::whereBetween('date', [$w['start'], $w['end']])->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-                })->sum('amount'),
-        ]);
 
-        // Monthly (12 Months of current year)
+        $earliestStart = Carbon::now()->subWeeks(3)->startOfWeek()->format('Y-m-d');
+        $latestEnd = Carbon::now()->endOfWeek()->format('Y-m-d');
+
+        $weekSales = Sales::whereBetween('date', [$earliestStart, $latestEnd])
+            ->select('date', 'net_total')
+            ->get();
+
+        $weekRecoveries = Payment::whereBetween('date', [$earliestStart, $latestEnd])
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+            })
+            ->select('date', 'amount')
+            ->get();
+
+        $salesRecoveries['weekly'] = $weeks->map(function($w) use ($weekSales, $weekRecoveries) {
+            $sDate = $w['start']->format('Y-m-d');
+            $eDate = $w['end']->format('Y-m-d');
+            return [
+                'label' => $w['label'],
+                'sales' => (float)$weekSales->filter(fn($r) => $r->date >= $sDate && $r->date <= $eDate)->sum('net_total'),
+                'recoveries' => (float)$weekRecoveries->filter(fn($r) => $r->date >= $sDate && $r->date <= $eDate)->sum('amount'),
+            ];
+        });
+
+        // Monthly (12 Months of current year - single pass grouped aggregate)
+        $monthlySalesGrouped = Sales::whereYear('date', $thisYear)
+            ->selectRaw('MONTH(date) as m, SUM(net_total) as total')
+            ->groupBy('m')
+            ->pluck('total', 'm');
+
+        $monthlyRecGrouped = Payment::whereYear('date', $thisYear)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+            })
+            ->selectRaw('MONTH(date) as m, SUM(amount) as total')
+            ->groupBy('m')
+            ->pluck('total', 'm');
+
         $months = collect(range(1, 12))->map(fn($m) => Carbon::create($thisYear, $m, 1));
         $salesRecoveries['monthly'] = $months->map(fn($m) => [
             'label' => $m->format('M'),
-            'sales' => (float)Sales::whereMonth('date', $m->month)->whereYear('date', $m->year)->sum('net_total'),
-            'recoveries' => (float)Payment::whereMonth('date', $m->month)->whereYear('date', $m->year)->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-                })->sum('amount'),
+            'sales' => (float)($monthlySalesGrouped[$m->month] ?? 0),
+            'recoveries' => (float)($monthlyRecGrouped[$m->month] ?? 0),
         ]);
 
-        // Yearly (Last 5 Years)
+        // Yearly (Last 5 Years - single pass grouped aggregate)
+        $startYear = $thisYear - 4;
+        $yearlySalesGrouped = Sales::whereYear('date', '>=', $startYear)
+            ->whereYear('date', '<=', $thisYear)
+            ->selectRaw('YEAR(date) as y, SUM(net_total) as total')
+            ->groupBy('y')
+            ->pluck('total', 'y');
+
+        $yearlyRecGrouped = Payment::whereYear('date', '>=', $startYear)
+            ->whereYear('date', '<=', $thisYear)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+            })
+            ->selectRaw('YEAR(date) as y, SUM(amount) as total')
+            ->groupBy('y')
+            ->pluck('total', 'y');
+
         $years = collect(range(4, 0))->map(fn($i) => $thisYear - $i);
         $salesRecoveries['yearly'] = $years->map(fn($y) => [
             'label' => (string)$y,
-            'sales' => (float)Sales::whereYear('date', $y)->sum('net_total'),
-            'recoveries' => (float)Payment::whereYear('date', $y)->where('type', 'RECEIPT')
-                ->where(function($q) {
-                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-                })->sum('amount'),
+            'sales' => (float)($yearlySalesGrouped[$y] ?? 0),
+            'recoveries' => (float)($yearlyRecGrouped[$y] ?? 0),
         ]);
+
+        // Total Receivables & Payables (Single-pass aggregate from ReportBuilder)
+        $accountSummary = $this->reportBuilder->summary();
+        $totalReceivable = (float)$accountSummary->sum('debit');
+        $totalPayable = (float)$accountSummary->sum('credit');
 
         return Inertia::render('Dashboard/Index', [
             'stats' => [
@@ -322,7 +363,11 @@ class DashboardController extends Controller
                 'totalOrdersMonth' => $totalOrdersMonth,
                 'cancelledOrdersMonth' => $cancelledOrdersMonth,
                 'currentMonthName' => $currentMonthName,
+                'totalReceivable' => $totalReceivable,
+                'totalPayable' => $totalPayable,
             ],
+            'totalReceivable' => $totalReceivable,
+            'totalPayable' => $totalPayable,
             'orderChartData' => $orderChart,
             'fundsData' => $fundsData,
             'salesRecoveries' => $salesRecoveries,
@@ -360,9 +405,9 @@ class DashboardController extends Controller
                     'status'    => $p->total_qty <= 0 ? 'out' : ($p->total_qty <= $p->reorder_level ? 'low' : 'ok'),
                 ]),
             'stockSummary' => [
-                'total_skus'    => Items::count(),
-                'low_stock'     => Items::whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= reorder_level')->whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) > 0')->count(),
-                'out_of_stock'  => Items::whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= 0')->count(),
+                'total_skus'    => (int)(DB::table('items')->count()),
+                'low_stock'     => (int)(DB::table('items')->whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= reorder_level AND (IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) > 0')->count()),
+                'out_of_stock'  => (int)(DB::table('items')->whereRaw('(IFNULL(stock_1, 0) * IFNULL(packing_qty, 1)) + IFNULL(stock_2, 0) <= 0')->count()),
             ],
             'recentCustomers' => $recentCustomers,
             'recentPurchases' => $recentPurchases,

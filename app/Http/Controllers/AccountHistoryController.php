@@ -74,20 +74,38 @@ class AccountHistoryController extends Controller implements HasMiddleware
             ->latest('id')
             ->paginate(10);
 
-        // Fetch unpaid bills
-        if ($account->accountType && $account->accountType->name === 'Customers') {
-            $unpaidBills = Sales::where('customer_id', $account->id)
+        $account->loadMissing('accountType');
+        $typeLower = strtolower($account->accountType->name ?? '');
+        $hasSale = (bool) $account->sale || $typeLower === 'customers';
+        $hasPurchase = (bool) $account->purchase || $typeLower === 'supplier';
+
+        $unpaidBills = collect();
+
+        if ($hasSale) {
+            $unpaidSales = Sales::where('customer_id', $account->id)
                 ->where('remaining_amount', '>', 0)
                 ->orderBy('date', 'asc')
-                ->get(['id', 'date', 'invoice', 'net_total', 'paid_amount', 'remaining_amount']);
-        } elseif ($account->accountType && $account->accountType->name === 'Supplier') {
-             $unpaidBills = Purchase::where('supplier_id', $account->id)
-                ->where('remaining_amount', '>', 0)
-                ->orderBy('date', 'asc')
-                ->get(['id', 'date', 'invoice', 'net_total', 'paid_amount', 'remaining_amount']);
-        } else {
-            $unpaidBills = [];
+                ->get(['id', 'date', 'invoice', 'net_total', 'paid_amount', 'remaining_amount'])
+                ->map(function ($bill) {
+                    $bill->bill_type = 'Sale';
+                    return $bill;
+                });
+            $unpaidBills = $unpaidBills->concat($unpaidSales);
         }
+
+        if ($hasPurchase) {
+            $unpaidPurchases = Purchase::where('supplier_id', $account->id)
+                ->where('remaining_amount', '>', 0)
+                ->orderBy('date', 'asc')
+                ->get(['id', 'date', 'invoice', 'net_total', 'paid_amount', 'remaining_amount'])
+                ->map(function ($bill) {
+                    $bill->bill_type = 'Purchase';
+                    return $bill;
+                });
+            $unpaidBills = $unpaidBills->concat($unpaidPurchases);
+        }
+
+        $unpaidBills = $unpaidBills->sortBy('date')->values();
 
         return response()->json([
             'data' => $payments->items(),

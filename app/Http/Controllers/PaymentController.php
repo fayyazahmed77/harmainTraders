@@ -38,7 +38,7 @@ class PaymentController extends Controller implements HasMiddleware
     // List payments and stats
     public function index(Request $request)
     {
-        $query = Payment::with(['account', 'paymentAccount', 'messageLine']);
+        $query = Payment::with(['account:id,code,title,type', 'paymentAccount:id,code,title,type', 'messageLine:id,name']);
 
         // Filter by Date Range
         if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
@@ -60,10 +60,16 @@ class PaymentController extends Controller implements HasMiddleware
             $query->where('payment_method', $request->payment_method);
         }
 
+        // Filter by Amount
+        if ($request->filled('amount')) {
+            $query->where('amount', $request->amount);
+        }
+
         $allPayments = $query->orderBy('date', 'desc')
             ->orderBy('id', 'desc')
             ->get();
 
+        // Merge grouped (multi-voucher) payments
         $grouped = collect();
         $groups = [];
 
@@ -74,8 +80,6 @@ class PaymentController extends Controller implements HasMiddleware
                     $rep->amount += $p->amount;
                     $rep->net_amount += $p->net_amount;
                     $rep->discount += $p->discount;
-                    
-                    // Comma separate voucher nos
                     $vNos = explode(', ', $rep->voucher_no);
                     if (!in_array($p->voucher_no, $vNos)) {
                         $vNos[] = $p->voucher_no;
@@ -93,12 +97,12 @@ class PaymentController extends Controller implements HasMiddleware
             }
         }
 
+        $perPage = 25;
         $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage() ?: 1;
-        $perPage = 10;
-        $currentPageItems = $grouped->slice(($currentPage - 1) * $perPage, $perPage)->all();
+        $currentPageItems = $grouped->slice(($currentPage - 1) * $perPage, $perPage)->values();
 
         $payments = new \Illuminate\Pagination\LengthAwarePaginator(
-            array_values($currentPageItems),
+            $currentPageItems,
             $grouped->count(),
             $perPage,
             $currentPage,
@@ -122,105 +126,111 @@ class PaymentController extends Controller implements HasMiddleware
         if ($request->has('payment_method') && $request->payment_method && $request->payment_method !== 'all') {
             $summaryQueryBase->where('payment_method', $request->payment_method);
         }
+        if ($request->filled('amount')) {
+            $summaryQueryBase->where('amount', $request->amount);
+        }
 
-        $totalReceipts = (clone $summaryQueryBase)->where('type', 'RECEIPT')
-            ->where(function ($q) {
-                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-            })
-            ->selectRaw('COALESCE(SUM(amount + COALESCE(discount, 0)), 0) as total')->value('total');
+        $summaryRow = (clone $summaryQueryBase)
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN type = 'RECEIPT' AND (cheque_status NOT IN ('Canceled', 'Cancelled') OR cheque_status IS NULL) THEN (amount + COALESCE(discount, 0)) ELSE 0 END), 0) as total_receipts,
+                COALESCE(SUM(CASE WHEN type = 'PAYMENT' AND (cheque_status NOT IN ('Canceled', 'Cancelled') OR cheque_status IS NULL) THEN (amount + COALESCE(discount, 0)) ELSE 0 END), 0) as total_payments,
+                COALESCE(SUM(CASE WHEN type = 'RECEIPT' AND cheque_status IN ('Canceled', 'Cancelled') THEN amount ELSE 0 END), 0) as canceled_receipts,
+                COALESCE(SUM(CASE WHEN type = 'PAYMENT' AND cheque_status IN ('Canceled', 'Cancelled') THEN amount ELSE 0 END), 0) as canceled_payments,
+                COUNT(*) as count,
+                COUNT(CASE WHEN (cheque_status NOT IN ('Canceled', 'Cancelled') OR cheque_status IS NULL) THEN 1 END) as active_count,
+                COUNT(CASE WHEN cheque_status IN ('Canceled', 'Cancelled') THEN 1 END) as canceled_count
+            ")
+            ->first();
 
-        $totalPayments = (clone $summaryQueryBase)->where('type', 'PAYMENT')
-            ->where(function ($q) {
-                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-            })
-            ->selectRaw('COALESCE(SUM(amount + COALESCE(discount, 0)), 0) as total')->value('total');
-
-        $canceledReceipts = (clone $summaryQueryBase)->where('type', 'RECEIPT')->whereIn('cheque_status', ['Canceled', 'Cancelled'])->sum('amount');
-        $canceledPayments = (clone $summaryQueryBase)->where('type', 'PAYMENT')->whereIn('cheque_status', ['Canceled', 'Cancelled'])->sum('amount');
+        $totalReceipts = (float)($summaryRow->total_receipts ?? 0);
+        $totalPayments = (float)($summaryRow->total_payments ?? 0);
+        $canceledReceipts = (float)($summaryRow->canceled_receipts ?? 0);
+        $canceledPayments = (float)($summaryRow->canceled_payments ?? 0);
 
         $summary = [
             'total_receipts' => $totalReceipts,
             'total_payments' => $totalPayments,
             'net_flow' => $totalReceipts - $totalPayments,
             'canceled_amount' => $canceledReceipts + $canceledPayments,
-            'count' => $summaryQueryBase->count(),
-            'active_count' => (clone $summaryQueryBase)->where(function ($q) {
-                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-            })->count(),
-            'canceled_count' => (clone $summaryQueryBase)->whereIn('cheque_status', ['Canceled', 'Cancelled'])->count(),
+            'count' => (int)($summaryRow->count ?? 0),
+            'active_count' => (int)($summaryRow->active_count ?? 0),
+            'canceled_count' => (int)($summaryRow->canceled_count ?? 0),
         ];
 
         // ───────────────────────────────────────────
-        // SALES SUMMARY
+        // SALES SUMMARY (Lazy closure for partial reloads)
         // ───────────────────────────────────────────
-        $salesQuery = Sales::query();
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $salesQuery->whereBetween('date', [$request->start_date, $request->end_date]);
-        }
-        $salesData = clone $salesQuery;
+        $salesSummary = function () use ($request) {
+            $salesQuery = Sales::query();
+            if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+                $salesQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+            }
+            $salesAgg = (clone $salesQuery)->selectRaw('COALESCE(SUM(net_total), 0) as total_sales, COALESCE(SUM(paid_amount), 0) as total_paid, COALESCE(SUM(remaining_amount), 0) as total_unpaid')->first();
 
-        $salesReturnQuery = \App\Models\SalesReturn::query();
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $salesReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
-        }
+            $salesReturnQuery = \App\Models\SalesReturn::query();
+            if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+                $salesReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+            }
 
-        $salesSummary = [
-            'total_sales' => $salesData->sum('net_total'),
-            'total_paid' => $salesData->sum('paid_amount'),
-            'total_unpaid' => $salesData->sum('remaining_amount'),
-            'total_returns' => $salesReturnQuery->sum('net_total'),
-        ];
-
-        // ───────────────────────────────────────────
-        // PURCHASE SUMMARY
-        // ───────────────────────────────────────────
-        $purchaseQuery = Purchase::query();
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $purchaseQuery->whereBetween('date', [$request->start_date, $request->end_date]);
-        }
-        $purchaseData = clone $purchaseQuery;
-
-        $purchaseReturnQuery = \App\Models\PurchaseReturn::query();
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $purchaseReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
-        }
-
-        $purchaseSummary = [
-            'total_purchase' => $purchaseData->sum('net_total'),
-            'total_paid' => $purchaseData->sum('paid_amount'),
-            'total_unpaid' => $purchaseData->sum('remaining_amount'),
-            'total_returns' => $purchaseReturnQuery->sum('net_total'),
-        ];
-
-        // ───────────────────────────────────────────
-        // ANALYTICS (Rolling 7 Days or Filtered Range)
-        // ───────────────────────────────────────────
-        $analytics = [];
-        $startDate = $request->start_date ? \Carbon\Carbon::parse($request->start_date) : now()->subDays(6);
-        $endDate = $request->end_date ? \Carbon\Carbon::parse($request->end_date) : now();
-
-        // Limit range for analytics performance
-        $diff = $startDate->diffInDays($endDate);
-        if ($diff > 30) $startDate = (clone $endDate)->subDays(30);
-
-        $salesTotals = Sales::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
-        $purchasesTotals = Purchase::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
-        $receiptsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'RECEIPT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
-        $paymentsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'PAYMENT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
-
-        for ($date = clone $startDate; $date->lte($endDate); $date->addDay()) {
-            $currentDate = $date->toDateString();
-            $analytics[] = [
-                'date' => $date->format('M d'),
-                'sales' => $salesTotals[$currentDate] ?? 0,
-                'purchases' => $purchasesTotals[$currentDate] ?? 0,
-                'receipts' => $receiptsTotals[$currentDate] ?? 0,
-                'payments' => $paymentsTotals[$currentDate] ?? 0,
+            return [
+                'total_sales' => (float)($salesAgg->total_sales ?? 0),
+                'total_paid' => (float)($salesAgg->total_paid ?? 0),
+                'total_unpaid' => (float)($salesAgg->total_unpaid ?? 0),
+                'total_returns' => (float)($salesReturnQuery->sum('net_total') ?? 0),
             ];
-        }
+        };
 
-        // Accounts for filters
-        $accounts = Account::select('id', 'title', 'type')->get();
+        // ───────────────────────────────────────────
+        // PURCHASE SUMMARY (Lazy closure for partial reloads)
+        // ───────────────────────────────────────────
+        $purchaseSummary = function () use ($request) {
+            $purchaseQuery = Purchase::query();
+            if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+                $purchaseQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+            }
+            $purchaseAgg = (clone $purchaseQuery)->selectRaw('COALESCE(SUM(net_total), 0) as total_purchase, COALESCE(SUM(paid_amount), 0) as total_paid, COALESCE(SUM(remaining_amount), 0) as total_unpaid')->first();
+
+            $purchaseReturnQuery = \App\Models\PurchaseReturn::query();
+            if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
+                $purchaseReturnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
+            }
+
+            return [
+                'total_purchase' => (float)($purchaseAgg->total_purchase ?? 0),
+                'total_paid' => (float)($purchaseAgg->total_paid ?? 0),
+                'total_unpaid' => (float)($purchaseAgg->total_unpaid ?? 0),
+                'total_returns' => (float)($purchaseReturnQuery->sum('net_total') ?? 0),
+            ];
+        };
+
+        // ───────────────────────────────────────────
+        // ANALYTICS (Lazy closure for partial reloads)
+        // ───────────────────────────────────────────
+        $analytics = function () use ($request) {
+            $analyticsData = [];
+            $startDate = $request->start_date ? \Carbon\Carbon::parse($request->start_date) : now()->subDays(6);
+            $endDate = $request->end_date ? \Carbon\Carbon::parse($request->end_date) : now();
+
+            $diff = $startDate->diffInDays($endDate);
+            if ($diff > 30) $startDate = (clone $endDate)->subDays(30);
+
+            $salesTotals = Sales::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+            $purchasesTotals = Purchase::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->selectRaw('date, SUM(net_total) as total')->groupBy('date')->pluck('total', 'date');
+            $receiptsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'RECEIPT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+            $paymentsTotals = Payment::whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])->where('type', 'PAYMENT')->selectRaw('date, SUM(amount) as total')->groupBy('date')->pluck('total', 'date');
+
+            for ($date = clone $startDate; $date->lte($endDate); $date->addDay()) {
+                $currentDate = $date->toDateString();
+                $analyticsData[] = [
+                    'date' => $date->format('M d'),
+                    'sales' => $salesTotals[$currentDate] ?? 0,
+                    'purchases' => $purchasesTotals[$currentDate] ?? 0,
+                    'receipts' => $receiptsTotals[$currentDate] ?? 0,
+                    'payments' => $paymentsTotals[$currentDate] ?? 0,
+                ];
+            }
+            return $analyticsData;
+        };
 
         return Inertia::render('daily/payment/index', [
             'payments' => $payments,
@@ -228,8 +238,8 @@ class PaymentController extends Controller implements HasMiddleware
             'sales_summary' => $salesSummary,
             'purchase_summary' => $purchaseSummary,
             'analytics' => $analytics,
-            'filters' => $request->all(['start_date', 'end_date', 'account_id', 'type', 'payment_method']),
-            'accounts' => $accounts,
+            'filters' => $request->only(['start_date', 'end_date', 'account_id', 'type', 'payment_method', 'amount']),
+            'accounts' => fn () => Account::select('id', 'title', 'type')->orderBy('title')->get(),
         ]);
     }
 
@@ -281,13 +291,8 @@ class PaymentController extends Controller implements HasMiddleware
         }
         $payment->splits = $splits;
 
-        $accounts = Account::active()->with('accountType')->select('id', 'title', 'type')->get();
-        $paymentAccounts = Account::active()
-            ->with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-            })
-            ->get();
+        $accounts = Account::active()->with('accountType')->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank')->get();
+        $paymentAccounts = Account::eligibleForCashBank()->with('accountType')->get();
 
         $messageLines = \App\Models\MessageLine::where(function ($query) {
             $query->whereJsonContains('category', 'Payments')
@@ -827,7 +832,7 @@ class PaymentController extends Controller implements HasMiddleware
         // For now fetching all, but ideally filter by type
         $accounts = Account::active()
             ->with('accountType')
-            ->select('id', 'title', 'type')
+            ->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', [
                     'Customers', 'Supplier', 'Expense', 'Other', 'Bank',
@@ -835,11 +840,8 @@ class PaymentController extends Controller implements HasMiddleware
                 ]);
             })
             ->get();
-        $paymentAccounts = Account::active()
+        $paymentAccounts = Account::eligibleForCashBank()
             ->with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
-            })
             ->get();
 
         $messageLines = \App\Models\MessageLine::where(function ($query) {
@@ -966,7 +968,8 @@ class PaymentController extends Controller implements HasMiddleware
             }
 
             $type = strtolower($account->accountType->name ?? '');
-            $isCreditNormal = in_array($type, ['supplier', 'capital', 'amanat payable', 'reserve']) || (int)$account->purchase === 1;
+            $isCreditNormal = in_array($type, ['supplier', 'capital', 'amanat payable', 'reserve'])
+                || in_array((int)$account->type, [6, 9, 17, 18]);
             $orientation = $isCreditNormal ? 'cr' : 'dr';
 
             // Calculate Unpaid Billed Balance (Sum of remaining amounts on invoices)

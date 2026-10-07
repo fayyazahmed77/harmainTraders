@@ -32,6 +32,29 @@ export default defineConfig({
         jsx: 'automatic',
     },
     build: {
-        chunkSizeWarningLimit: 2000,
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        if (id.includes('jspdf') || id.includes('html2canvas')) {
+                            return 'vendor-pdf';
+                        }
+                        if (id.includes('leaflet') || id.includes('react-leaflet')) {
+                            return 'vendor-maps';
+                        }
+                        if (id.includes('framer-motion')) {
+                            return 'vendor-motion';
+                        }
+                        if (id.includes('lucide-react') || id.includes('@tabler/icons-react')) {
+                            return 'vendor-icons';
+                        }
+                    }
+                },
+            },
+        },
     }
 });

@@ -18,6 +18,10 @@ interface Props {
     payments: {
         data: any[];
         links: any[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: any;
     sales_summary: any;
@@ -118,7 +122,14 @@ export default function PaymentIndex({
                     {/* FILTERS & DATA TABLE */}
                     <div className="space-y-6 pt-4">
                         <PaymentFilters filters={filters} accounts={accounts} />
-                        <DataTable data={payments.data} />
+                        <DataTable
+                            data={payments.data}
+                            currentPage={payments.current_page}
+                            lastPage={payments.last_page}
+                            perPage={payments.per_page}
+                            total={payments.total}
+                            filters={filters}
+                        />
                     </div>
 
                     {/* COMPACT FOOTER SYSTEM */}

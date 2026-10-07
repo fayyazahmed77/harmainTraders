@@ -6,7 +6,6 @@ import {
     SortingState,
     VisibilityState,
     getCoreRowModel,
-    getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
     flexRender,
@@ -64,9 +63,21 @@ interface Payment {
 
 interface DataTableProps {
     data: Payment[];
+    currentPage?: number;
+    lastPage?: number;
+    perPage?: number;
+    total?: number;
+    filters?: Record<string, string>;
 }
 
-export default function DataTable({ data }: DataTableProps) {
+export default function DataTable({
+    data,
+    currentPage = 1,
+    lastPage = 1,
+    perPage = 15,
+    total = data?.length || 0,
+    filters = {},
+}: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
@@ -120,11 +131,7 @@ export default function DataTable({ data }: DataTableProps) {
                 return (
                     <div className="flex items-center gap-2">
                         <span className="font-mono font-bold">{voucherNo}</span>
-                        {groupId && (
-                            <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[8px] font-black uppercase tracking-widest rounded border border-orange-500/20 shadow-sm animate-pulse">
-                                Multi
-                            </span>
-                        )}
+                       
                     </div>
                 );
             }
@@ -253,12 +260,26 @@ export default function DataTable({ data }: DataTableProps) {
         columns,
         onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
         state: { sorting, columnVisibility, rowSelection },
     });
+
+    const goToPage = (pageNumber: number) => {
+        router.get(
+            "/payments",
+            {
+                ...filters,
+                page: String(pageNumber),
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                only: ["payments", "filters"],
+            }
+        );
+    };
 
     return (
         <div className="w-full">
@@ -310,77 +331,75 @@ export default function DataTable({ data }: DataTableProps) {
                     </TableBody>
                 </Table>
 
-                {/* Pagination Footer */}
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                    <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-                        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                        {table.getFilteredRowModel().rows.length} row(s) selected.
+                {/* Server-Side Pagination Footer */}
+                <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t bg-card gap-3">
+                    <div className="text-sm text-muted-foreground">
+                        {total > 0 ? (
+                            <>
+                                Showing{" "}
+                                <span className="font-semibold text-foreground">
+                                    {(currentPage - 1) * perPage + 1}
+                                </span>{" "}
+                                to{" "}
+                                <span className="font-semibold text-foreground">
+                                    {Math.min(currentPage * perPage, total)}
+                                </span>{" "}
+                                of{" "}
+                                <span className="font-semibold text-foreground">{total}</span> records
+                            </>
+                        ) : (
+                            "No records found"
+                        )}
                     </div>
 
-                    <div className="flex w-full items-center gap-8 lg:w-fit">
-                        {/* Rows per page */}
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <Label className="text-sm font-medium">Rows per page</Label>
-                            <Select
-                                value={`${table.getState().pagination.pageSize}`}
-                                onValueChange={(value) => table.setPageSize(Number(value))}
-                            >
-                                <SelectTrigger size="sm" className="w-20">
-                                    <SelectValue placeholder={table.getState().pagination.pageSize} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[10, 20, 30, 40, 50, 100].map((pageSize) => (
-                                        <SelectItem key={pageSize} value={`${pageSize}`}>
-                                            {pageSize}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium mr-2 text-muted-foreground">
+                            Page {currentPage} of {Math.max(lastPage, 1)}
+                        </span>
 
-                        {/* Page info */}
-                        <div className="text-sm font-medium">
-                            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                        </div>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={currentPage <= 1}
+                            onClick={() => goToPage(1)}
+                            title="First page"
+                        >
+                            <IconChevronsLeft className="h-4 w-4" />
+                        </Button>
 
-                        {/* Pagination buttons */}
-                        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-                            <Button
-                                variant="outline"
-                                className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <IconChevronsLeft className="h-4 w-4" />
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={currentPage <= 1}
+                            onClick={() => goToPage(currentPage - 1)}
+                            title="Previous page"
+                        >
+                            <IconChevronLeft className="h-4 w-4" />
+                        </Button>
 
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <IconChevronLeft className="h-4 w-4" />
-                            </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={currentPage >= lastPage}
+                            onClick={() => goToPage(currentPage + 1)}
+                            title="Next page"
+                        >
+                            <IconChevronRight className="h-4 w-4" />
+                        </Button>
 
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <IconChevronRight className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                                variant="outline"
-                                className="hidden size-8 lg:flex"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <IconChevronsRight className="h-4 w-4" />
-                            </Button>
-                        </div>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={currentPage >= lastPage}
+                            onClick={() => goToPage(lastPage)}
+                            title="Last page"
+                        >
+                            <IconChevronsRight className="h-4 w-4" />
+                        </Button>
                     </div>
                 </div>
             </div>

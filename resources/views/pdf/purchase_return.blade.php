@@ -465,8 +465,8 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
                 Thank you for choosing Haramain Traders.
             </div>
-            <div style="font-size: 8px; color: #999; letter-spacing: 0.3px;">
-                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            <div style="font-size: 8px; color: #555; letter-spacing: 0.3px;">
+                Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
             </div>
         </div>
     </div>

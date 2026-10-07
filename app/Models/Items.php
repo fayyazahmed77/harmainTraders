@@ -68,7 +68,6 @@ class Items extends Model
         'price_per_pcs',
         'total_stock_pcs',
         'stock_breakdown',
-        'primary_image_url',
     ];
 
     public function scopeActive($query)
@@ -155,6 +154,11 @@ class Items extends Model
 
     public function getPrimaryImageUrlAttribute()
     {
+        if ($this->relationLoaded('images')) {
+            $primary = $this->images->firstWhere('is_primary', true) ?? $this->images->first();
+            return $primary ? asset($primary->image_path) : null;
+        }
+
         $primary = $this->images()->where('is_primary', true)->first() ?? $this->images()->first();
         return $primary ? asset($primary->image_path) : null;
     }

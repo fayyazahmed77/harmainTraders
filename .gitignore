@@ -49,13 +49,16 @@ package-lock.json.backup
 .DS_Store
 Thumbs.db
 
-# Deployment and Temporary files
+# Deployment, Scratch, and Temporary files
 /bootstrap/ssr
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore
-app.zip
+*.zip
 .temp_ag_kit/
 accounts_schema.json
 componentstrtert.json
 fix_categories.php
 search_results.csv
+/scratch/
+query_test.php
+task.md

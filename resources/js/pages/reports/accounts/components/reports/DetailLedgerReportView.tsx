@@ -148,7 +148,7 @@ export function DetailLedgerReportView({
                                                 {isFirstRow && row.credit > 0 ? formatCurrency(row.credit) : ''}
                                             </td>
                                             <td className="px-4 py-2 text-right font-black text-text-primary tabular-nums">
-                                                {isFirstRow && row.balance ? formatCurrency(row.balance) : ''}
+                                                {isFirstRow && row.balance !== undefined && row.balance !== null ? formatCurrency(row.balance) : ''}
                                             </td>
                                         </tr>
                                     );

@@ -168,20 +168,25 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
     @php
     $groupedItems = $offer->items->groupBy(function($item) use ($groupBy) {
         if ($groupBy === 'company') {
-            return $item->items->companyAccount->title ?? 'NO COMPANY';
+            $companyTitle = $item->items->companyAccount->title ?? null;
+            return !empty(trim((string)$companyTitle)) ? trim($companyTitle) : 'NO COMPANY';
         }
 
         if (isset($item->items) && isset($item->items->category)) {
             if ($item->items->relationLoaded('category') && $item->items->category instanceof \App\Models\ItemCategory) {
-                return $item->items->category->name;
+                return trim($item->items->category->name);
             }
 
             if (is_numeric($item->items->category)) {
                 $cat = \App\Models\ItemCategory::find($item->items->category);
-                return $cat ? $cat->name : 'UNCATEGORIZED';
+                return $cat ? trim($cat->name) : 'UNCATEGORIZED';
             }
         }
         return 'UNCATEGORIZED';
+    })->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)->map(function($items) {
+        return $items->sortBy(function($item) {
+            return strtolower(trim($item->items->title ?? ''));
+        }, SORT_NATURAL | SORT_FLAG_CASE);
     });
     @endphp
 

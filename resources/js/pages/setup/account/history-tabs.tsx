@@ -221,7 +221,7 @@ export const PurchasesHistoryTab = ({ accountId }: { accountId: number }) => {
 };
 
 // --- Payments & Unpaid Bills Ledger ---
-export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: number, accountType: string }) => {
+export const PaymentsLedgerTab = ({ accountId, accountType, hasSale, hasPurchase }: { accountId: number, accountType: string, hasSale?: boolean, hasPurchase?: boolean }) => {
     const [data, setData] = useState([]);
     const [unpaidBills, setUnpaidBills] = useState([]);
     const [meta, setMeta] = useState<any>(null);
@@ -243,6 +243,10 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
     }, [accountId, page]);
 
     if (loading && data.length === 0) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>;
+
+    const isDualRole = (Boolean(hasSale) && Boolean(hasPurchase)) || unpaidBills.some((b: any) => Boolean(b.bill_type));
+    const saleUnpaidTotal = unpaidBills.filter((b: any) => b.bill_type === 'Sale' || !b.bill_type).reduce((acc: number, curr: any) => acc + Number(curr.remaining_amount || 0), 0);
+    const purchaseUnpaidTotal = unpaidBills.filter((b: any) => b.bill_type === 'Purchase').reduce((acc: number, curr: any) => acc + Number(curr.remaining_amount || 0), 0);
 
     return (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
@@ -312,7 +316,7 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                     <CardTitle className="text-md flex items-center justify-between text-red-700">
                         <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
-                            Outstanding Unpaid {accountType === 'Customers' ? 'Invoices' : 'Bills'}
+                            Outstanding Unpaid {isDualRole ? 'Invoices & Bills' : (accountType === 'Customers' ? 'Invoices' : 'Bills')}
                         </div>
                         <Badge variant="destructive" className="bg-red-600">
                             {unpaidBills.length} Pending
@@ -326,13 +330,14 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                             <TableRow className="bg-muted/10 sticky top-0 bg-white">
                                 <TableHead>Date</TableHead>
                                 <TableHead>Invoice #</TableHead>
+                                {isDualRole && <TableHead>Type</TableHead>}
                                 <TableHead className="text-right">Balance Due</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {unpaidBills.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center py-12 text-muted-foreground italic h-full flex items-center justify-center">
+                                    <TableCell colSpan={isDualRole ? 4 : 3} className="text-center py-12 text-muted-foreground italic h-full flex items-center justify-center">
                                        <div className="flex flex-col items-center gap-2">
                                            <CheckCircle2 className="h-8 w-8 text-green-500 opacity-50" />
                                            <p>All bills are settled.</p>
@@ -340,9 +345,16 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                                     </TableCell>
                                 </TableRow>
                             ) : unpaidBills.map((bill: any) => (
-                                <TableRow key={bill.id} className="hover:bg-red-50/30">
+                                <TableRow key={`${bill.bill_type || 'bill'}_${bill.id}`} className="hover:bg-red-50/30">
                                     <TableCell className="text-xs">{formatDate(bill.date)}</TableCell>
                                     <TableCell className="text-xs font-semibold">{bill.invoice}</TableCell>
+                                    {isDualRole && (
+                                        <TableCell>
+                                            <Badge variant="outline" className={`text-[10px] ${bill.bill_type === 'Purchase' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                {bill.bill_type === 'Purchase' ? 'Purchase (Payable)' : 'Sale (Receivable)'}
+                                            </Badge>
+                                        </TableCell>
+                                    )}
                                     <TableCell className="text-right font-bold text-red-600 text-xs">
                                         {formatCurrency(bill.remaining_amount)}
                                     </TableCell>
@@ -352,11 +364,36 @@ export const PaymentsLedgerTab = ({ accountId, accountType }: { accountId: numbe
                     </Table>
                 </CardContent>
                 {unpaidBills.length > 0 && (
-                     <div className="p-3 border-t bg-muted/10 flex justify-between items-center text-sm font-bold">
-                         <span>Total Outstanding:</span>
-                         <span className="text-red-700">
-                             {formatCurrency(unpaidBills.reduce((acc, curr: any) => acc + Number(curr.remaining_amount), 0))}
-                         </span>
+                     <div className="p-3 border-t bg-muted/10 flex flex-col gap-1.5 text-xs">
+                         {isDualRole ? (
+                             <>
+                                 <div className="flex justify-between items-center text-zinc-600 font-medium">
+                                     <span>Receivable Invoices ({unpaidBills.filter((b: any) => b.bill_type === 'Sale' || !b.bill_type).length}):</span>
+                                     <span className="font-bold text-blue-600">
+                                         {formatCurrency(saleUnpaidTotal)}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-zinc-600 font-medium">
+                                     <span>Payable Bills ({unpaidBills.filter((b: any) => b.bill_type === 'Purchase').length}):</span>
+                                     <span className="font-bold text-purple-600">
+                                         {formatCurrency(purchaseUnpaidTotal)}
+                                     </span>
+                                 </div>
+                                 <div className="flex justify-between items-center text-sm font-bold border-t pt-1.5">
+                                     <span>Net Position:</span>
+                                     <span className={purchaseUnpaidTotal > saleUnpaidTotal ? 'text-purple-700' : 'text-blue-700'}>
+                                         {formatCurrency(Math.abs(saleUnpaidTotal - purchaseUnpaidTotal))} {purchaseUnpaidTotal > saleUnpaidTotal ? 'CR (Payable)' : 'DR (Receivable)'}
+                                     </span>
+                                 </div>
+                             </>
+                         ) : (
+                             <div className="flex justify-between items-center text-sm font-bold">
+                                 <span>Total Outstanding:</span>
+                                 <span className="text-red-700">
+                                     {formatCurrency(unpaidBills.reduce((acc, curr: any) => acc + Number(curr.remaining_amount), 0))}
+                                 </span>
+                             </div>
+                         )}
                      </div>
                 )}
             </Card>

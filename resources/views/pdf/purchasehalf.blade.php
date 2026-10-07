@@ -301,8 +301,8 @@
             <div style="font-size: 9px; font-weight: bold; color: #000;">
                 Thank you for choosing Haramain Traders.
             </div>
-            <div style="font-size: 7.5px; color: #555; margin-top: 4px; letter-spacing: 0.3px;">
-                Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>
+            <div style="font-size: 7.5px; color: #000; margin-top: 4px; letter-spacing: 0.3px;">
+                Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
             </div>
         </div>
     </div>

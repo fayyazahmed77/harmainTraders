@@ -360,7 +360,7 @@ export function ParameterForm({
                                         {[
                                             { id: 'last_purchase', label: 'Last Purchase' },
                                             { id: 'average', label: 'Average Rate' },
-                                            
+                                            { id: 'opening_stock', label: 'Opening Stock' },
                                         ].map(opt => (
                                             <div key={opt.id} className="flex items-center space-x-3 group cursor-pointer">
                                                 <RadioGroupItem value={opt.id} id={opt.id} className="border-blue-600/40 text-blue-600 h-4 w-4" />

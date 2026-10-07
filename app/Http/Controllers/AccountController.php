@@ -80,17 +80,108 @@ class AccountController extends Controller implements HasMiddleware
             return $account->accountType && $account->accountType->name === 'Supplier';
         });
 
-        // Correctly compute receivables and payables using the same ledger formula
-        // as the per-account balance (via PaymentAccountingService / getSignedOpeningBalance)
+        $customerIds = $customers->pluck('id')->toArray();
+        $supplierIds = $suppliers->pluck('id')->toArray();
+
+        // Bulk load customer transactions in single-pass queries
+        $custSales = empty($customerIds) ? collect() : \App\Models\Sales::whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        $custReturns = empty($customerIds) ? collect() : \App\Models\SalesReturn::whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        $custReceipts = empty($customerIds) ? collect() : \App\Models\Payment::whereIn('account_id', $customerIds)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        $custPaymentsPaid = empty($customerIds) ? collect() : \App\Models\Payment::whereIn('account_id', $customerIds)
+            ->where('type', 'PAYMENT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        // Bulk load supplier transactions in single-pass queries
+        $suppPurchases = empty($supplierIds) ? collect() : \App\Models\Purchase::whereIn('supplier_id', $supplierIds)
+            ->selectRaw('supplier_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $suppReturns = empty($supplierIds) ? collect() : \App\Models\PurchaseReturn::whereIn('supplier_id', $supplierIds)
+            ->selectRaw('supplier_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $suppPayments = empty($supplierIds) ? collect() : \App\Models\Payment::whereIn('account_id', $supplierIds)
+            ->where('type', 'PAYMENT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        $suppReceipts = empty($supplierIds) ? collect() : \App\Models\Payment::whereIn('account_id', $supplierIds)
+            ->where('type', 'RECEIPT')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        // Correctly compute receivables using exact same formula in memory
         $receivables = 0;
         foreach ($customers as $customer) {
-            $bal = \App\Services\PaymentAccountingService::getCustomerCurrentBalance($customer);
+            $totalSales = (float)($custSales[$customer->id] ?? 0);
+            $totalReturns = (float)($custReturns[$customer->id] ?? 0);
+
+            $receipts = $custReceipts->get($customer->id, collect());
+            $totalReceiptsSettlement = 0.0;
+            foreach ($receipts as $r) {
+                $totalReceiptsSettlement += \App\Services\PaymentAccountingService::getRecognizedNetSettlement($r);
+            }
+
+            $paymentsPaid = $custPaymentsPaid->get($customer->id, collect());
+            $totalPaymentsSettlement = 0.0;
+            foreach ($paymentsPaid as $p) {
+                $totalPaymentsSettlement += \App\Services\PaymentAccountingService::getRecognizedNetSettlement($p);
+            }
+
+            $bal = $customer->getSignedOpeningBalance() + $totalSales + $totalPaymentsSettlement - $totalReturns - $totalReceiptsSettlement;
             if ($bal > 0) $receivables += $bal; // Only DR balances count as receivable
         }
 
+        // Correctly compute payables using exact same formula in memory
         $payables = 0;
         foreach ($suppliers as $supplier) {
-            $bal = \App\Services\PaymentAccountingService::getSupplierCurrentBalance($supplier);
+            $totalPurchases = (float)($suppPurchases[$supplier->id] ?? 0);
+            $totalReturns = (float)($suppReturns[$supplier->id] ?? 0);
+
+            $payments = $suppPayments->get($supplier->id, collect());
+            $totalPaymentsSettlement = 0.0;
+            foreach ($payments as $p) {
+                $totalPaymentsSettlement += \App\Services\PaymentAccountingService::getRecognizedNetSettlement($p);
+            }
+
+            $receipts = $suppReceipts->get($supplier->id, collect());
+            $totalReceiptsSettlement = 0.0;
+            foreach ($receipts as $r) {
+                $totalReceiptsSettlement += \App\Services\PaymentAccountingService::getRecognizedNetSettlement($r);
+            }
+
+            $bal = $supplier->getSignedOpeningBalance() + $totalPurchases + $totalReceiptsSettlement - $totalReturns - $totalPaymentsSettlement;
             if ($bal > 0) $payables += $bal; // Only CR balances count as payable
         }
 
@@ -383,7 +474,83 @@ class AccountController extends Controller implements HasMiddleware
         $type = trim($account->accountType->name ?? '');
         $typeLower = strtolower($type);
 
-        if ($typeLower === 'customers') {
+        $hasSale = (bool) $account->sale || $typeLower === 'customers';
+        $hasPurchase = (bool) $account->purchase || $typeLower === 'supplier';
+
+        if ($hasSale && $hasPurchase) {
+            // Dual Role: Customer + Supplier
+            $totalSalesGross = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
+            $totalExtraDiscount = \App\Models\Sales::where('customer_id', $account->id)->sum('extra_discount');
+            $totalSales = $totalSalesGross - $totalExtraDiscount;
+            $totalSalesReturns = \App\Models\SalesReturn::where('customer_id', $account->id)->sum('net_total');
+
+            $totalPurchases = \App\Models\Purchase::where('supplier_id', $account->id)->sum('net_total');
+            $totalPurchaseReturns = \App\Models\PurchaseReturn::where('supplier_id', $account->id)->sum('net_total');
+
+            $receiptsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'RECEIPT')->where('cheque_status', '!=', 'Canceled');
+            $totalReceiptsCash = (float) (clone $receiptsQuery)->sum('amount');
+            $totalReceiptsDiscount = (float) (clone $receiptsQuery)->sum('discount');
+            $totalReceipts = $totalReceiptsCash + $totalReceiptsDiscount;
+
+            $paymentsQuery = \App\Models\Payment::where('account_id', $account->id)->where('type', 'PAYMENT')->where('cheque_status', '!=', 'Canceled');
+            $totalPaymentsCash = (float) (clone $paymentsQuery)->sum('amount');
+            $totalPaymentsDiscount = (float) (clone $paymentsQuery)->sum('discount');
+            $totalPayments = $totalPaymentsCash + $totalPaymentsDiscount;
+
+            $unpaidInvoices = \App\Models\Sales::where('customer_id', $account->id)->where('remaining_amount', '>', 0)->count();
+            $unpaidBills = \App\Models\Purchase::where('supplier_id', $account->id)->where('remaining_amount', '>', 0)->count();
+
+            $currentBalance = $account->current_balance;
+
+            $outstandingReceivable = (float) \App\Models\Sales::where('customer_id', $account->id)
+                ->whereNotIn('status', ['Paid', 'Returned'])
+                ->get()
+                ->sum(fn($s) => max(0.0, (float)$s->remaining_amount));
+
+            $outstandingPayable = (float) \App\Models\Purchase::where('supplier_id', $account->id)
+                ->whereNotIn('status', ['Paid', 'Returned'])
+                ->get()
+                ->sum(fn($p) => max(0.0, (float)$p->remaining_amount));
+
+            $customerCredit = (float) \App\Models\CustomerCredit::where('customer_id', $account->id)
+                ->whereIn('status', ['Available', 'Partial'])
+                ->sum('available_balance');
+
+            $supplierCredit = (float) \App\Models\SupplierCredit::where('supplier_id', $account->id)
+                ->whereIn('status', ['Available', 'Partial'])
+                ->sum('available_balance');
+
+            $advance = \App\Services\PaymentAccountingService::getAccountAdvanceBalance($account);
+
+            $summary = [
+                'is_dual_role' => true,
+                'total_sales' => $totalSales,
+                'total_extra_discount' => $totalExtraDiscount,
+                'total_returns' => $totalSalesReturns,
+                'total_sales_returns' => $totalSalesReturns,
+                'unpaid_invoices' => $unpaidInvoices,
+                'outstanding_receivable' => $outstandingReceivable,
+                'customer_credit_balance' => $customerCredit,
+
+                'total_purchases' => $totalPurchases,
+                'total_purchase_returns' => $totalPurchaseReturns,
+                'unpaid_bills' => $unpaidBills,
+                'outstanding_payable' => $outstandingPayable,
+                'supplier_credit_balance' => $supplierCredit,
+
+                'total_receipts' => $totalReceipts,
+                'total_receipts_cash' => $totalReceiptsCash,
+                'total_receipts_discount' => $totalReceiptsDiscount,
+                'total_payments' => $totalPayments,
+                'total_payments_cash' => $totalPaymentsCash,
+                'total_payments_discount' => $totalPaymentsDiscount,
+
+                'current_balance' => $currentBalance,
+                'outstanding' => $outstandingReceivable,
+                'credit_balance' => $customerCredit + $supplierCredit,
+                'advance_balance' => $advance,
+            ];
+        } elseif ($typeLower === 'customers') {
             $totalSalesGross = \App\Models\Sales::where('customer_id', $account->id)->sum('net_total');
             $totalExtraDiscount = \App\Models\Sales::where('customer_id', $account->id)->sum('extra_discount');
             $totalSales = $totalSalesGross - $totalExtraDiscount;

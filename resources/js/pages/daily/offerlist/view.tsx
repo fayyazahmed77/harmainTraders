@@ -39,8 +39,14 @@ interface OfferItem {
     scheme: string;
     items: {
         title: string;
-        category: {
+        category?: {
             name: string;
+        };
+        companyAccount?: {
+            title: string;
+        };
+        company_account?: {
+            title: string;
         };
     };
 }
@@ -66,15 +72,46 @@ interface Props {
 }
 
 export default function View({ offer }: Props) {
-    // Group items by category
-    const groupedItems = offer.items.reduce((acc, item) => {
-        const categoryName = item.items.category?.name || "Uncategorized";
-        if (!acc[categoryName]) {
-            acc[categoryName] = [];
+    // Read optional ?group_by query param or default to 'company'
+    const [groupBy, setGroupBy] = React.useState<'category' | 'company'>(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('group_by') === 'category') return 'category';
         }
-        acc[categoryName].push(item);
-        return acc;
-    }, {} as Record<string, OfferItem[]>);
+        return 'company';
+    });
+
+    // Group items and sort both groups and items A-Z
+    const groupedItems = React.useMemo(() => {
+        const rawGroups = (offer.items || []).reduce((acc, item) => {
+            let groupName = "Uncategorized";
+            if (groupBy === 'company') {
+                groupName = item.items?.companyAccount?.title || item.items?.company_account?.title || "No Company";
+            } else {
+                groupName = item.items?.category?.name || "Uncategorized";
+            }
+            groupName = groupName.trim();
+            if (!acc[groupName]) {
+                acc[groupName] = [];
+            }
+            acc[groupName].push(item);
+            return acc;
+        }, {} as Record<string, OfferItem[]>);
+
+        // Sort groups A-Z and items within each group A-Z
+        const sortedGroups: Record<string, OfferItem[]> = {};
+        const sortedKeys = Object.keys(rawGroups).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+        );
+
+        for (const key of sortedKeys) {
+            sortedGroups[key] = [...rawGroups[key]].sort((a, b) =>
+                (a.items?.title || '').localeCompare(b.items?.title || '', undefined, { sensitivity: 'base', numeric: true })
+            );
+        }
+
+        return sortedGroups;
+    }, [offer.items, groupBy]);
 
     return (
         <SidebarProvider>
@@ -207,6 +244,42 @@ export default function View({ offer }: Props) {
                         </Card>
                     </motion.div>
 
+                    {/* Grouping Toggle */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">Group By:</span>
+                            <div className="inline-flex rounded-xl p-1 bg-zinc-200/60 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
+                                <button
+                                    type="button"
+                                    onClick={() => setGroupBy('company')}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                        groupBy === 'company'
+                                            ? "bg-white dark:bg-zinc-900 text-orange-600 dark:text-orange-400 shadow-sm"
+                                            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+                                    )}
+                                >
+                                    Company (A-Z)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setGroupBy('category')}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                        groupBy === 'category'
+                                            ? "bg-white dark:bg-zinc-900 text-orange-600 dark:text-orange-400 shadow-sm"
+                                            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+                                    )}
+                                >
+                                    Category (A-Z)
+                                </button>
+                            </div>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                            Alphabetical Order A &rarr; Z
+                        </span>
+                    </div>
+
                     {/* Manifest Archives */}
                     <div className="space-y-10 pb-20">
                         <AnimatePresence>
@@ -256,7 +329,10 @@ export default function View({ offer }: Props) {
                                                                         {item.items.title}
                                                                     </span>
                                                                     <span className="text-[8px] font-bold text-zinc-400 tracking-widest mt-1">
-                                                                        NODE_ID: {item.id.toString().padStart(5, '0')}
+                                                                        {groupBy === 'company'
+                                                                            ? (item.items.category?.name ? `CAT: ${item.items.category.name}` : `ID: ${item.id}`)
+                                                                            : (item.items.companyAccount?.title ? `COM: ${item.items.companyAccount.title}` : `ID: ${item.id}`)
+                                                                        }
                                                                     </span>
                                                                 </div>
                                                             </td>

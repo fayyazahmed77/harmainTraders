@@ -130,9 +130,100 @@ export default function AccountView({ account, financial_summary }: Props) {
 
     const type = account.account_type?.name || account.type;
     const typeLower = (type || '').toLowerCase();
+    const hasSale = Boolean(Number(account.sale)) || typeLower === 'customers';
+    const hasPurchase = Boolean(Number(account.purchase)) || typeLower === 'supplier';
+    const hasTrade = hasSale || hasPurchase;
 
     const renderFinancialSummary = () => {
         if (!financial_summary || Object.keys(financial_summary).length === 0) return null;
+
+        if (financial_summary.is_dual_role) {
+            return (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2 text-indigo-600">
+                            <TrendingUp className="h-4 w-4" />
+                            Customer & Supplier Activity
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {/* Sales Section */}
+                        <div className="rounded-md bg-blue-50/50 p-2.5 space-y-1.5 border border-blue-100">
+                            <div className="flex items-center justify-between text-xs font-bold text-blue-900 uppercase">
+                                <span>Sales (Customer)</span>
+                                <Badge variant="outline" className="text-[10px] bg-blue-100/50 text-blue-700 border-blue-200">
+                                    {financial_summary.unpaid_invoices} Unpaid
+                                </Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-zinc-600">Total Sales (Net)</span>
+                                <span className="font-semibold">{formatCurrency(financial_summary.total_sales)}</span>
+                            </div>
+                            {Number(financial_summary.total_sales_returns) > 0 && (
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-zinc-600">Sales Returns</span>
+                                    <span className="font-semibold text-orange-600">-{formatCurrency(financial_summary.total_sales_returns)}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between text-sm pt-1 border-t border-blue-100/80">
+                                <span className="text-zinc-700 font-medium">Outstanding Receivable</span>
+                                <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding_receivable)}</span>
+                            </div>
+                        </div>
+
+                        {/* Purchases Section */}
+                        <div className="rounded-md bg-purple-50/50 p-2.5 space-y-1.5 border border-purple-100">
+                            <div className="flex items-center justify-between text-xs font-bold text-purple-900 uppercase">
+                                <span>Purchases (Supplier)</span>
+                                <Badge variant="outline" className="text-[10px] bg-purple-100/50 text-purple-700 border-purple-200">
+                                    {financial_summary.unpaid_bills} Unpaid
+                                </Badge>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-zinc-600">Total Purchases</span>
+                                <span className="font-semibold">{formatCurrency(financial_summary.total_purchases)}</span>
+                            </div>
+                            {Number(financial_summary.total_purchase_returns) > 0 && (
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-zinc-600">Purchase Returns</span>
+                                    <span className="font-semibold text-orange-600">-{formatCurrency(financial_summary.total_purchase_returns)}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between text-sm pt-1 border-t border-purple-100/80">
+                                <span className="text-zinc-700 font-medium">Outstanding Payable</span>
+                                <span className="font-bold text-red-600">{formatCurrency(financial_summary.outstanding_payable)}</span>
+                            </div>
+                        </div>
+
+                        {/* Cash / Receipts / Payments */}
+                        <div className="space-y-1.5 pt-1">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-zinc-600">Amount Received</span>
+                                <span className="font-bold text-green-600">
+                                    {formatCurrency(financial_summary.total_receipts_cash !== undefined ? financial_summary.total_receipts_cash : financial_summary.total_receipts)}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-zinc-600">Amount Paid</span>
+                                <span className="font-bold text-blue-600">
+                                    {formatCurrency(financial_summary.total_payments_cash !== undefined ? financial_summary.total_payments_cash : financial_summary.total_payments)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Net Balance Breakdown */}
+                        <div className="border-t pt-2 mt-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="font-semibold text-zinc-800">Net Position</span>
+                                <span className={`font-bold ${Number(financial_summary.current_balance) < 0 ? 'text-purple-600' : 'text-blue-600'}`}>
+                                    {formatCurrency(Math.abs(Number(financial_summary.current_balance)))} {Number(financial_summary.current_balance) < 0 ? 'CR (Payable)' : 'DR (Receivable)'}
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            );
+        }
 
         if (typeLower === 'customers') {
             return (
@@ -211,7 +302,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
                             </div>
                         )}
-                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
+                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && Number(financial_summary.current_balance) < 0 && account.opening_balance_type !== 'DR' && (
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-zinc-700">Advance Payment (Advance)</span>
                                 <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
@@ -272,7 +363,7 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 <span className="font-bold text-emerald-600">{formatCurrency(financial_summary.credit_balance)}</span>
                             </div>
                         )}
-                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && (
+                        {financial_summary.advance_balance !== undefined && Number(financial_summary.advance_balance) > 0 && Number(financial_summary.current_balance) < 0 && account.opening_balance_type !== 'DR' && (
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-zinc-700">Advance Payment (Advance)</span>
                                 <span className="font-bold text-sky-600">{formatCurrency(financial_summary.advance_balance)}</span>
@@ -582,26 +673,22 @@ export default function AccountView({ account, financial_summary }: Props) {
                                             Identity & Detail
                                         </TabsTrigger>
                                         
-                                        {typeLower === 'customers' && (
-                                            <>
-                                                <TabsTrigger value="sales" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
-                                                    Sales History
-                                                </TabsTrigger>
-                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
-                                                    Payments & Outstanding
-                                                </TabsTrigger>
-                                            </>
+                                        {hasSale && (
+                                            <TabsTrigger value="sales" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                Sales History
+                                            </TabsTrigger>
                                         )}
 
-                                        {typeLower === 'supplier' && (
-                                            <>
-                                                <TabsTrigger value="purchases" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
-                                                    Purchase History
-                                                </TabsTrigger>
-                                                <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
-                                                    Payments & Outstanding
-                                                </TabsTrigger>
-                                            </>
+                                        {hasPurchase && (
+                                            <TabsTrigger value="purchases" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                Purchase History
+                                            </TabsTrigger>
+                                        )}
+
+                                        {hasTrade && (
+                                            <TabsTrigger value="payments" className="relative rounded-none border-b-2 border-transparent bg-transparent px-6 pb-3 pt-3 font-semibold text-zinc-700 shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:bg-transparent">
+                                                Payments & Outstanding
+                                            </TabsTrigger>
                                         )}
 
                                         {['bank', 'cash', 'cheque in hand'].includes(typeLower) && (
@@ -716,26 +803,22 @@ export default function AccountView({ account, financial_summary }: Props) {
                                 </TabsContent>
 
                                 {/* Dynamic Tabs Content Loading */}
-                                {typeLower === 'customers' && (
-                                    <>
-                                        <TabsContent value="sales" className="mt-2 focus-visible:outline-none">
-                                            <SalesHistoryTab accountId={account.id} />
-                                        </TabsContent>
-                                        <TabsContent value="payments" className="mt-2 focus-visible:outline-none">
-                                            <PaymentsLedgerTab accountId={account.id} accountType={type} />
-                                        </TabsContent>
-                                    </>
+                                {hasSale && (
+                                    <TabsContent value="sales" className="mt-2 focus-visible:outline-none">
+                                        <SalesHistoryTab accountId={account.id} />
+                                    </TabsContent>
                                 )}
 
-                                {typeLower === 'supplier' && (
-                                    <>
-                                        <TabsContent value="purchases" className="mt-2 focus-visible:outline-none">
-                                            <PurchasesHistoryTab accountId={account.id} />
-                                        </TabsContent>
-                                        <TabsContent value="payments" className="mt-2 focus-visible:outline-none">
-                                            <PaymentsLedgerTab accountId={account.id} accountType={type} />
-                                        </TabsContent>
-                                    </>
+                                {hasPurchase && (
+                                    <TabsContent value="purchases" className="mt-2 focus-visible:outline-none">
+                                        <PurchasesHistoryTab accountId={account.id} />
+                                    </TabsContent>
+                                )}
+
+                                {hasTrade && (
+                                    <TabsContent value="payments" className="mt-2 focus-visible:outline-none">
+                                        <PaymentsLedgerTab accountId={account.id} accountType={type} hasSale={hasSale} hasPurchase={hasPurchase} />
+                                    </TabsContent>
                                 )}
 
                                 {['bank', 'cash', 'cheque in hand'].includes(typeLower) && (
