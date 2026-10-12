@@ -32,6 +32,7 @@ class PaymentController extends Controller implements HasMiddleware
             ]),
             new Middleware('permission:create payments', only: ['create', 'store', 'refundCredit']),
             new Middleware('permission:edit payments', only: ['edit', 'update']),
+            new Middleware('permission:delete payments', only: ['destroy']),
         ];
     }
 
@@ -291,7 +292,8 @@ class PaymentController extends Controller implements HasMiddleware
         }
         $payment->splits = $splits;
 
-        $accounts = Account::active()->with('accountType')->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank')->get();
+        $accounts = Account::active()->with('accountType')->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank', 'opening_balance', 'opening_balance_type')->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
         $paymentAccounts = Account::eligibleForCashBank()->with('accountType')->get();
 
         $messageLines = \App\Models\MessageLine::where(function ($query) {
@@ -563,14 +565,15 @@ class PaymentController extends Controller implements HasMiddleware
 
     public function destroy($id)
     {
-        if (! \Illuminate\Support\Facades\Gate::allows('delete-payment')) {
-            abort(403);
+        if (
+            !auth()->user()?->can('delete payments') &&
+            !\Illuminate\Support\Facades\Gate::allows('delete payments') &&
+            !\Illuminate\Support\Facades\Gate::allows('delete-payment')
+        ) {
+            abort(403, 'Unauthorized to delete payment vouchers.');
         }
-        $payment = Payment::with('allocations')->findOrFail($id);
 
-        if ($payment->cheque_status === 'Cancelled' || $payment->cheque_status === 'Canceled') {
-            return back()->with('error', 'Payment is already canceled.');
-        }
+        $payment = Payment::with(['allocations', 'account'])->findOrFail($id);
 
         DB::beginTransaction();
         try {
@@ -580,17 +583,29 @@ class PaymentController extends Controller implements HasMiddleware
                     : Purchase::find($allocation->bill_id);
 
                 if ($bill) {
-                    $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
-                    $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
-                    $bill->remaining_amount = $bill->net_total - (float)($bill->extra_discount ?? 0) - $bill->paid_amount - $sumOfReturns;
+                    $bill->paid_amount = max(0.0, round((float)$bill->paid_amount - (float)$allocation->amount, 2));
+                    $netPayable = max(0.0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0));
+                    $sumOfReturns = (float)$this->getTotalReturns($bill, $allocation->bill_type);
+                    $bill->remaining_amount = max(0.0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
 
-                    // Re-evaluate status
-                    if ($bill->remaining_amount <= 0 && $bill->paid_amount > 0) {
-                        $bill->status = 'Paid';
-                    } elseif ($bill->remaining_amount > 0 && $bill->paid_amount > 0) {
-                        $bill->status = 'Partial';
+                    // Re-evaluate status based on specific model schema
+                    if ($allocation->bill_type === 'App\Models\Sales') {
+                        if ($bill->remaining_amount <= 0.001 && $bill->paid_amount > 0) {
+                            $bill->status = 'Paid';
+                        } elseif ($bill->remaining_amount > 0 && $bill->paid_amount > 0) {
+                            $bill->status = 'Partial';
+                        } else {
+                            $bill->status = 'Unpaid';
+                        }
                     } else {
-                        $bill->status = 'Unpaid';
+                        // Purchase model enum: 'Completed', 'Partial Return', 'Returned', ''
+                        if ($sumOfReturns >= $netPayable) {
+                            $bill->status = 'Returned';
+                        } elseif ($sumOfReturns > 0) {
+                            $bill->status = 'Partial Return';
+                        } else {
+                            $bill->status = 'Completed';
+                        }
                     }
                     $bill->save();
                 }
@@ -621,16 +636,22 @@ class PaymentController extends Controller implements HasMiddleware
             if ($payment->customer_credit_id) {
                 $creditService = new \App\Services\CustomerCreditService();
                 $creditService->cancelRefund($payment->id);
-            } else {
-                // Soft-cancels the payment (sets cheque_status = 'Cancelled') and deletes its allocations
-                $payment->update(['cheque_status' => 'Cancelled']);
-                PaymentAllocation::where('payment_id', $payment->id)->delete();
             }
 
-            \Illuminate\Support\Facades\Log::info('Financial Audit - Payment Cancelled', [
-                'action' => 'PAYMENT_CANCEL',
+            // Delete payment allocations
+            PaymentAllocation::where('payment_id', $payment->id)->delete();
+
+            // Clear any self-referencing foreign keys pointing to this payment
+            Payment::where('source_payment_id', $payment->id)->update(['source_payment_id' => null]);
+
+            \Illuminate\Support\Facades\Log::info('Financial Audit - Payment Voucher Deleted', [
+                'action' => 'PAYMENT_PERMANENT_DELETE',
                 'payment_id' => $payment->id,
                 'voucher_no' => $payment->voucher_no,
+                'account_id' => $payment->account_id,
+                'party_title' => $payment->account?->title,
+                'amount' => $payment->amount,
+                'discount' => $payment->discount,
                 'user_id' => request()->user()?->id,
                 'user_name' => request()->user()?->name ?? 'System',
                 'ip_address' => request()->ip(),
@@ -639,8 +660,11 @@ class PaymentController extends Controller implements HasMiddleware
                 'timestamp' => now()->toIso8601String(),
             ]);
 
+            $voucherNo = $payment->voucher_no;
+            $payment->delete();
+
             DB::commit();
-            return back()->with('success', 'Payment deleted and allocations reversed.');
+            return back()->with('success', "Payment voucher {$voucherNo} deleted and all ledger balances restored.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Payment Delete Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -832,7 +856,7 @@ class PaymentController extends Controller implements HasMiddleware
         // For now fetching all, but ideally filter by type
         $accounts = Account::active()
             ->with('accountType')
-            ->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank')
+            ->select('id', 'title', 'type', 'purchase', 'sale', 'cashbank', 'opening_balance', 'opening_balance_type')
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', [
                     'Customers', 'Supplier', 'Expense', 'Other', 'Bank',
@@ -840,6 +864,7 @@ class PaymentController extends Controller implements HasMiddleware
                 ]);
             })
             ->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
         $paymentAccounts = Account::eligibleForCashBank()
             ->with('accountType')
             ->get();

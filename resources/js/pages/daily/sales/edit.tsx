@@ -190,10 +190,15 @@ interface Sale {
   invoice: string;
   code?: string;
   date?: string;
+  customer_id?: number | null;
   salesman_id?: number | null;
   customer?: Account | null;
   courier_charges?: number | string;
+  net_total?: number | string;
   extra_discount?: number | string;
+  total_receivable?: number | string;
+  paid_amount?: number | string;
+  remaining_amount?: number | string;
   print_format?: string;
   firm_id?: number | null;
   message_line_id?: number | null;
@@ -278,7 +283,28 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const [cashCredit, setCashCredit] = useState<string>("CREDIT");
   const [accountType, setAccountType] = useState<Option | null>(sale.customer ? { value: String(sale.customer.id), label: sale.customer.title } : null);
   const [courier, setCourier] = useState<number>(toNumber(sale.courier_charges));
-  const [previousBalance, setPreviousBalance] = useState<number>(0);
+
+  // Compute effective previous balance before this bill
+  const getEffectivePreviousBalance = (fetchedBalance: number, customerId?: number | string | null) => {
+    const isOriginalCustomer = Number(customerId) === Number(sale.customer_id || sale.customer?.id);
+    if (!isOriginalCustomer) {
+      return Number(fetchedBalance) || 0;
+    }
+    // For original customer, this bill's net impact is already inside fetchedBalance in the ledger.
+    // Subtract this bill's original remaining net amount to get true previous balance prior to this bill.
+    const originalBillNet = Math.max(0, toNumber(sale.net_total) - toNumber(sale.extra_discount));
+    const existingPaid = toNumber(sale.paid_amount);
+    const netImpact = Math.max(0, originalBillNet - existingPaid);
+    return Math.round((Number(fetchedBalance) || 0) - netImpact);
+  };
+
+  const initialCalculatedPrevBal = useMemo(() => {
+    const totalRec = toNumber(sale.total_receivable);
+    const billNet = Math.max(0, toNumber(sale.net_total) - toNumber(sale.extra_discount));
+    return totalRec > 0 ? Math.max(0, Math.round(totalRec - billNet)) : 0;
+  }, [sale]);
+
+  const [previousBalance, setPreviousBalance] = useState<number>(initialCalculatedPrevBal);
   const [useAdvance, setUseAdvance] = useState<boolean>(sale.has_advance_allocated ?? false);
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [printOption, setPrintOption] = useState<"big" | "small">(sale.print_format === "small" ? "small" : "big");
@@ -297,10 +323,9 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   useEffect(() => {
     if (sale.customer?.id) {
       axios.get(`/account/${sale.customer.id}/balance`).then(res => {
-        setPreviousBalance(res.data.balance);
+        setPreviousBalance(getEffectivePreviousBalance(res.data.balance, sale.customer?.id));
       }).catch(err => {
         console.error("Failed to fetch balance", err);
-        setPreviousBalance(0);
       });
     }
   }, [sale.customer?.id]);
@@ -651,8 +676,11 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   };
 
   const saveInvoice = (forceSave = false) => {
-    // Only submit splits with real amounts
-    const newSplits = splits.filter(s => toNumber(s.amount) > 0);
+    // Only submit NEW splits (without existing voucher_no) if Instant Checkout is active
+    const newSplits = isPayNow
+      ? splits.filter(s => !s.voucher_no && toNumber(s.amount) > 0)
+      : [];
+    const newPaidAmount = newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0);
 
     const payload = {
       date: date ? formatLocalDate(date) : formatLocalDate(new Date()),
@@ -666,7 +694,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       print_format: printOption,
       allow_negative_stock: forceSave,
 
-      is_pay_now: isPayNow,
+      is_pay_now: isPayNow && newSplits.length > 0,
       is_multi: isMultiPayment,
       splits: newSplits,
       message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
@@ -678,8 +706,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       courier_charges: totals.courier,
       net_total: totals.net,
       total_receivable: totals.finalAmount,
-      paid_amount: newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0),
-      remaining_amount: totals.net - newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) - totals.appliedAdvance,
+      paid_amount: newPaidAmount,
+      remaining_amount: totals.net - newPaidAmount - totals.appliedAdvance,
       use_advance: useAdvance,
       applied_advance: totals.appliedAdvance,
 
@@ -775,7 +803,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                           setSalesman(salemanId);
                           setCode(selectedAccount.code ?? "");
                           axios.get(`/account/${id}/balance`).then(res => {
-                            setPreviousBalance(res.data.balance);
+                            setPreviousBalance(getEffectivePreviousBalance(res.data.balance, id));
                           }).catch(err => {
                             console.error("Failed to fetch balance", err);
                             setPreviousBalance(0);
@@ -919,7 +947,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                           setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
                           setSalesman(selectedAccount.saleman_id ?? null);
                           setCode(selectedAccount.code ?? "");
-                          axios.get(`/account/${id}/balance`).then(res => setPreviousBalance(res.data.balance)).catch(() => setPreviousBalance(0));
+                          axios.get(`/account/${id}/balance`).then(res => setPreviousBalance(getEffectivePreviousBalance(res.data.balance, id))).catch(() => setPreviousBalance(0));
                           setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
                         } else {
                           setCreditDays(0);

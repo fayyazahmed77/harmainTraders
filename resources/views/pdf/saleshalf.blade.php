@@ -23,7 +23,7 @@
         }
 
         .receipt-wrapper {
-            width: 64mm;
+            width: 66mm;
             /* Further reduced width for maximum safety on 80mm/58mm printers */
             margin: 0 auto;
             padding-right: 3mm; /* Safe margin for printer head to prevent cut-off */
@@ -107,11 +107,11 @@
         }
 
         .w-bonus {
-            width: 34%;
+            width: 31%;
         }
 
         .w-normal {
-            width: 47%;
+            width: 44%;
         }
 
         .items-table td {
@@ -206,6 +206,10 @@
                 <span class="info-label">Time:</span>
                 <span class="info-value">{{ $sale->created_at ? \Carbon\Carbon::parse($sale->created_at)->setTimezone('Asia/Karachi')->format('h:i A') : \Carbon\Carbon::now()->setTimezone('Asia/Karachi')->format('h:i A') }}</span>
             </div>
+            <div class="info-row">
+                <span class="info-label">Invoice #:</span>
+                <span class="info-value">{{ $sale->invoice }}</span>
+            </div>
         </div>
 
         <!-- Table -->
@@ -214,16 +218,17 @@
         @endphp
         <table class="items-table">
             <thead>
-                <tr>
-                    <th style="width: 7%; text-align: center;">F</th>
+                <tr class="border-top border-bottom">
+                    <th style="width: 7%; text-align: center; border-left: 1px solid #000;">F</th>
                     <th style="width: 7%; text-align: center; border-left: 1px solid #000;">P</th>
                     @if($hasBonus)
-                    <th style="width: 10%; text-align: center;">Bns</th>
+                    <th style="width: 10%; text-align: center; border-left: 1px solid #000;">Bns</th>
                     @endif
-                    <th class="{{ $hasBonus ? 'w-bonus' : 'w-normal' }}">Item(s)</th>
+                    <th class="{{ $hasBonus ? 'w-bonus' : 'w-normal' }} border-left: 1px solid #000;">Item(s)</th>
+                    <th style="width: 13%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">MRP</th>
                     <th style="width: 13%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Rate</th>
-                    <th style="width: 9%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Dis</th>
-                    <th style="width: 17%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Amount</th>
+                    <th style="width: 11%; text-align: right; border-left: 1px solid #000; padding-right: 1mm;">Disc</th>
+                    <th style="width: 18%; text-align: right; border-left: 1px solid #000; padding-right: 1mm; border-right: 1px solid #000;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -236,15 +241,16 @@
                 if ($item->bonus_qty_pcs > 0) $bonusText .= number_format($item->bonus_qty_pcs,0).'P';
                 @endphp
                 <tr>
-                    <td class="text-center">{{ (int)$item->qty_carton }}</td>
+                    <td class="text-center" style="border-left: 1px solid #000;">{{ (int)$item->qty_carton }}</td>
                     <td class="text-center" style="border-left: 1px solid #000;">{{ (int)$item->qty_pcs }}</td>
                     @if($hasBonus)
-                    <td class="text-center">{{ $bonusText ?: '-' }}</td>
+                    <td class="text-center" style="border-left: 1px solid #000;">{{ $bonusText ?: '-' }}</td>
                     @endif
-                    <td>{{ $item->item->title }}</td>
+                    <td style="border-left: 1px solid #000;">{{ $item->item->title }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->item->retail, 0) }}</td>
                     <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->trade_price, 0) }}</td>
-                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->discount, 0) }}</td>
-                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->subtotal, 0) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($disc_percent, 2) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm; border-right: 1px solid #000;">{{ number_format($item->subtotal - $item->discount, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -261,17 +267,17 @@
 
             <div class="total-row clearfix">
                 <span class="total-label">Courier Charges :-</span>
-                <span class="total-value">{{ number_format($sale->courier_charges ?? 0, 0) }}</span>
+                <span class="total-value">{{ number_format($sale->courier_charges ?? 0, 2) }}</span>
             </div>
            @if($sale->extra_discount > 0)
             <div class="total-row clearfix">
                 <span class="total-label">Extra Discount :-</span>
-                <span class="total-value">{{ number_format($sale->extra_discount, 0) }}</span>
+                <span class="total-value">{{ number_format($sale->extra_discount, 2) }}</span>
             </div>
             @endif
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Rs. :-</span>
-                <span class="total-value">{{ number_format($sale->net_total - $sale->extra_discount, 0) }}</span>
+                <span class="total-value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</span>
             </div>
 
             
@@ -281,32 +287,32 @@
             $remaining_amount = (float)($sale->remaining_amount ?? 0);
             $paid_amount = (float)($sale->paid_amount ?? 0);
             $prev_balance = $total_receivable > 0 
-                ? max(0, round($total_receivable - ($remaining_amount + $paid_amount))) 
+                ? max(0, round($total_receivable - ($remaining_amount + $paid_amount), 2)) 
                 : 0;
             @endphp
 
             <div class="total-row clearfix">
                 <span class="total-label">Previous Balance :-</span>
-                <span class="total-value">{{ number_format($prev_balance, 0) }}</span>
+                <span class="total-value">{{ number_format($prev_balance, 2) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Balance :-</span>
-                <span class="total-value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 0) }}</span>
+                <span class="total-value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 2) }}</span>
             </div>
 
             <div class="total-row clearfix">
                 <span class="total-label">Cash Received :-</span>
-                <span class="total-value">{{ number_format($sale->paid_amount, 0) }}</span>
+                <span class="total-value">{{ number_format($sale->paid_amount, 2) }}</span>
             </div>
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Receivable :</span>
-                <span class="total-value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 0) }}</span>
+                <span class="total-value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2) }}</span>
             </div>
         </div>
 
@@ -317,7 +323,7 @@
                 Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
             </div>
             <div style="font-size: 9px; font-weight: bold; color: #000;">
-                Thank you for choosing Haramain Traders.
+                Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
             <div style="font-size: 7.5px; color: #000; margin-top: 4px; letter-spacing: 0.3px;">
                 Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819

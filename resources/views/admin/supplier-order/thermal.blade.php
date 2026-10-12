@@ -265,7 +265,7 @@
                 Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
             </div>
             <div style="font-size: 9px; font-weight: bold; color: #000;">
-                Thank you for choosing Haramain Traders.
+                Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
             <div style="font-size: 7.5px; color: #0a0a0aff; margin-top: 4px; letter-spacing: 0.3px;">
                 Design &amp; Develop by <strong>Aishtycoons</strong> <span style="font-family: DejaVu Sans, serif; font-size: 10px;">&#9829;</span>

@@ -99,12 +99,17 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
 
-  // Auto fill remaining balance into last split row
+  // Auto fill remaining balance into last editable (non-voucher) split row
   const fillRemainingBalance = () => {
-    if (splits.length > 0 && remaining > 0) {
-      const lastRow = splits[splits.length - 1];
-      const currentVal = toNumber(lastRow.amount);
-      updateSplitRow(lastRow.id, 'amount', Number((currentVal + remaining).toFixed(2)));
+    const editableRows = splits.filter(s => !s.voucher_no);
+    if (remaining > 0) {
+      if (editableRows.length > 0) {
+        const lastRow = editableRows[editableRows.length - 1];
+        const currentVal = toNumber(lastRow.amount);
+        updateSplitRow(lastRow.id, 'amount', Number((currentVal + remaining).toFixed(2)));
+      } else {
+        addSplitRow();
+      }
     }
   };
 

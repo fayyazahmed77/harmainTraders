@@ -51,7 +51,7 @@ class Account extends Model
         'guest_token',
     ];
 
-    protected $appends = ['guest_link', 'image_url'];
+    protected $appends = ['current_balance', 'guest_link', 'image_url'];
 
     protected $casts = [
         'purchase'             => 'boolean',
@@ -87,8 +87,9 @@ class Account extends Model
         // NOTE: $this->purchase is an OPERATIONAL flag (controls form access), not an accounting classification.
         // CR-normality must be determined by account type ONLY.
         $accountTypeName = strtolower($this->accountType->name ?? '');
-        $isCrNormal = in_array($this->type, [9, 17, 18]) // Capital / Reserve / Amanat type IDs
-            || in_array($accountTypeName, ['supplier', 'capital', 'amanat payable', 'reserve']);
+        $isCrNormal = in_array((int)$this->type, [6, 9, 17, 18]) // Supplier, Capital, Reserve, Amanat type IDs
+            || in_array($accountTypeName, ['supplier', 'capital', 'amanat payable', 'reserve'])
+            || (bool)($this->purchase ?? false);
 
         if ($isCrNormal) {
             // Positive stored value + CR type = normal supplier/capital balance (+)
@@ -222,6 +223,14 @@ class Account extends Model
 
     public function getCurrentBalanceAttribute()
     {
+        if (array_key_exists('current_balance', $this->attributes) && $this->attributes['current_balance'] !== null) {
+            return (float)$this->attributes['current_balance'];
+        }
+
+        if (isset($this->memoizedCurrentBalance)) {
+            return $this->memoizedCurrentBalance;
+        }
+
         $type = strtolower($this->accountType->name ?? '');
 
         // Ensure purchase and sale flags are checked even if partial SQL select was used
@@ -238,11 +247,11 @@ class Account extends Model
 
         if ($isMultiRole) {
             $net = \App\Services\PaymentAccountingService::getPartyNetBalance($this);
-            return $type === 'supplier' ? ($net['total_cr'] - $net['total_dr']) : ($net['total_dr'] - $net['total_cr']);
+            $balance = $type === 'supplier' ? ($net['total_cr'] - $net['total_dr']) : ($net['total_dr'] - $net['total_cr']);
         } elseif ($type === 'customers') {
-            return \App\Services\PaymentAccountingService::getCustomerCurrentBalance($this);
+            $balance = \App\Services\PaymentAccountingService::getCustomerCurrentBalance($this);
         } elseif ($type === 'supplier') {
-            return \App\Services\PaymentAccountingService::getSupplierCurrentBalance($this);
+            $balance = \App\Services\PaymentAccountingService::getSupplierCurrentBalance($this);
         } elseif ($type === 'cheque in hand') {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {
@@ -252,7 +261,7 @@ class Account extends Model
             $totalIn = (clone $baseQuery)->where('type', 'RECEIPT')->sum('amount');
             $totalOut = (clone $baseQuery)->where('type', 'PAYMENT')->sum('amount');
 
-            return $this->getSignedOpeningBalance() + $totalIn - $totalOut;
+            $balance = $this->getSignedOpeningBalance() + $totalIn - $totalOut;
         } elseif (in_array($type, ['bank', 'cash'])) {
             $baseQuery = $this->financialPayments()
                 ->where(function($q) {
@@ -280,7 +289,7 @@ class Account extends Model
 
             $partyOut = (clone $partyQuery)->where('type', 'RECEIPT')->sum('amount');
             
-            return $this->getSignedOpeningBalance() + $totalIn - $totalOut + $partyIn - $partyOut;
+            $balance = $this->getSignedOpeningBalance() + $totalIn - $totalOut + $partyIn - $partyOut;
         } elseif (in_array($type, ['expense', 'other'])) {
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {
@@ -292,7 +301,7 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
+            $balance = $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
         } elseif (in_array($type, ['capital', 'amanat payable', 'reserve']) || in_array($this->type, [9, 17, 18])) {
             $totalReceipts = $this->partyPayments()->where('type', 'RECEIPT')
                 ->where(function($q) {
@@ -304,7 +313,7 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return $this->getSignedOpeningBalance() + $totalReceipts - $totalPayments;
+            $balance = $this->getSignedOpeningBalance() + $totalReceipts - $totalPayments;
         } elseif ($type === 'drawings' || $this->type == 8) {
             $totalPayments = $this->partyPayments()->where('type', 'PAYMENT')
                 ->where(function($q) {
@@ -316,10 +325,12 @@ class Account extends Model
                     $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
                 })->sum(DB::raw('amount + discount'));
 
-            return $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
+            $balance = $this->getSignedOpeningBalance() + $totalPayments - $totalReceipts;
+        } else {
+            $balance = $this->getSignedOpeningBalance();
         }
         
-        return $this->getSignedOpeningBalance();
+        return $this->memoizedCurrentBalance = $balance;
     }
 
     public function assignedCompanies()

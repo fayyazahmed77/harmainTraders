@@ -94,8 +94,19 @@ export default function ItemShow({ item, stats, recentPurchases, recentSales, pa
                     {/* PROFESSIONAL HEADER BAR */}
                     <div className="border-b bg-white dark:bg-zinc-900 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
                         <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400">
-                                <Box size={20} strokeWidth={2.5} />
+                            <div className="h-10 w-10 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-400 overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-700">
+                                {item.primary_image_url ? (
+                                    <img 
+                                        src={item.primary_image_url} 
+                                        alt={item.title} 
+                                        className="w-full h-full object-cover" 
+                                        onError={(e) => {
+                                            (e.target as HTMLElement).style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <Box size={20} strokeWidth={2.5} />
+                                )}
                             </div>
                             <div>
                                 <h1 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">

@@ -420,6 +420,7 @@ export default function AccountReports({
                                             pageCount={pageCount}
                                             pagination={pagination}
                                             setPagination={setPagination}
+                                            balanceType={balanceType}
                                         />
                                     </motion.div>
                                 ) : (params.reportId === 'general_ledger') ? (

@@ -4,6 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
+use App\Models\Purchase;
+use App\Models\PurchaseReturn;
+use App\Models\Sales;
+use App\Models\SalesReturn;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -84,6 +89,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 $q->whereIn('name', ['Customers', 'Supplier']);
             })
             ->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
 
         return Inertia::render('journal-voucher/Create', [
             'accounts' => $accounts,
@@ -141,35 +147,28 @@ class JournalVoucherController extends Controller implements HasMiddleware
             $groupId = $receipt->id;
             $receipt->update(['group_id' => $groupId]);
 
-            // Process Source Allocations
-            if ($request->has('source_allocations') && is_array($request->source_allocations)) {
-                foreach ($request->source_allocations as $alloc) {
+            // Process Source Allocations (manual) OR Auto-FIFO for Customer RECEIPT side
+            $sourceAllocations = $request->source_allocations ?? [];
+            $hasManualSource = !empty(array_filter($sourceAllocations, fn($a) => !empty($a['bill_id']) && !empty($a['amount']) && $a['amount'] > 0));
+
+            if ($hasManualSource) {
+                // User manually selected bills — honour their selection
+                foreach ($sourceAllocations as $alloc) {
                     if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
-                        \App\Models\PaymentAllocation::create([
+                        PaymentAllocation::create([
                             'payment_id' => $receipt->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['type'],
-                            'amount' => $alloc['amount']
+                            'bill_id'    => $alloc['bill_id'],
+                            'bill_type'  => $alloc['type'],
+                            'amount'     => $alloc['amount'],
                         ]);
-                        
-                        $bill = $alloc['type'] === 'App\Models\Sales' 
-                            ? \App\Models\Sales::find($alloc['bill_id']) 
-                            : \App\Models\Purchase::find($alloc['bill_id']);
-                            
-                        if ($bill) {
-                            $bill->paid_amount += $alloc['amount'];
-                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
-                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
-                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
-                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
-                            if ($alloc['type'] === 'App\Models\Sales') {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
-                            } else {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
-                            }
-                            $bill->save();
-                        }
+                        $this->updateBillAfterAllocation($alloc['bill_id'], $alloc['type'], $alloc['amount']);
                     }
+                }
+            } else {
+                // Auto-FIFO: if credit account is a Customer, settle their Sales invoices
+                $creditAccount = Account::with('accountType')->find($request->credit_account_id);
+                if ($creditAccount && strtolower($creditAccount->accountType->name ?? '') === 'customers') {
+                    $this->fifoAllocateBills($receipt->id, $creditAccount->id, 'sales', (float) $request->amount);
                 }
             }
 
@@ -189,35 +188,28 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'cheque_status' => 'Clear',
             ]);
 
-            // Process Destination Allocations
-            if ($request->has('destination_allocations') && is_array($request->destination_allocations)) {
-                foreach ($request->destination_allocations as $alloc) {
+            // Process Destination Allocations (manual) OR Auto-FIFO for Supplier PAYMENT side
+            $destAllocations = $request->destination_allocations ?? [];
+            $hasManualDest = !empty(array_filter($destAllocations, fn($a) => !empty($a['bill_id']) && !empty($a['amount']) && $a['amount'] > 0));
+
+            if ($hasManualDest) {
+                // User manually selected bills — honour their selection
+                foreach ($destAllocations as $alloc) {
                     if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
-                        \App\Models\PaymentAllocation::create([
+                        PaymentAllocation::create([
                             'payment_id' => $payment->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['type'],
-                            'amount' => $alloc['amount']
+                            'bill_id'    => $alloc['bill_id'],
+                            'bill_type'  => $alloc['type'],
+                            'amount'     => $alloc['amount'],
                         ]);
-                        
-                        $bill = $alloc['type'] === 'App\Models\Sales' 
-                            ? \App\Models\Sales::find($alloc['bill_id']) 
-                            : \App\Models\Purchase::find($alloc['bill_id']);
-                            
-                        if ($bill) {
-                            $bill->paid_amount += $alloc['amount'];
-                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
-                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
-                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
-                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
-                            if ($alloc['type'] === 'App\Models\Sales') {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
-                            } else {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
-                            }
-                            $bill->save();
-                        }
+                        $this->updateBillAfterAllocation($alloc['bill_id'], $alloc['type'], $alloc['amount']);
                     }
+                }
+            } else {
+                // Auto-FIFO: if debit account is a Supplier, settle their Purchase bills
+                $debitAccount = Account::with('accountType')->find($request->debit_account_id);
+                if ($debitAccount && strtolower($debitAccount->accountType->name ?? '') === 'supplier') {
+                    $this->fifoAllocateBills($payment->id, $debitAccount->id, 'purchases', (float) $request->amount);
                 }
             }
 
@@ -325,6 +317,7 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 $q->whereIn('name', ['Customers', 'Supplier']);
             })
             ->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
 
         return Inertia::render('journal-voucher/Edit', [
             'receipt' => $receipt,
@@ -419,66 +412,48 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 'cheque_status' => 'Clear',
             ]);
 
-            // 3. Process new allocations
-            if ($request->has('source_allocations') && is_array($request->source_allocations)) {
-                foreach ($request->source_allocations as $alloc) {
+            // 3. Process new allocations (manual) OR Auto-FIFO
+            $sourceAllocations = $request->source_allocations ?? [];
+            $hasManualSource = !empty(array_filter($sourceAllocations, fn($a) => !empty($a['bill_id']) && !empty($a['amount']) && $a['amount'] > 0));
+
+            if ($hasManualSource) {
+                foreach ($sourceAllocations as $alloc) {
                     if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
-                        \App\Models\PaymentAllocation::create([
+                        PaymentAllocation::create([
                             'payment_id' => $receipt->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['type'],
-                            'amount' => $alloc['amount']
+                            'bill_id'    => $alloc['bill_id'],
+                            'bill_type'  => $alloc['type'],
+                            'amount'     => $alloc['amount'],
                         ]);
-                        
-                        $bill = $alloc['type'] === 'App\Models\Sales' 
-                            ? \App\Models\Sales::find($alloc['bill_id']) 
-                            : \App\Models\Purchase::find($alloc['bill_id']);
-                            
-                        if ($bill) {
-                            $bill->paid_amount += $alloc['amount'];
-                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
-                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
-                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
-                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
-                            if ($alloc['type'] === 'App\Models\Sales') {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
-                            } else {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
-                            }
-                            $bill->save();
-                        }
+                        $this->updateBillAfterAllocation($alloc['bill_id'], $alloc['type'], $alloc['amount']);
                     }
+                }
+            } else {
+                $creditAccount = Account::with('accountType')->find($request->credit_account_id);
+                if ($creditAccount && strtolower($creditAccount->accountType->name ?? '') === 'customers') {
+                    $this->fifoAllocateBills($receipt->id, $creditAccount->id, 'sales', (float) $request->amount);
                 }
             }
 
-            if ($request->has('destination_allocations') && is_array($request->destination_allocations)) {
-                foreach ($request->destination_allocations as $alloc) {
+            $destAllocations = $request->destination_allocations ?? [];
+            $hasManualDest = !empty(array_filter($destAllocations, fn($a) => !empty($a['bill_id']) && !empty($a['amount']) && $a['amount'] > 0));
+
+            if ($hasManualDest) {
+                foreach ($destAllocations as $alloc) {
                     if (isset($alloc['bill_id']) && isset($alloc['amount']) && $alloc['amount'] > 0) {
-                        \App\Models\PaymentAllocation::create([
+                        PaymentAllocation::create([
                             'payment_id' => $payment->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['type'],
-                            'amount' => $alloc['amount']
+                            'bill_id'    => $alloc['bill_id'],
+                            'bill_type'  => $alloc['type'],
+                            'amount'     => $alloc['amount'],
                         ]);
-                        
-                        $bill = $alloc['type'] === 'App\Models\Sales' 
-                            ? \App\Models\Sales::find($alloc['bill_id']) 
-                            : \App\Models\Purchase::find($alloc['bill_id']);
-                            
-                        if ($bill) {
-                            $bill->paid_amount += $alloc['amount'];
-                            $sumOfReturns = $alloc['type'] === 'App\Models\Sales' 
-                                ? (float) \App\Models\SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total')
-                                : (float) \App\Models\PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
-                            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumOfReturns;
-                            if ($alloc['type'] === 'App\Models\Sales') {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Paid' : 'Partial';
-                            } else {
-                                $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
-                            }
-                            $bill->save();
-                        }
+                        $this->updateBillAfterAllocation($alloc['bill_id'], $alloc['type'], $alloc['amount']);
                     }
+                }
+            } else {
+                $debitAccount = Account::with('accountType')->find($request->debit_account_id);
+                if ($debitAccount && strtolower($debitAccount->accountType->name ?? '') === 'supplier') {
+                    $this->fifoAllocateBills($payment->id, $debitAccount->id, 'purchases', (float) $request->amount);
                 }
             }
 
@@ -488,6 +463,106 @@ class JournalVoucherController extends Controller implements HasMiddleware
             DB::rollBack();
             \Illuminate\Support\Facades\Log::error('JV Update Error: ' . $e->getMessage());
             return back()->withErrors(['error' => 'Failed to update: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Auto-FIFO: Allocate a payment/receipt against the oldest unpaid bills (oldest date first).
+     *
+     * @param int    $paymentId  The Payment record this allocation belongs to
+     * @param int    $accountId  The customer or supplier account id
+     * @param string $billType   'sales' or 'purchases'
+     * @param float  $amount     Total amount to distribute
+     */
+    private function fifoAllocateBills(int $paymentId, int $accountId, string $billType, float $amount): void
+    {
+        if ($amount <= 0) {
+            return;
+        }
+
+        if ($billType === 'sales') {
+            $bills = Sales::where('customer_id', $accountId)
+                ->where('remaining_amount', '>', 0)
+                ->orderBy('date', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            $remaining = $amount;
+            foreach ($bills as $bill) {
+                if ($remaining <= 0) {
+                    break;
+                }
+                $allocate = min((float) $bill->remaining_amount, $remaining);
+
+                PaymentAllocation::create([
+                    'payment_id' => $paymentId,
+                    'bill_id'   => $bill->id,
+                    'bill_type' => 'App\\Models\\Sales',
+                    'amount'    => $allocate,
+                ]);
+
+                $this->updateBillAfterAllocation($bill->id, 'App\\Models\\Sales', $allocate);
+                $remaining -= $allocate;
+            }
+        } elseif ($billType === 'purchases') {
+            $bills = Purchase::where('supplier_id', $accountId)
+                ->where('remaining_amount', '>', 0)
+                ->orderBy('date', 'asc')
+                ->orderBy('id', 'asc')
+                ->get();
+
+            $remaining = $amount;
+            foreach ($bills as $bill) {
+                if ($remaining <= 0) {
+                    break;
+                }
+                $allocate = min((float) $bill->remaining_amount, $remaining);
+
+                PaymentAllocation::create([
+                    'payment_id' => $paymentId,
+                    'bill_id'   => $bill->id,
+                    'bill_type' => 'App\\Models\\Purchase',
+                    'amount'    => $allocate,
+                ]);
+
+                $this->updateBillAfterAllocation($bill->id, 'App\\Models\\Purchase', $allocate);
+                $remaining -= $allocate;
+            }
+        }
+    }
+
+    /**
+     * Re-calculate and persist paid_amount, remaining_amount, and status on a bill
+     * after an allocation of $allocatedAmount has been added.
+     */
+    private function updateBillAfterAllocation(int $billId, string $billType, float $allocatedAmount): void
+    {
+        if ($billType === 'App\\Models\\Sales') {
+            $bill = Sales::find($billId);
+            if (!$bill) {
+                return;
+            }
+            $sumReturns = (float) SalesReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+            $bill->paid_amount     += $allocatedAmount;
+            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumReturns;
+            if ($bill->remaining_amount <= 0 && $bill->paid_amount > 0) {
+                $bill->status = 'Paid';
+            } elseif ($bill->paid_amount > 0) {
+                $bill->status = 'Partial';
+            } else {
+                $bill->status = 'Unpaid';
+            }
+            $bill->save();
+        } else {
+            $bill = Purchase::find($billId);
+            if (!$bill) {
+                return;
+            }
+            $sumReturns = (float) PurchaseReturn::where('original_invoice', $bill->invoice)->sum('net_total');
+            $bill->paid_amount     += $allocatedAmount;
+            $bill->remaining_amount = $bill->net_total - $bill->paid_amount - $sumReturns;
+            $bill->status = $bill->remaining_amount <= 0 ? 'Completed' : $bill->status;
+            $bill->save();
         }
     }
 

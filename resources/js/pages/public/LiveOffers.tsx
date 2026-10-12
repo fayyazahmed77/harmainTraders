@@ -93,6 +93,7 @@ interface ItemImage {
     id: number;
     image_path: string;
     is_primary: boolean;
+    url?: string;
 }
 
 interface Item {
@@ -292,7 +293,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 price_carton: 0,
                 price_piece: 0,
                 scheme: offerItem.scheme,
-                image: offerItem.items?.primary_image_url || DEFAULT_IMAGE,
+                image: offerItem.items?.primary_image_url || offerItem.items?.images?.[0]?.url || DEFAULT_IMAGE,
             };
 
             let qtyCarton = existing.qty_carton || 0;
@@ -1359,7 +1360,7 @@ function OfferProductCard({ offerItem, cartItem, onOpenModal, formatCurrency }: 
     formatCurrency: (val: number) => string;
 }) {
     const item = offerItem.items;
-    const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
+    const primaryImg = item?.primary_image_url || item?.images?.[0]?.url || DEFAULT_IMAGE;
 
     const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
     const qtyCtn = toNum(cartItem?.qty_carton);
@@ -1482,7 +1483,7 @@ function OfferProductRow({ offerItem, cartItem, onOpenModal, formatCurrency }: {
     formatCurrency: (val: number) => string;
 }) {
     const item = offerItem.items;
-    const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
+    const primaryImg = item?.primary_image_url || item?.images?.[0]?.url || DEFAULT_IMAGE;
     const { cartonRate, looseRate, singleRate } = getOfferItemRates(offerItem);
     const isGroupOffer = String((offerItem as any).offertype) === '1';
     const packingQty = toNum(item?.packing_size || item?.packing_qty || 1);

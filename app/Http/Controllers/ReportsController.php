@@ -785,8 +785,12 @@ class ReportsController extends Controller implements HasMiddleware
             $request->all()
         );
 
+        $firmId = $request->firmId ?? $request->firm_id ?? null;
+        $firm = ($firmId && $firmId !== 'ALL') ? \App\Models\Firm::find($firmId) : (\App\Models\Firm::first() ?? null);
+
         $pdfData = [
             'account' => $account,
+            'firm' => $firm,
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
@@ -816,8 +820,12 @@ class ReportsController extends Controller implements HasMiddleware
             $request->all()
         );
 
+        $firmId = $request->firmId ?? $request->firm_id ?? null;
+        $firm = ($firmId && $firmId !== 'ALL') ? \App\Models\Firm::find($firmId) : (\App\Models\Firm::first() ?? null);
+
         $pdfData = [
             'account' => $account,
+            'firm' => $firm,
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),

@@ -28,8 +28,8 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
     formatCurrency,
 }) => {
     const item = offerItem?.items;
-    const images = item?.images?.map((img: any) => assetUrl(img.image_path)) || [];
-    const primaryImg = item?.primary_image_url || DEFAULT_IMAGE;
+    const images = item?.images?.map((img: any) => img.url || assetUrl(img.image_path)) || [];
+    const primaryImg = item?.primary_image_url || images[0] || DEFAULT_IMAGE;
     
     const [currentImg, setCurrentImg] = useState(0);
     const [unitMode, setUnitMode] = useState<'pcs' | 'ctn'>('pcs');
@@ -38,7 +38,11 @@ export const OfferItemDialog: React.FC<OfferItemDialogProps> = ({
     function assetUrl(path: string) {
         if (!path) return DEFAULT_IMAGE;
         if (path.startsWith('http')) return path;
-        return `/${path.replace(/^\//, '')}`;
+        const clean = path.replace(/^\/+/, '');
+        if (clean.startsWith('storage/') || clean.startsWith('images/')) {
+            return `/${clean}`;
+        }
+        return `/storage/${clean}`;
     }
 
     useEffect(() => {

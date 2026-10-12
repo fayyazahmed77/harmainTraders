@@ -41,6 +41,8 @@ interface OutstandingBill {
     balance: number;
     credit_days: number;
     credit_limit: number;
+    is_opening_balance?: boolean;
+    ob_type?: 'CR' | 'DR';
     is_last_for_party?: boolean;
     party_summary?: {
         party_un_due_amount: number;
@@ -161,22 +163,39 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                 <div className="flex items-center gap-2">
                                                     <div className={cn(
                                                         "h-4 border-l-2",
-                                                        isReceivable ? "border-indigo-500" : "border-amber-500"
+                                                        (item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL'))
+                                                            ? ((item.remaining < 0 || item.voucher_no?.includes('DR')) ? "border-emerald-400" : "border-amber-400")
+                                                            : (isReceivable ? "border-indigo-500" : "border-amber-500")
                                                     )} />
-                                                    <span className="text-[10px] font-bold text-text-muted">{format(new Date(item.date), 'dd/MM/yy')}</span>
+                                                    <span className="text-[10px] font-bold text-text-muted">
+                                                        {item.date && !isNaN(new Date(item.date).getTime()) ? format(new Date(item.date), 'dd/MM/yy') : (item.date || '-')}
+                                                    </span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <FileText className="h-3 w-3 text-text-muted/40" />
-                                                    <span className="text-[11px] font-mono-jet font-black text-text-primary tracking-tight">
-                                                        {item.voucher_no}
-                                                        {isReceivable ? <ArrowUpRight className="inline-block h-3 w-3 ml-1 text-indigo-400 opacity-0 group-hover:opacity-100" /> : <ArrowDownRight className="inline-block h-3 w-3 ml-1 text-amber-400 opacity-0 group-hover:opacity-100" />}
-                                                    </span>
+                                                    {item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL') ? (
+                                                        <Badge variant="outline" className={cn(
+                                                            "text-[9px] font-mono-jet font-black tracking-wider px-2 py-0.5 rounded shadow-sm",
+                                                            (item.remaining < 0 || item.voucher_no?.includes('DR'))
+                                                                ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                                                                : "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                                                        )}>
+                                                            {item.voucher_no || 'OPENING-BAL'}
+                                                        </Badge>
+                                                    ) : (
+                                                        <>
+                                                            <FileText className="h-3 w-3 text-text-muted/40" />
+                                                            <span className="text-[11px] font-mono-jet font-black text-text-primary tracking-tight">
+                                                                {item.voucher_no}
+                                                                {isReceivable ? <ArrowUpRight className="inline-block h-3 w-3 ml-1 text-indigo-400 opacity-0 group-hover:opacity-100" /> : <ArrowDownRight className="inline-block h-3 w-3 ml-1 text-amber-400 opacity-0 group-hover:opacity-100" />}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-[11px] font-bold text-text-muted">
-                                                {format(new Date(item.due_date), 'dd/MM/yy')}
+                                                {item.due_date && !isNaN(new Date(item.due_date).getTime()) ? format(new Date(item.due_date), 'dd/MM/yy') : (item.due_date || '-')}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <div className="flex justify-center">
@@ -188,22 +207,28 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right text-[11px] font-mono-jet font-bold text-text-secondary">
-                                                {item.bill_amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            <TableCell className="text-right text-[11px] font-mono-jet font-bold">
+                                                <span className={item.bill_amt < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-text-secondary"}>
+                                                    {item.bill_amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
                                             </TableCell>
                                             <TableCell className="text-right text-[11px] font-mono-jet font-bold text-emerald-500/80">
                                                 {item.paid > 0 ? item.paid.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-right text-[11px] font-mono-jet font-black text-text-primary">
-                                                {item.remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            <TableCell className="text-right text-[11px] font-mono-jet font-black">
+                                                <span className={item.remaining < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-text-primary"}>
+                                                    {item.remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
                                             </TableCell>
                                             <TableCell className="text-right pr-6">
-                                               <span className={cn(
-                                                   "text-[11px] font-mono-jet font-black px-1.5 py-0.5 rounded-sm",
-                                                   isReceivable ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                               )}>
-                                                   {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                               </span>
+                                                <span className={cn(
+                                                    "text-[11px] font-mono-jet font-black px-1.5 py-0.5 rounded-sm",
+                                                    item.balance < 0
+                                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                                        : (isReceivable ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400")
+                                                )}>
+                                                    {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
                                             </TableCell>
                                         </TableRow>
                                     </React.Fragment>

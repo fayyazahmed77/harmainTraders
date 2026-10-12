@@ -127,7 +127,7 @@ class GuestController extends Controller
                 'stock' => $item->total_stock_pcs,
                 'category_id' => $item->category,
                 'image' => $item->primary_image_url,
-                'images' => $item->images->map(fn($img) => asset($img->image_path)),
+                'images' => $item->images->map(fn($img) => $img->url),
                 'price_carton' => $priceCarton,
                 'price_loose_carton' => $priceLooseCarton,
                 'price_piece' => $pricePiece,

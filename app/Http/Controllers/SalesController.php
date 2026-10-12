@@ -264,25 +264,34 @@ class SalesController extends Controller implements HasMiddleware
             }
 
             // --- Multi-Method Split Payments & Allocation Logic ---
+            $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = $isMulti ? $request->input('splits', []) : [];
-
+            $splitsData = [];
             $totalPaidAmount = 0;
-            if ($isMulti) {
-                foreach ($splitsData as $split) {
-                    $totalPaidAmount += (float) ($split['amount'] ?? 0);
-                }
-            } else {
-                $totalPaidAmount = (float) ($request->paid_amount ?? 0);
-                if ($request->is_pay_now && $totalPaidAmount > 0 && $request->payment_account_id) {
-                    $splitsData = [[
-                        'payment_account_id' => $request->payment_account_id,
-                        'amount' => $totalPaidAmount,
-                        'payment_method' => $request->payment_method ?? 'Cash',
-                        'cheque_no' => $request->cheque_no,
-                        'cheque_date' => $request->cheque_date,
-                        'clear_date' => $request->clear_date,
-                    ]];
+
+            if ($isPayNow) {
+                if ($isMulti) {
+                    $rawSplits = $request->input('splits', []);
+                    foreach ($rawSplits as $split) {
+                        $amt = (float) ($split['amount'] ?? 0);
+                        if ($amt > 0 && !empty($split['payment_account_id'])) {
+                            $splitsData[] = $split;
+                            $totalPaidAmount += $amt;
+                        }
+                    }
+                } else {
+                    $amount = (float) ($request->paid_amount ?? 0);
+                    if ($amount > 0 && $request->payment_account_id) {
+                        $totalPaidAmount = $amount;
+                        $splitsData = [[
+                            'payment_account_id' => $request->payment_account_id,
+                            'amount' => $totalPaidAmount,
+                            'payment_method' => $request->payment_method ?? 'Cash',
+                            'cheque_no' => $request->cheque_no,
+                            'cheque_date' => $request->cheque_date,
+                            'clear_date' => $request->clear_date,
+                        ]];
+                    }
                 }
             }
 
@@ -698,24 +707,42 @@ class SalesController extends Controller implements HasMiddleware
             $sale = Sales::findOrFail($id);
 
             // --- Multi-Method Split Payments & Allocation Logic ---
+            $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = $isMulti ? $request->input('splits', []) : [];
+            $splitsData = [];
             $totalNewPaid = 0;
 
-            if ($isMulti) {
-                foreach ($splitsData as $split) {
-                    $totalNewPaid += (float) ($split['amount'] ?? 0);
+            if ($isPayNow) {
+                // Fetch IDs of payments already allocated to this sale to strictly avoid duplicating them
+                $existingAllocatedPaymentIds = PaymentAllocation::where('bill_id', $sale->id)
+                    ->where('bill_type', 'App\Models\Sales')
+                    ->pluck('payment_id')
+                    ->toArray();
+
+                if ($isMulti) {
+                    $rawSplits = $request->input('splits', []);
+                    foreach ($rawSplits as $split) {
+                        $amt = (float) ($split['amount'] ?? 0);
+                        $hasVoucher = !empty($split['voucher_no']);
+                        $isExistingPayment = !empty($split['id']) && in_array($split['id'], $existingAllocatedPaymentIds);
+
+                        // Only consider truly NEW splits added during this edit session
+                        if ($amt > 0 && !$hasVoucher && !$isExistingPayment && !empty($split['payment_account_id'])) {
+                            $splitsData[] = $split;
+                            $totalNewPaid += $amt;
+                        }
+                    }
+                } else if ((float)$request->paid_amount > 0 && $request->payment_account_id) {
+                    $totalNewPaid = (float)$request->paid_amount;
+                    $splitsData = [[
+                        'payment_account_id' => $request->payment_account_id,
+                        'amount' => $totalNewPaid,
+                        'payment_method' => $request->payment_method ?? 'Cash',
+                        'cheque_no' => $request->cheque_no,
+                        'cheque_date' => $request->cheque_date,
+                        'clear_date' => $request->clear_date,
+                    ]];
                 }
-            } else if ($request->is_pay_now && (float)$request->paid_amount > 0) {
-                $totalNewPaid = (float)$request->paid_amount;
-                $splitsData = [[
-                    'payment_account_id' => $request->payment_account_id,
-                    'amount' => $totalNewPaid,
-                    'payment_method' => $request->payment_method ?? 'Cash',
-                    'cheque_no' => $request->cheque_no,
-                    'cheque_date' => $request->cheque_date,
-                    'clear_date' => $request->clear_date,
-                ]];
             }
 
             // Calculate updated totals
@@ -1037,13 +1064,17 @@ class SalesController extends Controller implements HasMiddleware
         $pdf = Pdf::loadView($view, compact('sale', 'firm'));
 
         if ($format === 'small') {
-            // Receipt size for thermal printers
+            // Receipt size for thermal printers.
+            // 28pt per item handles long product names that wrap to 2+ lines.
+            // 400pt base covers header, customer info, table header, totals & footer.
             $itemCount = count($sale->items);
-            $height = 320 + ($itemCount * 16);
+            $hasBonus   = $sale->items->sum('bonus_qty_carton') > 0 || $sale->items->sum('bonus_qty_pcs') > 0;
+            $ptPerItem  = $hasBonus ? 30 : 28; // bonus column = slightly taller rows
+            $height = 400 + ($itemCount * $ptPerItem);
             if ($sale->extra_discount > 0) {
-                $height += 15;
+                $height += 20;
             }
-            $height = max(280, $height);
+            $height = max(400, $height);
             $pdf->setPaper([0, 0, 226.77, $height], 'portrait'); // ~80mm width
         } else {
             $pdf->setPaper('A4', 'portrait');
@@ -1071,12 +1102,14 @@ class SalesController extends Controller implements HasMiddleware
         $pdf = Pdf::loadView($view, compact('sale', 'firm'));
 
         if ($format === 'small') {
-            $itemCount = count($sale->items);
-            $height = 320 + ($itemCount * 16);
+            $itemCount  = count($sale->items);
+            $hasBonus   = $sale->items->sum('bonus_qty_carton') > 0 || $sale->items->sum('bonus_qty_pcs') > 0;
+            $ptPerItem  = $hasBonus ? 30 : 28;
+            $height = 400 + ($itemCount * $ptPerItem);
             if ($sale->extra_discount > 0) {
-                $height += 15;
+                $height += 20;
             }
-            $height = max(280, $height);
+            $height = max(400, $height);
             $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
         } else {
             $pdf->setPaper('A4', 'portrait');

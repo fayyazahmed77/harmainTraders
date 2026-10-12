@@ -27,17 +27,32 @@ class ItemCategory extends Model
         if (!$this->image) return null;
         
         // If it's already an absolute URL, return it
-        if (filter_var($this->image, FILTER_VALIDATE_URL)) return $this->image;
-        
-        // Fix: If it has redundant /images/ prefix from old data
-        $path = ltrim($this->image, '/');
-        if (str_starts_with($path, 'images/storage/')) {
-            $path = str_replace('images/storage/', 'storage/', $path);
-        } elseif (str_starts_with($path, 'images/')) {
-            $path = str_replace('images/', '', $path);
+        if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+            return $this->image;
         }
         
-        return asset($path);
+        $path = ltrim($this->image, '/');
+        if (str_starts_with($path, 'images/storage/')) {
+            $path = substr($path, 7);
+        }
+
+        if (file_exists(public_path($path))) {
+            return asset($path);
+        }
+
+        if (file_exists(public_path('storage/' . $path))) {
+            return asset('storage/' . $path);
+        }
+
+        if (file_exists(public_path('images/' . $path))) {
+            return asset('images/' . $path);
+        }
+
+        if (str_starts_with($path, 'storage/') || str_starts_with($path, 'images/')) {
+            return asset($path);
+        }
+        
+        return asset('storage/' . $path);
     }
 
     public function items()

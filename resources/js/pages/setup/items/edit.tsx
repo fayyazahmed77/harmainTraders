@@ -1061,7 +1061,14 @@ export default function Page({ item, categories, companies, pagination }: Props)
                   {/* Existing Images */}
                   {existingImages.map((img: any, idx: number) => (
                     <div key={`existing-${img.id}`} className={`relative aspect-square rounded-xl overflow-hidden border group shadow-sm transition-all ${data.primary_image_id === img.id ? 'border-orange-500 ring-2 ring-orange-500/20' : 'border-zinc-100 dark:border-zinc-800'}`}>
-                      <img src={`/${img.image_path}`} alt="Product" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                      <img 
+                        src={img.url || (img.image_path?.startsWith('http') ? img.image_path : `/${(img.image_path || '').replace(/^\/+/, '')}`)} 
+                        alt="Product" 
+                        className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://placehold.co/200x200/f8fafc/cbd5e1?text=?";
+                        }}
+                      />
                       <div className="absolute top-2 right-2 flex gap-1.5 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-200">
                         <TooltipProvider>
                           <Tooltip>

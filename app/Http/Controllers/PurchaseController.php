@@ -162,9 +162,10 @@ class PurchaseController extends Controller implements HasMiddleware
             });
 
         $accounts = Account::eligibleForPurchase()
-            ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id')
+            ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id', 'opening_balance', 'opening_balance_type', 'purchase', 'sale')
             ->with(['accountType:id,name', 'accountCategory:id,name'])
             ->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
 
         $salemans = Saleman::select('id', 'name', 'code')->get();
 
@@ -259,27 +260,34 @@ class PurchaseController extends Controller implements HasMiddleware
 
         try {
             // --- Multi-Method Split Payments & Allocation Logic ---
+            $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = $isMulti ? $request->input('splits', []) : [];
-
-            // Calculate total paid from all splits
+            $splitsData = [];
             $totalPaidAmount = 0;
-            if ($isMulti) {
-                foreach ($splitsData as $split) {
-                    $totalPaidAmount += (float) ($split['amount'] ?? 0);
-                }
-            } else {
-                $totalPaidAmount = (float) ($request->paid_amount ?? 0);
-                // Normalize single payment to split format for unified processing
-                if ($request->is_pay_now && $totalPaidAmount > 0 && $request->payment_account_id) {
-                    $splitsData = [[
-                        'payment_account_id' => $request->payment_account_id,
-                        'amount' => $totalPaidAmount,
-                        'payment_method' => $request->payment_method ?? 'Cash',
-                        'cheque_no' => $request->cheque_no,
-                        'cheque_date' => $request->cheque_date,
-                        'clear_date' => $request->clear_date,
-                    ]];
+
+            if ($isPayNow) {
+                if ($isMulti) {
+                    $rawSplits = $request->input('splits', []);
+                    foreach ($rawSplits as $split) {
+                        $amt = (float) ($split['amount'] ?? 0);
+                        if ($amt > 0 && !empty($split['payment_account_id'])) {
+                            $splitsData[] = $split;
+                            $totalPaidAmount += $amt;
+                        }
+                    }
+                } else {
+                    $amount = (float) ($request->paid_amount ?? 0);
+                    if ($amount > 0 && $request->payment_account_id) {
+                        $totalPaidAmount = $amount;
+                        $splitsData = [[
+                            'payment_account_id' => $request->payment_account_id,
+                            'amount' => $totalPaidAmount,
+                            'payment_method' => $request->payment_method ?? 'Cash',
+                            'cheque_no' => $request->cheque_no,
+                            'cheque_date' => $request->cheque_date,
+                            'clear_date' => $request->clear_date,
+                        ]];
+                    }
                 }
             }
 
@@ -553,6 +561,7 @@ class PurchaseController extends Controller implements HasMiddleware
         $accounts = Account::eligibleForPurchase()
             ->with(['accountType', 'accountCategory'])
             ->get();
+        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
         $salemans = Saleman::get();
         $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
             ->where('status', 'active')
@@ -635,32 +644,55 @@ class PurchaseController extends Controller implements HasMiddleware
             $purchase = Purchase::findOrFail($id);
 
             // --- Multi-Method Split Payments & Allocation Logic ---
+            $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = $isMulti ? $request->input('splits', []) : [];
+            $splitsData = [];
             $totalNewPaid = 0;
 
-            if ($isMulti) {
-                foreach ($splitsData as $split) {
-                    $totalNewPaid += (float) ($split['amount'] ?? 0);
+            if ($isPayNow) {
+                // Fetch IDs of payments already allocated to this purchase to strictly avoid duplicating them
+                $existingAllocatedPaymentIds = PaymentAllocation::where('bill_id', $purchase->id)
+                    ->where('bill_type', 'App\Models\Purchase')
+                    ->pluck('payment_id')
+                    ->toArray();
+
+                if ($isMulti) {
+                    $rawSplits = $request->input('splits', []);
+                    foreach ($rawSplits as $split) {
+                        $amt = (float) ($split['amount'] ?? 0);
+                        $hasVoucher = !empty($split['voucher_no']);
+                        $isExistingPayment = !empty($split['id']) && in_array($split['id'], $existingAllocatedPaymentIds);
+
+                        // Only consider truly NEW splits added during this edit session
+                        if ($amt > 0 && !$hasVoucher && !$isExistingPayment && !empty($split['payment_account_id'])) {
+                            $splitsData[] = $split;
+                            $totalNewPaid += $amt;
+                        }
+                    }
+                } else if ((float)$request->paid_amount > 0 && $request->payment_account_id) {
+                    $totalNewPaid = (float)$request->paid_amount;
+                    $splitsData = [[
+                        'payment_account_id' => $request->payment_account_id,
+                        'amount' => $totalNewPaid,
+                        'payment_method' => $request->payment_method ?? 'Cash',
+                        'cheque_no' => $request->cheque_no,
+                        'cheque_date' => $request->cheque_date,
+                        'clear_date' => $request->clear_date,
+                    ]];
                 }
-            } else if ($request->is_pay_now && (float)$request->paid_amount > 0) {
-                $totalNewPaid = (float)$request->paid_amount;
-                $splitsData = [[
-                    'payment_account_id' => $request->payment_account_id,
-                    'amount' => $totalNewPaid,
-                    'payment_method' => $request->payment_method ?? 'Cash',
-                    'cheque_no' => $request->cheque_no,
-                    'cheque_date' => $request->cheque_date,
-                    'clear_date' => $request->clear_date,
-                ]];
             }
 
             // Calculate updated totals
             $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netTotal = (float) $request->net_total;
             $netPurchaseTotal = max(0, $netTotal - $extraDiscount);
-            $existingPaid = (float) $purchase->paid_amount;
-            
+
+            // Re-read existing paid amount from actual PaymentAllocations
+            $existingPaidFromAlloc = (float) PaymentAllocation::where('bill_id', $purchase->id)
+                ->where('bill_type', 'App\Models\Purchase')
+                ->sum('amount');
+            $existingPaid = max((float)$purchase->paid_amount, $existingPaidFromAlloc);
+
             // Increment paid amount with NEW payments made during this edit
             $newTotalPaid = $existingPaid + $totalNewPaid;
             

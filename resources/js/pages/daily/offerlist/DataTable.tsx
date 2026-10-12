@@ -120,7 +120,8 @@ export default function DataTable({ data }: DataTableProps) {
                 </div>
             ),
             cell: ({ row }) => {
-                const date = new Date(row.original.date);
+                const raw = row.original.date ? row.original.date.split('T')[0].split('-') : [];
+                const date = raw.length === 3 ? new Date(Number(raw[0]), Number(raw[1]) - 1, Number(raw[2])) : new Date(row.original.date);
                 return (
                     <div className="flex flex-col">
                         <span className="font-black text-zinc-900 dark:text-zinc-100 tabular-nums text-xs">

@@ -40,7 +40,8 @@ class ReportBuilder
         // orientation: 'dr' for Customers (Receivables), 'cr' for Suppliers (Payables)
         $type = strtolower($account->accountType->name ?? '');
         $isCreditNormal = in_array($type, ['supplier', 'capital', 'amanat payable', 'reserve'])
-            || in_array((int)$account->type, [6, 9, 17, 18]);
+            || in_array((int)$account->type, [6, 9, 17, 18])
+            || (bool)($account->purchase ?? false);
         $orientation = $isCreditNormal ? 'cr' : 'dr';
 
         // 1. Calculate Opening Balance before $fromDate
@@ -79,10 +80,12 @@ class ReportBuilder
                   ->orWhere('id', 'like', "%{$params['remarks']}%");
             });
         }
-        $purchases->selectRaw("'Purchase' as type, purchases.id, purchases.date, purchases.invoice as voucher_no, CONCAT('Purchase #', COALESCE(purchases.invoice, purchases.id)) as description, NULL as payment_method, 0 as debit, purchases.net_total as credit, purchases.created_at, NULL as cheque_no, NULL as cheque_date");
+        $purchases->selectRaw("'Purchase' as type, purchases.id, purchases.date, purchases.invoice as voucher_no, CONCAT('Purchase #', COALESCE(purchases.invoice, purchases.id)) as description, NULL as payment_method, 0 as debit, (purchases.net_total - COALESCE(purchases.extra_discount, 0)) as credit, purchases.created_at, NULL as cheque_no, NULL as cheque_date");
 
         // Determine which column to query in payments table
-        $isAsset = in_array($account->type, [1, 2, 14]);
+        $isAsset = in_array((int)$account->type, [1, 2, 14])
+            || in_array($type, ['cash', 'bank', 'cheque in hand'])
+            || (bool)($account->cashbank ?? false);
 
         if ($isAsset) {
             $payments = Payment::where(function($q) use ($accountId) {
@@ -90,12 +93,12 @@ class ReportBuilder
                       ->orWhere('account_id', $accountId);
                 })
                 ->whereBetween('payments.date', [$fromDate, $toDate])
-                ->where('payments.cheque_status', '!=', 'Canceled')
+                ->whereNotIn('payments.cheque_status', ['Canceled', 'Returned'])
                 ->where(function($q) {
                     $q->whereNotIn('payments.payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('payments.cheque_status')
                       ->orWhere('payments.cheque_status', '')
-                      ->orWhereIn('payments.cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('payments.cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
                 });
 
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
@@ -141,7 +144,7 @@ class ReportBuilder
             $paymentColumn = 'account_id';
             $payments = Payment::where($paymentColumn, $accountId)
                 ->whereBetween('payments.date', [$fromDate, $toDate])
-                ->where('payments.cheque_status', '!=', 'Canceled')
+                ->whereNotIn('payments.cheque_status', ['Canceled', 'Returned'])
                 ->leftJoin('accounts as party_acc', 'party_acc.id', '=', 'payments.payment_account_id');
 
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
@@ -217,7 +220,38 @@ class ReportBuilder
 
         $page = (int)($params['page'] ?? request()->input('page', 1));
 
-        // 4. Calculate Balance at the start of the current page
+        // 4. Calculate Totals for the entire period from unpaginated query
+        $totalQuery = DB::table(DB::raw("({$unpaginatedQuery->toSql()}) as transactions"))
+            ->mergeBindings($unpaginatedQuery->getQuery());
+
+        $totals = $totalQuery->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')->first();
+
+        $totalDebit = (float)($totals->total_debit ?? 0);
+        $totalCredit = (float)($totals->total_credit ?? 0);
+
+        if ($orientation === 'cr') {
+            $closingBalance = $openingBalance + $totalCredit - $totalDebit;
+        } else {
+            $closingBalance = $openingBalance + $totalDebit - $totalCredit;
+        }
+
+        // When reporting through today (or no restrictive historical cutoff) with standard account-wide query,
+        // synchronize closing balance and opening balance with Account's true real-time current_balance.
+        $hasCustomFilters = (isset($params['salemanId']) && $params['salemanId'] !== 'ALL')
+            || (isset($params['firmId']) && $params['firmId'] !== 'ALL')
+            || (isset($params['contraId']) && $params['contraId'] !== 'ALL')
+            || (isset($params['remarks']) && trim($params['remarks']) !== '');
+
+        if (!$hasCustomFilters && $toDate >= date('Y-m-d')) {
+            $closingBalance = (float)$account->current_balance;
+            if ($orientation === 'cr') {
+                $openingBalance = $closingBalance - ($totalCredit - $totalDebit);
+            } else {
+                $openingBalance = $closingBalance - ($totalDebit - $totalCredit);
+            }
+        }
+
+        // 5. Calculate Balance at the start of the current page using aligned openingBalance
         $pageStartBalance = $openingBalance;
         if ($page > 1) {
             $offset = ($page - 1) * $perPage;
@@ -243,21 +277,6 @@ class ReportBuilder
             }
         }
 
-        // 5. Calculate Totals for the entire period from unpaginated query
-        $totalQuery = DB::table(DB::raw("({$unpaginatedQuery->toSql()}) as transactions"))
-            ->mergeBindings($unpaginatedQuery->getQuery());
-
-        $totals = $totalQuery->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')->first();
-
-        $totalDebit = (float)($totals->total_debit ?? 0);
-        $totalCredit = (float)($totals->total_credit ?? 0);
-
-        if ($orientation === 'cr') {
-            $closingBalance = $openingBalance + $totalCredit - $totalDebit;
-        } else {
-            $closingBalance = $openingBalance + $totalDebit - $totalCredit;
-        }
-
         $transactions = $query->paginate($perPage, ['*'], 'page', $page);
 
         $runningBalance = $pageStartBalance;
@@ -277,6 +296,7 @@ class ReportBuilder
             'total_debit'          => $totalDebit,
             'total_credit'         => $totalCredit,
             'closing_balance'      => (float)$closingBalance,
+            'current_balance'      => (float)$account->current_balance,
             'balance_type'         => $orientation,
             'data'                 => $transactions,
             'from_date'            => $fromDate,
@@ -404,12 +424,14 @@ class ReportBuilder
         if (isset($params['salemanId']) && $params['salemanId'] !== 'ALL') {
             $purchasesQuery->where('salesman_id', $params['salemanId']);
         }
-        $purchases = $purchasesQuery->sum('net_total');
+        $purchases = $purchasesQuery->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
 
-        $isAsset = in_array($account->type, [1, 2, 14]);
+        $isAsset = in_array((int)$account->type, [1, 2, 14])
+            || in_array($type, ['cash', 'bank', 'cheque in hand'])
+            || (bool)($account->cashbank ?? false);
         $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
 
-        $pQuery = Payment::where($paymentColumn, $accountId)->where('date', '<', $date)->where('cheque_status', '!=', 'Canceled');
+        $pQuery = Payment::where($paymentColumn, $accountId)->where('date', '<', $date)->whereNotIn('cheque_status', ['Canceled', 'Returned']);
         if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
             $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
             $pQuery->where($otherCol, $params['contraId']);
@@ -430,12 +452,12 @@ class ReportBuilder
         if ($isAsset) {
             $finPayments = Payment::where('payment_account_id', $accountId)
                 ->where('date', '<', $date)
-                ->where('cheque_status', '!=', 'Canceled')
+                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
                       ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
                 });
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
                 $finPayments->where('account_id', $params['contraId']);
@@ -445,12 +467,12 @@ class ReportBuilder
 
             $partyPayments = Payment::where('account_id', $accountId)
                 ->where('date', '<', $date)
-                ->where('cheque_status', '!=', 'Canceled')
+                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
                       ->orWhere('cheque_status', '')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed']);
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
                 });
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
                 $partyPayments->where('payment_account_id', $params['contraId']);
@@ -1904,7 +1926,7 @@ class ReportBuilder
         }
 
         // 2. Fetch Purchases (Payables)
-        $includePurchases = ($accountId === 'ALL') || ($targetParty && $targetParty->purchase == 1);
+        $includePurchases = ($accountId === 'ALL') || ($targetParty && ($targetParty->purchase == 1 || $targetParty->type == 6 || strtolower($targetParty->accountType?->name ?? '') === 'supplier'));
         if ($includePurchases) {
             $purchaseQuery = Purchase::with(['supplier' => function($q) {
                 $q->select('id', 'title', 'aging_days', 'credit_limit');
@@ -1922,46 +1944,175 @@ class ReportBuilder
             $unifiedResults = $unifiedResults->merge($purchases);
         }
 
-        // 3. Group and Process
-        $grouped = $unifiedResults->groupBy('party_id');
+        // 3. Group and Process with Opening Balance & Full Calculation
+        $groupedBills = $unifiedResults->groupBy('party_id');
+        $partyIdsFromBills = $unifiedResults->pluck('party_id')->unique()->filter()->values()->all();
+
+        // Query all relevant accounts: either have unpaid bills OR have opening_balance != 0
+        $accountQuery = Account::with('accountType');
+        if ($accountId !== 'ALL') {
+            $accountQuery->where('id', $accountId);
+        } else {
+            $accountQuery->where(function($q) use ($partyIdsFromBills, $includePurchases, $includeSales) {
+                if (!empty($partyIdsFromBills)) {
+                    $q->whereIn('id', $partyIdsFromBills);
+                }
+                $q->orWhere(function($subQ) use ($includePurchases, $includeSales) {
+                    $subQ->whereNotNull('opening_balance')->where('opening_balance', '!=', 0);
+                    if ($includePurchases && !$includeSales) {
+                        $subQ->where(function($pQ) {
+                            $pQ->where('purchase', 1)
+                               ->orWhere('type', 6)
+                               ->orWhereHas('accountType', fn($at) => $at->where('name', 'Supplier'));
+                        });
+                    } elseif ($includeSales && !$includePurchases) {
+                        $subQ->where(function($sQ) {
+                            $sQ->where('sale', 1)
+                               ->orWhere('type', 3)
+                               ->orWhereHas('accountType', fn($at) => $at->where('name', 'Customer'));
+                        });
+                    }
+                });
+            });
+        }
+        $this->applyAccountFilters($accountQuery, $params);
+        $accounts = $accountQuery->get()->keyBy('id');
+
         $finalData = [];
 
-        foreach ($grouped as $partyId => $partyBills) {
-            $sortedBills = $partyBills->sortBy('date')->values();
-            $cumulativeBalance = 0;
-            $partyUnDueAmount = 0;
-            $partyDueAmount = 0;
-            
-            foreach ($sortedBills as $index => $bill) {
-                $rem = $bill['remaining'];
-                $cumulativeBalance += $rem;
-                $bill['balance'] = $cumulativeBalance;
-                
-                if ($bill['days'] > 0) $partyDueAmount += $rem;
-                else $partyUnDueAmount += $rem;
-                
-                $finalData[] = $bill;
+        foreach ($accounts as $partyId => $account) {
+            $partyBills = $groupedBills->get($partyId, collect());
+            $billsRemaining = (float)$partyBills->sum('remaining');
+            $currentBal = (float)$account->current_balance;
+            $signedOB = (float)$account->getSignedOpeningBalance();
+
+            // Compute remaining unpaid/unsettled opening balance
+            $excessOverBills = round($currentBal - $billsRemaining, 2);
+            $remainingOB = 0.0;
+            if ($signedOB > 0) {
+                $remainingOB = min($signedOB, max(0.0, $excessOverBills));
+            } elseif ($signedOB < 0) {
+                $remainingOB = max($signedOB, min(0.0, $excessOverBills));
             }
-            
-            if (count($finalData) > 0) {
-                $lastIndex = count($finalData) - 1;
-                $finalData[$lastIndex]['is_last_for_party'] = true;
-                $finalData[$lastIndex]['party_summary'] = [
-                    'party_un_due_amount' => $partyUnDueAmount,
-                    'party_due_amount' => $partyDueAmount,
-                    'credit_days' => $finalData[$lastIndex]['credit_days'],
-                    'credit_limit' => $finalData[$lastIndex]['credit_limit'],
-                    'party_type' => $finalData[$lastIndex]['bill_type']
+
+            // If no unpaid bills and no unpaid opening balance, skip
+            if ($partyBills->isEmpty() && abs($remainingOB) <= 0.001) {
+                continue;
+            }
+
+            $itemsForParty = collect();
+
+            if (abs($remainingOB) > 0.001) {
+                $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : ($fromDate ?? \Carbon\Carbon::parse($toDate)->subDays(30)->format('Y-m-d'));
+                $agingDays = (int)($account->aging_days ?? 0);
+                $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
+                $asOn = \Carbon\Carbon::parse($toDate);
+                $days = (int)$dueDate->diffInDays($asOn, false);
+
+                $isSupplier = ($account->purchase == 1 || $account->type == 6 || strtolower($account->accountType?->name ?? '') === 'supplier');
+                $billType = $isSupplier ? 'payable' : 'receivable';
+
+                // Determine OB display type: CR or DR
+                $obType = strtoupper($account->opening_balance_type ?? '');
+                if (empty($obType)) {
+                    $obType = $signedOB >= 0 ? ($isSupplier ? 'CR' : 'DR') : ($isSupplier ? 'DR' : 'CR');
+                }
+
+                $obPaid = round(abs($signedOB) - abs($remainingOB), 2);
+                if ($obPaid < 0) $obPaid = 0.0;
+
+                $itemsForParty->push([
+                    'date' => $obDate,
+                    'voucher_no' => 'OPENING-BAL (' . $obType . ')',
+                    'bill_type' => $billType,
+                    'party_name' => $account->title ?? 'Unknown',
+                    'party_id' => $account->id,
+                    'due_date' => $dueDate->format('Y-m-d'),
+                    'days' => $days,
+                    'bill_amt' => $remainingOB < 0 ? -abs($signedOB) : abs($signedOB),
+                    'paid' => $obPaid,
+                    'remaining' => $remainingOB,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'is_opening_balance' => true,
+                    'ob_type' => $obType,
+                ]);
+            }
+
+            // Merge bill items
+            $itemsForParty = $itemsForParty->merge($partyBills);
+
+            // Sort party items: OPENING-BAL first, then chronological date & voucher
+            $sortedItems = $itemsForParty->sort(function($a, $b) {
+                $aIsOb = !empty($a['is_opening_balance']) || str_starts_with($a['voucher_no'] ?? '', 'OPENING-BAL');
+                $bIsOb = !empty($b['is_opening_balance']) || str_starts_with($b['voucher_no'] ?? '', 'OPENING-BAL');
+                if ($aIsOb && !$bIsOb) return -1;
+                if (!$aIsOb && $bIsOb) return 1;
+                $dateCmp = strtotime($a['date']) - strtotime($b['date']);
+                if ($dateCmp !== 0) return $dateCmp;
+                return strcmp($a['voucher_no'] ?? '', $b['voucher_no'] ?? '');
+            })->values();
+
+            $processedPartyItems = [];
+            $cumulativeBalance = 0.0;
+            $partyUnDueAmount = 0.0;
+            $partyDueAmount = 0.0;
+
+            foreach ($sortedItems as $item) {
+                $rem = (float)$item['remaining'];
+                $cumulativeBalance += $rem;
+                $item['balance'] = round($cumulativeBalance, 2);
+
+                if ($item['days'] > 0) {
+                    $partyDueAmount += $rem;
+                } else {
+                    $partyUnDueAmount += $rem;
+                }
+                $processedPartyItems[] = $item;
+            }
+
+            if (!empty($processedPartyItems)) {
+                $partySummary = [
+                    'party_un_due_amount' => round($partyUnDueAmount, 2),
+                    'party_due_amount' => round($partyDueAmount, 2),
+                    'credit_days' => (int)($account->aging_days ?? 0),
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'party_type' => $processedPartyItems[0]['bill_type'] ?? 'payable',
                 ];
+
+                $count = count($processedPartyItems);
+                for ($i = 0; $i < $count; $i++) {
+                    $processedPartyItems[$i]['party_summary'] = $partySummary;
+                    if ($i === $count - 1) {
+                        $processedPartyItems[$i]['is_last_for_party'] = true;
+                    }
+                    $finalData[] = $processedPartyItems[$i];
+                }
             }
         }
 
-        // Global Sort: Party Name -> Date
+        // Global Sort: Party Name -> (OPENING-BAL first) -> Date -> Voucher
         usort($finalData, function($a, $b) {
             $nameCmp = strcmp($a['party_name'], $b['party_name']);
             if ($nameCmp !== 0) return $nameCmp;
-            return strtotime($a['date']) - strtotime($b['date']);
+
+            $aIsOb = !empty($a['is_opening_balance']) || $a['voucher_no'] === 'OPENING-BAL';
+            $bIsOb = !empty($b['is_opening_balance']) || $b['voucher_no'] === 'OPENING-BAL';
+            if ($aIsOb && !$bIsOb) return -1;
+            if (!$aIsOb && $bIsOb) return 1;
+
+            $dateCmp = strtotime($a['date']) - strtotime($b['date']);
+            if ($dateCmp !== 0) return $dateCmp;
+
+            return strcmp($a['voucher_no'], $b['voucher_no']);
         });
+
+        // Ensure is_last_for_party is set accurately after sort
+        $totalRows = count($finalData);
+        for ($i = 0; $i < $totalRows; $i++) {
+            $isLast = ($i === $totalRows - 1) || ($finalData[$i]['party_id'] !== $finalData[$i + 1]['party_id']);
+            $finalData[$i]['is_last_for_party'] = $isLast;
+        }
 
         return collect($finalData);
     }

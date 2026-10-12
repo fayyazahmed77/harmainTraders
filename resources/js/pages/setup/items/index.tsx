@@ -46,6 +46,7 @@ interface Item {
   created_at: string;
   packing_qty: string;
   reorder_level: string;
+  primary_image_url?: string;
 }
 
 interface Category {

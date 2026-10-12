@@ -421,7 +421,7 @@ class ItemsController extends Controller implements HasMiddleware
     //show
     public function show($id)
     {
-        $item = Items::with('category')->findOrFail($id);
+        $item = Items::with(['category', 'images'])->findOrFail($id);
 
         // 1. Purchase Analysis
         // We need to aggregate all PurchaseItems for this item
@@ -571,7 +571,7 @@ class ItemsController extends Controller implements HasMiddleware
             return response()->json([]);
         }
 
-        $items = Items::with(['category', 'companyAccount'])
+        $items = Items::with(['category', 'companyAccount', 'images'])
             ->where('title', 'like', '%' . $query . '%')
             ->when($excludeId, function ($q) use ($excludeId) {
                 return $q->where('id', '!=', $excludeId);
@@ -589,6 +589,7 @@ class ItemsController extends Controller implements HasMiddleware
                 'id' => $item->id,
                 'title' => $item->title,
                 'code' => $item->code,
+                'image' => $item->primary_image_url,
                 'category' => $cat ? $cat->name : null,
                 'company' => $item->companyAccount ? $item->companyAccount->title : null,
             ];

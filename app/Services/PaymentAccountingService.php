@@ -18,8 +18,11 @@ class PaymentAccountingService
     public static function getRecognizedDiscount(Payment $payment): float
     {
         $allocatedSettlement = (float)$payment->allocations()->sum('amount');
-        $cashAllocated = min((float)$payment->amount, $allocatedSettlement);
-        return max(0.0, $allocatedSettlement - $cashAllocated);
+        if ($allocatedSettlement > 0) {
+            $cashAllocated = min((float)$payment->amount, $allocatedSettlement);
+            return max(0.0, $allocatedSettlement - $cashAllocated);
+        }
+        return (float)($payment->discount ?? 0);
     }
 
     /**
@@ -205,5 +208,195 @@ class PaymentAccountingService
             'signed_balance'  => $netDiff,
             'orientation'     => $netDiff >= 0 ? 'DR' : 'CR',
         ];
+    }
+
+    /**
+     * Efficiently bulk-calculate and attach real-time current_balance to a collection of accounts.
+     * Prevents N+1 queries during listing / serialization while ensuring 100% accurate balances.
+     */
+    public static function attachBulkBalances($accounts): void
+    {
+        if (!$accounts || $accounts->isEmpty()) {
+            return;
+        }
+
+        // Defensive check: ensure opening balance fields are loaded on all models
+        $missingOBIds = $accounts->filter(function ($a) {
+            return !array_key_exists('opening_balance', $a->getAttributes()) || !array_key_exists('opening_balance_type', $a->getAttributes());
+        })->pluck('id')->toArray();
+
+        if (!empty($missingOBIds)) {
+            $obs = DB::table('accounts')->whereIn('id', $missingOBIds)->select('id', 'opening_balance', 'opening_balance_type')->get()->keyBy('id');
+            foreach ($accounts as $a) {
+                if (isset($obs[$a->id])) {
+                    $a->setAttribute('opening_balance', $obs[$a->id]->opening_balance);
+                    $a->setAttribute('opening_balance_type', $obs[$a->id]->opening_balance_type);
+                }
+            }
+        }
+
+        // Ensure purchase and sale flags are loaded
+        $missingFlags = $accounts->filter(function ($a) {
+            return !array_key_exists('purchase', $a->getAttributes()) || !array_key_exists('sale', $a->getAttributes());
+        })->pluck('id')->toArray();
+
+        if (!empty($missingFlags)) {
+            $flags = DB::table('accounts')->whereIn('id', $missingFlags)->select('id', 'purchase', 'sale')->get()->keyBy('id');
+            foreach ($accounts as $a) {
+                if (isset($flags[$a->id])) {
+                    $a->setAttribute('purchase', $flags[$a->id]->purchase);
+                    $a->setAttribute('sale', $flags[$a->id]->sale);
+                }
+            }
+        }
+
+        // Group accounts by role
+        $customerIds = [];
+        $supplierIds = [];
+
+        foreach ($accounts as $account) {
+            if (array_key_exists('current_balance', $account->getAttributes()) && $account->getAttributes()['current_balance'] !== null) {
+                continue;
+            }
+
+            $type = strtolower($account->accountType->name ?? '');
+            $hasPurchase = (bool)($account->purchase ?? false);
+            $hasSale = (bool)($account->sale ?? false);
+
+            if ($hasPurchase && $hasSale) {
+                $customerIds[] = $account->id;
+                $supplierIds[] = $account->id;
+            } elseif ($type === 'customers') {
+                $customerIds[] = $account->id;
+            } elseif ($type === 'supplier') {
+                $supplierIds[] = $account->id;
+            }
+        }
+
+        $customerIds = array_values(array_unique($customerIds));
+        $supplierIds = array_values(array_unique($supplierIds));
+        $allPartyIds = array_values(array_unique(array_merge($customerIds, $supplierIds)));
+
+        // Bulk load sales & returns
+        $custSales = empty($customerIds) ? collect() : \App\Models\Sales::whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        $custReturns = empty($customerIds) ? collect() : \App\Models\SalesReturn::whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+
+        // Bulk load purchases & returns
+        $suppPurchases = empty($supplierIds) ? collect() : \App\Models\Purchase::whereIn('supplier_id', $supplierIds)
+            ->selectRaw('supplier_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        $suppReturns = empty($supplierIds) ? collect() : \App\Models\PurchaseReturn::whereIn('supplier_id', $supplierIds)
+            ->selectRaw('supplier_id, SUM(net_total - COALESCE(extra_discount, 0)) as total')
+            ->groupBy('supplier_id')
+            ->pluck('total', 'supplier_id');
+
+        // Bulk load payments for parties
+        $partyReceipts = empty($allPartyIds) ? collect() : \App\Models\Payment::whereIn('account_id', $allPartyIds)
+            ->where('type', 'RECEIPT')
+            ->where(function ($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        $partyPayments = empty($allPartyIds) ? collect() : \App\Models\Payment::whereIn('account_id', $allPartyIds)
+            ->where('type', 'PAYMENT')
+            ->where(function ($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Returned'])->orWhereNull('cheque_status');
+            })
+            ->with('allocations')
+            ->get()
+            ->groupBy('account_id');
+
+        // Pre-compute settlement sums per account in memory
+        $receiptSettlements = [];
+        foreach ($partyReceipts as $accId => $receipts) {
+            $sum = 0.0;
+            foreach ($receipts as $r) {
+                $sum += self::getRecognizedNetSettlement($r);
+            }
+            $receiptSettlements[$accId] = $sum;
+        }
+
+        $paymentSettlements = [];
+        $custPaymentSettlements = [];
+        foreach ($partyPayments as $accId => $payments) {
+            $allSum = 0.0;
+            $custSum = 0.0;
+            foreach ($payments as $p) {
+                $rec = self::getRecognizedNetSettlement($p);
+                $allSum += $rec;
+                if (!$p->is_return_refund) {
+                    $custSum += $rec;
+                }
+            }
+            $paymentSettlements[$accId] = $allSum;
+            $custPaymentSettlements[$accId] = $custSum;
+        }
+
+        // Attach balances to every account
+        foreach ($accounts as $account) {
+            if (array_key_exists('current_balance', $account->getAttributes()) && $account->getAttributes()['current_balance'] !== null) {
+                continue;
+            }
+
+            $type = strtolower($account->accountType->name ?? '');
+            $hasPurchase = (bool)($account->purchase ?? false);
+            $hasSale = (bool)($account->sale ?? false);
+
+            if ($hasPurchase && $hasSale) {
+                $rawOB = (float)($account->opening_balance ?? 0);
+                $obType = strtoupper($account->opening_balance_type ?? 'DR');
+                $obDR = $obType === 'DR' ? $rawOB : 0.0;
+                $obCR = $obType === 'CR' ? $rawOB : 0.0;
+
+                $totalS = (float)($custSales[$account->id] ?? 0);
+                $totalSR = (float)($custReturns[$account->id] ?? 0);
+                $totalP = (float)($suppPurchases[$account->id] ?? 0);
+                $totalPR = (float)($suppReturns[$account->id] ?? 0);
+                $rSettlement = (float)($receiptSettlements[$account->id] ?? 0);
+                $pSettlement = (float)($paymentSettlements[$account->id] ?? 0);
+
+                $totalDR = $obDR + $totalS + $pSettlement + $totalPR;
+                $totalCR = $obCR + $totalP + $rSettlement + $totalSR;
+
+                $bal = $type === 'supplier' ? ($totalCR - $totalDR) : ($totalDR - $totalCR);
+                $account->setAttribute('current_balance', round($bal, 2));
+                $account->memoizedCurrentBalance = round($bal, 2);
+            } elseif ($type === 'customers') {
+                $totalS = (float)($custSales[$account->id] ?? 0);
+                $totalSR = (float)($custReturns[$account->id] ?? 0);
+                $rSettlement = (float)($receiptSettlements[$account->id] ?? 0);
+                $pSettlement = (float)($custPaymentSettlements[$account->id] ?? 0);
+
+                $bal = $account->getSignedOpeningBalance() + $totalS + $pSettlement - $totalSR - $rSettlement;
+                $account->setAttribute('current_balance', round($bal, 2));
+                $account->memoizedCurrentBalance = round($bal, 2);
+            } elseif ($type === 'supplier') {
+                $totalP = (float)($suppPurchases[$account->id] ?? 0);
+                $totalPR = (float)($suppReturns[$account->id] ?? 0);
+                $rSettlement = (float)($receiptSettlements[$account->id] ?? 0);
+                $pSettlement = (float)($paymentSettlements[$account->id] ?? 0);
+
+                $bal = $account->getSignedOpeningBalance() + $totalP + $rSettlement - $totalPR - $pSettlement;
+                $account->setAttribute('current_balance', round($bal, 2));
+                $account->memoizedCurrentBalance = round($bal, 2);
+            } else {
+                // Non-customer/non-supplier accounts (bank, cash, expense, etc.)
+                $bal = (float)$account->current_balance;
+                $account->setAttribute('current_balance', round($bal, 2));
+                $account->memoizedCurrentBalance = round($bal, 2);
+            }
+        }
     }
 }

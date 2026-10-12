@@ -15,7 +15,8 @@ export function DetailLedgerReportView({
     closingBalance,
     pageCount,
     pagination,
-    setPagination
+    setPagination,
+    balanceType = 'dr'
 }: any) {
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -50,7 +51,19 @@ export function DetailLedgerReportView({
                 </div>
                 <div className={cn("bg-card rounded-lg border border-border border-l-4 p-5 shadow-sm", closingBalance >= 0 ? "border-l-text-primary" : "border-l-red-500")}>
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Closing Balance</p>
-                    <h3 className={cn("text-2xl font-black", closingBalance >= 0 ? "text-text-primary" : "text-red-500")}>{formatCurrency(closingBalance)}</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className={cn("text-2xl font-black", closingBalance >= 0 ? "text-text-primary" : "text-red-500")}>
+                            {formatCurrency(Math.abs(closingBalance))}
+                        </h3>
+                        {Math.abs(Number(closingBalance)) >= 0.01 && (
+                            <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] font-black text-white uppercase",
+                                (balanceType === 'cr' ? (closingBalance > 0 ? "bg-rose-500" : "bg-sky-500") : (closingBalance > 0 ? "bg-emerald-500" : "bg-rose-500"))
+                            )}>
+                                {closingBalance > 0 ? balanceType.toUpperCase() : (balanceType === 'cr' ? 'DR' : 'CR')}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 

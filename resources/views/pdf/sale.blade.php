@@ -459,7 +459,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                     Address : {{ $sale->customer->address1 ?? 'Address not available' }}
                 </div>
                 <div class="customer-address" style="font-weight: bold; color: #222; margin-top: 2px;">
-                    Invoice No : {{ $sale->id }}
+                    Invoice No : {{ $sale->invoice }}
                 </div>
             </div>
             <div class="invoice-details-wrapper">
@@ -531,9 +531,9 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <td class="text-left">{{ $item->item->title }}</td>
                         <td>{{ number_format($item->item->retail ?? 0, 0) }}</td>
                         <td>{{ number_format($item->trade_price, 0) }}</td>
-                        <td>{{ number_format($disc_percent > 0 ? $disc_percent : 0, 0) }}</td>
-                        <td>{{ number_format($after_disc_rate, 0) }}</td>
-                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 0) }}</td>
+                        <td>{{ number_format($disc_percent > 0 ? $disc_percent : 0, 2) }}</td>
+                        <td>{{ number_format($after_disc_rate, 2) }}</td>
+                        <td class="text-right">{{ number_format($item->subtotal - $item->discount, 2) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -555,7 +555,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
 
             <div class="footer-center">
                 <div style="font-weight: bold; margin-top: 0px; font-size: 10px;">
-                    Discount Amount : &nbsp; {{ number_format($sale->discount_total, 0) }}
+                    Discount Amount : &nbsp; {{ number_format($sale->discount_total, 2) }}
                 </div>
             </div>
 
@@ -566,20 +566,20 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Courier Charges -->
                         <tr>
                             <td class="label">Courier Charges :-</td>
-                            <td class="value">{{ number_format($sale->courier_charges ?? 0, 0) }}</td>
+                            <td class="value">{{ number_format($sale->courier_charges ?? 0, 2) }}</td>
                         </tr>
                        
                         <!-- Extra Discount -->
                         @if($sale->extra_discount > 0)
                         <tr>
                             <td class="label">Extra Discount :-</td>
-                            <td class="value">{{ number_format($sale->extra_discount, 0) }}</td>
+                            <td class="value">{{ number_format($sale->extra_discount, 2) }}</td>
                         </tr>
                         @endif
                          <!-- Total Rs. (Net of current invoice) -->
                         <tr>
                             <td class="label">Total Rs. :-</td>
-                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 0) }}</td>
+                            <td class="value">{{ number_format($sale->net_total - $sale->extra_discount, 2) }}</td>
                         </tr>
                         <!-- Previous Balance -->
                         @php
@@ -587,12 +587,12 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         $remaining_amount = (float)($sale->remaining_amount ?? 0);
                         $paid_amount = (float)($sale->paid_amount ?? 0);
                         $prev_balance = $total_receivable > 0 
-                            ? max(0, round($total_receivable - ($remaining_amount + $paid_amount))) 
+                            ? max(0, round($total_receivable - ($remaining_amount + $paid_amount), 2)) 
                             : 0;
                         @endphp
                         <tr>
                             <td class="label">Previous Balance :-</td>
-                            <td class="value">{{ number_format($prev_balance, 0) }}</td>
+                            <td class="value">{{ number_format($prev_balance, 2) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -607,7 +607,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                         <!-- Cash Received -->
                         <tr>
                             <td class="label">Cash Received :-</td>
-                            <td class="value">{{ number_format($sale->paid_amount, 0) }}</td>
+                            <td class="value">{{ number_format($sale->paid_amount, 2) }}</td>
                         </tr>
                         <!-- Divider Line -->
                         <tr>
@@ -631,7 +631,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                 Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
             </div>
             <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
-                Thank you for choosing Haramain Traders.
+                Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
             <div style="font-size: 8px; color: #555; letter-spacing: 0.3px;">
                 Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819

@@ -508,7 +508,7 @@ if (file_exists($logo_path)) {
                 Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
             </div>
             <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
-                Thank you for choosing Haramain Traders.
+                Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
             <div style="font-size: 8px; color: #555; letter-spacing: 0.3px;">
                 Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819

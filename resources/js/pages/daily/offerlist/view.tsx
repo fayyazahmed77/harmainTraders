@@ -207,7 +207,15 @@ export default function View({ offer }: Props) {
                                         Offer Date
                                     </div>
                                     <div className="h-11 flex items-center px-4 bg-zinc-100/50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-sm font-black tabular-nums text-zinc-600 w-full truncate">
-                                        {new Date(offer.date).toLocaleDateString('en-GB')}
+                                        {(() => {
+                                            if (!offer.date) return '-';
+                                            const parts = offer.date.split('T')[0].split('-');
+                                            if (parts.length === 3) {
+                                                const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                                                return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                            }
+                                            return new Date(offer.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                        })()}
                                     </div>
                                 </div>
 

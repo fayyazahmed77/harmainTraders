@@ -161,7 +161,7 @@ if (file_exists($logo_path)) {
     <div class="header text-center">
         <div class="logo-section">
             <div class="brand-text">
-                <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
+                <div class="brand-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
                 <div class="brand-tagline">Financial Portfolio Intelligence</div>
             </div>
         </div>
@@ -209,21 +209,37 @@ if (file_exists($logo_path)) {
                             $agingWeight = $bill['days'] > 0 ? 'font-bold' : '';
                         @endphp
                     <tr>
-                        <td class="text-center">{{ date('d-M-y', strtotime($bill['date'])) }}</td>
-                        <td class="text-center font-bold">{{ $bill['voucher_no'] }}</td>
+                        <td class="text-center">{{ !empty($bill['date']) ? date('d-M-y', strtotime($bill['date'])) : '-' }}</td>
+                        <td class="text-center font-bold">
+                            @if(!empty($bill['is_opening_balance']) || str_starts_with($bill['voucher_no'] ?? '', 'OPENING-BAL'))
+                                @if(str_contains($bill['voucher_no'] ?? '', 'DR') || ($bill['remaining'] ?? 0) < 0)
+                                    <span style="color: #059669; font-weight: bold;">{{ $bill['voucher_no'] }}</span>
+                                @else
+                                    <span style="color: #b45309; font-weight: bold;">{{ $bill['voucher_no'] }}</span>
+                                @endif
+                            @else
+                                {{ $bill['voucher_no'] }}
+                            @endif
+                        </td>
                         <td class="text-center">
-                            <span class="type-badge {{ $bill['bill_type'] === 'receivable' ? 'type-rec' : 'type-pay' }}">
-                                {{ $bill['bill_type'] === 'receivable' ? 'REC' : 'PAY' }}
-                            </span>
+                            @if(!empty($bill['is_opening_balance']) && (str_contains($bill['voucher_no'] ?? '', 'DR') || ($bill['remaining'] ?? 0) < 0))
+                                <span class="type-badge" style="background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;">
+                                    ADV
+                                </span>
+                            @else
+                                <span class="type-badge {{ $bill['bill_type'] === 'receivable' ? 'type-rec' : 'type-pay' }}">
+                                    {{ $bill['bill_type'] === 'receivable' ? 'REC' : 'PAY' }}
+                                </span>
+                            @endif
                         </td>
                         <td class="font-bold">{{ $bill['party_name'] }}</td>
-                        <td class="text-center">{{ date('d-M-y', strtotime($bill['due_date'])) }}</td>
+                        <td class="text-center">{{ !empty($bill['due_date']) ? date('d-M-y', strtotime($bill['due_date'])) : '-' }}</td>
                         <td class="text-center {{ $agingWeight }}" style="color: {{ $agingColor }};">
                             {{ $bill['days'] > 0 ? $bill['days'].' d' : abs($bill['days']).' l' }}
                         </td>
-                        <td class="text-right">{{ formatNum($bill['bill_amt']) }}</td>
+                        <td class="text-right" style="{{ ($bill['bill_amt'] ?? 0) < 0 ? 'color: #059669;' : '' }}">{{ formatNum($bill['bill_amt']) }}</td>
                         <td class="text-right">{{ formatNum($bill['paid']) }}</td>
-                        <td class="text-right font-bold">{{ formatNum($bill['remaining']) }}</td>
+                        <td class="text-right font-bold" style="{{ ($bill['remaining'] ?? 0) < 0 ? 'color: #059669;' : '' }}">{{ formatNum($bill['remaining']) }}</td>
                     </tr>
                     @endforeach
                 </tbody>

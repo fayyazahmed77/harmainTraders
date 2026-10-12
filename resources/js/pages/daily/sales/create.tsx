@@ -690,7 +690,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       // Split Payment Data
       is_pay_now: isPayNow,
       is_multi: isMultiPayment,
-      splits: splits,
+      splits: isPayNow ? splits.filter(s => toNumber(s.amount) > 0) : [],
       message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
       gross_total: totals.gross,
@@ -700,8 +700,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       courier_charges: totals.courier,
       net_total: totals.net,
       total_receivable: totals.finalAmount,
-      paid_amount: splits.reduce((acc, s) => acc + toNumber(s.amount), 0),
-      remaining_amount: totals.net - splits.reduce((acc, s) => acc + toNumber(s.amount), 0) - totals.appliedAdvance,
+      paid_amount: isPayNow ? splits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0,
+      remaining_amount: totals.net - (isPayNow ? splits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0) - totals.appliedAdvance,
       use_advance: useAdvance,
       applied_advance: totals.appliedAdvance,
 

@@ -611,7 +611,8 @@ export default function PurchaseEdit({
 
         const absAdvance = Math.max(0, -advanceAvailable);
         const appliedAdvance = useAdvance ? Math.min(netPayable, absAdvance) : 0;
-        const netSettlement = Math.max(0, netPayable - appliedAdvance);
+        const alreadyPaid = toNumber(purchase?.paid_amount ?? 0);
+        const netSettlement = Math.max(0, netPayable - appliedAdvance - alreadyPaid);
 
         const finalNetPayable = prevBal + netSettlement;
 
@@ -696,7 +697,7 @@ export default function PurchaseEdit({
             // Payment Data
             is_pay_now: isPayNow,
             is_multi: true,
-            splits: isPayNow ? paymentSplits : [],
+            splits: isPayNow ? paymentSplits.filter(s => toNumber(s.amount) > 0) : [],
 
             items: rowsWithComputed.filter(r => r.item_id !== null).map((r) => {
                 const item = items.find(i => Number(i.id) === Number(r.item_id));

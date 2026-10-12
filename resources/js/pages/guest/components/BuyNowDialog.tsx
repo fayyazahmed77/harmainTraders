@@ -60,6 +60,9 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                             src={img}
                                             alt={`${buyItem.title} - ${idx + 1}`}
                                             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${idx === currentImg ? 'opacity-100' : 'opacity-0'}`}
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                                            }}
                                         />
                                     ))}
                                     
@@ -79,6 +82,9 @@ export const BuyNowDialog: React.FC<BuyNowDialogProps> = ({
                                     src={buyItem.image || DEFAULT_IMAGE} 
                                     alt={buyItem.title} 
                                     className="w-full h-full object-cover" 
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                                    }}
                                 />
                             )}
                             

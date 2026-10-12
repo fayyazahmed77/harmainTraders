@@ -134,8 +134,8 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         </div>
     </div>
     <div style="text-align: center; margin-bottom: 15px;">
-        <span>1st Floor, Marvi Market, Katchi Gali No.1 Denso Hall, Karachi</span><br>
-        <span>Phone No. : 0332 3218684 / 021 32401607</span>
+        <span>1st floor, shop#163, Alavi Chamber, Near HBL, Opposite Zeenat Medicine Market, Nappier Road, Karachi</span><br>
+        <span>Sales team: 0332 3218684 &nbsp;|&nbsp; Complain: 0343 8772357</span>
     </div>
 @else
     <div class="logo-section" style="text-align: center; margin-bottom: 15px;">
@@ -160,7 +160,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
             <small>{{ $offer->account->address ?? "Karachi, Pakistan" }}</small>
         </div>
         <div class="header-right">
-            <strong>Date:</strong> {{ \Carbon\Carbon::parse($offer->date)->format('d/m/Y') }}
+            <strong>Date:</strong> {{ \Carbon\Carbon::parse($offer->date)->format('d M Y') }}
         </div>
         <div class="clear"></div>
     </div>
