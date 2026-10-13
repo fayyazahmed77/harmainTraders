@@ -386,8 +386,14 @@ class ReportBuilder
         $sales = Sales::where('customer_id', $accountId)->whereBetween('date', [$fromDate, $toDate])->sum(DB::raw('net_total - extra_discount'));
         $purchases = Purchase::where('supplier_id', $accountId)->whereBetween('date', [$fromDate, $toDate])->sum('net_total');
 
-        $account = Account::find($accountId);
-        $isAsset = in_array($account->type, [1, 2, 14]);
+        $account = Account::with('accountType')->find($accountId);
+        if (!$account) {
+            return 0;
+        }
+        $type = strtolower($account->accountType->name ?? '');
+        $isAsset = in_array((int)$account->type, [1, 2, 14])
+            || in_array($type, ['cash', 'bank', 'cheque in hand'])
+            || (bool)($account->cashbank ?? false);
         $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
 
         $paymentsReceived = Payment::where($paymentColumn, $accountId)->whereBetween('date', [$fromDate, $toDate])->where('type', 'RECEIPT')->sum('amount');
@@ -404,7 +410,10 @@ class ReportBuilder
 
     private function calculateOpeningBalance($accountId, $date, $orientation = 'dr', $params = [])
     {
-        $account = Account::find($accountId);
+        $account = Account::with('accountType')->find($accountId);
+        if (!$account) {
+            return 0;
+        }
         $manualOpening = $account->getSignedOpeningBalance();
         
         // Sum all transactions before $date
@@ -426,6 +435,7 @@ class ReportBuilder
         }
         $purchases = $purchasesQuery->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
 
+        $type = strtolower($account->accountType->name ?? '');
         $isAsset = in_array((int)$account->type, [1, 2, 14])
             || in_array($type, ['cash', 'bank', 'cheque in hand'])
             || (bool)($account->cashbank ?? false);
