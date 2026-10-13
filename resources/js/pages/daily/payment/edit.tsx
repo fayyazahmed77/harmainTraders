@@ -365,6 +365,7 @@ interface PaymentProps {
     remarks?: string;
     payment_method: string;
     cheque_id?: number | null;
+    source_payment_id?: number | string | null;
     group_id?: number | null;
     cheque_status?: string;
     message_line_id?: number | null;
@@ -498,7 +499,9 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
   }, [flash?.success]);
 
   const [paymentType, setPaymentType] = useState<"RECEIPT" | "PAYMENT">(payment.type || "RECEIPT");
-  const [paymentAccountId, setPaymentAccountId] = useState<string>(payment.payment_account_id?.toString() ?? "");
+  const initialPaymentAccId = payment.payment_account_id?.toString() 
+    || (payment.splits && payment.splits[0]?.payment_account_id ? payment.splits[0].payment_account_id.toString() : "");
+  const [paymentAccountId, setPaymentAccountId] = useState<string>(initialPaymentAccId);
 
   const t = useMemo(() => {
     return paymentType === 'RECEIPT' ? {
@@ -570,9 +573,13 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
   const [clearDate, setClearDate] = useState<string>(payment.clear_date || "");
   const [remarks, setRemarks] = useState<string>(payment.remarks || "");
 
-  const [paymentMethod, setPaymentMethod] = useState<string>(payment.payment_method || "Cash");
-  const [selectedFirmId, setSelectedFirmId] = useState<string>(payment.firm_id?.toString() ?? "0");
-  const [selectedMessageId, setSelectedMessageId] = useState<string>(payment.message_line_id?.toString() ?? "0");
+  const initialPaymentMethod = payment.payment_method 
+    || (payment.splits && payment.splits[0]?.payment_method ? payment.splits[0].payment_method : "Cash");
+  const [paymentMethod, setPaymentMethod] = useState<string>(initialPaymentMethod);
+  const selectedFirmInitial = payment.firm_id?.toString() ?? "0";
+  const [selectedFirmId, setSelectedFirmId] = useState<string>(selectedFirmInitial);
+  const selectedMessageInitial = payment.message_line_id?.toString() ?? "0";
+  const [selectedMessageId, setSelectedMessageId] = useState<string>(selectedMessageInitial);
   const [showRightSidebar, setShowRightSidebar] = useState<boolean>(false);
   
   const initialIsMulti = Boolean(payment.is_multi || (payment.splits && payment.splits.length > 1));
@@ -581,25 +588,25 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
   const initialSplits = useMemo(() => {
     if (payment.splits && payment.splits.length > 0) {
       return payment.splits.map((s: any, idx: number) => ({
-        id: Date.now() + idx,
+        id: s.id || (Date.now() + idx),
         payment_account_id: s.payment_account_id ? s.payment_account_id.toString() : "",
         amount: toNum(s.amount),
         cheque_no: s.cheque_no || "",
         cheque_date: s.cheque_date || "",
         clear_date: s.clear_date || "",
         payment_method: s.payment_method || "Cash",
-        original_cheque_id: s.cheque_id ? s.cheque_id.toString() : ""
+        original_cheque_id: s.original_cheque_id ? s.original_cheque_id.toString() : (s.cheque_id ? s.cheque_id.toString() : "")
       }));
     }
     return [{
-      id: Date.now(),
+      id: payment.id || Date.now(),
       payment_account_id: payment.payment_account_id ? payment.payment_account_id.toString() : "",
       amount: toNum(payment.amount),
       cheque_no: payment.cheque_no || "",
       cheque_date: payment.cheque_date || "",
       clear_date: payment.clear_date || "",
       payment_method: payment.payment_method || "Cash",
-      original_cheque_id: payment.cheque_id ? payment.cheque_id.toString() : ""
+      original_cheque_id: payment.source_payment_id ? payment.source_payment_id.toString() : (payment.cheque_id ? payment.cheque_id.toString() : "")
     }];
   }, [payment]);
 
@@ -1038,6 +1045,28 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
         fetchCustomerCheques();
       }
     }
+
+    // Keep primary paymentAccountId, paymentMethod, amount in sync when row 0 is edited
+    if (splitPayments.length <= 1 || splitPayments[0]?.id === id) {
+      if (field === 'payment_account_id') {
+        setPaymentAccountId(value ? value.toString() : "");
+        const account = paymentAccounts.find(a => a.id.toString() === value?.toString());
+        const accTypeName = (account?.account_type?.name || "").toLowerCase();
+        if (accTypeName.includes('cheque in hand')) {
+          setPaymentMethod('Cheque');
+        } else if (accTypeName.includes('bank')) {
+          setPaymentMethod(paymentType === 'RECEIPT' ? 'Online' : '');
+        } else if (accTypeName.includes('cash')) {
+          setPaymentMethod('Cash');
+        }
+      }
+      if (field === 'payment_method') {
+        setPaymentMethod(value || "");
+      }
+      if (field === 'amount' && splitPayments.length <= 1) {
+        setAmount(toNum(value));
+      }
+    }
   };
 
   const [loading, setLoading] = useState(false);
@@ -1104,11 +1133,18 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
       if (!isValid) return;
 
       const splitsTotal = cleanedSplits.reduce((s, p) => s + Number(p.amount), 0);
+      const firstSplit = cleanedSplits[0];
 
       finalPayload = {
         is_multi: true,
         date,
         account_id: Number(selectedAccountId),
+        payment_account_id: firstSplit?.payment_account_id ? Number(firstSplit.payment_account_id) : null,
+        payment_method: firstSplit?.payment_method || null,
+        cheque_no: firstSplit?.cheque_no || null,
+        cheque_date: firstSplit?.cheque_date || null,
+        clear_date: firstSplit?.clear_date || null,
+        original_cheque_id: firstSplit?.original_cheque_id || null,
         type: paymentType,
         remarks: remarks || null,
         message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,

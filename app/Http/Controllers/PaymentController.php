@@ -273,22 +273,27 @@ class PaymentController extends Controller implements HasMiddleware
 
         $splits = [];
         if ($payment->group_id) {
-            $groupPayments = Payment::where('group_id', $payment->group_id)->get();
+            $groupPayments = Payment::where('group_id', $payment->group_id)->orderBy('id')->get();
+        } else {
+            $groupPayments = collect([$payment]);
+        }
+
+        if ($groupPayments->isNotEmpty()) {
             if ($groupPayments->count() > 1) {
                 $payment->is_multi = true;
-                $splits = $groupPayments->map(function($p) {
-                    return [
-                        'id' => $p->id,
-                        'payment_account_id' => $p->payment_account_id ? (string)$p->payment_account_id : "",
-                        'amount' => (float)$p->amount,
-                        'cheque_no' => $p->cheque_no ?? "",
-                        'cheque_date' => $p->cheque_date ?? "",
-                        'clear_date' => $p->clear_date ?? "",
-                        'payment_method' => $p->payment_method ?? "Cash",
-                        'original_cheque_id' => $p->source_payment_id ? (string)$p->source_payment_id : ""
-                    ];
-                })->toArray();
             }
+            $splits = $groupPayments->map(function($p) {
+                return [
+                    'id' => $p->id,
+                    'payment_account_id' => $p->payment_account_id ? (string)$p->payment_account_id : "",
+                    'amount' => (float)$p->amount,
+                    'cheque_no' => $p->cheque_no ?? "",
+                    'cheque_date' => $p->cheque_date ?? "",
+                    'clear_date' => $p->clear_date ?? "",
+                    'payment_method' => $p->payment_method ?? "Cash",
+                    'original_cheque_id' => $p->source_payment_id ? (string)$p->source_payment_id : ""
+                ];
+            })->toArray();
         }
         $payment->splits = $splits;
 
@@ -331,16 +336,50 @@ class PaymentController extends Controller implements HasMiddleware
             'firm_id' => 'nullable|integer',
             'allocations' => 'nullable|array',
             'original_cheque_id' => 'nullable|string',
+            'is_multi' => 'nullable|boolean',
+            'splits' => 'nullable|array',
         ]);
 
         $payment = Payment::with('allocations')->findOrFail($id);
         $account = Account::findOrFail($request->account_id);
 
+        $isMulti = (bool) $request->input('is_multi', false);
+        $splitsData = $isMulti ? $request->input('splits', []) : [];
+
+        if (empty($splitsData)) {
+            $splitsData = [[
+                'id' => $payment->id,
+                'payment_account_id' => $request->payment_account_id,
+                'amount' => $request->amount,
+                'discount' => $request->discount ?? 0,
+                'payment_method' => $request->payment_method ?? 'Cash',
+                'cheque_no' => $request->cheque_no,
+                'cheque_date' => $request->cheque_date,
+                'clear_date' => $request->clear_date,
+                'original_cheque_id' => $request->original_cheque_id,
+            ]];
+        }
+
         DB::beginTransaction();
 
         try {
-            // 1. Reverse old allocations
-            foreach ($payment->allocations as $allocation) {
+            $groupId = $payment->group_id ?: $payment->id;
+            $existingGroupPayments = $payment->group_id
+                ? Payment::where('group_id', $payment->group_id)->orderBy('id')->get()
+                : collect([$payment]);
+
+            if ($existingGroupPayments->isEmpty()) {
+                $existingGroupPayments = collect([$payment]);
+            }
+
+            $existingGroupPaymentIds = $existingGroupPayments->pluck('id')->toArray();
+            if (!in_array($payment->id, $existingGroupPaymentIds)) {
+                $existingGroupPaymentIds[] = $payment->id;
+            }
+
+            // 1. Reverse old allocations for all payments in this group
+            $oldAllocations = PaymentAllocation::whereIn('payment_id', $existingGroupPaymentIds)->get();
+            foreach ($oldAllocations as $allocation) {
                 $bill = $allocation->bill_type === 'App\Models\Sales'
                     ? Sales::find($allocation->bill_id)
                     : Purchase::find($allocation->bill_id);
@@ -363,170 +402,337 @@ class PaymentController extends Controller implements HasMiddleware
             }
 
             // 2. Delete old allocations
-            PaymentAllocation::where('payment_id', $payment->id)->delete();
+            PaymentAllocation::whereIn('payment_id', $existingGroupPaymentIds)->delete();
 
-            // 3. Reset old cheque status in Chequebook if it exists
-            if ($payment->cheque_id) {
-                $cheque = \App\Models\Chequebook::find($payment->cheque_id);
-                if ($cheque) {
-                    $cheque->update(['status' => 'unused']);
+            // 3. Reset old cheque status in Chequebook and restore distributed cheques
+            foreach ($existingGroupPayments as $oldP) {
+                if ($oldP->cheque_id) {
+                    $cheque = \App\Models\Chequebook::find($oldP->cheque_id);
+                    if ($cheque) {
+                        $cheque->update(['status' => 'unused']);
+                    }
+                }
+                if ($oldP->source_payment_id) {
+                    Payment::where('id', $oldP->source_payment_id)->update(['cheque_status' => 'In Hand']);
                 }
             }
 
-            // 4. Restore distributed cheque in hand status if type was PAYMENT and method was Cheque
-            if ($payment->source_payment_id) {
-                Payment::where('id', $payment->source_payment_id)->update(['cheque_status' => 'In Hand']);
-            }
+            // 4. Validate and issue cheques for splits
+            $chequeIds = [];
+            foreach ($splitsData as $index => $split) {
+                $splitChequeId = null;
+                $splitMethod = $split['payment_method'] ?? null;
+                $splitAccId = $split['payment_account_id'] ?? null;
 
-            // 5. Check/issue new cheque if applicable
-            $chequeId = null;
-            if ($request->type === 'PAYMENT' && $request->payment_method === 'Cheque' && $request->payment_account_id) {
-                $bankAccount = Account::with('accountType')->find($request->payment_account_id);
-                $isBankAcc = $bankAccount && $bankAccount->accountType && strtolower($bankAccount->accountType->name) === 'bank';
+                if ($request->type === 'PAYMENT' && $splitMethod === 'Cheque' && $splitAccId) {
+                    $bankAccount = Account::with('accountType')->find($splitAccId);
+                    $isBankAcc = $bankAccount && $bankAccount->accountType && strtolower($bankAccount->accountType->name) === 'bank';
 
-                if ($isBankAcc) {
-                    $chequeNoInput = trim($request->cheque_no ?? '');
-                    if (empty($chequeNoInput)) {
-                        DB::rollBack();
-                        return back()->withErrors(['cheque_no' => 'Cheque Number is required for Bank Cheque payments.']);
+                    if ($isBankAcc) {
+                        $chequeNoInput = trim($split['cheque_no'] ?? '');
+                        if (empty($chequeNoInput)) {
+                            DB::rollBack();
+                            return back()->withErrors(['cheque_no' => 'Cheque Number is required for Bank Cheque payments.']);
+                        }
+
+                        // Check if used in ANY OTHER active payment voucher (outside this group)
+                        $alreadyUsedInPayment = Payment::where('payment_account_id', $splitAccId)
+                            ->where('type', 'PAYMENT')
+                            ->where('cheque_no', $chequeNoInput)
+                            ->whereNotIn('id', $existingGroupPaymentIds)
+                            ->where(function ($q) {
+                                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
+                            })
+                            ->exists();
+
+                        if ($alreadyUsedInPayment) {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} is already assigned to another active payment voucher/invoice."
+                            ])->with('error', "Cheque #{$chequeNoInput} is already assigned to another active payment voucher.");
+                        }
+
+                        // Locate leaf in Chequebook
+                        $chequeNoParts = explode('-', $chequeNoInput);
+                        $cPrefix = '';
+                        $cNum = $chequeNoInput;
+                        if (count($chequeNoParts) >= 2) {
+                            $cPrefix = $chequeNoParts[0];
+                            $cNum = implode('-', array_slice($chequeNoParts, 1));
+                        }
+
+                        $cheque = \App\Models\Chequebook::where('bank_id', $splitAccId)
+                            ->where(function ($q) use ($chequeNoInput, $cNum, $cPrefix) {
+                                $q->where('cheque_no', $chequeNoInput)
+                                  ->orWhere(function ($sub) use ($cNum, $cPrefix) {
+                                      $sub->where('cheque_no', $cNum);
+                                      if (!empty($cPrefix)) {
+                                          $sub->where('prefix', $cPrefix);
+                                      }
+                                  });
+                            })
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (!$cheque) {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account. Duplicate or unregistered cheque numbers are blocked."
+                            ])->with('error', "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account.");
+                        }
+
+                        $oldChequeIdsInGroup = $existingGroupPayments->pluck('cheque_id')->filter()->toArray();
+                        if ($cheque->status !== 'unused' && !in_array($cheque->id, $oldChequeIdsInGroup)) {
+                            DB::rollBack();
+                            return back()->withErrors([
+                                'cheque_no' => "Cheque #{$chequeNoInput} is currently marked as '{$cheque->status}'. Re-using an issued or cancelled cheque is strictly blocked."
+                            ])->with('error', "Cheque #{$chequeNoInput} has already been {$cheque->status}.");
+                        }
+
+                        $splitChequeId = $cheque->id;
+                        $cheque->update(['status' => 'issued']);
                     }
-
-                    // 1. Check if used in ANY OTHER active payment voucher
-                    $alreadyUsedInPayment = Payment::where('payment_account_id', $request->payment_account_id)
-                        ->where('type', 'PAYMENT')
-                        ->where('cheque_no', $chequeNoInput)
-                        ->where('id', '!=', $payment->id)
-                        ->where(function ($q) {
-                            $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
-                        })
-                        ->exists();
-
-                    if ($alreadyUsedInPayment) {
-                        DB::rollBack();
-                        return back()->withErrors([
-                            'cheque_no' => "Cheque #{$chequeNoInput} is already assigned to another active payment voucher/invoice."
-                        ])->with('error', "Cheque #{$chequeNoInput} is already assigned to another active payment voucher.");
-                    }
-
-                    // 2. Locate leaf in Chequebook
-                    $chequeNoParts = explode('-', $chequeNoInput);
-                    $cPrefix = '';
-                    $cNum = $chequeNoInput;
-                    if (count($chequeNoParts) >= 2) {
-                        $cPrefix = $chequeNoParts[0];
-                        $cNum = implode('-', array_slice($chequeNoParts, 1));
-                    }
-
-                    $cheque = \App\Models\Chequebook::where('bank_id', $request->payment_account_id)
-                        ->where(function ($q) use ($chequeNoInput, $cNum, $cPrefix) {
-                            $q->where('cheque_no', $chequeNoInput)
-                              ->orWhere(function ($sub) use ($cNum, $cPrefix) {
-                                  $sub->where('cheque_no', $cNum);
-                                  if (!empty($cPrefix)) {
-                                      $sub->where('prefix', $cPrefix);
-                                  }
-                              });
-                        })
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (!$cheque) {
-                        DB::rollBack();
-                        return back()->withErrors([
-                            'cheque_no' => "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account. Duplicate or unregistered cheque numbers are blocked."
-                        ])->with('error', "Cheque #{$chequeNoInput} does not exist in the Cheque Book for this Bank Account.");
-                    }
-
-                    if ($cheque->status !== 'unused' && $cheque->id !== $payment->cheque_id) {
-                        DB::rollBack();
-                        return back()->withErrors([
-                            'cheque_no' => "Cheque #{$chequeNoInput} is currently marked as '{$cheque->status}'. Re-using an issued or cancelled cheque is strictly blocked."
-                        ])->with('error', "Cheque #{$chequeNoInput} has already been {$cheque->status}.");
-                    }
-
-                    $chequeId = $cheque->id;
-                    $cheque->update(['status' => 'issued']);
                 }
+                $chequeIds[$index] = $splitChequeId;
             }
 
-            // 6. Update payment
+            // 5. Update primary payment ($payment) and group payments
+            $activePayments = [];
+
+            // Primary split (index 0)
+            $firstSplit = $splitsData[0];
+            $firstSplitDiscount = (float)($request->discount ?? 0);
+            $firstSplitAmount = max(0, (float)($firstSplit['amount'] ?? 0));
+            $firstSplitMethod = !empty($firstSplit['payment_method']) ? $firstSplit['payment_method'] : 'Cash';
+            $firstSplitAccId = !empty($firstSplit['payment_account_id']) ? $firstSplit['payment_account_id'] : null;
+
+            $firstChequeStatus = ($account->accountType?->name === 'Bank')
+                ? 'Clear'
+                : ($firstSplitMethod === 'Cheque'
+                    ? ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending')
+                    : 'Clear');
+
             $payment->update([
                 'date' => $request->date,
                 'account_id' => $request->account_id,
-                'payment_account_id' => $request->payment_account_id,
-                'amount' => max(0, (float)$request->amount),
-                'discount' => (float)($request->discount ?? 0),
-                'net_amount' => max(0, (float)$request->amount + (float)($request->discount ?? 0)),
+                'payment_account_id' => $firstSplitAccId,
+                'amount' => $firstSplitAmount,
+                'discount' => $firstSplitDiscount,
+                'net_amount' => max(0, $firstSplitAmount + $firstSplitDiscount),
                 'type' => $request->type,
-                'cheque_no' => $request->cheque_no,
-                'cheque_date' => $request->cheque_date,
-                'clear_date' => $request->clear_date,
+                'cheque_no' => !empty($firstSplit['cheque_no']) ? $firstSplit['cheque_no'] : null,
+                'cheque_date' => !empty($firstSplit['cheque_date']) ? $firstSplit['cheque_date'] : null,
+                'clear_date' => !empty($firstSplit['clear_date']) ? $firstSplit['clear_date'] : null,
                 'remarks' => $request->remarks,
-                'payment_method' => $request->payment_method,
-                'cheque_id' => $chequeId ?? $payment->cheque_id,
-                'source_payment_id' => ($request->type === 'PAYMENT') ? $request->original_cheque_id : null,
-                'cheque_status' => ($account->accountType?->name === 'Bank')
-                    ? 'Clear'
-                    : ($request->payment_method === 'Cheque'
-                        ? ($payment->payment_method === 'Cheque' ? $payment->cheque_status : ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending'))
-                        : 'Clear'),
+                'payment_method' => $firstSplitMethod,
+                'cheque_id' => $chequeIds[0] ?? null,
+                'source_payment_id' => ($request->type === 'PAYMENT' && !empty($firstSplit['original_cheque_id'])) ? $firstSplit['original_cheque_id'] : null,
+                'cheque_status' => $firstChequeStatus,
                 'message_line_id' => $request->message_line_id,
                 'firm_id' => $request->firm_id,
+                'group_id' => $groupId,
             ]);
 
-            // 7. Handle Cheque in hand state
+            // Handle Cheque in hand state for primary split
             if ($payment->paymentAccount && $payment->paymentAccount->accountType?->name === 'Cheque in hand') {
                 if ($request->type === 'RECEIPT' && $payment->payment_method === 'Cheque') {
                     $payment->update(['cheque_status' => 'In Hand']);
-                } elseif ($request->type === 'PAYMENT') {
-                    if ($request->original_cheque_id) {
-                        Payment::where('id', $request->original_cheque_id)->update(['cheque_status' => 'Distributed']);
+                } elseif ($request->type === 'PAYMENT' && !empty($firstSplit['original_cheque_id'])) {
+                    Payment::where('id', $firstSplit['original_cheque_id'])->update(['cheque_status' => 'Distributed']);
+                }
+            }
+            $activePayments[] = $payment;
+
+            // Handle additional splits (index 1..)
+            $otherExistingPayments = $existingGroupPayments->where('id', '!=', $payment->id)->values();
+            for ($i = 1; $i < count($splitsData); $i++) {
+                $split = $splitsData[$i];
+                $splitAmt = max(0, (float)($split['amount'] ?? 0));
+                $splitMethod = !empty($split['payment_method']) ? $split['payment_method'] : 'Cash';
+                $splitAccId = !empty($split['payment_account_id']) ? $split['payment_account_id'] : null;
+
+                $splitChequeStatus = ($account->accountType?->name === 'Bank')
+                    ? 'Clear'
+                    : ($splitMethod === 'Cheque'
+                        ? ($request->type === 'RECEIPT' ? 'In Hand' : 'Pending')
+                        : 'Clear');
+
+                $splitData = [
+                    'date' => $request->date,
+                    'voucher_no' => $payment->voucher_no,
+                    'account_id' => $request->account_id,
+                    'payment_account_id' => $splitAccId,
+                    'amount' => $splitAmt,
+                    'discount' => 0,
+                    'net_amount' => $splitAmt,
+                    'type' => $request->type,
+                    'cheque_no' => !empty($split['cheque_no']) ? $split['cheque_no'] : null,
+                    'cheque_date' => !empty($split['cheque_date']) ? $split['cheque_date'] : null,
+                    'clear_date' => !empty($split['clear_date']) ? $split['clear_date'] : null,
+                    'remarks' => $request->remarks,
+                    'payment_method' => $splitMethod,
+                    'cheque_id' => $chequeIds[$i] ?? null,
+                    'source_payment_id' => ($request->type === 'PAYMENT' && !empty($split['original_cheque_id'])) ? $split['original_cheque_id'] : null,
+                    'cheque_status' => $splitChequeStatus,
+                    'message_line_id' => $request->message_line_id,
+                    'firm_id' => $request->firm_id,
+                    'group_id' => $groupId,
+                ];
+
+                if (isset($otherExistingPayments[$i - 1])) {
+                    $gp = $otherExistingPayments[$i - 1];
+                    $gp->update($splitData);
+                    $targetP = $gp;
+                } else {
+                    $targetP = Payment::create($splitData);
+                }
+
+                if (!empty($splitAccId)) {
+                    $acc = Account::with('accountType')->find($splitAccId);
+                    if ($acc && $acc->accountType?->name === 'Cheque in hand') {
+                        if ($request->type === 'RECEIPT' && $splitMethod === 'Cheque') {
+                            $targetP->update(['cheque_status' => 'In Hand']);
+                        } elseif ($request->type === 'PAYMENT' && !empty($split['original_cheque_id'])) {
+                            Payment::where('id', $split['original_cheque_id'])->update(['cheque_status' => 'Distributed']);
+                        }
+                    }
+                }
+                $activePayments[] = $targetP;
+            }
+
+            // Delete surplus old group payments if split count was reduced
+            if ($otherExistingPayments->count() > (count($splitsData) - 1)) {
+                for ($i = count($splitsData) - 1; $i < $otherExistingPayments->count(); $i++) {
+                    $otherExistingPayments[$i]->delete();
+                }
+            }
+
+            // 6. Allocate new allocations across $activePayments
+            $allocationQueue = $request->allocations ?? [];
+            foreach ($activePayments as $p) {
+                if (count($allocationQueue) <= 0) break;
+                $cashRemaining = (float)$p->amount;
+
+                while ($cashRemaining > 0.001 && count($allocationQueue) > 0) {
+                    $allocIdx = array_key_first($allocationQueue);
+                    $alloc = &$allocationQueue[$allocIdx];
+
+                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
+                        ? Sales::find($alloc['bill_id'])
+                        : Purchase::find($alloc['bill_id']);
+
+                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
+                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
+                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
+
+                    if ($billRem <= 0.001) {
+                        array_shift($allocationQueue);
+                        continue;
+                    }
+
+                    $canAllocate = round(min($cashRemaining, $alloc['amount'], $billRem), 2);
+                    if ($canAllocate > 0.001) {
+                        PaymentAllocation::create([
+                            'payment_id' => $p->id,
+                            'bill_id' => $alloc['bill_id'],
+                            'bill_type' => $alloc['bill_type'],
+                            'amount' => $canAllocate,
+                        ]);
+
+                        if ($bill) {
+                            $bill->paid_amount += $canAllocate;
+                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
+
+                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
+                            if ($bill->remaining_amount <= 0.001) {
+                                $bill->remaining_amount = 0;
+                                $bill->status = $isSale ? 'Paid' : 'Completed';
+                            } elseif ($bill->paid_amount > 0) {
+                                $bill->status = $isSale ? 'Partial' : 'Completed';
+                            } else {
+                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
+                            }
+                            $bill->save();
+                        }
+
+                        $cashRemaining -= $canAllocate;
+                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
+                    }
+
+                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
+                        array_shift($allocationQueue);
                     }
                 }
             }
 
-            // 8. Add new allocations
-            $allocationPayload = $request->allocations ?? [];
-            foreach ($allocationPayload as $alloc) {
-                PaymentAllocation::create([
-                    'payment_id' => $payment->id,
-                    'bill_id' => $alloc['bill_id'],
-                    'bill_type' => $alloc['bill_type'],
-                    'amount' => $alloc['amount'],
-                ]);
+            // Pass 2: Allocate discount if remaining
+            foreach ($activePayments as $p) {
+                if (count($allocationQueue) <= 0) break;
+                $currentAllocated = (float)$p->allocations()->sum('amount');
+                $discountRemaining = max(0.0, (float)$p->net_amount - $currentAllocated);
 
-                $bill = ($alloc['bill_type'] === 'App\Models\Sales')
-                    ? Sales::find($alloc['bill_id'])
-                    : Purchase::find($alloc['bill_id']);
+                while ($discountRemaining > 0.001 && count($allocationQueue) > 0) {
+                    $allocIdx = array_key_first($allocationQueue);
+                    $alloc = &$allocationQueue[$allocIdx];
 
-                if ($bill) {
-                    $bill->paid_amount      += $alloc['amount'];
-                    $netPayable = max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0));
-                    $sumOfReturns = $this->getTotalReturns($bill, $alloc['bill_type']);
-                    $bill->remaining_amount = max(0, $netPayable - $bill->paid_amount - $sumOfReturns);
+                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
+                        ? Sales::find($alloc['bill_id'])
+                        : Purchase::find($alloc['bill_id']);
 
-                    $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
-                    if ($bill->remaining_amount <= 0.001) {
-                        $bill->remaining_amount = 0;
-                        $bill->status = $isSale ? 'Paid' : 'Completed';
-                    } elseif ($bill->paid_amount > 0) {
-                        $bill->status = $isSale ? 'Partial' : 'Completed';
-                    } else {
-                        $bill->status = $isSale ? 'Unpaid' : 'Completed';
+                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
+                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
+                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
+
+                    if ($billRem <= 0.001) {
+                        array_shift($allocationQueue);
+                        continue;
                     }
-                    $bill->save();
+
+                    $canAllocate = round(min($discountRemaining, $alloc['amount'], $billRem), 2);
+                    if ($canAllocate > 0.001) {
+                        PaymentAllocation::create([
+                            'payment_id' => $p->id,
+                            'bill_id' => $alloc['bill_id'],
+                            'bill_type' => $alloc['bill_type'],
+                            'amount' => $canAllocate,
+                        ]);
+
+                        if ($bill) {
+                            $bill->paid_amount += $canAllocate;
+                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
+
+                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
+                            if ($bill->remaining_amount <= 0.001) {
+                                $bill->remaining_amount = 0;
+                                $bill->status = $isSale ? 'Paid' : 'Completed';
+                            } elseif ($bill->paid_amount > 0) {
+                                $bill->status = $isSale ? 'Partial' : 'Completed';
+                            } else {
+                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
+                            }
+                            $bill->save();
+                        }
+
+                        $discountRemaining -= $canAllocate;
+                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
+                    }
+
+                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
+                        array_shift($allocationQueue);
+                    }
                 }
             }
 
             DB::commit();
+            $totalActiveAmount = collect($activePayments)->sum('amount');
             return redirect()->route('payments.index')
                 ->with('success', 'Payment updated successfully.')
                 ->with('print_id', $payment->group_id ?? $payment->id)
                 ->with('party_name', $account->title ?? 'General Party')
-                ->with('amount', $payment->amount)
+                ->with('amount', $totalActiveAmount)
                 ->with('discount', $payment->discount)
                 ->with('invoices_count', count($payment->allocations ?? []))
-                ->with('method', $payment->payment_method ?? 'Cash')
+                ->with('method', count($activePayments) > 1 ? 'Multi' : ($payment->payment_method ?? ''))
                 ->with('payment_type', $payment->type);
         } catch (\Exception $e) {
             DB::rollBack();

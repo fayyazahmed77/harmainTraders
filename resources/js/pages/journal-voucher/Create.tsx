@@ -3,15 +3,28 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Save, ArrowLeft, Send, CheckSquare, Square, Calculator, X, ChevronDown, Search } from "lucide-react";
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { 
+    ArrowLeft, 
+    CheckSquare, 
+    Square, 
+    Calculator, 
+    X, 
+    ChevronDown, 
+    Search,
+    Send,
+    ArrowRightLeft,
+    FileText,
+    Check,
+    AlertCircle
+} from "lucide-react";
+import { router, useForm, usePage } from '@inertiajs/react';
 import { motion, AnimatePresence } from "framer-motion";
 import { route } from 'ziggy-js';
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import axios from 'axios';
-import { formatSafeDate } from '@/lib/utils';
+import { cn, formatSafeDate } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -27,7 +40,7 @@ type FormState = {
     remarks: string;
     source_allocations: any[];
     destination_allocations: any[];
-    [key: string]: any; // Add index signature to help with TS deep recursion in useForm overloads
+    [key: string]: any;
 };
 
 export default function JournalVoucherCreate({ accounts }: Props) {
@@ -63,11 +76,6 @@ export default function JournalVoucherCreate({ accounts }: Props) {
     const [destDialogOpen, setDestDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const accountOptions = accounts.map(acc => ({
-        value: acc.id,
-        label: `${acc.code ? acc.code + ' - ' : ''}${acc.title}`
-    }));
-
     // Fetch bills when source account changes
     useEffect(() => {
         if (data.credit_account_id) {
@@ -75,6 +83,9 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                 .then(res => {
                     setSourceBills(res.data.bills || []);
                     setSelectedSourceBills({});
+                })
+                .catch(() => {
+                    setSourceBills([]);
                 });
         } else {
             setSourceBills([]);
@@ -89,6 +100,9 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                 .then(res => {
                     setDestBills(res.data.bills || []);
                     setSelectedDestBills({});
+                })
+                .catch(() => {
+                    setDestBills([]);
                 });
         } else {
             setDestBills([]);
@@ -110,8 +124,13 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         }));
     };
 
-    const totalSourceSelected = sourceBills.filter(b => selectedSourceBills[b.id]).reduce((sum, b) => sum + parseFloat(b.remaining_amount), 0);
-    const totalDestSelected = destBills.filter(b => selectedDestBills[b.id]).reduce((sum, b) => sum + parseFloat(b.remaining_amount), 0);
+    const totalSourceSelected = sourceBills
+        .filter(b => selectedSourceBills[b.id])
+        .reduce((sum, b) => sum + parseFloat(b.remaining_amount), 0);
+
+    const totalDestSelected = destBills
+        .filter(b => selectedDestBills[b.id])
+        .reduce((sum, b) => sum + parseFloat(b.remaining_amount), 0);
 
     // Auto-update transfer amount if user selects bills
     useEffect(() => {
@@ -136,7 +155,6 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         sAllocations.push({ bill_id: bill.id, type: bill.type, amount: allocate });
         sRemaining -= allocate;
     }
-    const finalSourceAllocated = sAllocations.reduce((sum, a) => sum + a.amount, 0);
 
     // Distribute transferAmount across selected dest bills
     let dRemaining = transferAmount;
@@ -148,14 +166,13 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         dAllocations.push({ bill_id: bill.id, type: bill.type, amount: allocate });
         dRemaining -= allocate;
     }
-    const finalDestAllocated = dAllocations.reduce((sum, a) => sum + a.amount, 0);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setCustomError(null);
 
         if (!data.credit_account_id || !data.debit_account_id) {
-            setCustomError('Please select both Source and Destination accounts.');
+            setCustomError('Please select both Source (Credit) and Destination (Debit) accounts.');
             return;
         }
 
@@ -165,7 +182,7 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         }
 
         if (!data.amount || parseFloat(data.amount) <= 0) {
-            setCustomError('Please enter a valid transfer amount.');
+            setCustomError('Please enter a valid transfer amount greater than 0.');
             return;
         }
 
@@ -176,9 +193,6 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         };
 
         router.post(route('journal-vouchers.store'), formData, {
-            onSuccess: () => {
-                // Success message is handled by flash in controller + redirect
-            },
             onError: (errs) => {
                 if (errs.error) {
                     setCustomError(errs.error);
@@ -187,158 +201,188 @@ export default function JournalVoucherCreate({ accounts }: Props) {
         });
     };
 
-    const selectStyles = {
-        control: (base: any, state: any) => ({
-            ...base,
-            minHeight: '44px',
-            borderRadius: '0.5rem',
-            borderColor: state.isFocused ? '#6366f1' : '#e2e8f0',
-            boxShadow: state.isFocused ? '0 0 0 1px #6366f1' : 'none',
-            '&:hover': {
-                borderColor: '#6366f1'
-            }
-        }),
-        option: (base: any, state: any) => ({
-            ...base,
-            backgroundColor: state.isSelected ? '#6366f1' : state.isFocused ? '#e0e7ff' : 'white',
-            color: state.isSelected ? 'white' : '#1e293b',
-            fontSize: '12px',
-            fontWeight: '500'
-        }),
-        menu: (base: any) => ({ ...base, zIndex: 50 })
-    };
+    const selectedSourceAccount = accounts.find(a => a.id === data.credit_account_id);
+    const selectedDestAccount = accounts.find(a => a.id === data.debit_account_id);
 
     return (
         <SidebarProvider>
             <Toaster position="top-right" />
             <AppSidebar variant="inset" />
-            <SidebarInset className="bg-background">
-                <SiteHeader breadcrumbs={[{ title: "Dashboard", href: "/" }, { title: "Journal Vouchers", href: route('journal-vouchers.index') }, { title: "Create", href: "#" }]} />
+            <SidebarInset className="bg-slate-50/50 dark:bg-zinc-950 min-w-0">
+                <SiteHeader breadcrumbs={[
+                    { title: "Dashboard", href: "/" },
+                    { title: "Journal Vouchers", href: route('journal-vouchers.index') },
+                    { title: "Create", href: "#" }
+                ]} />
 
-                <div className="mx-auto w-full max-w-[1600px] p-4 lg:p-6 space-y-4">
+                <div className="w-full px-4 py-4 md:px-6 space-y-4 max-w-7xl mx-auto">
                     
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <motion.div
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-4"
-                        >
-                            <Button variant="outline" size="icon" onClick={() => router.visit(route('journal-vouchers.index'))} className="h-10 w-10 rounded-xl">
+                    {/* HEADER */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-zinc-800">
+                        <div className="flex items-center gap-3">
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={() => router.visit(route('journal-vouchers.index'))} 
+                                className="h-9 w-9 rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                            >
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
                             <div>
-                                <h1 className="text-2xl font-black tracking-tighter text-foreground uppercase">
+                                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">
                                     Create Journal Voucher
                                 </h1>
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                                    Direct Account to Account Transfer
+                                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                                    Direct double-entry transfer and invoice balance settlement
                                 </p>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-3">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         
-                        {/* TOP BAR: Inputs */}
-                        <Card className="rounded-2xl border-border/50 shadow-sm p-4 bg-surface-1/50">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* TOP FORM CONTROLS BAR */}
+                        <div className="p-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                                
+                                {/* 1. Voucher Date */}
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Voucher Date</Label>
+                                    <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                                        Voucher Date <span className="text-rose-500">*</span>
+                                    </Label>
                                     <Input 
                                         type="date" 
                                         value={data.date} 
                                         onChange={e => setData('date', e.target.value)} 
-                                        className="h-11 bg-card border-border/50 rounded-xl"
+                                        className="h-9 text-xs bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 rounded-lg focus:bg-white dark:focus:bg-zinc-900"
                                     />
-                                    {errors.date && <p className="text-[10px] text-rose-500 font-bold">{errors.date}</p>}
+                                    {errors.date && <p className="text-[11px] text-rose-500 font-medium">{errors.date}</p>}
                                 </div>
-                                <div className="space-y-1.5 relative">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-rose-600">Source Account</Label>
+
+                                {/* 2. Source Account (Credit) */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+                                        <span>Source Account (Cr) <span className="text-rose-500">*</span></span>
+                                        <span className="text-[10px] text-slate-400 font-normal">Credit side</span>
+                                    </Label>
                                     <button 
                                         type="button"
                                         onClick={() => setSourceDialogOpen(true)}
-                                        className="h-11 w-full flex items-center justify-between px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:border-indigo-500 transition-colors"
+                                        className={cn(
+                                            "h-9 w-full flex items-center justify-between px-3 text-xs rounded-lg border transition-colors",
+                                            selectedSourceAccount 
+                                                ? "bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-zinc-100 font-medium" 
+                                                : "bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 text-slate-400"
+                                        )}
                                     >
-                                        <span className={data.credit_account_id ? "text-slate-800" : "text-slate-400"}>
-                                            {data.credit_account_id ? accounts.find(a => a.id === data.credit_account_id)?.title : "Select source..."}
+                                        <span className="truncate">
+                                            {selectedSourceAccount 
+                                                ? `${selectedSourceAccount.code ? selectedSourceAccount.code + ' - ' : ''}${selectedSourceAccount.title}` 
+                                                : "Select Source (Credit)..."}
                                         </span>
                                         {data.credit_account_id ? (
                                             <div 
-                                                className="p-1 hover:bg-slate-100 rounded"
+                                                className="p-0.5 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded text-slate-400"
                                                 onClick={(e) => { e.stopPropagation(); setData('credit_account_id', null); }}
                                             >
-                                                <X className="h-4 w-4 text-slate-400" />
+                                                <X className="h-3.5 w-3.5" />
                                             </div>
                                         ) : (
-                                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                                         )}
                                     </button>
-                                    {errors.credit_account_id && <p className="text-[10px] text-rose-500 font-bold">{errors.credit_account_id}</p>}
+                                    {errors.credit_account_id && <p className="text-[11px] text-rose-500 font-medium">{errors.credit_account_id}</p>}
                                 </div>
-                                <div className="space-y-1.5 relative">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Destination Account</Label>
+
+                                {/* 3. Destination Account (Debit) */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+                                        <span>Destination Account (Dr) <span className="text-rose-500">*</span></span>
+                                        <span className="text-[10px] text-slate-400 font-normal">Debit side</span>
+                                    </Label>
                                     <button 
                                         type="button"
                                         onClick={() => setDestDialogOpen(true)}
-                                        className="h-11 w-full flex items-center justify-between px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:border-indigo-500 transition-colors"
+                                        className={cn(
+                                            "h-9 w-full flex items-center justify-between px-3 text-xs rounded-lg border transition-colors",
+                                            selectedDestAccount 
+                                                ? "bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-zinc-100 font-medium" 
+                                                : "bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 text-slate-400"
+                                        )}
                                     >
-                                        <span className={data.debit_account_id ? "text-slate-800" : "text-slate-400"}>
-                                            {data.debit_account_id ? accounts.find(a => a.id === data.debit_account_id)?.title : "Select destination..."}
+                                        <span className="truncate">
+                                            {selectedDestAccount 
+                                                ? `${selectedDestAccount.code ? selectedDestAccount.code + ' - ' : ''}${selectedDestAccount.title}` 
+                                                : "Select Destination (Debit)..."}
                                         </span>
                                         {data.debit_account_id ? (
                                             <div 
-                                                className="p-1 hover:bg-slate-100 rounded"
+                                                className="p-0.5 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded text-slate-400"
                                                 onClick={(e) => { e.stopPropagation(); setData('debit_account_id', null); }}
                                             >
-                                                <X className="h-4 w-4 text-slate-400" />
+                                                <X className="h-3.5 w-3.5" />
                                             </div>
                                         ) : (
-                                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                                         )}
                                     </button>
-                                    {errors.debit_account_id && <p className="text-[10px] text-rose-500 font-bold">{errors.debit_account_id}</p>}
+                                    {errors.debit_account_id && <p className="text-[11px] text-rose-500 font-medium">{errors.debit_account_id}</p>}
                                 </div>
+
+                                {/* 4. Transfer Amount */}
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Transfer Amount</Label>
+                                    <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                                        Transfer Amount (PKR) <span className="text-rose-500">*</span>
+                                    </Label>
                                     <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-xs font-bold text-muted-foreground">RS</span>
+                                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                            <span className="text-[11px] font-bold text-slate-400">Rs</span>
                                         </div>
                                         <Input 
                                             type="number" 
                                             step="0.01"
                                             value={data.amount} 
                                             onChange={e => setData('amount', e.target.value)} 
-                                            className="h-11 pl-9 bg-card border-indigo-500/20 focus-visible:ring-indigo-500/50 rounded-xl font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400"
+                                            className="h-9 pl-8 text-xs font-mono font-semibold bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 rounded-lg text-slate-900 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-900 text-right"
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    {errors.amount && <p className="text-[10px] text-rose-500 font-bold">{errors.amount}</p>}
+                                    {errors.amount && <p className="text-[11px] text-rose-500 font-medium">{errors.amount}</p>}
                                 </div>
-                            </div>
-                        </Card>
 
-                        {/* BOTTOM PANELS */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-5">
+                            </div>
+                        </div>
+
+                        {/* THREE-COLUMN WORKFLOW SECTION */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                             
-                            {/* Panel 1: Source Bills */}
-                            <Card className="rounded-2xl border-rose-500/20 shadow-sm overflow-hidden flex flex-col h-[600px] bg-card p-0 gap-0">
-                                <div className="bg-rose-500/10 px-4 py-3 border-b border-rose-500/10 flex justify-between items-center">
+                            {/* COLUMN 1: Source Bills (Credit Side) */}
+                            <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-xs flex flex-col h-[520px]">
+                                <div className="px-4 py-2.5 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/60 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-rose-600">Source Bills</h3>
-                                        <p className="text-[9px] text-muted-foreground uppercase font-bold mt-0.5">Select bills to allocate</p>
+                                        <h3 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                                            Source Bills (Credit)
+                                        </h3>
+                                        <p className="text-[10px] text-slate-500">Unpaid bills for source party</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-black text-rose-600">{Number(totalSourceSelected).toLocaleString()}</p>
-                                        <p className="text-[9px] text-muted-foreground uppercase font-bold mt-0.5">Selected</p>
+                                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100">
+                                            Rs {Number(totalSourceSelected).toLocaleString()}
+                                        </span>
+                                        <div className="text-[10px] text-slate-400 font-medium">Selected</div>
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
                                     {!data.credit_account_id ? (
-                                        <div className="h-full flex items-center justify-center text-xs font-medium text-muted-foreground">Select Source Account</div>
+                                        <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 gap-1">
+                                            <FileText className="h-6 w-6 stroke-1 text-slate-300 dark:text-zinc-700" />
+                                            <span>Select Source Account first</span>
+                                        </div>
                                     ) : sourceBills.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-xs font-medium text-muted-foreground">No unpaid bills found.</div>
+                                        <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 gap-1">
+                                            <Check className="h-5 w-5 text-emerald-500" />
+                                            <span>No unpaid bills found for this account</span>
+                                        </div>
                                     ) : (
                                         sourceBills.map(bill => {
                                             const isSelected = selectedSourceBills[bill.id];
@@ -347,29 +391,32 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                             return (
                                                 <div 
                                                     key={bill.id} 
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-rose-500/5 border-rose-500/30 shadow-sm' : 'border-border/50 hover:border-rose-500/30 hover:bg-rose-500/5'}`}
                                                     onClick={() => handleSourceBillToggle(bill)}
+                                                    className={cn(
+                                                        "flex items-start gap-2.5 p-2.5 rounded-lg border text-xs transition-colors cursor-pointer select-none",
+                                                        isSelected 
+                                                            ? "bg-slate-100/80 dark:bg-zinc-800/80 border-slate-300 dark:border-zinc-600" 
+                                                            : "border-slate-100 dark:border-zinc-800/60 hover:bg-slate-50 dark:hover:bg-zinc-800/30"
+                                                    )}
                                                 >
-                                                    <div className="text-rose-500">
-                                                        {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-muted-foreground" />}
+                                                    <div className="pt-0.5 text-slate-600 dark:text-zinc-300">
+                                                        {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-slate-400" />}
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-[11px] font-black text-text-primary">
-                                                                {bill.invoice_no} <span className="text-text-muted font-medium ml-1">({bill.bill_type_label})</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-center gap-2">
+                                                            <span className="font-semibold text-slate-800 dark:text-zinc-200 truncate">
+                                                                {bill.invoice_no || bill.invoice}
                                                             </span>
-                                                            <span className="text-[11px] font-black text-rose-600">
-                                                                RS {Number(bill.remaining_amount).toLocaleString()}
+                                                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100 whitespace-nowrap">
+                                                                Rs {Number(bill.remaining_amount).toLocaleString()}
                                                             </span>
                                                         </div>
-                                                        <div className="flex justify-between items-center mt-1">
-                                                            <div className="text-[9px] text-muted-foreground font-bold uppercase">
-                                                                Dated: {formatSafeDate(bill.date, 'dd MMM yyyy')}
-                                                            </div>
+                                                        <div className="flex justify-between items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                                            <span>Dated: {formatSafeDate(bill.date, 'dd MMM yyyy')}</span>
                                                             {allocation && (
-                                                                <div className="text-[10px] font-black text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded uppercase">
-                                                                    Paying: {Number(allocation.amount).toLocaleString()}
-                                                                </div>
+                                                                <span className="font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                                                                    Paying: Rs {Number(allocation.amount).toLocaleString()}
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -378,25 +425,35 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                         })
                                     )}
                                 </div>
-                            </Card>
+                            </div>
 
-                            {/* Panel 2: Destination Bills */}
-                            <Card className="rounded-2xl border-emerald-500/20 shadow-sm overflow-hidden flex flex-col h-[600px] bg-card p-0 gap-0">
-                                <div className="bg-emerald-500/10 px-4 py-3 border-b border-emerald-500/10 flex justify-between items-center">
+                            {/* COLUMN 2: Destination Bills (Debit Side) */}
+                            <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-xs flex flex-col h-[520px]">
+                                <div className="px-4 py-2.5 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/60 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600">Destination Bills</h3>
-                                        <p className="text-[9px] text-muted-foreground uppercase font-bold mt-0.5">Select bills to allocate</p>
+                                        <h3 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                                            Destination Bills (Debit)
+                                        </h3>
+                                        <p className="text-[10px] text-slate-500">Unpaid bills for destination party</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-xs font-black text-emerald-600">{Number(totalDestSelected).toLocaleString()}</p>
-                                        <p className="text-[9px] text-muted-foreground uppercase font-bold mt-0.5">Selected</p>
+                                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100">
+                                            Rs {Number(totalDestSelected).toLocaleString()}
+                                        </span>
+                                        <div className="text-[10px] text-slate-400 font-medium">Selected</div>
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                                <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
                                     {!data.debit_account_id ? (
-                                        <div className="h-full flex items-center justify-center text-xs font-medium text-muted-foreground">Select Destination Account</div>
+                                        <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 gap-1">
+                                            <FileText className="h-6 w-6 stroke-1 text-slate-300 dark:text-zinc-700" />
+                                            <span>Select Destination Account first</span>
+                                        </div>
                                     ) : destBills.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-xs font-medium text-muted-foreground">No unpaid bills found.</div>
+                                        <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 gap-1">
+                                            <Check className="h-5 w-5 text-emerald-500" />
+                                            <span>No unpaid bills found for this account</span>
+                                        </div>
                                     ) : (
                                         destBills.map(bill => {
                                             const isSelected = selectedDestBills[bill.id];
@@ -405,29 +462,32 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                             return (
                                                 <div 
                                                     key={bill.id} 
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-emerald-500/5 border-emerald-500/30 shadow-sm' : 'border-border/50 hover:border-emerald-500/30 hover:bg-emerald-500/5'}`}
                                                     onClick={() => handleDestBillToggle(bill)}
+                                                    className={cn(
+                                                        "flex items-start gap-2.5 p-2.5 rounded-lg border text-xs transition-colors cursor-pointer select-none",
+                                                        isSelected 
+                                                            ? "bg-slate-100/80 dark:bg-zinc-800/80 border-slate-300 dark:border-zinc-600" 
+                                                            : "border-slate-100 dark:border-zinc-800/60 hover:bg-slate-50 dark:hover:bg-zinc-800/30"
+                                                    )}
                                                 >
-                                                    <div className="text-emerald-500">
-                                                        {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-muted-foreground" />}
+                                                    <div className="pt-0.5 text-slate-600 dark:text-zinc-300">
+                                                        {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4 text-slate-400" />}
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-[11px] font-black text-text-primary">
-                                                                {bill.invoice_no} <span className="text-text-muted font-medium ml-1">({bill.bill_type_label})</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-center gap-2">
+                                                            <span className="font-semibold text-slate-800 dark:text-zinc-200 truncate">
+                                                                {bill.invoice_no || bill.invoice}
                                                             </span>
-                                                            <span className="text-[11px] font-black text-emerald-600">
-                                                                RS {Number(bill.remaining_amount).toLocaleString()}
+                                                            <span className="font-mono font-semibold text-slate-900 dark:text-zinc-100 whitespace-nowrap">
+                                                                Rs {Number(bill.remaining_amount).toLocaleString()}
                                                             </span>
                                                         </div>
-                                                        <div className="flex justify-between items-center mt-1">
-                                                            <div className="text-[9px] text-muted-foreground font-bold uppercase">
-                                                                Dated: {formatSafeDate(bill.date, 'dd MMM yyyy')}
-                                                            </div>
+                                                        <div className="flex justify-between items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                                            <span>Dated: {formatSafeDate(bill.date, 'dd MMM yyyy')}</span>
                                                             {allocation && (
-                                                                <div className="text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded uppercase">
-                                                                    Paying: {Number(allocation.amount).toLocaleString()}
-                                                                </div>
+                                                                <span className="font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                                                                    Paying: Rs {Number(allocation.amount).toLocaleString()}
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -436,77 +496,103 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                         })
                                     )}
                                 </div>
-                            </Card>
+                            </div>
 
-                            {/* Panel 3: Summary */}
-                            <Card className="rounded-2xl border-indigo-500/20 shadow-sm flex flex-col h-[600px] bg-card relative overflow-hidden p-0 gap-0">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                                
-                                <div className="px-5 py-4 border-b border-indigo-500/10 flex items-center gap-3 relative z-10">
-                                    <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                                        <Calculator className="h-4 w-4 text-indigo-600" />
-                                    </div>
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-indigo-600">Summary & Submit</h3>
+                            {/* COLUMN 3: Live Voucher Summary & Submit */}
+                            <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-xs flex flex-col h-[520px]">
+                                <div className="px-4 py-2.5 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/60 flex items-center justify-between">
+                                    <h3 className="text-xs font-semibold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+                                        <Calculator className="h-3.5 w-3.5 text-slate-500" /> Voucher Summary
+                                    </h3>
+                                    <span className="text-[11px] text-slate-400">Dr / Cr Balance</span>
                                 </div>
 
-                                <div className="p-5 space-y-6 flex-1 relative z-10">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-surface-1 rounded-xl">
-                                            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">Source Selected</span>
-                                            <span className="text-sm font-black text-rose-600 tabular-nums">RS {Number(totalSourceSelected).toLocaleString()}</span>
+                                <div className="p-4 space-y-4 flex-1 overflow-y-auto">
+                                    
+                                    {/* Double Entry Recap */}
+                                    <div className="space-y-2 border border-slate-200 dark:border-zinc-800 rounded-lg p-3 bg-slate-50/50 dark:bg-zinc-800/20 text-xs">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-500">Debit (Dr):</span>
+                                            <span className="font-semibold text-slate-900 dark:text-zinc-100 truncate max-w-[170px]">
+                                                {selectedDestAccount ? selectedDestAccount.title : 'Not selected'}
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-surface-1 rounded-xl">
-                                            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">Dest Selected</span>
-                                            <span className="text-sm font-black text-emerald-600 tabular-nums">RS {Number(totalDestSelected).toLocaleString()}</span>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-500">Credit (Cr):</span>
+                                            <span className="font-semibold text-slate-900 dark:text-zinc-100 truncate max-w-[170px]">
+                                                {selectedSourceAccount ? selectedSourceAccount.title : 'Not selected'}
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
-                                            <span className="text-[11px] font-black uppercase text-indigo-600 tracking-wider">Total Transfer</span>
-                                            <span className="text-base font-black text-indigo-600 tabular-nums">RS {Number(transferAmount).toLocaleString()}</span>
+                                        <div className="pt-2 border-t border-slate-200 dark:border-zinc-700 flex justify-between items-center">
+                                            <span className="font-semibold text-slate-700 dark:text-zinc-300">Net Amount:</span>
+                                            <span className="font-mono font-bold text-sm text-slate-900 dark:text-zinc-100">
+                                                Rs {Number(transferAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Remarks / Description</Label>
+                                    {/* Allocation Engine Info */}
+                                    <div className="p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800 bg-slate-50/30 dark:bg-zinc-800/10 text-xs text-slate-600 dark:text-zinc-400">
+                                        <span className="font-semibold text-slate-800 dark:text-zinc-200 block mb-0.5">Allocation Mode:</span>
+                                        {totalSourceSelected > 0 || totalDestSelected > 0 ? (
+                                            <span className="text-slate-600 dark:text-zinc-400">
+                                                Manual bill allocation active ({sAllocations.length} source, {dAllocations.length} dest).
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-500">
+                                                Auto-FIFO active: Automatically clears oldest unpaid invoices upon voucher posting.
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Remarks Textarea */}
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                                            Remarks / Narration
+                                        </Label>
                                         <Textarea 
                                             value={data.remarks} 
                                             onChange={e => setData('remarks', e.target.value)} 
-                                            className="min-h-[80px] bg-surface-1 border-border/50 rounded-xl resize-none text-xs"
-                                            placeholder="Enter reason for transfer..."
+                                            className="min-h-[75px] bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 rounded-lg resize-none text-xs"
+                                            placeholder="Enter reason for transfer or reference note..."
                                         />
-                                        {errors.remarks && <p className="text-[10px] text-rose-500 font-bold">{errors.remarks}</p>}
+                                        {errors.remarks && <p className="text-[11px] text-rose-500">{errors.remarks}</p>}
                                     </div>
 
+                                    {/* Custom Error Banner */}
                                     {customError && (
-                                        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
-                                            <p className="text-[11px] font-bold text-rose-600">{customError}</p>
+                                        <div className="p-2.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg text-xs text-rose-600 dark:text-rose-400 flex items-start gap-1.5">
+                                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <span>{customError}</span>
                                         </div>
                                     )}
+
                                 </div>
 
-                                <div className="p-5 border-t border-indigo-500/10 bg-indigo-500/5 relative z-10">
+                                <div className="p-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50/40 dark:bg-zinc-900">
                                     <Button 
                                         type="submit" 
                                         disabled={processing}
-                                        className="w-full h-14 text-sm font-black bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/20 border-none transition-all tracking-widest uppercase"
+                                        className="w-full h-10 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-lg shadow-xs transition-colors"
                                     >
-                                        <Send className="h-4 w-4 mr-2" />
-                                        {processing ? 'Processing...' : 'Pay Now'}
+                                        <Send className="h-3.5 w-3.5 mr-1.5" />
+                                        {processing ? 'Posting Voucher...' : 'Post Journal Voucher'}
                                     </Button>
                                 </div>
-                            </Card>
+                            </div>
 
                         </div>
                     </form>
 
-                    {/* Account Selection Dialogs */}
+                    {/* ACCOUNT SELECTION MODAL */}
                     <AnimatePresence>
                         {(sourceDialogOpen || destDialogOpen) && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                                 <motion.div 
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                                    className="absolute inset-0 bg-black/50 backdrop-blur-xs"
                                     onClick={() => {
                                         setSourceDialogOpen(false);
                                         setDestDialogOpen(false);
@@ -514,14 +600,14 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                     }}
                                 />
                                 <motion.div 
-                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    initial={{ opacity: 0, scale: 0.98, y: 8 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="relative w-full max-w-2xl bg-card rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                                    exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                                    className="relative w-full max-w-xl bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xl overflow-hidden flex flex-col max-h-[80vh]"
                                 >
-                                    <div className="p-4 border-b border-border/50 bg-surface-1/50 flex justify-between items-center">
-                                        <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
-                                            Select {sourceDialogOpen ? 'Source' : 'Destination'} Account
+                                    <div className="p-3.5 border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/60 flex justify-between items-center">
+                                        <h2 className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                                            Select {sourceDialogOpen ? 'Source (Credit)' : 'Destination (Debit)'} Account
                                         </h2>
                                         <button 
                                             onClick={() => {
@@ -529,33 +615,33 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                                 setDestDialogOpen(false);
                                                 setSearchQuery('');
                                             }}
-                                            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                            className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded text-slate-400"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
                                     </div>
                                     
-                                    <div className="p-4 border-b border-border/50">
+                                    <div className="p-3 border-b border-slate-200 dark:border-zinc-800">
                                         <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                             <Input 
                                                 autoFocus
-                                                placeholder="Search by name, code, or type..."
+                                                placeholder="Search by title, code, or type..."
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="pl-9 h-11 bg-surface-1 border-border/50 rounded-xl"
+                                                className="pl-9 h-9 text-xs bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700 rounded-lg"
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 overflow-y-auto p-2">
+                                    <div className="flex-1 overflow-y-auto p-1.5 text-xs">
                                         <table className="w-full text-left border-collapse">
-                                            <thead className="sticky top-0 bg-card z-10">
+                                            <thead className="sticky top-0 bg-slate-50 dark:bg-zinc-800 text-slate-500 text-[11px]">
                                                 <tr>
-                                                    <th className="py-3 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-wider border-b border-border/50">Code</th>
-                                                    <th className="py-3 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-wider border-b border-border/50">Name</th>
-                                                    <th className="py-3 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-wider border-b border-border/50">Type</th>
-                                                    <th className="py-3 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-wider text-right border-b border-border/50">Balance</th>
+                                                    <th className="py-2 px-3 font-semibold">Code</th>
+                                                    <th className="py-2 px-3 font-semibold">Account Title</th>
+                                                    <th className="py-2 px-3 font-semibold">Type</th>
+                                                    <th className="py-2 px-3 font-semibold text-right">Balance</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -577,17 +663,17 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                                             }
                                                             setSearchQuery('');
                                                         }}
-                                                        className="cursor-pointer hover:bg-indigo-500/5 transition-colors border-b border-border/20 last:border-0"
+                                                        className="cursor-pointer hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 transition-colors border-b border-slate-100 dark:border-zinc-800/50 last:border-0"
                                                     >
-                                                        <td className="py-3 px-4 text-xs font-bold text-muted-foreground">{acc.code || '-'}</td>
-                                                        <td className="py-3 px-4 text-sm font-bold text-foreground">{acc.title}</td>
-                                                        <td className="py-3 px-4 text-xs font-bold text-muted-foreground">
-                                                            <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                                        <td className="py-2 px-3 font-mono text-slate-500">{acc.code || '-'}</td>
+                                                        <td className="py-2 px-3 font-semibold text-slate-800 dark:text-zinc-200">{acc.title}</td>
+                                                        <td className="py-2 px-3 text-slate-500">
+                                                            <span className="bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px]">
                                                                 {acc.account_type?.name || acc.type}
                                                             </span>
                                                         </td>
-                                                        <td className="py-3 px-4 text-sm font-black text-right text-foreground">
-                                                            RS {Number(acc.current_balance || 0).toLocaleString()}
+                                                        <td className="py-2 px-3 font-mono font-semibold text-right text-slate-900 dark:text-zinc-100">
+                                                            Rs {Number(acc.current_balance || 0).toLocaleString()}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -598,8 +684,8 @@ export default function JournalVoucherCreate({ accounts }: Props) {
                                                     (acc.account_type && acc.account_type.name.toLowerCase().includes(searchQuery.toLowerCase()))
                                                 ).length === 0 && (
                                                     <tr>
-                                                        <td colSpan={4} className="py-8 text-center text-sm font-medium text-muted-foreground">
-                                                            No accounts found matching "{searchQuery}"
+                                                        <td colSpan={4} className="py-6 text-center text-slate-400">
+                                                            No accounts match "{searchQuery}"
                                                         </td>
                                                     </tr>
                                                 )}

@@ -22,6 +22,7 @@ interface PriceUpdateDialogProps {
     onOpenChange: (open: boolean) => void;
     priceUpdates: PriceUpdateInfo[];
     submitPurchase: (updatePrices: boolean) => void;
+    isSubmitting?: boolean;
 }
 
 export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
@@ -29,6 +30,7 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
     onOpenChange,
     priceUpdates,
     submitPurchase,
+    isSubmitting = false,
 }) => {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,16 +90,28 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
                 <div className="p-6 bg-gray-50/50 dark:bg-black/20 border-t border-gray-100 dark:border-gray-800">
                     <div className="grid grid-cols-2 gap-4">
                         <Button
-                            className="w-full h-12 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group shadow-sm"
+                            className="w-full h-12 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 font-bold rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group shadow-sm disabled:opacity-50"
+                            disabled={isSubmitting}
                             onClick={() => submitPurchase(false)}
                         >
-                            <X size={18} className="group-hover:rotate-90 transition-transform" /> No, Only Store Bill
+                            {isSubmitting ? (
+                                <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <X size={18} className="group-hover:rotate-90 transition-transform" />
+                            )}
+                            No, Only Store Bill
                         </Button>
                         <Button
-                            className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 dark:shadow-orange-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                            className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl shadow-lg shadow-orange-200 dark:shadow-orange-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
+                            disabled={isSubmitting}
                             onClick={() => submitPurchase(true)}
                         >
-                            <Check size={18} /> Yes, Update Prices
+                            {isSubmitting ? (
+                                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Check size={18} />
+                            )}
+                            Yes, Update Prices
                         </Button>
                     </div>
                 </div>

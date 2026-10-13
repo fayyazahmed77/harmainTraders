@@ -170,8 +170,11 @@ class PurchaseController extends Controller implements HasMiddleware
         $salemans = Saleman::select('id', 'name', 'code')->get();
 
         // Calculate Next Invoice Number
-        $lastPurchase = Purchase::select('id', 'invoice')->latest()->first();
-        $nextInvoiceNo = 'PUR-000002';
+        $lastPurchase = Purchase::where('invoice', 'LIKE', 'PUR-%')
+            ->where('invoice', 'NOT LIKE', 'PUR-TMP-%')
+            ->orderByDesc('id')
+            ->first();
+        $nextInvoiceNo = 'PUR-000001';
 
         if ($lastPurchase && preg_match('/PUR-(\d+)/', $lastPurchase->invoice, $matches)) {
             $number = intval($matches[1]);
@@ -216,7 +219,7 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $request->validate([
             'date'            => 'required|date',
-            'invoice'         => 'required|string',
+            'invoice'         => 'nullable|string',
             'code'            => 'nullable|string',
             'supplier_id'     => [
                 'required',
@@ -297,10 +300,10 @@ class PurchaseController extends Controller implements HasMiddleware
             $surplusAmount = max(0, $totalPaidAmount - $netPurchaseTotal);
             $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
 
-            // Create purchase
+            // Create purchase with unique temporary invoice to obtain auto-increment ID atomically
             $purchase = Purchase::create([
                 'date'            => $request->date,
-                'invoice'         => $request->invoice,
+                'invoice'         => uniqid('PUR-TMP-', true),
                 'code'            => $request->code,
                 'supplier_id'     => $request->supplier_id,
                 'salesman_id'     => $request->salesman_id,
@@ -317,6 +320,31 @@ class PurchaseController extends Controller implements HasMiddleware
                 'message_line_id' => $request->message_line_id,
                 'firm_id'         => $request->firm_id,
             ]);
+
+            // Auto-increment ID is now known — derive unique sequential invoice number
+            $latestInvoice = Purchase::where('invoice', 'LIKE', 'PUR-%')
+                ->where('invoice', 'NOT LIKE', 'PUR-TMP-%')
+                ->where('id', '!=', $purchase->id)
+                ->lockForUpdate()
+                ->orderByDesc('id')
+                ->value('invoice');
+
+            $nextNum = $purchase->id;
+            if ($latestInvoice && preg_match('/PUR-(\d+)/', $latestInvoice, $matches)) {
+                $highestNum = (int)$matches[1];
+                if ($highestNum >= $nextNum) {
+                    $nextNum = $highestNum + 1;
+                }
+            }
+
+            $candidateInvoice = 'PUR-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (Purchase::where('invoice', $candidateInvoice)->where('id', '!=', $purchase->id)->exists()) {
+                $nextNum++;
+                $candidateInvoice = 'PUR-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
+
+            $purchase->invoice = $candidateInvoice;
+            $purchase->save();
 
             // --- Auto-Allocate Existing Advances (Unallocated Payments) ---
             $unallocatedPayments = Payment::where('account_id', $purchase->supplier_id)
@@ -356,8 +384,7 @@ class PurchaseController extends Controller implements HasMiddleware
             // --- Process Payments & Allocations ---
             if (count($splitsData) > 0) {
                 $prefix = 'CPV-';
-                $count = Payment::where('type', 'PAYMENT')->count() + 1;
-                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $baseVoucherNo = $this->generateNextPurchaseVoucherNo($prefix);
                 $groupId = null;
                 $createdPayments = [];
 
@@ -599,7 +626,7 @@ class PurchaseController extends Controller implements HasMiddleware
     {
         $request->validate([
             'date'            => 'required|date',
-            'invoice'         => 'required|string',
+            'invoice'         => 'nullable|string',
             'code'            => 'nullable|string',
             'supplier_id'     => [
                 'required',
@@ -701,7 +728,7 @@ class PurchaseController extends Controller implements HasMiddleware
 
             $purchase->update([
                 'date'            => $request->date,
-                'invoice'         => $request->invoice,
+                'invoice'         => $purchase->invoice, // Preserve existing unique invoice number
                 'code'            => $request->code,
                 'supplier_id'     => $request->supplier_id,
                 'salesman_id'     => $request->salesman_id,
@@ -757,8 +784,7 @@ class PurchaseController extends Controller implements HasMiddleware
             // --- Process New Payments & Allocations ---
             if (count($splitsData) > 0 && $totalNewPaid > 0) {
                 $prefix = 'CPV-';
-                $count = Payment::where('type', 'PAYMENT')->count() + 1;
-                $baseVoucherNo = $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+                $baseVoucherNo = $this->generateNextPurchaseVoucherNo($prefix);
                 $groupId = null;
                 $createdPayments = [];
 
@@ -863,17 +889,27 @@ class PurchaseController extends Controller implements HasMiddleware
                 }
             }
 
-            // Revert Stock for old items (total_pcs already includes bonus units)
+            // Calculate net stock delta (new items - old items)
+            $stockDeltas = [];
             $oldItems = PurchaseItem::where('purchase_id', $id)->get();
             foreach ($oldItems as $oldItem) {
-                $item = Items::find($oldItem->item_id);
-                if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs - (int)$oldItem->total_pcs);
-                    $item->save();
+                $stockDeltas[$oldItem->item_id] = ($stockDeltas[$oldItem->item_id] ?? 0) - (int)$oldItem->total_pcs;
+            }
+            foreach ($request->items as $it) {
+                $stockDeltas[$it['item_id']] = ($stockDeltas[$it['item_id']] ?? 0) + (int)$it['total_pcs'];
+            }
+
+            // Apply net delta to stock
+            foreach ($stockDeltas as $itemId => $delta) {
+                if ($delta !== 0) {
+                    $item = Items::find($itemId);
+                    if ($item) {
+                        $item->updateStockFromPcs(max(0, $item->total_stock_pcs + $delta));
+                    }
                 }
             }
 
-            // Delete old items
+            // Delete old items and insert updated items
             PurchaseItem::where('purchase_id', $id)->delete();
 
             // Fetch supplier category percentage
@@ -883,7 +919,6 @@ class PurchaseController extends Controller implements HasMiddleware
                 $percentage = floatval($supplier->accountCategory->percentage);
             }
 
-            // Insert new items and update stock
             foreach ($request->items as $it) {
                 PurchaseItem::create([
                     'purchase_id' => $purchase->id,
@@ -899,18 +934,14 @@ class PurchaseController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Increase Stock (total_pcs already includes purchased + bonus units)
-                $item = Items::find($it['item_id']);
-                if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs + (int)$it['total_pcs']);
-
-                    // Auto-update trade price based on supplier category percentage if enabled
-                    if ($request->update_prices && $percentage > 0) {
+                // Auto-update trade price based on supplier category percentage if enabled
+                if ($request->update_prices && $percentage > 0) {
+                    $item = Items::find($it['item_id']);
+                    if ($item) {
                         $newTradePrice = $it['trade_price'] + ($it['trade_price'] * $percentage / 100);
                         $item->trade_price = round($newTradePrice);
+                        $item->save();
                     }
-
-                    $item->save();
                 }
             }
 
@@ -1035,7 +1066,12 @@ class PurchaseController extends Controller implements HasMiddleware
         try {
             $purchase = Purchase::with('items')->findOrFail($id);
 
-            // Revert Stock (Decrease stock by total_pcs which already includes bonus units)
+            // 1. Guard against deleting a purchase if purchase return(s) exist against it
+            if (\App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)->exists()) {
+                return redirect()->back()->with('error', "Cannot delete purchase {$purchase->invoice} because purchase return(s) have already been processed for this bill.");
+            }
+
+            // 2. Revert Stock (Decrease stock by total_pcs)
             foreach ($purchase->items as $pi) {
                 $item = Items::find($pi->item_id);
                 if ($item) {
@@ -1043,15 +1079,84 @@ class PurchaseController extends Controller implements HasMiddleware
                 }
             }
 
-            // Delete Purchase items & Purchase
+            // 3. Handle Payment Allocations and Auto-generated Payments
+            $allocations = PaymentAllocation::where('bill_id', $purchase->id)
+                ->where('bill_type', 'App\Models\Purchase')
+                ->get();
+
+            foreach ($allocations as $alloc) {
+                $payment = Payment::find($alloc->payment_id);
+                if ($payment && str_starts_with($payment->remarks ?? '', 'Auto-generated from Purchase ' . $purchase->invoice)) {
+                    // Bank cheque restoration
+                    if (!empty($payment->cheque_id)) {
+                        Chequebook::where('id', $payment->cheque_id)->update(['status' => 'unused']);
+                    }
+                    // Customer cheque restoration
+                    if (!empty($payment->customer_cheque_id)) {
+                        Payment::where('id', $payment->customer_cheque_id)->update(['cheque_status' => 'Pending']);
+                    }
+                    PaymentAllocation::where('payment_id', $payment->id)->delete();
+                    $payment->delete();
+                } else {
+                    // Advance payment or manual payment allocation — remove allocation to free advance back to supplier
+                    $alloc->delete();
+                }
+            }
+
+            // Clean up any remaining auto-generated payments with remarks referencing this purchase
+            $autoPayments = Payment::where('remarks', 'like', 'Auto-generated from Purchase ' . $purchase->invoice . '%')->get();
+            foreach ($autoPayments as $autoPayment) {
+                if (!empty($autoPayment->cheque_id)) {
+                    Chequebook::where('id', $autoPayment->cheque_id)->update(['status' => 'unused']);
+                }
+                // If surplus was applied to older bills, revert older bills paid/remaining balances
+                $surplusAllocs = PaymentAllocation::where('payment_id', $autoPayment->id)
+                    ->where('bill_id', '!=', $purchase->id)
+                    ->where('bill_type', 'App\Models\Purchase')
+                    ->get();
+                foreach ($surplusAllocs as $sAlloc) {
+                    $olderBill = Purchase::find($sAlloc->bill_id);
+                    if ($olderBill) {
+                        $olderBill->paid_amount = max(0, $olderBill->paid_amount - $sAlloc->amount);
+                        $olderBill->remaining_amount += $sAlloc->amount;
+                        $olderBill->save();
+                    }
+                    $sAlloc->delete();
+                }
+                PaymentAllocation::where('payment_id', $autoPayment->id)->delete();
+                $autoPayment->delete();
+            }
+
+            // 4. Delete Purchase items & Purchase
             PurchaseItem::where('purchase_id', $id)->delete();
             $purchase->delete();
 
             DB::commit();
-            return redirect()->back()->with('success', 'Purchase invoice deleted and stock reverted successfully!');
+            return redirect()->back()->with('success', "Purchase invoice {$purchase->invoice} deleted and stock/accounting reverted successfully!");
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error deleting purchase: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Generate sequential CPV voucher number inside current DB transaction.
+     * Uses lockForUpdate() so concurrent requests serialize and never produce duplicates.
+     *
+     * @param string $prefix e.g. 'CPV-' -> CPV-0001
+     */
+    private function generateNextPurchaseVoucherNo(string $prefix): string
+    {
+        $last = Payment::where('voucher_no', 'LIKE', $prefix . '%')
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->value('voucher_no');
+
+        $nextNum = 1;
+        if ($last && preg_match('/' . preg_quote(rtrim($prefix, '-'), '/') . '-(\d+)/', $last, $matches)) {
+            $nextNum = (int)$matches[1] + 1;
+        }
+
+        return $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
     }
 }

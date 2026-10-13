@@ -64,6 +64,7 @@ interface PurchasePaymentDialogProps {
   customerCheques?: any[];
   availableCheques?: any[];
   extraDiscount?: number;
+  isSubmitting?: boolean;
 }
 
 export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
@@ -81,7 +82,8 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
   previousBalance = 0,
   customerCheques = [],
   availableCheques = [],
-  extraDiscount = 0
+  extraDiscount = 0,
+  isSubmitting = false
 }) => {
   const toNumber = (v: any) => {
     const n = Number(v);
@@ -448,6 +450,7 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
 
           <Button
             variant="ghost"
+            disabled={isSubmitting}
             onClick={() => onOpenChange(false)}
             className="h-9 px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5"
           >
@@ -457,11 +460,21 @@ export const PurchasePaymentDialog: React.FC<PurchasePaymentDialogProps> = ({
 
           <Button
             onClick={onCommit}
-            className="h-9 px-6 text-[10px] font-black uppercase tracking-wider bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow-md shadow-orange-500/20 active:scale-[0.97] transition-all flex items-center gap-2 border-none"
+            disabled={isSubmitting}
+            className="h-9 px-6 text-[10px] font-black uppercase tracking-wider bg-orange-500 hover:bg-orange-600 text-white rounded-lg shadow-md shadow-orange-500/20 active:scale-[0.97] transition-all flex items-center gap-2 border-none disabled:opacity-50"
           >
-            <span>Process Disbursement</span>
-            <kbd className="px-1.5 py-0.5 text-[8px] font-mono bg-white/20 rounded border border-white/30">Ctrl+Enter</kbd>
-            <ArrowRight size={13} strokeWidth={2.5} />
+            {isSubmitting ? (
+              <>
+                <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span>Process Disbursement</span>
+                <kbd className="px-1.5 py-0.5 text-[8px] font-mono bg-white/20 rounded border border-white/30">Ctrl+Enter</kbd>
+                <ArrowRight size={13} strokeWidth={2.5} />
+              </>
+            )}
           </Button>
         </div>
 

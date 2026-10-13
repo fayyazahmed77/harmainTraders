@@ -99,12 +99,11 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
   const isFullyPaid = Math.abs(remaining) < 0.01;
   const isOverpaid = remaining < -0.01;
 
-  // Auto fill remaining balance into last editable (non-voucher) split row
+  // Auto fill remaining balance into last split row
   const fillRemainingBalance = () => {
-    const editableRows = splits.filter(s => !s.voucher_no);
     if (remaining > 0) {
-      if (editableRows.length > 0) {
-        const lastRow = editableRows[editableRows.length - 1];
+      if (splits.length > 0) {
+        const lastRow = splits[splits.length - 1];
         const currentVal = toNumber(lastRow.amount);
         updateSplitRow(lastRow.id, 'amount', Number((currentVal + remaining).toFixed(2)));
       } else {
@@ -225,7 +224,7 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
         {/* Multi-Payment Rows */}
         <div className="p-6 max-h-[350px] overflow-y-auto space-y-4 bg-background/50 custom-scrollbar">
           {splits.map((split, index) => {
-            const acc = paymentAccounts.find(a => a.id.toString() === split.payment_account_id);
+            const acc = paymentAccounts.find(a => a.id.toString() === split.payment_account_id?.toString());
             const typeLower = (acc?.account_type?.name || acc?.title || '').toLowerCase();
             const isBank = typeLower.includes('bank');
             const isChequeInHand = typeLower.includes('cheque in hand');
@@ -243,12 +242,18 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                       "col-span-12 flex flex-col gap-1.5",
                       isChequeInHand ? "lg:col-span-3" : isBank ? "lg:col-span-4" : "lg:col-span-7"
                     )}>
-                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-wider ml-0.5">
-                        Payment From {split.voucher_no && <span className="text-orange-500/50">({split.voucher_no})</span>}
-                      </Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-wider ml-0.5">
+                          Payment From
+                        </Label>
+                        {split.voucher_no && (
+                          <span className="font-mono text-[9px] font-black px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                            {split.voucher_no}
+                          </span>
+                        )}
+                      </div>
                       <Select 
-                        value={split.payment_account_id} 
-                        disabled={!!split.voucher_no}
+                        value={split.payment_account_id ? split.payment_account_id.toString() : ""} 
                         onValueChange={(val) => {
                           updateSplitRow(split.id, 'payment_account_id', val);
                           const acc = paymentAccounts.find(a => a.id.toString() === val);
@@ -258,13 +263,12 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                             updateSplitRow(split.id, 'payment_method', 'Online');
                           } else if (typeLower.includes('cheque in hand')) {
                             updateSplitRow(split.id, 'payment_method', 'Cheque');
+                          } else {
+                            updateSplitRow(split.id, 'payment_method', 'Cash');
                           }
                         }}
                       >
-                        <SelectTrigger className={cn(
-                          "h-10 w-full rounded-lg bg-background border-border text-foreground font-bold text-xs",
-                          split.voucher_no && "opacity-60 cursor-not-allowed"
-                        )}>
+                        <SelectTrigger className="h-10 w-full rounded-lg bg-background border-border text-foreground font-bold text-xs">
                           <SelectValue placeholder="Select Origin..." />
                         </SelectTrigger>
                         <SelectContent className="bg-popover border-border text-popover-foreground rounded-lg">
@@ -289,12 +293,8 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                           type="number"
                           placeholder="0.00"
                           value={split.amount || ""}
-                          disabled={!!split.voucher_no}
                           onChange={(e) => updateSplitRow(split.id, 'amount', e.target.value)}
-                          className={cn(
-                            "h-10 pl-8 pr-3 rounded-lg bg-background border-border text-foreground font-bold text-xs text-right focus-visible:ring-orange-500",
-                            split.voucher_no && "opacity-60 cursor-not-allowed"
-                          )}
+                          className="h-10 pl-8 pr-3 rounded-lg bg-background border-border text-foreground font-bold text-xs text-right focus-visible:ring-orange-500"
                         />
                       </div>
                     </div>
@@ -337,8 +337,7 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
                       <Button
                         variant="ghost"
                         onClick={() => removeSplitRow(split.id)}
-                        disabled={!!split.voucher_no}
-                        className="h-10 w-10 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-white border border-destructive/20 transition-all active:scale-95 disabled:opacity-50"
+                        className="h-10 w-10 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive hover:text-white border border-destructive/20 transition-all active:scale-95"
                       >
                         <Trash2 size={16} />
                       </Button>

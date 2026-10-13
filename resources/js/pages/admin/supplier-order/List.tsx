@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -43,6 +43,10 @@ interface ListProps {
 
 export default function SupplierOrdersList({ orders }: ListProps) {
   const [search, setSearch] = useState("");
+  const { auth } = usePage<any>().props;
+  const permissions: string[] = auth?.permissions || [];
+  const roles: string[] = auth?.roles || [];
+  const canCreate = roles.includes('Admin') || permissions.includes('create supplier orders') || permissions.includes('create orders');
 
   const filteredOrders = orders.filter(order => 
     order.supplier?.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -81,11 +85,13 @@ export default function SupplierOrdersList({ orders }: ListProps) {
                 <h1 className="text-2xl font-black tracking-widest text-zinc-900 dark:text-white uppercase">Supplier Orders</h1>
                 <p className="text-zinc-500 text-sm mt-1">Manage and track your historical supplier stock orders.</p>
               </div>
-              <Link href="/admin/supplier-order">
-                <Button className="bg-orange-600 hover:bg-orange-700 text-white font-bold tracking-widest uppercase text-xs">
-                  Create New Order
-                </Button>
-              </Link>
+              {canCreate && (
+                <Link href="/admin/supplier-order">
+                  <Button className="bg-orange-600 hover:bg-orange-700 text-white font-bold tracking-widest uppercase text-xs">
+                    Create New Order
+                  </Button>
+                </Link>
+              )}
             </div>
 
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden flex flex-col shadow-sm">

@@ -431,8 +431,8 @@ export const COMMAND_REGISTRY: CommandItem[] = [
         parentModule: 'Orders',
         url: '/admin/supplier-order/list',
         icon: ShoppingCart,
-        keywords: ['supplier orders', 'po list', 'vendor orders'],
-        permissions: ['view purchases'],
+        keywords: ['supplier orders', 'po list', 'vendor orders', 'orders'],
+        permissions: ['view supplier orders', 'view orders'],
     },
     {
         id: 'action-create-supplier-order',
@@ -442,8 +442,19 @@ export const COMMAND_REGISTRY: CommandItem[] = [
         parentModule: 'Orders',
         url: '/admin/supplier-order',
         icon: Plus,
-        keywords: ['create supplier order', 'new po', 'order inventory'],
-        permissions: ['create purchases'],
+        keywords: ['create supplier order', 'new po', 'order inventory', 'create order'],
+        permissions: ['create supplier orders', 'create orders'],
+    },
+    {
+        id: 'nav-supplier-companies',
+        title: 'Supplier Companies',
+        description: 'Manage assigned companies for wholesale suppliers',
+        category: 'Pages',
+        parentModule: 'Orders',
+        url: '/admin/supplier-companies',
+        icon: Building,
+        keywords: ['supplier companies', 'vendor companies', 'companies', 'supplier company'],
+        permissions: ['manage supplier companies'],
     },
 
     // ------------------------------------------------------------------------

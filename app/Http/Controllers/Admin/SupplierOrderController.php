@@ -22,8 +22,8 @@ class SupplierOrderController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:view purchases', only: ['index', 'getItems', 'getAllItems', 'list', 'show', 'print']),
-            new Middleware('permission:create purchases', only: ['store']),
+            new Middleware('permission:view supplier orders|view orders', only: ['list', 'show', 'print']),
+            new Middleware('permission:create supplier orders|create orders', only: ['index', 'getItems', 'getAllItems', 'store']),
         ];
     }
     public function index()

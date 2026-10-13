@@ -86,6 +86,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/api/server-time', \App\Http\Controllers\Api\ServerTimeController::class);
 
+    // Session Keepalive / Heartbeat
+    Route::get('/api/ping', function () {
+        return response()->json([
+            'status' => 'active',
+            'user_id' => auth()->id(),
+            'timestamp' => now()->timestamp,
+        ]);
+    })->name('api.ping');
+
     // Notification Center
     Route::get('/notifications', [NotificationController::class, 'renderCenter'])->name('notifications.center');
     Route::get('/api/v1/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -373,6 +382,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{purchas}/view', [PurchaseController::class, 'view'])->name('purchase.view');
         Route::put('/{purchas}', [PurchaseController::class, 'update'])->name('purchase.update');
         Route::delete('/{id}', [PurchaseController::class, 'destroy'])->name('purchase.destroy');
+        Route::delete('/{id}/delete', [PurchaseController::class, 'destroy'])->name('purchase.destroy.delete');
         // Purchase PDF
         Route::get('/{id}/pdf', [PurchaseController::class, 'pdf'])->name('purchase.pdf');
         Route::get('/{id}/download', [PurchaseController::class, 'download'])->name('purchase.download');
@@ -601,23 +611,28 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('admin.activity-logs.index');
 
-        // Supplier Companies
-        Route::get('/supplier-companies', [SupplierCompanyController::class, 'index'])->name('admin.supplier-companies.index');
-        Route::post('/supplier-companies', [SupplierCompanyController::class, 'store'])->name('admin.supplier-companies.store');
-        Route::delete('/supplier-companies/{supplierId}/{companyId}', [SupplierCompanyController::class, 'destroy'])->name('admin.supplier-companies.destroy');
-
-        // Supplier Orders
-        Route::get('/supplier-order', [SupplierOrderController::class, 'index'])->name('admin.supplier-order.index');
-        Route::post('/api/supplier-order/items', [SupplierOrderController::class, 'getItems']);
-        Route::get('/api/supplier-order/all-items', [SupplierOrderController::class, 'getAllItems']);
-        Route::post('/api/supplier-order/store', [SupplierOrderController::class, 'store']);
-        Route::get('/supplier-order/list', [SupplierOrderController::class, 'list'])->name('admin.supplier-order.list');
-        Route::get('/supplier-order/{id}/show', [SupplierOrderController::class, 'show'])->name('admin.supplier-order.show');
-        Route::get('/supplier-order/{id}/print', [SupplierOrderController::class, 'print'])->name('admin.supplier-order.print');
-
         // Admin Access Requests Dashboard
         Route::get('/access-requests', [\App\Http\Controllers\AccessRequestController::class, 'adminIndex'])->name('admin.access-requests.index');
     });
+
+    // Supplier Orders & Companies (Secured with Spatie role/permission)
+    Route::middleware(['role_or_permission:Admin|view supplier orders|create supplier orders|manage supplier companies|view orders|create orders', 'two_factor'])
+        ->prefix('admin')
+        ->group(function () {
+            // Supplier Companies
+            Route::get('/supplier-companies', [SupplierCompanyController::class, 'index'])->name('admin.supplier-companies.index');
+            Route::post('/supplier-companies', [SupplierCompanyController::class, 'store'])->name('admin.supplier-companies.store');
+            Route::delete('/supplier-companies/{supplierId}/{companyId}', [SupplierCompanyController::class, 'destroy'])->name('admin.supplier-companies.destroy');
+
+            // Supplier Orders
+            Route::get('/supplier-order', [SupplierOrderController::class, 'index'])->name('admin.supplier-order.index');
+            Route::post('/api/supplier-order/items', [SupplierOrderController::class, 'getItems']);
+            Route::get('/api/supplier-order/all-items', [SupplierOrderController::class, 'getAllItems']);
+            Route::post('/api/supplier-order/store', [SupplierOrderController::class, 'store']);
+            Route::get('/supplier-order/list', [SupplierOrderController::class, 'list'])->name('admin.supplier-order.list');
+            Route::get('/supplier-order/{id}/show', [SupplierOrderController::class, 'show'])->name('admin.supplier-order.show');
+            Route::get('/supplier-order/{id}/print', [SupplierOrderController::class, 'print'])->name('admin.supplier-order.print');
+        });
 
     // Access Request API Routes
     Route::post('/api/v1/access-requests', [\App\Http\Controllers\AccessRequestController::class, 'store'])->name('access-requests.store')->middleware('throttle:5,1');

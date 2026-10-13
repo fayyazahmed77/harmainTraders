@@ -30,20 +30,72 @@ class JournalVoucherController extends Controller implements HasMiddleware
 
     public function index(Request $request)
     {
-        // Fetch all JVs, group by voucher_no. We can fetch where payment_method = 'Journal'
-        // Since each JV has two records (RECEIPT and PAYMENT), we can just fetch the RECEIPTs and then load the related PAYMENT via voucher_no, or fetch all and group them.
-        $query = Payment::with(['account'])->where('payment_method', 'Journal');
-        
-        if ($request->has('start_date') && $request->start_date && $request->has('end_date') && $request->end_date) {
-            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        $query = Payment::with(['account'])
+            ->where('payment_method', 'Journal')
+            ->where('type', 'RECEIPT');
+
+        // Search by Voucher No or Remarks
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('voucher_no', 'like', "%{$search}%")
+                  ->orWhere('remarks', 'like', "%{$search}%");
+            });
         }
 
-        // To list them uniquely, let's fetch the 'RECEIPT' side of the JV as the primary record to display in the table,
-        // and append the 'PAYMENT' side information using group_id.
-        $jvs = $query->where('type', 'RECEIPT')
-                     ->orderBy('date', 'desc')
+        // Date Range
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('date', '>=', $request->start_date);
+        } elseif ($request->filled('end_date')) {
+            $query->where('date', '<=', $request->end_date);
+        }
+
+        // Min & Max Amount
+        if ($request->filled('min_amount')) {
+            $query->where('amount', '>=', (float) $request->min_amount);
+        }
+        if ($request->filled('max_amount')) {
+            $query->where('amount', '<=', (float) $request->max_amount);
+        }
+
+        // Universal Party Account (matches either Credit or Debit side)
+        if ($request->filled('account_id') && $request->account_id !== 'all') {
+            $accountId = $request->account_id;
+            $query->whereIn('group_id', function ($sub) use ($accountId) {
+                $sub->select('group_id')
+                    ->from('payments')
+                    ->where('payment_method', 'Journal')
+                    ->where('account_id', $accountId);
+            });
+        }
+
+        // Specific Credit Account
+        if ($request->filled('credit_account_id') && $request->credit_account_id !== 'all') {
+            $query->where('account_id', $request->credit_account_id);
+        }
+
+        // Specific Debit Account
+        if ($request->filled('debit_account_id') && $request->debit_account_id !== 'all') {
+            $debitAccId = $request->debit_account_id;
+            $query->whereIn('group_id', function ($sub) use ($debitAccId) {
+                $sub->select('group_id')
+                    ->from('payments')
+                    ->where('type', 'PAYMENT')
+                    ->where('payment_method', 'Journal')
+                    ->where('account_id', $debitAccId);
+            });
+        }
+
+        // Total amount for filtered results
+        $filteredTotalAmount = (float) (clone $query)->sum('amount');
+
+        // Pagination (Default 50 rows)
+        $perPage = in_array((int) $request->input('per_page'), [15, 25, 50, 100]) ? (int) $request->input('per_page') : 50;
+        $jvs = $query->orderBy('date', 'desc')
                      ->orderBy('id', 'desc')
-                     ->paginate(15)
+                     ->paginate($perPage)
                      ->withQueryString();
 
         // Get the matching 'PAYMENT' records for these vouchers using group_id
@@ -55,29 +107,50 @@ class JournalVoucherController extends Controller implements HasMiddleware
             ->get()
             ->keyBy('group_id');
 
-        $mappedJvs = collect($jvs->items())->map(function($receipt) use ($creditSides) {
+        $mappedJvs = collect($jvs->items())->map(function ($receipt) use ($creditSides) {
             $payment = $creditSides->get($receipt->group_id);
             // Clean up voucher no for display (remove suffix)
             $cleanVoucherNo = str_replace(['-A', '-B'], '', $receipt->voucher_no);
             return [
-                'id' => $receipt->id, // primary ID for deletion/reference
-                'date' => $receipt->date,
-                'voucher_no' => $cleanVoucherNo,
-                'credit_account' => $receipt->account ? $receipt->account->title : 'N/A', // RECEIPT side
-                'debit_account' => $payment && $payment->account ? $payment->account->title : 'N/A', // PAYMENT side
-                'amount' => $receipt->amount,
-                'remarks' => $receipt->remarks,
+                'id'                => $receipt->id, // primary ID for deletion/reference
+                'date'              => $receipt->date,
+                'voucher_no'        => $cleanVoucherNo,
+                'credit_account'    => $receipt->account ? $receipt->account->title : 'N/A', // RECEIPT side
+                'credit_account_id' => $receipt->account_id,
+                'debit_account'     => $payment && $payment->account ? $payment->account->title : 'N/A', // PAYMENT side
+                'debit_account_id'  => $payment ? $payment->account_id : null,
+                'amount'            => (float) $receipt->amount,
+                'remarks'           => $receipt->remarks,
             ];
         });
 
+        $accounts = Account::active()
+            ->select('id', 'title', 'code')
+            ->orderBy('title', 'asc')
+            ->get();
+
         return Inertia::render('journal-voucher/Index', [
             'jvs' => [
-                'data' => $mappedJvs,
+                'data'         => $mappedJvs,
                 'current_page' => $jvs->currentPage(),
-                'last_page' => $jvs->lastPage(),
-                'total' => $jvs->total(),
+                'last_page'    => $jvs->lastPage(),
+                'per_page'     => $jvs->perPage(),
+                'total'        => $jvs->total(),
+                'links'        => $jvs->linkCollection()->toArray(),
             ],
-            'filters' => $request->all(['start_date', 'end_date'])
+            'total_amount' => $filteredTotalAmount,
+            'accounts'     => $accounts,
+            'filters'      => $request->all([
+                'search',
+                'start_date',
+                'end_date',
+                'account_id',
+                'debit_account_id',
+                'credit_account_id',
+                'min_amount',
+                'max_amount',
+                'per_page',
+            ]),
         ]);
     }
 
@@ -279,23 +352,25 @@ class JournalVoucherController extends Controller implements HasMiddleware
 
     public function show($id)
     {
-        $receipt = Payment::with(['account', 'allocations.bill', 'firm'])->findOrFail($id);
+        $receipt = Payment::with(['account.accountType', 'allocations.bill', 'firm'])->findOrFail($id);
         if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
             abort(403, 'Not a primary Credit side Journal Voucher');
         }
 
-        $payment = Payment::with(['account', 'allocations.bill'])
+        $payment = Payment::with(['account.accountType', 'allocations.bill'])
             ->where('group_id', $receipt->group_id)
             ->where('type', 'PAYMENT')
             ->where('payment_method', 'Journal')
             ->firstOrFail();
 
         $cleanVoucherNo = str_replace(['-A', '-B'], '', $receipt->voucher_no);
+        $amountInWords = self::convertNumberToWords((float) $receipt->amount);
 
         return Inertia::render('journal-voucher/Show', [
             'receipt' => $receipt,
             'payment' => $payment,
             'voucher_no' => $cleanVoucherNo,
+            'amount_in_words' => $amountInWords,
         ]);
     }
 
@@ -568,27 +643,45 @@ class JournalVoucherController extends Controller implements HasMiddleware
 
     public function pdf($id)
     {
-        $receipt = Payment::with(['account', 'allocations.bill', 'firm'])->findOrFail($id);
+        $receipt = Payment::with(['account.accountType', 'allocations.bill', 'firm'])->findOrFail($id);
         if ($receipt->payment_method !== 'Journal' || $receipt->type !== 'RECEIPT') {
             abort(403, 'Not a primary Credit side Journal Voucher');
         }
 
-        $payment = Payment::with(['account', 'allocations.bill'])
+        $payment = Payment::with(['account.accountType', 'allocations.bill'])
             ->where('group_id', $receipt->group_id)
             ->where('type', 'PAYMENT')
             ->where('payment_method', 'Journal')
             ->firstOrFail();
 
         $cleanVoucherNo = str_replace(['-A', '-B'], '', $receipt->voucher_no);
+        $amountInWords = self::convertNumberToWords((float) $receipt->amount);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.journal-voucher', [
             'receipt' => $receipt,
             'payment' => $payment,
             'voucher_no' => $cleanVoucherNo,
+            'amount_in_words' => $amountInWords,
         ]);
 
         $pdf->setPaper('A4', 'portrait');
 
         return $pdf->stream($cleanVoucherNo . '.pdf');
+    }
+
+    /**
+     * Converts numeric currency amounts into formal English words.
+     */
+    public static function convertNumberToWords(float $amount): string
+    {
+        if (class_exists(\NumberFormatter::class)) {
+            try {
+                $formatter = new \NumberFormatter('en', \NumberFormatter::SPELLOUT);
+                return ucfirst($formatter->format($amount)) . ' Rupees Only';
+            } catch (\Exception $e) {
+                // Fallback below
+            }
+        }
+        return 'PKR ' . number_format($amount, 2);
     }
 }

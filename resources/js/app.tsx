@@ -44,3 +44,55 @@ createInertiaApp({
 
 // This will set light / dark mode on load...
 initializeTheme();
+
+// Global session keepalive to prevent timeouts during long sales/purchase entries
+function initSessionKeepalive() {
+    const INTERVAL_MS = 3 * 60 * 1000; // Ping every 3 minutes
+    let lastPing = Date.now();
+
+    const sendHeartbeat = () => {
+        // Only ping if not on login or landing page
+        if (window.location.pathname.startsWith('/login') || window.location.pathname === '/') {
+            return;
+        }
+
+        fetch('/api/ping', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then((res) => {
+                if (res.status === 401) {
+                    console.warn('Session has ended on server');
+                }
+            })
+            .catch(() => {});
+        lastPing = Date.now();
+    };
+
+    // Periodic ping
+    setInterval(sendHeartbeat, INTERVAL_MS);
+
+    // Ping when browser tab comes into focus after being backgrounded
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && Date.now() - lastPing > INTERVAL_MS) {
+            sendHeartbeat();
+        }
+    });
+
+    // Ping on active user interaction if more than 3 minutes have elapsed
+    ['click', 'keydown'].forEach((eventType) => {
+        window.addEventListener(
+            eventType,
+            () => {
+                if (Date.now() - lastPing > INTERVAL_MS) {
+                    sendHeartbeat();
+                }
+            },
+            { passive: true }
+        );
+    });
+}
+
+initSessionKeepalive();
+

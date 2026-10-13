@@ -32,7 +32,7 @@ class DashboardController extends Controller
         if ($user->hasRole('investor') || $user->hasRole('Investor')) {
             return redirect()->route('investor.dashboard');
         }
-        if ($user->hasRole('Sales man') || $user->hasRole('salesman')) {
+        if (!$user->hasRole('Admin') && !$user->hasRole('admin')) {
             return redirect()->route('salesman.dashboard');
         }
 

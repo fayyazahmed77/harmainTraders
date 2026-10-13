@@ -246,6 +246,8 @@ export default function PurchaseEdit({
     const [showPaymentDialog, setShowPaymentDialog] = useState(false);
     const [paymentSplits, setPaymentSplits] = useState<SplitPayment[]>([]);
     const [updatePricesAfterPayment, setUpdatePricesAfterPayment] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = React.useRef(false);
 
     const handlePostPriceUpdate = (update: boolean) => {
         setUpdatePricesAfterPayment(update);
@@ -660,7 +662,9 @@ export default function PurchaseEdit({
             // F9 or Ctrl+Enter (when dialog not open): Update Purchase
             if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !showPaymentDialog) {
                 e.preventDefault();
-                handleSave();
+                if (!isSubmittingRef.current) {
+                    handleSave();
+                }
                 return;
             }
         };
@@ -673,6 +677,10 @@ export default function PurchaseEdit({
     // Simple renderer / layout
     // ───────────────────────────────────────────
     const submitPurchase = (updatePrices: boolean) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
+
         const payload = {
             date: date ? date.toISOString().slice(0, 10) : null,
             invoice: invoiceNo,
@@ -720,6 +728,9 @@ export default function PurchaseEdit({
 
         router.put(`/purchase/${purchase.id}`, payload, {
             onSuccess: (page) => {
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
+
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
@@ -737,13 +748,20 @@ export default function PurchaseEdit({
                 setShowPriceDialog(false); // Close price dialog if open
             },
             onError: (errors) => {
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
                 console.error(errors);
                 alert("Failed to save purchase. Check console for details.");
+            },
+            onFinish: () => {
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
             }
         });
     };
 
     const handleSave = async () => {
+        if (isSubmittingRef.current) return;
         const updates: PriceUpdateInfo[] = [];
 
         rowsWithComputed.forEach(r => {
@@ -1717,9 +1735,22 @@ export default function PurchaseEdit({
                                 <span className="hidden sm:inline">{isPayNow ? "Checkout ON" : "Checkout"}</span>
                             </Button>
 
-                            <Button onClick={handleSave} className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2">
-                                <Save size={18} />
-                                Update Invoice
+                            <Button 
+                                onClick={handleSave} 
+                                disabled={isSubmitting}
+                                className="bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-widest h-10 px-8 shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-xl gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={18} />
+                                        <span>Update Invoice</span>
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -1734,8 +1765,22 @@ export default function PurchaseEdit({
                                     {Math.round(totals.net).toFixed(2)}
                                 </div>
                             </div>
-                            <Button onClick={handleSave} className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/50 rounded-xl font-bold transition-all active:scale-95">
-                                <Save className="mr-2" size={18} /> Save Invoice
+                            <Button 
+                                onClick={handleSave} 
+                                disabled={isSubmitting}
+                                className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white shadow-lg shadow-emerald-200/50 dark:shadow-emerald-900/50 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2" size={18} /> 
+                                        <span>Save Invoice</span>
+                                    </>
+                                )}
                             </Button>
                         </div>
 
@@ -1773,6 +1818,7 @@ export default function PurchaseEdit({
                     onOpenChange={setShowPriceDialog}
                     priceUpdates={priceUpdates}
                     submitPurchase={handlePostPriceUpdate}
+                    isSubmitting={isSubmitting}
                 />
 
                 {/* Purchase Payment Dialog */}
@@ -1795,6 +1841,7 @@ export default function PurchaseEdit({
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
                     extraDiscount={extraDiscount}
+                    isSubmitting={isSubmitting}
                 />
 
                 {/* Success Summary Dialog */}

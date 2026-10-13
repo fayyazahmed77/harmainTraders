@@ -114,6 +114,7 @@ export default function DataTable({ data }: DataTableProps) {
     const [rowSelection, setRowSelection] = useState({});
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [purchaseToDelete, setPurchaseToDelete] = useState<Purchases | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const statusMap: Record<string, { color: string; icon: JSX.Element }> = {
         Completed: {
@@ -506,20 +507,38 @@ export default function DataTable({ data }: DataTableProps) {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                        <Button variant="outline" disabled={isDeleting} onClick={() => setIsDeleteDialogOpen(false)}>
                             Cancel
                         </Button>
                         <Button
                             variant="destructive"
+                            disabled={isDeleting}
                             onClick={() => {
-                                if (purchaseToDelete) {
-                                    router.delete(`/purchase/${purchaseToDelete.id}/delete`, {
-                                        onSuccess: () => setIsDeleteDialogOpen(false)
+                                if (purchaseToDelete && !isDeleting) {
+                                    setIsDeleting(true);
+                                    router.delete(`/purchase/${purchaseToDelete.id}`, {
+                                        onSuccess: () => {
+                                            setIsDeleteDialogOpen(false);
+                                            setIsDeleting(false);
+                                        },
+                                        onError: () => {
+                                            setIsDeleting(false);
+                                        },
+                                        onFinish: () => {
+                                            setIsDeleting(false);
+                                        }
                                     });
                                 }
                             }}
                         >
-                            Confirm Delete
+                            {isDeleting ? (
+                                <span className="flex items-center gap-1.5">
+                                    <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Deleting...
+                                </span>
+                            ) : (
+                                "Confirm Delete"
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

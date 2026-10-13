@@ -17,6 +17,7 @@ import {
   History,
   ArrowRightLeft,
   MessageSquare,
+  ShoppingCart,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -281,23 +282,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     {
       title: "Orders",
       url: "#",
-      icon: Settings2,
-      permissions: ['view purchases', 'create purchases'],
+      icon: ShoppingCart,
+      permissions: ['view supplier orders', 'create supplier orders', 'manage supplier companies', 'view orders', 'create orders'],
       items: [
         {
           title: "Supplier Orders List",
           url: "/admin/supplier-order/list",
-          permissions: ['view purchases'],
+          permissions: ['view supplier orders', 'view orders'],
         },
         {
           title: "Create Order",
           url: "/admin/supplier-order",
-          permissions: ['create purchases'],
+          permissions: ['create supplier orders', 'create orders'],
         },
         {
           title: "Supplier Companies",
           url: "/admin/supplier-companies",
-          permissions: ['view purchases'],
+          permissions: ['manage supplier companies'],
         },
       ],
     },

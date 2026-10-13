@@ -30,6 +30,8 @@ class UpdatePaymentRequest extends FormRequest
             'firm_id' => 'nullable|integer',
             'allocations' => 'nullable|array',
             'original_cheque_id' => 'nullable|string',
+            'is_multi' => 'nullable|boolean',
+            'splits' => 'nullable|array',
         ];
     }
 

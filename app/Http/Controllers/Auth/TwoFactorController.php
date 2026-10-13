@@ -56,10 +56,17 @@ class TwoFactorController extends Controller
             if ($user->hasRole('investor') || $user->hasRole('Investor')) {
                 return redirect()->intended('/investor/dashboard');
             }
+
+            if ($user->hasRole('Admin') || $user->hasRole('admin')) {
+                return redirect()->intended('/dashboard');
+            }
+
             if ($user->hasRole('Sales man') || $user->hasRole('salesman')) {
                 return redirect()->intended('/salesman/dashboard');
             }
-            return redirect()->intended('/dashboard');
+
+            // Other staff/roles all share the salesman dashboard
+            return redirect()->intended('/salesman/dashboard');
         }
 
         return back()->withErrors(['code' => 'The provided code is incorrect.']);

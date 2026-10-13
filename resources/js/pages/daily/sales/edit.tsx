@@ -331,7 +331,9 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   }, [sale.customer?.id]);
 
   // Pay Now State
-  const [isPayNow, setIsPayNow] = useState<boolean>(false);
+  const [isPayNow, setIsPayNow] = useState<boolean>(() => {
+    return Boolean(sale.splits && sale.splits.length > 0);
+  });
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState<boolean>(false);
   const [extraDiscount, setExtraDiscount] = useState<number>(toNumber(sale.extra_discount));
   const [processing, setProcessing] = useState<boolean>(false);
@@ -348,7 +350,12 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const [isMultiPayment, setIsMultiPayment] = useState<boolean>(true);
   const [splits, setSplits] = useState<any[]>(() => {
     if (!sale.splits?.length) return [{ id: Date.now(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }];
-    return sale.splits.map(s => ({ ...s, id: s.id || Date.now() + Math.random() }));
+    return sale.splits.map(s => ({
+      ...s,
+      id: s.id || Date.now() + Math.random(),
+      payment_account_id: s.payment_account_id ? String(s.payment_account_id) : "",
+      amount: toNumber(s.amount),
+    }));
   });
 
   const addSplitRow = () => {
@@ -358,6 +365,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const removeSplitRow = (id: number | string) => {
     if (splits.length > 1) {
       setSplits(splits.filter(s => s.id !== id));
+    } else {
+      setSplits([{ id: Date.now() + Math.random(), payment_account_id: "", amount: 0, payment_method: "Cash", cheque_no: "", cheque_date: "", clear_date: "" }]);
     }
   };
 
@@ -676,11 +685,14 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   };
 
   const saveInvoice = (forceSave = false) => {
-    // Only submit NEW splits (without existing voucher_no) if Instant Checkout is active
-    const newSplits = isPayNow
-      ? splits.filter(s => !s.voucher_no && toNumber(s.amount) > 0)
+    // Process splits if Instant Checkout is active
+    const validSplits = isPayNow
+      ? splits.filter(s => toNumber(s.amount) > 0 && s.payment_account_id)
       : [];
-    const newPaidAmount = newSplits.reduce((acc, s) => acc + toNumber(s.amount), 0);
+    const totalPaidInSplits = validSplits.reduce((acc, s) => acc + toNumber(s.amount), 0);
+    const effectivePaid = isPayNow
+      ? totalPaidInSplits
+      : (sale.splits?.length ? sale.splits.reduce((acc: number, s: any) => acc + toNumber(s.amount), 0) : toNumber(sale.paid_amount));
 
     const payload = {
       date: date ? formatLocalDate(date) : formatLocalDate(new Date()),
@@ -694,9 +706,20 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       print_format: printOption,
       allow_negative_stock: forceSave,
 
-      is_pay_now: isPayNow && newSplits.length > 0,
+      is_pay_now: isPayNow,
       is_multi: isMultiPayment,
-      splits: newSplits,
+      splits: validSplits.map(s => ({
+        id: s.id,
+        allocation_id: s.allocation_id || (typeof s.id === 'number' && s.voucher_no ? s.id : undefined),
+        payment_id: s.payment_id,
+        voucher_no: s.voucher_no,
+        payment_account_id: s.payment_account_id ? String(s.payment_account_id) : "",
+        amount: toNumber(s.amount),
+        payment_method: s.payment_method || "Cash",
+        cheque_no: s.cheque_no || null,
+        cheque_date: s.cheque_date || null,
+        clear_date: s.clear_date || null,
+      })),
       message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
 
       gross_total: totals.gross,
@@ -706,8 +729,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       courier_charges: totals.courier,
       net_total: totals.net,
       total_receivable: totals.finalAmount,
-      paid_amount: newPaidAmount,
-      remaining_amount: totals.net - newPaidAmount - totals.appliedAdvance,
+      paid_amount: effectivePaid,
+      remaining_amount: Math.max(0, totals.net - effectivePaid - totals.appliedAdvance),
       use_advance: useAdvance,
       applied_advance: totals.appliedAdvance,
 
@@ -1185,7 +1208,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                   <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
                                 </div>
                                 <div className="col-span-1">
-                                  <div className="text-right font-mono text-[10px] text-zinc-400 bg-zinc-50 dark:bg-zinc-900 h-8 flex items-center justify-end px-1 border border-zinc-100 dark:border-zinc-800 rounded">
+                                  <div className="text-right font-mono text-[11px] text-zinc-900 bg-zinc-20 dark:bg-zinc-900 h-8 flex items-center justify-end px-1 border border-zinc-100 dark:border-zinc-800 rounded">
                                     {(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
                                   </div>
                                 </div>
