@@ -104,6 +104,8 @@ export function DueBillsReportView({
                                                             "px-1.5 py-0.5 rounded-[4px] text-[9px] font-black tracking-tighter uppercase",
                                                             row.type === 'CASH' ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : 
                                                             row.type === 'RETURN' ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" :
+                                                            row.type === 'OPENING' ? "bg-amber-500/10 text-amber-600 border border-amber-500/20" :
+                                                            row.type === 'PAYABLE' ? "bg-purple-500/10 text-purple-600 border border-purple-500/20" :
                                                             "bg-blue-500/10 text-blue-600 border border-blue-500/20"
                                                         )}>
                                                             {row.type || 'CREDIT'}
@@ -112,7 +114,9 @@ export function DueBillsReportView({
                                                     <td className="px-4 py-2 text-center tabular-nums text-text-muted border-r border-border/10">{format(new Date(row.due_date), 'dd MMM yy').toUpperCase()}</td>
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-secondary border-r border-border/10">
-                                                        {i === 0 ? (row.opening_balance ? `${formatCurrency(row.opening_balance)}${row.opening_balance_type === 'CR' ? ' CR' : ''}` : '0') : '—'}
+                                                        {row.is_opening_balance 
+                                                            ? `${formatCurrency(row.bill_amt)}${row.opening_balance_type === 'CR' ? ' CR' : ''}` 
+                                                            : '—'}
                                                     </td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.paid)}</td>

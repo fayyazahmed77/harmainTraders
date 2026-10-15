@@ -198,8 +198,7 @@ if (file_exists($logo_path)) {
                     @foreach($bills as $bill)
                     @php
                         $statusType = $bill['type'] ?? 'CREDIT';
-                        $statusColor = $statusType === 'CASH' ? '#059669' : '#2563eb';
-                        $statusStyle = "font-weight: bold; color: {$statusColor};";
+                        $statusColor = $statusType === 'CASH' ? '#059669' : ($statusType === 'RETURN' ? '#dc2626' : ($statusType === 'OPENING' ? '#d97706' : ($statusType === 'PAYABLE' ? '#7c3aed' : '#2563eb')));
                     @endphp
                     <tr>
                         <td class="text-center">{{ strtoupper(date('d-M-y', strtotime($bill['date']))) }}</td>
@@ -209,12 +208,16 @@ if (file_exists($logo_path)) {
                             <td class="text-center" style="font-weight: bold; color: #059669;">CASH</td>
                         @elseif($statusType === 'RETURN')
                             <td class="text-center" style="font-weight: bold; color: #dc2626;">RETURN</td>
+                        @elseif($statusType === 'OPENING')
+                            <td class="text-center" style="font-weight: bold; color: #d97706;">OPENING</td>
+                        @elseif($statusType === 'PAYABLE')
+                            <td class="text-center" style="font-weight: bold; color: #7c3aed;">PAYABLE</td>
                         @else
                             <td class="text-center" style="font-weight: bold; color: #2563eb;">CREDIT</td>
                         @endif
                         <td class="text-center">{{ strtoupper(date('d-M-y', strtotime($bill['due_date']))) }}</td>
                         <td class="text-center">{{ $bill['days'] }}</td>
-                        <td class="text-right">{{ $loop->first ? (isset($bill['opening_balance']) && $bill['opening_balance'] > 0 ? formatNum($bill['opening_balance']) . (($bill['opening_balance_type'] ?? '') === 'CR' ? ' CR' : '') : '0') : '—' }}</td>
+                        <td class="text-right">{{ !empty($bill['is_opening_balance']) ? (formatNum($bill['bill_amt']) . (($bill['opening_balance_type'] ?? '') === 'CR' ? ' CR' : '')) : '—' }}</td>
                         <td class="text-right">{{ formatNum($bill['bill_amt']) }}</td>
                         <td class="text-right">{{ formatNum($bill['paid']) }}</td>
                         <td class="text-right">{{ formatNum($bill['remaining']) }}</td>

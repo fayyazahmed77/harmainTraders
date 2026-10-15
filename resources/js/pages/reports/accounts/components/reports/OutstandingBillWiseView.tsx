@@ -254,7 +254,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                         <span className="text-[8px] font-display font-black text-text-muted uppercase tracking-widest mb-1">Total Payables</span>
                         <p className="text-base font-mono-jet font-black tracking-tighter text-amber-500">
                             <span className="text-[10px] font-medium opacity-30 mr-1.5 font-sans">PKR</span>
-                            {stats.payable.toLocaleString()}
+                            {stats.payable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     </div>
                 </div>
