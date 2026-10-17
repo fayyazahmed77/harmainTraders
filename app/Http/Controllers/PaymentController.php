@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
+use App\Services\PaymentAllocationEngine;
 
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -377,32 +378,9 @@ class PaymentController extends Controller implements HasMiddleware
                 $existingGroupPaymentIds[] = $payment->id;
             }
 
-            // 1. Reverse old allocations for all payments in this group
-            $oldAllocations = PaymentAllocation::whereIn('payment_id', $existingGroupPaymentIds)->get();
-            foreach ($oldAllocations as $allocation) {
-                $bill = $allocation->bill_type === 'App\Models\Sales'
-                    ? Sales::find($allocation->bill_id)
-                    : Purchase::find($allocation->bill_id);
-
-                if ($bill) {
-                    $bill->paid_amount = max(0, $bill->paid_amount - $allocation->amount);
-                    $sumOfReturns = $this->getTotalReturns($bill, $allocation->bill_type);
-                    $bill->remaining_amount = $bill->net_total - (float)($bill->extra_discount ?? 0) - $bill->paid_amount - $sumOfReturns;
-
-                    $isSale = ($allocation->bill_type === 'App\Models\Sales');
-                    if ($bill->remaining_amount <= 0) {
-                        $bill->status = $isSale ? 'Paid' : 'Completed';
-                    } elseif ($bill->paid_amount > 0) {
-                        $bill->status = $isSale ? 'Partial' : 'Completed';
-                    } else {
-                        $bill->status = $isSale ? 'Unpaid' : 'Completed';
-                    }
-                    $bill->save();
-                }
-            }
-
-            // 2. Delete old allocations
-            PaymentAllocation::whereIn('payment_id', $existingGroupPaymentIds)->delete();
+            // 1. Reverse old allocations for all payments in this group (including opening balance)
+            $allocationEngine = new PaymentAllocationEngine();
+            $allocationEngine->reverseAllocations($existingGroupPayments);
 
             // 3. Reset old cheque status in Chequebook and restore distributed cheques
             foreach ($existingGroupPayments as $oldP) {
@@ -607,120 +585,12 @@ class PaymentController extends Controller implements HasMiddleware
                 }
             }
 
-            // 6. Allocate new allocations across $activePayments
-            $allocationQueue = $request->allocations ?? [];
-            foreach ($activePayments as $p) {
-                if (count($allocationQueue) <= 0) break;
-                $cashRemaining = (float)$p->amount;
-
-                while ($cashRemaining > 0.001 && count($allocationQueue) > 0) {
-                    $allocIdx = array_key_first($allocationQueue);
-                    $alloc = &$allocationQueue[$allocIdx];
-
-                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
-                        ? Sales::find($alloc['bill_id'])
-                        : Purchase::find($alloc['bill_id']);
-
-                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
-                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
-                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
-
-                    if ($billRem <= 0.001) {
-                        array_shift($allocationQueue);
-                        continue;
-                    }
-
-                    $canAllocate = round(min($cashRemaining, $alloc['amount'], $billRem), 2);
-                    if ($canAllocate > 0.001) {
-                        PaymentAllocation::create([
-                            'payment_id' => $p->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['bill_type'],
-                            'amount' => $canAllocate,
-                        ]);
-
-                        if ($bill) {
-                            $bill->paid_amount += $canAllocate;
-                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
-
-                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
-                            if ($bill->remaining_amount <= 0.001) {
-                                $bill->remaining_amount = 0;
-                                $bill->status = $isSale ? 'Paid' : 'Completed';
-                            } elseif ($bill->paid_amount > 0) {
-                                $bill->status = $isSale ? 'Partial' : 'Completed';
-                            } else {
-                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
-                            }
-                            $bill->save();
-                        }
-
-                        $cashRemaining -= $canAllocate;
-                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
-                    }
-
-                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
-                        array_shift($allocationQueue);
-                    }
-                }
-            }
-
-            // Pass 2: Allocate discount if remaining
-            foreach ($activePayments as $p) {
-                if (count($allocationQueue) <= 0) break;
-                $currentAllocated = (float)$p->allocations()->sum('amount');
-                $discountRemaining = max(0.0, (float)$p->net_amount - $currentAllocated);
-
-                while ($discountRemaining > 0.001 && count($allocationQueue) > 0) {
-                    $allocIdx = array_key_first($allocationQueue);
-                    $alloc = &$allocationQueue[$allocIdx];
-
-                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
-                        ? Sales::find($alloc['bill_id'])
-                        : Purchase::find($alloc['bill_id']);
-
-                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
-                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
-                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
-
-                    if ($billRem <= 0.001) {
-                        array_shift($allocationQueue);
-                        continue;
-                    }
-
-                    $canAllocate = round(min($discountRemaining, $alloc['amount'], $billRem), 2);
-                    if ($canAllocate > 0.001) {
-                        PaymentAllocation::create([
-                            'payment_id' => $p->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['bill_type'],
-                            'amount' => $canAllocate,
-                        ]);
-
-                        if ($bill) {
-                            $bill->paid_amount += $canAllocate;
-                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
-
-                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
-                            if ($bill->remaining_amount <= 0.001) {
-                                $bill->remaining_amount = 0;
-                                $bill->status = $isSale ? 'Paid' : 'Completed';
-                            } elseif ($bill->paid_amount > 0) {
-                                $bill->status = $isSale ? 'Partial' : 'Completed';
-                            } else {
-                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
-                            }
-                            $bill->save();
-                        }
-
-                        $discountRemaining -= $canAllocate;
-                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
-                    }
-
-                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
-                        array_shift($allocationQueue);
-                    }
-                }
+            // 6. Allocate new allocations across $activePayments using PaymentAllocationEngine (Opening Balance First + FIFO / Mode B)
+            $allocationEngine = new PaymentAllocationEngine();
+            if ($payment->type === 'RECEIPT') {
+                $allocationEngine->allocateCustomerReceipt($activePayments, null, $request->allocations ?? []);
+            } elseif ($payment->type === 'PAYMENT') {
+                $allocationEngine->allocateSupplierPayment($activePayments, null, $request->allocations ?? []);
             }
 
             DB::commit();
@@ -783,39 +653,9 @@ class PaymentController extends Controller implements HasMiddleware
 
         DB::beginTransaction();
         try {
-            foreach ($payment->allocations as $allocation) {
-                $bill = $allocation->bill_type === 'App\Models\Sales'
-                    ? Sales::find($allocation->bill_id)
-                    : Purchase::find($allocation->bill_id);
-
-                if ($bill) {
-                    $bill->paid_amount = max(0.0, round((float)$bill->paid_amount - (float)$allocation->amount, 2));
-                    $netPayable = max(0.0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0));
-                    $sumOfReturns = (float)$this->getTotalReturns($bill, $allocation->bill_type);
-                    $bill->remaining_amount = max(0.0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
-
-                    // Re-evaluate status based on specific model schema
-                    if ($allocation->bill_type === 'App\Models\Sales') {
-                        if ($bill->remaining_amount <= 0.001 && $bill->paid_amount > 0) {
-                            $bill->status = 'Paid';
-                        } elseif ($bill->remaining_amount > 0 && $bill->paid_amount > 0) {
-                            $bill->status = 'Partial';
-                        } else {
-                            $bill->status = 'Unpaid';
-                        }
-                    } else {
-                        // Purchase model enum: 'Completed', 'Partial Return', 'Returned', ''
-                        if ($sumOfReturns >= $netPayable) {
-                            $bill->status = 'Returned';
-                        } elseif ($sumOfReturns > 0) {
-                            $bill->status = 'Partial Return';
-                        } else {
-                            $bill->status = 'Completed';
-                        }
-                    }
-                    $bill->save();
-                }
-            }
+            // Reverse and delete all allocations (Sales, Purchases, and Opening Balance)
+            $allocationEngine = new PaymentAllocationEngine();
+            $allocationEngine->reverseAllocations($payment);
 
             // If payment has a cheque_id, sets that Chequebook record back to 'unused'
             if ($payment->cheque_id) {
@@ -843,9 +683,6 @@ class PaymentController extends Controller implements HasMiddleware
                 $creditService = new \App\Services\CustomerCreditService();
                 $creditService->cancelRefund($payment->id);
             }
-
-            // Delete payment allocations
-            PaymentAllocation::where('payment_id', $payment->id)->delete();
 
             // Clear any self-referencing foreign keys pointing to this payment
             Payment::where('source_payment_id', $payment->id)->update(['source_payment_id' => null]);
@@ -1112,7 +949,34 @@ class PaymentController extends Controller implements HasMiddleware
                 }
             }
 
-            $bills = [];
+            // Calculate Remaining Opening Balance
+            $allocationEngine = new PaymentAllocationEngine();
+            $remainingOB = $allocationEngine->getRemainingOpeningBalance($account);
+
+            $obKey = 'App\Models\Account_' . $account->id;
+            $obAllocatedAmount = 0.0;
+            if (isset($allocatedBills[$obKey])) {
+                $obAllocatedAmount = (float)$allocatedBills[$obKey]->amount;
+            }
+
+            $obRemainingAmount = round($remainingOB + $obAllocatedAmount, 2);
+            $obBill = null;
+            if ($obRemainingAmount > 0.005) {
+                $obBill = [
+                    'id' => $account->id,
+                    'type' => 'App\Models\Account',
+                    'unique_key' => 'App\Models\Account_' . $account->id,
+                    'invoice_no' => 'OPENING-BAL',
+                    'date' => $account->created_at ? $account->created_at->format('Y-m-d') : ($account->date ?? date('Y-m-d')),
+                    'net_total' => (float)$account->opening_balance,
+                    'discount_total' => 0,
+                    'return_amount' => 0,
+                    'remaining_amount' => $obRemainingAmount,
+                    'bill_type_label' => 'Opening Balance',
+                    'allocated_amount' => $obAllocatedAmount,
+                    'is_opening_balance' => true,
+                ];
+            }
 
             // Fetch Unpaid Sales (Remaining Amount > 0 OR allocated to this payment)
             $salesQuery = Sales::where('customer_id', $accountId);
@@ -1140,6 +1004,7 @@ class PaymentController extends Controller implements HasMiddleware
                     return [
                         'id' => $sale->id,
                         'type' => 'App\Models\Sales',
+                        'unique_key' => 'App\Models\Sales_' . $sale->id,
                         'invoice_no' => $sale->invoice,
                         'date' => $sale->date,
                         'net_total' => $sale->net_total,
@@ -1147,7 +1012,8 @@ class PaymentController extends Controller implements HasMiddleware
                         'return_amount' => $returnAmount,
                         'remaining_amount' => $sale->remaining_amount + $allocatedAmount,
                         'bill_type_label' => 'Sale',
-                        'allocated_amount' => $allocatedAmount
+                        'allocated_amount' => $allocatedAmount,
+                        'is_opening_balance' => false,
                     ];
                 })
                 ->toArray();
@@ -1178,6 +1044,7 @@ class PaymentController extends Controller implements HasMiddleware
                     return [
                         'id' => $purchase->id,
                         'type' => 'App\Models\Purchase',
+                        'unique_key' => 'App\Models\Purchase_' . $purchase->id,
                         'invoice_no' => $purchase->invoice,
                         'date' => $purchase->date,
                         'net_total' => $purchase->net_total,
@@ -1185,12 +1052,22 @@ class PaymentController extends Controller implements HasMiddleware
                         'return_amount' => $returnAmount,
                         'remaining_amount' => $purchase->remaining_amount + $allocatedAmount,
                         'bill_type_label' => 'Purchase',
-                        'allocated_amount' => $allocatedAmount
+                        'allocated_amount' => $allocatedAmount,
+                        'is_opening_balance' => false,
                     ];
                 })
                 ->toArray();
 
             $bills = array_merge($sales, $purchases);
+            usort($bills, function($a, $b) {
+                $dateCmp = strcmp($a['date'], $b['date']);
+                if ($dateCmp !== 0) return $dateCmp;
+                return $a['id'] <=> $b['id'];
+            });
+
+            if ($obBill) {
+                array_unshift($bills, $obBill);
+            }
 
             // Use the centralized current_balance logic from Account model
             $netLedgerBalance = (float) $account->current_balance;
@@ -1741,182 +1618,12 @@ class PaymentController extends Controller implements HasMiddleware
                 $createdPayments[] = $payment;
             }
 
-            // Distribute allocations across created payments
-            $allocationQueue = $request->allocations ?? [];
-            $paymentQueue = $createdPayments;
-
-            // Auto-FIFO: If NO explicit allocations were selected by the user, but unpaid bills exist for this party
-            $hasExplicitAllocations = !empty($allocationQueue) && collect($allocationQueue)->sum('amount') > 0;
-            if (!$hasExplicitAllocations && $request->account_id) {
-                $autoAllocations = [];
-                $remainingToAutoAllocate = collect($createdPayments)->sum('net_amount'); // Total gross settlement amount (Cash + Discount)
-
-                if ($request->type === 'RECEIPT') {
-                    // Fetch unpaid Sales invoices for Customer (oldest first - FIFO)
-                    $unpaidBills = Sales::where('customer_id', $request->account_id)
-                        ->where('remaining_amount', '>', 0)
-                        ->whereNotIn('status', ['Canceled', 'Returned'])
-                        ->orderBy('date', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
-
-                    foreach ($unpaidBills as $bill) {
-                        if ($remainingToAutoAllocate <= 0) break;
-                        $allocAmount = min($remainingToAutoAllocate, (float)$bill->remaining_amount);
-                        if ($allocAmount > 0) {
-                            $autoAllocations[] = [
-                                'bill_id'   => $bill->id,
-                                'bill_type' => 'App\Models\Sales',
-                                'amount'    => $allocAmount,
-                            ];
-                            $remainingToAutoAllocate -= $allocAmount;
-                        }
-                    }
-                } elseif ($request->type === 'PAYMENT') {
-                    // Fetch unpaid Purchase bills for Supplier (oldest first - FIFO)
-                    $unpaidBills = Purchase::where('supplier_id', $request->account_id)
-                        ->where('remaining_amount', '>', 0)
-                        ->whereNotIn('status', ['Canceled', 'Returned'])
-                        ->orderBy('date', 'asc')
-                        ->orderBy('id', 'asc')
-                        ->get();
-
-                    foreach ($unpaidBills as $bill) {
-                        if ($remainingToAutoAllocate <= 0) break;
-                        $allocAmount = min($remainingToAutoAllocate, (float)$bill->remaining_amount);
-                        if ($allocAmount > 0) {
-                            $autoAllocations[] = [
-                                'bill_id'   => $bill->id,
-                                'bill_type' => 'App\Models\Purchase',
-                                'amount'    => $allocAmount,
-                            ];
-                            $remainingToAutoAllocate -= $allocAmount;
-                        }
-                    }
-                }
-
-                if (count($autoAllocations) > 0) {
-                    $allocationQueue = $autoAllocations;
-                }
-            }
-
-            // Pass 1: Allocate PHYSICAL CASH first across all created payments
-            foreach ($paymentQueue as $payment) {
-                if (count($allocationQueue) <= 0) break;
-                $cashRemaining = (float)$payment->amount;
-
-                while ($cashRemaining > 0.001 && count($allocationQueue) > 0) {
-                    $allocIdx = array_key_first($allocationQueue);
-                    $alloc = &$allocationQueue[$allocIdx];
-
-                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
-                        ? Sales::find($alloc['bill_id'])
-                        : Purchase::find($alloc['bill_id']);
-
-                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
-                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
-                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
-
-                    if ($billRem <= 0.001) {
-                        array_shift($allocationQueue);
-                        continue;
-                    }
-
-                    $canAllocate = round(min($cashRemaining, $alloc['amount'], $billRem), 2);
-
-                    if ($canAllocate > 0.001) {
-                        PaymentAllocation::create([
-                            'payment_id' => $payment->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['bill_type'],
-                            'amount' => $canAllocate,
-                        ]);
-
-                        if ($bill) {
-                            $bill->paid_amount      += $canAllocate;
-                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
-
-                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
-                            if ($bill->remaining_amount <= 0.001) {
-                                $bill->remaining_amount = 0;
-                                $bill->status = $isSale ? 'Paid' : 'Completed';
-                            } elseif ($bill->paid_amount > 0) {
-                                $bill->status = $isSale ? 'Partial' : 'Completed';
-                            } else {
-                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
-                            }
-
-                            $bill->save();
-                        }
-
-                        $cashRemaining -= $canAllocate;
-                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
-                    }
-
-                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
-                        array_shift($allocationQueue);
-                    }
-                }
-            }
-
-            // Pass 2: Allocate DISCOUNT next if allocation queue still has unpaid debt and payments have available discount
-            foreach ($paymentQueue as $payment) {
-                if (count($allocationQueue) <= 0) break;
-                $currentAllocated = (float)$payment->allocations()->sum('amount');
-                $discountRemaining = max(0.0, (float)$payment->net_amount - $currentAllocated);
-
-                while ($discountRemaining > 0.001 && count($allocationQueue) > 0) {
-                    $allocIdx = array_key_first($allocationQueue);
-                    $alloc = &$allocationQueue[$allocIdx];
-
-                    $bill = ($alloc['bill_type'] === 'App\Models\Sales')
-                        ? Sales::find($alloc['bill_id'])
-                        : Purchase::find($alloc['bill_id']);
-
-                    $netPayable = $bill ? max(0, (float)$bill->net_total - (float)($bill->extra_discount ?? 0)) : 0;
-                    $sumOfReturns = $bill ? $this->getTotalReturns($bill, $alloc['bill_type']) : 0;
-                    $billRem = $bill ? max(0, $netPayable - (float)$bill->paid_amount - $sumOfReturns) : 0;
-
-                    if ($billRem <= 0.001) {
-                        array_shift($allocationQueue);
-                        continue;
-                    }
-
-                    $canAllocate = round(min($discountRemaining, $alloc['amount'], $billRem), 2);
-
-                    if ($canAllocate > 0.001) {
-                        PaymentAllocation::create([
-                            'payment_id' => $payment->id,
-                            'bill_id' => $alloc['bill_id'],
-                            'bill_type' => $alloc['bill_type'],
-                            'amount' => $canAllocate,
-                        ]);
-
-                        if ($bill) {
-                            $bill->paid_amount      += $canAllocate;
-                            $bill->remaining_amount = max(0, round($netPayable - $bill->paid_amount - $sumOfReturns, 2));
-
-                            $isSale = ($alloc['bill_type'] === 'App\Models\Sales');
-                            if ($bill->remaining_amount <= 0.001) {
-                                $bill->remaining_amount = 0;
-                                $bill->status = $isSale ? 'Paid' : 'Completed';
-                            } elseif ($bill->paid_amount > 0) {
-                                $bill->status = $isSale ? 'Partial' : 'Completed';
-                            } else {
-                                $bill->status = $isSale ? 'Unpaid' : 'Completed';
-                            }
-
-                            $bill->save();
-                        }
-
-                        $discountRemaining -= $canAllocate;
-                        $allocationQueue[$allocIdx]['amount'] -= $canAllocate;
-                    }
-
-                    if ($allocationQueue[$allocIdx]['amount'] <= 0.001 || ($bill && $bill->remaining_amount <= 0.001)) {
-                        array_shift($allocationQueue);
-                    }
-                }
+            // Distribute allocations across created payments using PaymentAllocationEngine (Opening Balance First + FIFO / Mode B)
+            $allocationEngine = new PaymentAllocationEngine();
+            if ($request->type === 'RECEIPT') {
+                $allocationEngine->allocateCustomerReceipt($createdPayments, null, $request->allocations ?? []);
+            } elseif ($request->type === 'PAYMENT') {
+                $allocationEngine->allocateSupplierPayment($createdPayments, null, $request->allocations ?? []);
             }
 
             $savedPaymentsDetails = collect($createdPayments)->map(function ($p) {

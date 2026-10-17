@@ -1420,6 +1420,7 @@ class ReportBuilder
         PaymentAccountingService::attachBulkBalances($accounts);
 
         $finalData = [];
+        $allocationEngine = new PaymentAllocationEngine();
 
         foreach ($accounts as $partyId => $account) {
             $partyBills = $groupedBills->get($partyId, collect());
@@ -1427,11 +1428,12 @@ class ReportBuilder
             $currentBal = (float)$account->current_balance;
             $signedOB = (float)$account->getSignedOpeningBalance();
 
-            // Compute remaining unpaid opening balance for customer
+            // Compute remaining unpaid opening balance for customer using PaymentAllocationEngine
             $excessOverBills = round($currentBal - $billsRemaining, 2);
             $remainingOB = 0.0;
             if ($signedOB > 0) {
-                $remainingOB = min($signedOB, max(0.0, $excessOverBills));
+                $engineRemOB = $allocationEngine->getRemainingOpeningBalance($account, $toDate);
+                $remainingOB = min($engineRemOB, max(0.0, $excessOverBills));
             } elseif ($signedOB < 0) {
                 $remainingOB = max($signedOB, min(0.0, $excessOverBills));
             }
@@ -1542,8 +1544,14 @@ class ReportBuilder
                 }
                 return strtotime($a['date']) - strtotime($b['date']);
             }
-            return $cmp;
         });
+
+        // Ensure is_last_for_customer is set accurately after sort
+        $totalRows = count($finalData);
+        for ($i = 0; $i < $totalRows; $i++) {
+            $isLast = ($i === $totalRows - 1) || ($finalData[$i]['customer_id'] !== $finalData[$i + 1]['customer_id']);
+            $finalData[$i]['is_last_for_customer'] = $isLast;
+        }
 
         return collect($finalData);
     }
@@ -2079,6 +2087,7 @@ class ReportBuilder
         PaymentAccountingService::attachBulkBalances($accounts);
 
         $finalData = [];
+        $allocationEngine = new PaymentAllocationEngine();
 
         foreach ($accounts as $partyId => $account) {
             $partyBills = $groupedBills->get($partyId, collect());
@@ -2086,12 +2095,13 @@ class ReportBuilder
             $currentBal = (float)$account->current_balance;
             $signedOB = (float)$account->getSignedOpeningBalance();
 
-            // Compute remaining unpaid opening balance for supplier
+            // Compute remaining unpaid opening balance for supplier using PaymentAllocationEngine
             $excessOverBills = round($currentBal - $billsRemaining, 2);
             $remainingOB = 0.0;
             if ($signedOB > 0) {
                 // Normal supplier payable (CR)
-                $remainingOB = min($signedOB, max(0.0, $excessOverBills));
+                $engineRemOB = $allocationEngine->getRemainingOpeningBalance($account, $toDate);
+                $remainingOB = min($engineRemOB, max(0.0, $excessOverBills));
             } elseif ($signedOB < 0) {
                 // Advance paid to supplier (DR)
                 $remainingOB = max($signedOB, min(0.0, $excessOverBills));

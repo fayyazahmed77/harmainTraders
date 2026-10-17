@@ -96,6 +96,8 @@ interface Invoice {
     net_total: number;
     remaining_amount: number;
     status: string;
+    is_fully_returned?: boolean;
+    returnable_pcs?: number;
 }
 
 interface Props {
@@ -875,6 +877,10 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         router.post("/sales-return", payload, {
             onSuccess: (page) => {
                 setIsSaving(false);
+                const flashError = (page.props as any)?.flash?.error;
+                if (flashError) {
+                    return;
+                }
                 const id = (page.props as any).id || (page.props as any).flash?.id;
                 
                 setSuccessData({
@@ -1711,28 +1717,28 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                         <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest animate-pulse">Scanning Cloud Repository...</div>
                                     </div>
                                 ) : filteredInvoices.map((inv, idx) => {
-                                    const isFullyReturned = inv.status === 'Returned';
-                                    const isPartialReturn = inv.status === 'Partial Return';
+                                    const isFullyReturned = inv.status === 'Returned' || !!inv.is_fully_returned || inv.returnable_pcs === 0;
+                                    const isPartialReturn = !isFullyReturned && (inv.status === 'Partial Return' || (inv.returnable_pcs !== undefined && inv.returnable_pcs > 0));
                                     return (
                                     <motion.button key={inv.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
                                         disabled={isFullyReturned}
                                         className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group border transition-all ${
                                             isFullyReturned 
-                                                ? 'bg-zinc-100/50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800 opacity-60 cursor-not-allowed'
-                                                : 'bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-zinc-800 hover:border-orange-500 active:scale-[0.99]'
+                                                ? 'bg-zinc-100/70 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed pointer-events-none'
+                                                : 'bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-zinc-800 hover:border-orange-500 active:scale-[0.99] cursor-pointer'
                                         } ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0`}
                                         onClick={() => !isFullyReturned && handleSelectInvoice(inv)}>
                                         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
                                             <div className="flex justify-between md:block items-center">
                                                 <div className="space-y-1">
                                                     <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none">ID#</div>
-                                                    <div className={`text-lg font-black group-hover:text-orange-500 transition-colors tracking-tighter ${
-                                                        isFullyReturned ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white'
+                                                    <div className={`text-lg font-black tracking-tighter ${
+                                                        isFullyReturned ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white group-hover:text-orange-500 transition-colors'
                                                     }`}>{inv.invoice}</div>
                                                 </div>
                                                 <div className="md:hidden">
                                                     <SignalBadge 
-                                                        text={isFullyReturned ? 'Full Return' : isPartialReturn ? 'Partial Return' : inv.status} 
+                                                        text={isFullyReturned ? 'Returned' : isPartialReturn ? 'Partial Return' : inv.status} 
                                                         type={isFullyReturned ? 'red' : isPartialReturn ? 'orange' : inv.status === 'Completed' ? 'green' : 'blue'} 
                                                     />
                                                 </div>
@@ -1745,7 +1751,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                                 </div>
                                                 <div className="hidden md:block">
                                                     <SignalBadge 
-                                                        text={isFullyReturned ? 'Full Return' : isPartialReturn ? 'Partial Return' : inv.status} 
+                                                        text={isFullyReturned ? 'Returned' : isPartialReturn ? 'Partial Return' : inv.status} 
                                                         type={isFullyReturned ? 'red' : isPartialReturn ? 'orange' : inv.status === 'Completed' ? 'green' : 'blue'} 
                                                     />
                                                 </div>
@@ -1759,9 +1765,13 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                                             </div>
                                             <div className="space-y-1 text-right min-w-[100px] md:min-w-[120px]">
                                                 <div className="text-[10px] font-black text-orange-600 dark:text-orange-500 uppercase tracking-widest leading-none">Outstanding</div>
-                                                <div className="text-lg md:text-xl font-black text-orange-600 dark:text-orange-500 leading-none tracking-tighter">Rs {toNum(inv.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+                                                <div className={`text-lg md:text-xl font-black leading-none tracking-tighter ${isFullyReturned ? 'text-zinc-400 line-through' : 'text-orange-600 dark:text-orange-500'}`}>Rs {toNum(inv.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
                                             </div>
-                                            <ChevronRight size={18} className="text-zinc-300 dark:text-zinc-700 group-hover:text-orange-500 transition-colors hidden md:block" />
+                                            {!isFullyReturned ? (
+                                                <ChevronRight size={18} className="text-zinc-300 dark:text-zinc-700 group-hover:text-orange-500 transition-colors hidden md:block" />
+                                            ) : (
+                                                <span className="text-[10px] font-black uppercase text-red-500 bg-red-500/10 px-2.5 py-1 rounded-md tracking-wider hidden md:block border border-red-500/20">Returned</span>
+                                            )}
                                         </div>
                                     </motion.button>
                                     );

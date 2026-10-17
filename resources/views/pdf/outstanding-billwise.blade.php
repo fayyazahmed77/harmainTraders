@@ -10,286 +10,563 @@ if (file_exists($logo_path)) {
     $logo_type = pathinfo($logo_path, PATHINFO_EXTENSION);
     $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_data);
 }
+
+$globalReceivable = (float)collect($data)->filter(fn($i) => ($i['bill_type'] ?? '') === 'receivable')->sum('remaining');
+$globalPayable = (float)collect($data)->filter(fn($i) => ($i['bill_type'] ?? '') === 'payable')->sum('remaining');
+$globalTotalRemaining = (float)collect($data)->sum('remaining');
+$globalTotalBilled = (float)collect($data)->sum('bill_amt');
+$globalTotalPaid = (float)collect($data)->sum('paid');
+
+$groupedData = collect($data)->groupBy('party_id');
+
+function formatNum($num) {
+    if ($num === 0 || $num === 0.0 || $num == null) return '-';
+    return number_format((float)$num, 2);
+}
 @endphp
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Unified Outstanding Bill Wise Report</title>
+    <title>Outstanding Bill-Wise Statement - {{ $account ? $account->title : 'Consolidated' }}</title>
     <style>
+        @page {
+            size: A4 portrait;
+            margin: 7mm 7mm 8mm 7mm;
+        }
+        
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
         body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            font-size: 9px;
-            color: #000;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 8.5px;
+            color: #000000;
+            background-color: #ffffff;
             margin: 0;
             padding: 0;
+            line-height: 1.25;
         }
+
         .text-center { text-align: center; }
         .text-right { text-align: right; }
+        .text-left { text-align: left; }
         .font-bold { font-weight: bold; }
-        
-        .header {
-            margin-bottom: 20px;
+        .uppercase { text-transform: uppercase; }
+
+        /* Document Header */
+        .header-container {
+            width: 100%;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
         }
-        .report-title {
-            font-size: 15px;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #1e3a8a;
-            text-transform: uppercase;
+        
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .header-table td {
+            vertical-align: middle;
+            padding: 0;
         }
 
-        .logo-section {
-            display: inline-block;
+        .company-name {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: #000000;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .company-tagline {
+            font-size: 8.5px;
+            color: #333333;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .report-main-title {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #000000;
+            text-align: right;
+            line-height: 1.2;
+        }
+
+        .report-sub-title {
+            font-size: 8.5px;
+            font-weight: 600;
+            color: #444444;
+            text-align: right;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Metadata Strip */
+        .meta-strip {
+            width: 100%;
+            border: 1px solid #000000;
+            border-collapse: collapse;
             margin-bottom: 10px;
+            background-color: #f8f9fa;
         }
-        .brand-name {
-            font-size: 26px;
-            font-weight: bold;
-            color: #1e40af;
-            line-height: 1;
-        }
-        .brand-tagline {
-            font-size: 10px;
-            color: #334155;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-top: 4px;
-            font-weight: bold;
-        }
-        
-        .criteria-text {
-            font-size: 9px;
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #f1f5f9;
-            border-bottom: 2px solid #334155;
-            color: #334155;
-        }
-        
-        table.ledger {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #334155;
-        }
-        table.ledger th, table.ledger td {
-            border: 1px solid #94a3b8;
-            padding: 6px 4px;
-        }
-        table.ledger th {
-            background-color: #0f172a;
-            color: #ffffff;
-            font-weight: bold;
-            text-align: center;
-            text-transform: uppercase;
-            font-size: 8px;
-            border: 1px solid #0f172a;
-        }
-        
-        table.ledger tr:nth-child(even) {
-            background-color: #f8fafc;
-        }
-        
-        .type-badge {
-            display: inline-block;
-            padding: 1px 4px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 7px;
-            text-transform: uppercase;
-        }
-        .type-rec { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        .type-pay { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 
-        table.summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 25px;
-            border: 1px solid #334155;
-            border-top: none;
+        .meta-strip td {
+            padding: 4px 6px;
+            font-size: 8.5px;
+            border-right: 1px solid #cccccc;
         }
-        table.summary-table td {
-            padding: 8px 10px;
+        
+        .meta-strip td:last-child {
+            border-right: none;
+        }
+
+        .meta-label {
             font-weight: bold;
-            border: 1px solid #94a3b8;
-        }
-        .summary-label {
-            color: #1e293b;
+            color: #333333;
             text-transform: uppercase;
             font-size: 7.5px;
-            background-color: #f1f5f9;
-        }
-        .summary-value {
-            color: #0f172a;
-            font-size: 10px;
+            margin-bottom: 1px;
         }
 
-        .net-footer {
-            margin-top: 30px;
-            background-color: #0f172a;
-            color: #fff;
-            padding: 20px;
-            border-radius: 8px;
+        .meta-value {
+            font-weight: bold;
+            color: #000000;
+            font-size: 9px;
         }
-        .net-grid {
-            width: 100%;
-        }
-        .net-grid td { vertical-align: top; }
-        .stat-label { font-size: 8px; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-        .stat-value { font-size: 14px; font-weight: bold; }
 
-        .party-group {
+        /* Ledger Table */
+        .party-section {
             margin-bottom: 15px;
             page-break-inside: avoid;
+        }
+
+        table.ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000000;
+        }
+
+        table.ledger-table thead {
+            display: table-header-group;
+        }
+
+        table.ledger-table tr {
+            page-break-inside: avoid;
+        }
+
+        table.ledger-table th {
+            background-color: #f0f0f0;
+            color: #000000;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 8px;
+            padding: 5px 4px;
+            border: 1px solid #000000;
+            letter-spacing: 0.3px;
+        }
+
+        table.ledger-table td {
+            border: 1px solid #b0b0b0;
+            padding: 4px 4px;
+            font-size: 8.5px;
+            vertical-align: middle;
+        }
+
+        table.ledger-table tbody tr:nth-child(even) {
+            background-color: #fbfbfb;
+        }
+
+        .type-badge-bw {
+            display: inline-block;
+            border: 1px solid #000000;
+            padding: 1px 4px;
+            font-weight: bold;
+            font-size: 7px;
+            background-color: #ffffff;
+            color: #000000;
+            text-transform: uppercase;
+            border-radius: 2px;
+        }
+
+        /* Party Subtotal / Summary Bar */
+        table.party-summary-bar {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000000;
+            border-top: none;
+            background-color: #f4f4f4;
+            margin-bottom: 12px;
+        }
+
+        table.party-summary-bar td {
+            padding: 5px 6px;
+            border: 1px solid #999999;
+            font-size: 8.5px;
+        }
+
+        .summary-bar-label {
+            font-size: 7.5px;
+            font-weight: bold;
+            color: #333333;
+            text-transform: uppercase;
+            background-color: #e8e8e8;
+        }
+
+        .summary-bar-val {
+            font-weight: bold;
+            color: #000000;
+            font-size: 9px;
+        }
+
+        /* Grand Total Statement Summary */
+        .grand-summary-container {
+            width: 100%;
+            margin-top: 10px;
+            page-break-inside: avoid;
+        }
+
+        table.grand-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1.5px solid #000000;
+            background-color: #ffffff;
+        }
+
+        table.grand-summary-table th {
+            background-color: #f0f0f0;
+            border: 1px solid #000000;
+            padding: 5px 8px;
+            font-size: 8.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #000000;
+        }
+
+        table.grand-summary-table td {
+            border: 1px solid #000000;
+            padding: 6px 8px;
+            font-size: 9px;
+            vertical-align: middle;
+        }
+
+        .double-underline {
+            border-top: 1px solid #000000;
+            border-bottom: 3px double #000000;
+            padding-top: 2px;
+            padding-bottom: 2px;
+        }
+
+        /* Signatures block */
+        .signatures-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            page-break-inside: avoid;
+        }
+
+        .signatures-table td {
+            padding: 0 15px;
+            vertical-align: bottom;
+            text-align: center;
+        }
+
+        .sig-line {
+            border-top: 1px solid #000000;
+            margin-top: 25px;
+            padding-top: 4px;
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #222222;
+        }
+
+        /* Print Fixed Footer */
+        .doc-footer {
+            margin-top: 15px;
+            padding-top: 4px;
+            border-top: 1px solid #666666;
+            font-size: 7.5px;
+            color: #444444;
+            width: 100%;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0; padding: 0; }
         }
     </style>
 </head>
 <body>
 
-    @php
-       $globalReceivable = collect($data)->filter(fn($i) => $i['bill_type'] === 'receivable')->sum('remaining');
-       $globalPayable = collect($data)->filter(fn($i) => $i['bill_type'] === 'payable')->sum('remaining');
-       
-       $groupedData = collect($data)->groupBy('party_id');
-
-       function formatNum($num) {
-           if ($num == 0 || $num == null) return '-';
-           return number_format($num, 2);
-       }
-    @endphp
-
-    <div class="header text-center">
-        <div class="logo-section">
-            <div class="brand-text">
-                <div class="brand-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
-                <div class="brand-tagline">Financial Portfolio Intelligence</div>
-            </div>
-        </div>
-        
-        <div class="report-title">Unified Deep Analysis: Outstanding Bill Wise</div>
-
-        <div class="criteria-text">
-            <table width="100%">
-                <tr>
-                    <td width="33%" align="left"><strong>AS ON:</strong> {{ date('d-M-Y', strtotime($to_date)) }}</td>
-                    <td width="33%" align="center"><strong>CONSOLIDATED REPORT</strong></td>
-                    <td width="33%" align="right"><strong>ACC:</strong> {{ $account ? strtoupper($account->title) : 'ALL UNITS' }}</td>
-                </tr>
-            </table>
-        </div>
+    <!-- Top Header -->
+    <div class="header-container">
+        <table class="header-table">
+            <tr>
+                <td width="55%">
+                    <div class="company-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
+                    <div class="company-tagline">
+                        {{ $firm->address ?? 'Wholesale & Supply Chain Distribution ERP' }}
+                        @if(!empty($firm->phone)) | Tel: {{ $firm->phone }} @endif
+                    </div>
+                </td>
+                <td width="45%" align="right">
+                    <div class="report-main-title">Outstanding Bill-Wise Statement</div>
+                    <div class="report-sub-title">Financial Portfolio &amp; Bill Aging Audit</div>
+                </td>
+            </tr>
+        </table>
     </div>
 
+    <!-- Metadata Strip -->
+    <table class="meta-strip">
+        <tr>
+            <td width="30%">
+                <div class="meta-label">Party / Account Title</div>
+                <div class="meta-value">{{ $account ? strtoupper($account->title) : 'ALL PARTIES (CONSOLIDATED)' }}</div>
+            </td>
+            <td width="15%">
+                <div class="meta-label">Account Code / ID</div>
+                <div class="meta-value">{{ $account ? ($account->code ?? 'ACC-' . $account->id) : 'ALL' }}</div>
+            </td>
+            <td width="20%">
+                <div class="meta-label">Statement As On</div>
+                <div class="meta-value">{{ date('d-M-Y', strtotime($to_date)) }}</div>
+            </td>
+            <td width="20%">
+                <div class="meta-label">Date Filter Period</div>
+                <div class="meta-value">{{ date('d-M-Y', strtotime($from_date)) }} to {{ date('d-M-Y', strtotime($to_date)) }}</div>
+            </td>
+            <td width="15%">
+                <div class="meta-label">Classification</div>
+                <div class="meta-value">
+                    @if($account)
+                        {{ ($account->purchase || in_array($account->type, [4, 6])) ? 'Supplier (Payable)' : 'Customer (Receivable)' }}
+                    @else
+                        Consolidated
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Ledger Tables Grouped by Party -->
     @foreach($groupedData as $partyId => $bills)
         @php
             $lastBill = collect($bills)->last();
-            $summary = $lastBill['party_summary'] ?? ['party_un_due_amount' => 0, 'party_due_amount' => 0, 'credit_days' => 0, 'credit_limit' => 0, 'party_type' => 'receivable'];
-            $partyName = $lastBill['party_name'] ?? 'Unknown';
-            $isRec = $summary['party_type'] === 'receivable';
+            $summary = $lastBill['party_summary'] ?? [
+                'party_un_due_amount' => 0, 
+                'party_due_amount' => 0, 
+                'credit_days' => 0, 
+                'credit_limit' => 0, 
+                'party_type' => 'payable'
+            ];
+            $partyName = $lastBill['party_name'] ?? 'Unknown Party';
+            $isRec = ($summary['party_type'] ?? '') === 'receivable';
+            $partyTotalRemaining = (float)collect($bills)->sum('remaining');
+            $partyTotalBilled = (float)collect($bills)->sum('bill_amt');
+            $partyTotalPaid = (float)collect($bills)->sum('paid');
         @endphp
 
-        <div class="party-group">
-            <table class="ledger">
+        <div class="party-section">
+            <table class="ledger-table">
                 <thead>
                     <tr>
-                        <th width="8%">Date</th>
-                        <th width="10%">Voucher #</th>
-                        <th width="5%">Type</th>
-                        <th width="32%">Party/Account Name</th>
-                        <th width="10%">Due Date</th>
-                        <th width="7%">Aging</th>
-                        <th width="9%">Bill Amt</th>
-                        <th width="9%">Paid</th>
-                        <th width="10%">Remaining</th>
+                        <th width="9%" class="text-center">Date</th>
+                        <th width="13%" class="text-center">Voucher #</th>
+                        <th width="6%" class="text-center">Type</th>
+                        <th width="22%" class="text-left">Party / Account Name</th>
+                        <th width="9%" class="text-center">Due Date</th>
+                        <th width="11%" class="text-center">Aging / Status</th>
+                        <th width="10%" class="text-right">Bill Amt (Rs.)</th>
+                        <th width="10%" class="text-right">Paid (Rs.)</th>
+                        <th width="10%" class="text-right">Remaining (Rs.)</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($bills as $bill)
                         @php
-                            $agingColor = $bill['days'] > 0 ? '#b91c1c' : '#059669';
-                            $agingWeight = $bill['days'] > 0 ? 'font-bold' : '';
+                            $isOB = !empty($bill['is_opening_balance']) || str_starts_with($bill['voucher_no'] ?? '', 'OPENING-BAL');
+                            $daysVal = (int)($bill['days'] ?? 0);
+                            
+                            // Clear, unambiguous aging representation
+                            if ($daysVal > 0) {
+                                $agingText = $daysVal . 'd Overdue';
+                            } elseif ($daysVal === 0) {
+                                $agingText = 'Due Today';
+                            } else {
+                                $agingText = abs($daysVal) . 'd Left';
+                            }
+
+                            $billTypeLabel = strtoupper($bill['bill_type'] ?? '');
+                            if ($isOB) {
+                                if (str_contains($bill['voucher_no'] ?? '', 'DR') || ($bill['remaining'] ?? 0) < 0) {
+                                    $typeBadge = 'ADV (DR)';
+                                } else {
+                                    $typeBadge = 'OB (CR)';
+                                }
+                            } else {
+                                $typeBadge = $billTypeLabel === 'RECEIVABLE' ? 'REC' : 'PAY';
+                            }
                         @endphp
-                    <tr>
-                        <td class="text-center">{{ !empty($bill['date']) ? date('d-M-y', strtotime($bill['date'])) : '-' }}</td>
-                        <td class="text-center font-bold">
-                            @if(!empty($bill['is_opening_balance']) || str_starts_with($bill['voucher_no'] ?? '', 'OPENING-BAL'))
-                                @if(str_contains($bill['voucher_no'] ?? '', 'DR') || ($bill['remaining'] ?? 0) < 0)
-                                    <span style="color: #059669; font-weight: bold;">{{ $bill['voucher_no'] }}</span>
-                                @else
-                                    <span style="color: #b45309; font-weight: bold;">{{ $bill['voucher_no'] }}</span>
-                                @endif
-                            @else
+                        <tr>
+                            <td class="text-center">
+                                {{ !empty($bill['date']) ? date('d-M-y', strtotime($bill['date'])) : '-' }}
+                            </td>
+                            <td class="text-center font-bold">
                                 {{ $bill['voucher_no'] }}
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            @if(!empty($bill['is_opening_balance']) && (str_contains($bill['voucher_no'] ?? '', 'DR') || ($bill['remaining'] ?? 0) < 0))
-                                <span class="type-badge" style="background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;">
-                                    ADV
-                                </span>
-                            @else
-                                <span class="type-badge {{ $bill['bill_type'] === 'receivable' ? 'type-rec' : 'type-pay' }}">
-                                    {{ $bill['bill_type'] === 'receivable' ? 'REC' : 'PAY' }}
-                                </span>
-                            @endif
-                        </td>
-                        <td class="font-bold">{{ $bill['party_name'] }}</td>
-                        <td class="text-center">{{ !empty($bill['due_date']) ? date('d-M-y', strtotime($bill['due_date'])) : '-' }}</td>
-                        <td class="text-center {{ $agingWeight }}" style="color: {{ $agingColor }};">
-                            {{ $bill['days'] > 0 ? $bill['days'].' d' : abs($bill['days']).' l' }}
-                        </td>
-                        <td class="text-right" style="{{ ($bill['bill_amt'] ?? 0) < 0 ? 'color: #059669;' : '' }}">{{ formatNum($bill['bill_amt']) }}</td>
-                        <td class="text-right">{{ formatNum($bill['paid']) }}</td>
-                        <td class="text-right font-bold" style="{{ ($bill['remaining'] ?? 0) < 0 ? 'color: #059669;' : '' }}">{{ formatNum($bill['remaining']) }}</td>
-                    </tr>
+                            </td>
+                            <td class="text-center">
+                                <span class="type-badge-bw">{{ $typeBadge }}</span>
+                            </td>
+                            <td class="text-left font-bold">
+                                {{ $bill['party_name'] }}
+                            </td>
+                            <td class="text-center">
+                                {{ !empty($bill['due_date']) ? date('d-M-y', strtotime($bill['due_date'])) : '-' }}
+                            </td>
+                            <td class="text-center font-bold">
+                                {{ $agingText }}
+                            </td>
+                            <td class="text-right">
+                                {{ formatNum($bill['bill_amt']) }}
+                            </td>
+                            <td class="text-right">
+                                {{ formatNum($bill['paid']) }}
+                            </td>
+                            <td class="text-right font-bold">
+                                {{ formatNum($bill['remaining']) }}
+                            </td>
+                        </tr>
                     @endforeach
                 </tbody>
             </table>
 
-            <table class="summary-table">
+            <!-- Party Summary Bar -->
+            <table class="party-summary-bar">
                 <tr>
-                    <td width="15%" class="summary-label">UN DUE</td>
-                    <td width="15%" class="summary-value">{{ formatNum($summary['party_un_due_amount']) }}</td>
-                    <td width="15%" class="summary-label" style="color: #b91c1c;">DUE AMOUNT</td>
-                    <td width="15%" class="summary-value" style="color: #b91c1c;">{{ formatNum($summary['party_due_amount']) }}</td>
-                    <td width="10%" class="summary-label text-right">DAYS</td>
-                    <td width="5%" class="summary-value text-right">{{ $summary['credit_days'] }}</td>
-                    <td width="12%" class="summary-label text-right">LIMIT</td>
-                    <td width="13%" class="summary-value text-right">**********</td>
+                    <td width="13%" class="summary-bar-label text-center">Un-Due Amount</td>
+                    <td width="13%" class="summary-bar-val text-right">{{ formatNum($summary['party_un_due_amount']) }}</td>
+                    
+                    <td width="13%" class="summary-bar-label text-center">Overdue Amount</td>
+                    <td width="13%" class="summary-bar-val text-right">{{ formatNum($summary['party_due_amount']) }}</td>
+                    
+                    <td width="10%" class="summary-bar-label text-center">Credit Days</td>
+                    <td width="8%" class="summary-bar-val text-center">{{ $summary['credit_days'] }} Days</td>
+                    
+                    <td width="10%" class="summary-bar-label text-center">Credit Limit</td>
+                    <td width="10%" class="summary-bar-val text-center">
+                        @if(!empty($summary['credit_limit']) && (float)$summary['credit_limit'] > 0 && (float)$summary['credit_limit'] < 90000000)
+                            Rs. {{ number_format((float)$summary['credit_limit'], 0) }}
+                        @else
+                            No Limit
+                        @endif
+                    </td>
+                    
+                    <td width="10%" class="summary-bar-label text-center" style="background-color: #dedede;">Total Balance</td>
+                    <td width="10%" class="summary-bar-val text-right double-underline" style="background-color: #f0f0f0;">
+                        Rs. {{ formatNum($partyTotalRemaining) }}
+                    </td>
                 </tr>
             </table>
         </div>
     @endforeach
 
+    <!-- Grand Statement Summary Table -->
     @if(count($groupedData) > 0)
-    <div class="net-footer">
-        <table class="net-grid">
-            <tr>
-                <td width="50%">
-                    <div class="stat-label">Total Outbound Payables</div>
-                    <div class="stat-value">Rs. {{ number_format($globalPayable, 2) }}</div>
-                </td>
-                <td width="50%" align="right">
-                    <div class="stat-label" style="color: #818cf8;">Total Outstanding Balance</div>
-                    <div class="stat-value" style="font-size: 20px; color: #f87171;">
-                        Rs. {{ number_format($globalPayable, 2) }}
-                    </div>
-                </td>
-            </tr>
+    <div class="grand-summary-container">
+        <table class="grand-summary-table">
+            <thead>
+                <tr>
+                    <th width="25%" class="text-center">Total Invoices / Bills</th>
+                    <th width="25%" class="text-right">Total Billed Amount</th>
+                    <th width="25%" class="text-right">Total Amount Settled</th>
+                    <th width="25%" class="text-right">Net Total Outstanding</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center font-bold">
+                        {{ count($data) }} Record(s) across {{ count($groupedData) }} Account(s)
+                    </td>
+                    <td class="text-right font-bold">
+                        Rs. {{ number_format($globalTotalBilled, 2) }}
+                    </td>
+                    <td class="text-right font-bold">
+                        Rs. {{ number_format($globalTotalPaid, 2) }}
+                    </td>
+                    <td class="text-right font-bold" style="font-size: 11px;">
+                        <span class="double-underline">
+                            Rs. {{ number_format($globalTotalRemaining, 2) }}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="4" class="text-left" style="background-color: #fafafa; font-size: 8px;">
+                        <strong>Portfolio Position:</strong>
+                        @if($globalPayable > 0.005 && $globalReceivable > 0.005)
+                            Total Outbound Payables: <strong>Rs. {{ number_format($globalPayable, 2) }}</strong> &nbsp;|&nbsp; 
+                            Total Inbound Receivables: <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong> &nbsp;|&nbsp; 
+                            Net Balance: <strong>Rs. {{ number_format(abs($globalReceivable - $globalPayable), 2) }} {{ $globalReceivable >= $globalPayable ? '(Receivable)' : '(Payable)' }}</strong>
+                        @elseif($globalPayable > 0.005)
+                            Total Outbound Payables (Obligations to Suppliers): <strong>Rs. {{ number_format($globalPayable, 2) }}</strong>
+                        @elseif($globalReceivable > 0.005)
+                            Total Inbound Receivables (Claims from Customers): <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong>
+                        @else
+                            Account is fully reconciled. Zero outstanding balance.
+                        @endif
+                    </td>
+                </tr>
+            </tbody>
         </table>
     </div>
+
+    <!-- Official Signatures Block -->
+    <table class="signatures-table">
+        <tr>
+            <td width="25%">
+                <div class="sig-line">Prepared By</div>
+            </td>
+            <td width="25%">
+                <div class="sig-line">Checked &amp; Audited By</div>
+            </td>
+            <td width="25%">
+                <div class="sig-line">Accounts Manager</div>
+            </td>
+            <td width="25%">
+                <div class="sig-line">Party Acknowledgment</div>
+            </td>
+        </tr>
+    </table>
     @endif
 
-    <div style="position: fixed; bottom: -20px; width: 100%; border-top: 1px solid #e2e8f0; padding-top: 5px;">
-        <table width="100%" style="font-size: 7px; color: #64748b;">
+    <!-- Document Footer -->
+    <div class="doc-footer">
+        <table width="100%">
             <tr>
-                <td width="33%">Ref: Outstanding Unified Analysis | {{ date('d-M-Y H:i') }}</td>
-                <td width="33%" align="center">Harnain Financial OS v4.0</td>
-                <td width="33%" align="right">Page 1 of 1</td>
+                <td width="40%" class="text-left">
+                    Haramain Traders ERP &bull; Official Outstanding Bill-Wise Audit Statement
+                </td>
+                <td width="30%" class="text-center">
+                    Printed On: {{ date('d-M-Y \a\t h:i A') }}
+                </td>
+                <td width="30%" class="text-right">
+                    Confidential Financial Document
+                </td>
             </tr>
         </table>
     </div>
 
-    @if(isset($is_print_mode) && $is_print_mode)
+    @if(!empty($is_print_mode))
     <script>
         window.onload = function() {
             window.print();

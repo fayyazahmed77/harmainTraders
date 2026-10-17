@@ -253,6 +253,9 @@ class SalesReturnController extends Controller implements HasMiddleware
             // Log activity
             \App\Services\ActivityLogger::log('created', 'Sales Return', "Created sales return {$finalInvoice} for customer ID {$request->customer_id}");
 
+            // Recalculate status and balance of the source invoice
+            $this->updateSaleStatusAndBalance($sale->invoice, $sale->id);
+
             DB::commit();
             return redirect()->back()->with('success', 'Sales Return saved successfully!')->with('id', $return->id);
         } catch (\Exception $e) {
@@ -272,14 +275,27 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ->unique('invoice')
                 ->values()
                 ->map(function ($sale) {
+                    $totalSoldPcs = (float) \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+                    $allReturnIds = SalesReturn::where('sale_id', $sale->id)
+                        ->orWhere('original_invoice', $sale->invoice)
+                        ->pluck('id');
+                    $totalReturnedPcs = (float) \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+
+                    $isFullyReturned = ($totalSoldPcs > 0 && $totalReturnedPcs >= $totalSoldPcs) || $sale->status === 'Returned';
+                    $isPartialReturn = !$isFullyReturned && ($totalReturnedPcs > 0 || $sale->status === 'Partial Return');
+
+                    $status = $isFullyReturned ? 'Returned' : ($isPartialReturn ? 'Partial Return' : ($sale->status ?? 'Completed'));
+
                     return [
-                        'id'               => $sale->id,
-                        'invoice'          => $sale->invoice,
-                        'date'             => $sale->date,
-                        'net_total'        => $sale->net_total,
-                        'remaining_amount' => max(0.0, (float)$sale->remaining_amount),
-                        'status'           => $sale->status ?? 'Active',
-                        'firm_id'          => $sale->firm_id,
+                        'id'                => $sale->id,
+                        'invoice'           => $sale->invoice,
+                        'date'              => $sale->date,
+                        'net_total'         => $sale->net_total,
+                        'remaining_amount'  => $isFullyReturned ? 0.0 : max(0.0, (float)$sale->remaining_amount),
+                        'status'            => $status,
+                        'firm_id'           => $sale->firm_id,
+                        'is_fully_returned' => $isFullyReturned,
+                        'returnable_pcs'    => max(0, (int)($totalSoldPcs - $totalReturnedPcs)),
                     ];
                 });
 
@@ -610,6 +626,9 @@ class SalesReturnController extends Controller implements HasMiddleware
             // Log activity
             \App\Services\ActivityLogger::log('updated', 'Sales Return', "Updated sales return {$return->invoice}");
 
+            // Recalculate status and balance of the source invoice
+            $this->updateSaleStatusAndBalance($return->original_invoice, $return->sale_id);
+
             DB::commit();
             return redirect()->route('sales_return.index')->with('success', 'Sales Return updated successfully!');
         } catch (\Exception $e) {
@@ -753,12 +772,15 @@ class SalesReturnController extends Controller implements HasMiddleware
             $sale->remaining_amount = max(0, $sale->net_total - (float)($sale->extra_discount ?? 0) - ($totalPayments + $totalReturns));
 
             // Determine status based on returned quantity vs sold quantity
-            $totalSoldQty = \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
-            $allReturnIds = SalesReturn::where('sale_id', $sale->id)->pluck('id');
-            $totalReturnedQty = \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+            $totalSoldQty = (float) \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+            $allReturnIds = SalesReturn::where('sale_id', $sale->id)
+                ->orWhere('original_invoice', $sale->invoice)
+                ->pluck('id');
+            $totalReturnedQty = (float) \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
 
             if ($totalReturnedQty >= $totalSoldQty && $totalSoldQty > 0) {
                 $sale->status = 'Returned';
+                $sale->remaining_amount = 0;
             } elseif ($totalReturnedQty > 0) {
                 if ($sale->remaining_amount <= 0) {
                     $sale->status = ($totalReturns >= $sale->net_total) ? 'Returned' : 'Paid';
@@ -767,7 +789,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 }
             } elseif ($sale->remaining_amount <= 0) {
                 $sale->status = 'Paid';
-            } elseif ($totalPayments > 0) {
+            } elseif ($totalPayments > 0 || $allocatedReturns > 0) {
                 $sale->status = 'Partial';
             } else {
                 $sale->status = 'Completed';

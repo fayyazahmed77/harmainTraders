@@ -13,6 +13,7 @@ import { Box, Search, Plus, Check, PackageSearch, X, Layers, History, Calendar, 
 interface Item {
     id: number;
     title: string;
+    is_active?: boolean | number;
     short_name?: string;
     company?: string;
     trade_price?: number;

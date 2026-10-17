@@ -133,7 +133,9 @@ class PurchaseController extends Controller implements HasMiddleware
             ->get()
             ->keyBy('item_id');
 
-        $items = Items::select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
+        // Load active items with lightweight column selection
+        $items = Items::where('is_active', 1)
+            ->select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
             ->with(['lastPurchaseItem.purchase.supplier' => function($q) {
                 $q->select('id', 'title');
             }])
@@ -405,7 +407,7 @@ class PurchaseController extends Controller implements HasMiddleware
                         'cheque_no' => $split['cheque_no'] ?? null,
                         'cheque_date' => $split['cheque_date'] ?? null,
                         'clear_date' => $split['clear_date'] ?? null,
-                        'remarks' => 'Auto-generated from Purchase ' . $purchase->invoice,
+                        'remarks' => 'Instance Checkout for -> Purchase ' . $purchase->invoice,
                         'cheque_id' => $split['cheque_id'] ?? null,
                         'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'Pending' : 'Clear',
                     ]);
@@ -563,7 +565,19 @@ class PurchaseController extends Controller implements HasMiddleware
             ->get()
             ->keyBy('item_id');
 
-        $items = Items::with(['lastPurchaseItem.purchase.supplier'])->get()->map(function ($item) use ($purchaseStats, $saleStats) {
+        $existingItemIds = $purchase && $purchase->items ? $purchase->items->pluck('item_id')->filter()->unique()->toArray() : [];
+        $items = Items::where(function ($q) use ($existingItemIds) {
+                $q->where('is_active', 1);
+                if (!empty($existingItemIds)) {
+                    $q->orWhereIn('id', $existingItemIds);
+                }
+            })
+            ->select('id', 'date', 'code', 'title', 'short_name', 'company', 'trade_price', 'retail', 'retail_tp_diff', 'reorder_level', 'packing_qty', 'packing_size', 'pcs', 'type', 'category', 'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2', 'is_active')
+            ->with(['lastPurchaseItem.purchase.supplier' => function($q) {
+                $q->select('id', 'title');
+            }])
+            ->get()
+            ->map(function ($item) use ($purchaseStats, $saleStats) {
             $lastP = $item->lastPurchaseItem;
             if ($lastP) {
                 $item->last_purchase_rate = (float) $lastP->trade_price;
@@ -804,7 +818,7 @@ class PurchaseController extends Controller implements HasMiddleware
                         'cheque_no' => $split['cheque_no'] ?? null,
                         'cheque_date' => $split['cheque_date'] ?? null,
                         'clear_date' => $split['clear_date'] ?? null,
-                        'remarks' => 'Auto-generated from Edition of Purchase ' . $purchase->invoice,
+                        'remarks' => 'Instance Checkout for -> Edition of Purchase ' . $purchase->invoice,
                         'cheque_id' => $split['cheque_id'] ?? null,
                         'cheque_status' => ($split['payment_method'] ?? 'Cash') === 'Cheque' ? 'Pending' : 'Clear',
                     ]);

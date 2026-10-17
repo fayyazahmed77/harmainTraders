@@ -69,6 +69,7 @@ interface InventoryItem {
   code?: string;
   title: string;
   short_name?: string;
+  is_active?: boolean | number;
   company?: string;
   trade_price?: number;
   retail?: number;

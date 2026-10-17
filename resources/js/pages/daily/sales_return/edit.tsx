@@ -634,8 +634,12 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         };
 
         router.put(`/sales-return/${returnData.id}`, payload, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsSaving(false);
+                const flashError = (page.props as any)?.flash?.error;
+                if (flashError) {
+                    return;
+                }
                 router.get("/sales-return");
             },
             onError: (err) => {

@@ -250,12 +250,27 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             // Remaining = Net - Extra Discount - (Payments + Returns)
             $purchase->remaining_amount = max(0, $purchase->net_total - (float)($purchase->extra_discount ?? 0) - ($totalPayments + $totalReturns));
             
-            // Status Logic
-            if ($purchase->remaining_amount <= 0.005) {
-                $purchase->status = ($totalReturns >= $purchase->net_total) ? 'Returned' : 'Paid';
-            } elseif ($totalReturns > 0) {
-                $purchase->status = 'Partial Return';
-            } elseif ($totalPayments > 0) {
+            // Status Logic based on quantity and balances
+            $totalSoldQty = (float) \App\Models\PurchaseItem::where('purchase_id', $purchase->id)->sum('total_pcs');
+            $allReturnIds = \App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)
+                ->orWhere('id', function($q) use ($purchase) {
+                    $q->select('purchase_return_id')->from('purchase_return_allocations')->where('purchase_id', $purchase->id);
+                })
+                ->pluck('id');
+            $totalReturnedQty = (float) \App\Models\PurchaseReturnItem::whereIn('purchase_return_id', $allReturnIds)->sum('total_pcs');
+
+            if ($totalReturnedQty >= $totalSoldQty && $totalSoldQty > 0) {
+                $purchase->status = 'Returned';
+                $purchase->remaining_amount = 0;
+            } elseif ($totalReturnedQty > 0) {
+                if ($purchase->remaining_amount <= 0.005) {
+                    $purchase->status = ($totalReturns >= $purchase->net_total) ? 'Returned' : 'Paid';
+                } else {
+                    $purchase->status = 'Partial Return';
+                }
+            } elseif ($purchase->remaining_amount <= 0.005) {
+                $purchase->status = 'Paid';
+            } elseif ($totalPayments > 0 || $totalReturns > 0) {
                 $purchase->status = 'Partial';
             } else {
                 $purchase->status = 'Completed';
@@ -277,14 +292,29 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ->unique('invoice')
                 ->values()
                 ->map(function ($p) {
+                    $totalSoldPcs = (float) \App\Models\PurchaseItem::where('purchase_id', $p->id)->sum('total_pcs');
+                    $allReturnIds = \App\Models\PurchaseReturn::where('original_invoice', $p->invoice)
+                        ->orWhere('id', function($q) use ($p) {
+                            $q->select('purchase_return_id')->from('purchase_return_allocations')->where('purchase_id', $p->id);
+                        })
+                        ->pluck('id');
+                    $totalReturnedPcs = (float) \App\Models\PurchaseReturnItem::whereIn('purchase_return_id', $allReturnIds)->sum('total_pcs');
+
+                    $isFullyReturned = ($totalSoldPcs > 0 && $totalReturnedPcs >= $totalSoldPcs) || $p->status === 'Returned';
+                    $isPartialReturn = !$isFullyReturned && ($totalReturnedPcs > 0 || $p->status === 'Partial Return');
+
+                    $status = $isFullyReturned ? 'Returned' : ($isPartialReturn ? 'Partial Return' : ($p->status ?? 'Completed'));
+
                     return [
-                        'id'               => $p->id,
-                        'invoice'          => $p->invoice,
-                        'date'             => $p->date,
-                        'net_total'        => $p->net_total,
-                        'remaining_amount' => max(0.0, (float)$p->remaining_amount),
-                        'status'           => $p->status ?? 'Active',
-                        'firm_id'          => $p->firm_id,
+                        'id'                => $p->id,
+                        'invoice'           => $p->invoice,
+                        'date'              => $p->date,
+                        'net_total'         => $p->net_total,
+                        'remaining_amount'  => $isFullyReturned ? 0.0 : max(0.0, (float)$p->remaining_amount),
+                        'status'            => $status,
+                        'firm_id'           => $p->firm_id,
+                        'is_fully_returned' => $isFullyReturned,
+                        'returnable_pcs'    => max(0, (int)($totalSoldPcs - $totalReturnedPcs)),
                     ];
                 });
 

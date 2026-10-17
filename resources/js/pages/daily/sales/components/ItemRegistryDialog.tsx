@@ -31,6 +31,7 @@ interface Item {
     code?: string;
     title: string;
     short_name?: string;
+    is_active?: boolean | number;
     company?: string;
     category?: string;
     trade_price?: number;
@@ -111,11 +112,17 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
     const filteredItems = useMemo(() => {
         const q = itemSearch.trim().toLowerCase();
+        
+        // Exclude inactive items from registry selection
+        const activeItems = items.filter(
+            (it) => it.is_active !== false && (it.is_active as any) !== 0 && (it.is_active as any) !== '0'
+        );
+
         if (!q) {
-            return [...items].sort((a, b) => a.title.localeCompare(b.title));
+            return [...activeItems].sort((a, b) => a.title.localeCompare(b.title));
         }
 
-        const filtered = items.filter((it) => {
+        const filtered = activeItems.filter((it) => {
             const title = (it.title || "").toLowerCase();
             const shortName = (it.short_name || "").toLowerCase();
             const category = (it.category || "").toLowerCase();

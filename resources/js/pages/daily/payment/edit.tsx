@@ -320,6 +320,8 @@ interface PaymentAccount {
 interface Bill {
   id: number;
   type: string; // Model class name
+  unique_key?: string;
+  is_opening_balance?: boolean;
   invoice_no: string;
   date: string;
   net_total: number;
@@ -848,6 +850,9 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
             const initialAllocations: Record<string, number> = {};
             const initialSelectedIds = new Set<string>();
             payment.allocations.forEach((a: any) => {
+              const key = a.bill_type ? `${a.bill_type}_${a.bill_id}` : a.bill_id.toString();
+              initialAllocations[key] = Number(a.amount);
+              initialSelectedIds.add(key);
               initialAllocations[a.bill_id.toString()] = Number(a.amount);
               initialSelectedIds.add(a.bill_id.toString());
             });
@@ -920,17 +925,20 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
     }
   }, [paymentAccountId]);
 
-  const toggleBill = (billId: number, billAmount: number) => {
-    const idStr = billId.toString();
+  // Helper to resolve unique key for bill items
+  const getBillKey = (b: Bill) => b.unique_key || `${b.type}_${b.id}`;
+
+  const toggleBill = (bill: Bill) => {
+    const key = getBillKey(bill);
     const newSet = new Set(selectedBillIds);
     const newAllocations = { ...allocations };
 
-    if (newSet.has(idStr)) {
-      newSet.delete(idStr);
-      delete newAllocations[idStr];
+    if (newSet.has(key)) {
+      newSet.delete(key);
+      delete newAllocations[key];
     } else {
-      newSet.add(idStr);
-      newAllocations[idStr] = Number(billAmount.toFixed(2));
+      newSet.add(key);
+      newAllocations[key] = Number(Number(bill.remaining_amount).toFixed(2));
     }
 
     setSelectedBillIds(newSet);
@@ -951,8 +959,9 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
       const newAllocations: Record<string, number> = {};
       let total = 0;
       unpaidBills.forEach(b => {
-        newSet.add(b.id.toString());
-        newAllocations[b.id.toString()] = Number(b.remaining_amount);
+        const key = getBillKey(b);
+        newSet.add(key);
+        newAllocations[key] = Number(b.remaining_amount);
         total += Number(b.remaining_amount);
       });
       setSelectedBillIds(newSet);
@@ -962,13 +971,13 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
     }
   };
 
-  const handleAllocationChange = (billId: string, value: string) => {
+  const handleAllocationChange = (key: string, value: string) => {
     const amountVal = Number(value);
-    const bill = unpaidBills.find(b => b.id.toString() === billId);
+    const bill = unpaidBills.find(b => getBillKey(b) === key || b.id.toString() === key);
     if (!bill) return;
 
     const clampedAmount = Math.min(amountVal, bill.remaining_amount);
-    const newAllocations = { ...allocations, [billId]: clampedAmount };
+    const newAllocations = { ...allocations, [key]: clampedAmount };
     setAllocations(newAllocations);
   };
 
@@ -1081,11 +1090,11 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
     }
 
     const allocationPayload = unpaidBills
-      .filter(b => selectedBillIds.has(b.id.toString()))
+      .filter(b => selectedBillIds.has(getBillKey(b)) || selectedBillIds.has(b.id.toString()))
       .map(b => ({
         bill_id: b.id,
         bill_type: b.type,
-        amount: allocations[b.id.toString()] || 0
+        amount: allocations[getBillKey(b)] || allocations[b.id.toString()] || 0
       }))
       .filter(a => a.amount > 0);
 
@@ -1462,6 +1471,16 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                         </div>
                       </div>
 
+                      {/* Priority Opening Balance Settlement Banner */}
+                      {unpaidBills.some(b => b.is_opening_balance) && (
+                        <div className="mx-4 mt-3 mb-1 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5 text-amber-700 dark:text-amber-300 text-xs flex-shrink-0">
+                          <Info size={14} className="shrink-0 text-amber-500" />
+                          <span className="font-medium">
+                            <strong>Priority Settlement:</strong> This party has an outstanding Opening Balance. Payments automatically settle the Opening Balance first before clearing subsequent invoices.
+                          </span>
+                        </div>
+                      )}
+
                       {/* Table Content */}
                       <div className="flex-1 overflow-auto custom-scrollbar">
                         <table className="w-full border-separate border-spacing-0">
@@ -1490,55 +1509,66 @@ export default function PaymentEdit({ payment, accounts, paymentAccounts, messag
                                 </td>
                               </tr>
                             ) : (
-                              unpaidBills.map((bill) => (
-                                <motion.tr key={`${bill.type}-${bill.id}`}
-                                  className={`group hover:bg-zinc-50/30 dark:hover:bg-zinc-800/20 transition-colors cursor-default ${selectedBillIds.has(bill.id.toString()) ? t.blob : ''}`}>
-                                  <td className="p-4 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                                    <Checkbox checked={selectedBillIds.has(bill.id.toString())} onCheckedChange={() => toggleBill(bill.id, Number(bill.remaining_amount))} className={`border-zinc-300 dark:border-zinc-700 ${t.checkboxChecked}`} />
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                                    <span 
-                                      onClick={() => fetchBillDetail(bill)}
-                                      className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter flex items-center gap-1.5 cursor-pointer hover:underline hover:text-blue-500 transition-colors"
-                                    >
-                                      <FileText size={12} className="opacity-50" />
-                                      {bill.invoice_no}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
-                                    <SignalBadge text={bill.bill_type_label} type={bill.bill_type_label === 'Sale' ? 'blue' : 'orange'} />
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-[11px] font-mono text-zinc-500 font-bold uppercase tracking-tighter">
-                                    {fmtDate(bill.date)}
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right text-rose-500">
-                                    <div className="text-[11px] font-mono font-bold">{toNum(bill.discount_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right text-rose-500">
-                                    <div className="text-[11px] font-mono font-bold">{toNum(bill.return_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                  </td>
-                                  <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right">
-                                    <div className="text-[11px] font-mono font-black text-zinc-900 dark:text-zinc-100">{toNum(bill.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                  </td>
-                                  <td className="px-4 py-2 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right">
-                                    <AnimatePresence mode="wait">
-                                      {selectedBillIds.has(bill.id.toString()) ? (
-                                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                                          <Input
-                                            type="number"
-                                            value={allocations[bill.id.toString()] || ""}
-                                            onChange={(e) => handleAllocationChange(bill.id.toString(), e.target.value)}
-                                            className={`h-8 text-right font-mono font-black text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 p-2 focus-visible:ring-1 ${t.focusRing} ${PREMIUM_ROUNDING_MD}`}
-                                            placeholder="0.00"
-                                          />
-                                        </motion.div>
+                              unpaidBills.map((bill) => {
+                                const billKey = getBillKey(bill);
+                                const isSelected = selectedBillIds.has(billKey) || selectedBillIds.has(bill.id.toString());
+                                return (
+                                  <motion.tr key={billKey}
+                                    className={`group hover:bg-zinc-50/30 dark:hover:bg-zinc-800/20 transition-colors cursor-default ${isSelected ? t.blob : ''} ${bill.is_opening_balance ? 'bg-amber-500/[0.04] dark:bg-amber-500/[0.06]' : ''}`}>
+                                    <td className="p-4 border-b border-zinc-50/50 dark:border-zinc-800/30">
+                                      <Checkbox checked={isSelected} onCheckedChange={() => toggleBill(bill)} className={`border-zinc-300 dark:border-zinc-700 ${t.checkboxChecked}`} />
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
+                                      {bill.is_opening_balance ? (
+                                        <div className="flex items-center gap-1.5 text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-tighter">
+                                          <Scale size={12} className="opacity-75" />
+                                          <span>{bill.invoice_no || "OPENING-BAL"}</span>
+                                        </div>
                                       ) : (
-                                        <div className="text-[10px] font-mono text-zinc-300 dark:text-zinc-700 italic">--/--</div>
+                                        <span 
+                                          onClick={() => fetchBillDetail(bill)}
+                                          className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tighter flex items-center gap-1.5 cursor-pointer hover:underline hover:text-blue-500 transition-colors"
+                                        >
+                                          <FileText size={12} className="opacity-50" />
+                                          {bill.invoice_no}
+                                        </span>
                                       )}
-                                    </AnimatePresence>
-                                  </td>
-                                </motion.tr>
-                              ))
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30">
+                                      <SignalBadge text={bill.bill_type_label} type={bill.is_opening_balance ? 'orange' : (bill.bill_type_label === 'Sale' ? 'blue' : 'orange')} />
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-[11px] font-mono text-zinc-500 font-bold uppercase tracking-tighter">
+                                      {fmtDate(bill.date)}
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right text-rose-500">
+                                      <div className="text-[11px] font-mono font-bold">{toNum(bill.discount_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right text-rose-500">
+                                      <div className="text-[11px] font-mono font-bold">{toNum(bill.return_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    </td>
+                                    <td className="px-4 py-3 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right">
+                                      <div className="text-[11px] font-mono font-black text-zinc-900 dark:text-zinc-100">{toNum(bill.remaining_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    </td>
+                                    <td className="px-4 py-2 border-b border-zinc-50/50 dark:border-zinc-800/30 text-right">
+                                      <AnimatePresence mode="wait">
+                                        {isSelected ? (
+                                          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+                                            <Input
+                                              type="number"
+                                              value={allocations[billKey] ?? allocations[bill.id.toString()] ?? ""}
+                                              onChange={(e) => handleAllocationChange(billKey, e.target.value)}
+                                              className={`h-8 text-right font-mono font-black text-xs bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 p-2 focus-visible:ring-1 ${t.focusRing} ${PREMIUM_ROUNDING_MD}`}
+                                              placeholder="0.00"
+                                            />
+                                          </motion.div>
+                                        ) : (
+                                          <div className="text-[10px] font-mono text-zinc-300 dark:text-zinc-700 italic">--/--</div>
+                                        )}
+                                      </AnimatePresence>
+                                    </td>
+                                  </motion.tr>
+                                );
+                              })
                             )}
                           </tbody>
                         </table>

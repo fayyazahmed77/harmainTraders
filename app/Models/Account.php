@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 class Account extends Model
 {
     use Auditable;
+
+    public $memoizedCurrentBalance = null;
+
     protected $fillable = [
         'code',
         'title',

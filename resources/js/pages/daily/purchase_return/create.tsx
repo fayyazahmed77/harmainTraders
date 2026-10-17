@@ -104,6 +104,8 @@ interface Invoice {
     net_total: number;
     remaining_amount: number;
     status: string;
+    is_fully_returned?: boolean;
+    returnable_pcs?: number;
 }
 
 interface Account {
@@ -893,6 +895,10 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         router.post("/purchase-return", payload, {
             onSuccess: (page) => {
                 setIsSaving(false);
+                const flashError = (page.props as any)?.flash?.error;
+                if (flashError) {
+                    return;
+                }
                 const id = (page.props as any).id || (page.props as any).flash?.id;
                 
                 setSuccessData({
@@ -1466,14 +1472,14 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                         <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest animate-pulse">Scanning Registry...</div>
                                     </div>
                                 ) : filteredInvoices.map((inv, idx) => {
-                                    const isFullyReturned = inv.status === 'Returned';
-                                    const isPartialReturn = inv.status === 'Partial Return';
+                                    const isFullyReturned = inv.status === 'Returned' || !!inv.is_fully_returned || inv.returnable_pcs === 0;
+                                    const isPartialReturn = !isFullyReturned && (inv.status === 'Partial Return' || (inv.returnable_pcs !== undefined && inv.returnable_pcs > 0));
                                     return (
                                     <motion.button key={inv.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
                                         disabled={isFullyReturned}
                                         className={`w-full text-left p-4 mb-3 flex flex-col md:flex-row md:items-center justify-between group border transition-all active:scale-[0.99] ${PREMIUM_ROUNDING_MD} gap-4 md:gap-0 ${
                                             isFullyReturned
-                                                ? 'bg-zinc-100 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
+                                                ? 'bg-zinc-100/70 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed pointer-events-none'
                                                 : 'bg-zinc-50 dark:bg-white/5 border-zinc-100 dark:border-zinc-800 hover:border-orange-500 cursor-pointer'
                                         }`}
                                         onClick={() => !isFullyReturned && handleSelectInvoice(inv)}>
@@ -1481,11 +1487,13 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                             <div className="flex justify-between md:block items-center">
                                                 <div className="space-y-1">
                                                     <div className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest leading-none">ID#</div>
-                                                    <div className="text-lg font-black text-zinc-900 dark:text-white group-hover:text-orange-500 transition-colors tracking-tighter">{inv.invoice}</div>
+                                                    <div className={`text-lg font-black group-hover:text-orange-500 transition-colors tracking-tighter ${
+                                                        isFullyReturned ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-white'
+                                                    }`}>{inv.invoice}</div>
                                                 </div>
                                                 <div className="md:hidden">
                                                     {isFullyReturned
-                                                        ? <SignalBadge text="Full Return" type="red" />
+                                                        ? <SignalBadge text="Returned" type="red" />
                                                         : isPartialReturn
                                                             ? <SignalBadge text="Partial Return" type="orange" />
                                                             : <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'blue'} />}
@@ -1499,7 +1507,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 </div>
                                                 <div className="hidden md:block">
                                                     {isFullyReturned
-                                                        ? <SignalBadge text="Full Return" type="red" />
+                                                        ? <SignalBadge text="Returned" type="red" />
                                                         : isPartialReturn
                                                             ? <SignalBadge text="Partial Return" type="orange" />
                                                             : <SignalBadge text={inv.status} type={inv.status === 'Completed' ? 'green' : 'blue'} />}

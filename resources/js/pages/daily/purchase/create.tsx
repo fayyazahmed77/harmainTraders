@@ -65,6 +65,7 @@ const ACCENT_GRADIENT = "bg-gradient-to-br from-orange-400 via-orange-500 to-ora
 interface Item {
     id: number;
     title: string;
+    is_active?: boolean | number;
     short_name?: string;
     company?: string;
     trade_price?: number;
@@ -358,17 +359,24 @@ export default function Purchase({
     }, [salemans]);
 
     const itemOptions = React.useMemo(() => {
-        return items.map((it) => ({
-            value: it.id,
-            label: `${it.title} ${it.short_name ? `(${it.short_name})` : ""}`,
-        }));
+        return items
+            .filter((it) => it.is_active !== false && (it.is_active as any) !== 0 && (it.is_active as any) !== '0')
+            .map((it) => ({
+                value: it.id,
+                label: `${it.title} ${it.short_name ? `(${it.short_name})` : ""}`,
+            }));
     }, [items]);
 
     const filteredItems = React.useMemo(() => {
         const q = itemSearch.toLowerCase();
 
+        // Only active items for purchase
+        const activeItems = items.filter(
+            (it) => it.is_active !== false && (it.is_active as any) !== 0 && (it.is_active as any) !== '0'
+        );
+
         // Filter logic
-        const filtered = items.filter((it) =>
+        const filtered = activeItems.filter((it) =>
             it.title.toLowerCase().includes(q) ||
             (it.short_name?.toLowerCase().includes(q)) ||
             (it.company?.toLowerCase().includes(q)) ||
@@ -410,7 +418,10 @@ export default function Purchase({
 
     // Function to load all items
     const loadAllItems = () => {
-        const allItemRows: RowData[] = items.map((it) => {
+        const activeItems = items.filter(
+            (it) => it.is_active !== false && (it.is_active as any) !== 0 && (it.is_active as any) !== '0'
+        );
+        const allItemRows: RowData[] = activeItems.map((it) => {
             const baseRate = toNumber(it.trade_price ?? it.retail ?? 0);
             const packing = toNumber(it.packing_full ?? it.packing_qty ?? 1);
             const amount = 0; // Starts at 0
@@ -694,6 +705,11 @@ export default function Purchase({
             onSuccess: (page) => {
                 isSubmittingRef.current = false;
                 setIsSubmitting(false);
+
+                const flashError = (page.props as any)?.flash?.error;
+                if (flashError) {
+                    return;
+                }
 
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;

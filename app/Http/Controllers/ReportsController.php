@@ -797,7 +797,7 @@ class ReportsController extends Controller implements HasMiddleware
             'is_print_mode' => false
         ];
 
-        $pdf = PDF::loadView('pdf.outstanding-billwise', $pdfData)->setPaper('a4', 'landscape');
+        $pdf = PDF::loadView('pdf.outstanding-billwise', $pdfData)->setPaper('a4', 'portrait');
         $title = $account ? $account->title : 'ALL';
         return $pdf->download('outstanding-billwise-' . $title . '-' . date('d-M-Y') . '.pdf');
     }

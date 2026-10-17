@@ -506,6 +506,10 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
         router.put(`/purchase-return/${returnData.id}`, payload, {
             onSuccess: (page) => {
                 setIsSaving(false);
+                const flashError = (page.props as any)?.flash?.error;
+                if (flashError) {
+                    return;
+                }
                 const id = (page.props as any).id || (page.props as any).flash?.id || returnData.id;
                 setSuccessData({
                     supplierName: selectedAccount?.title || "Supplier",

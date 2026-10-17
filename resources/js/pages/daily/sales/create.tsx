@@ -75,6 +75,7 @@ interface InventoryItem {
   code?: string;
   title: string;
   short_name?: string;
+  is_active?: boolean | number;
   company?: string;
   trade_price?: number;
   retail?: number;
@@ -733,6 +734,11 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
     router.post("/sales", payload, {
       preserveState: true,
       onSuccess: (page) => {
+        const flashError = (page.props as any)?.flash?.error;
+        if (flashError) {
+          setProcessing(false);
+          return;
+        }
         const id = (page.props as any).id || (page.props as any).flash?.id;
 
         setSuccessData({

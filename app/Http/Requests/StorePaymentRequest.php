@@ -67,14 +67,25 @@ class StorePaymentRequest extends FormRequest
                     $allocAmount = (float)($alloc['amount'] ?? 0);
 
                     if ($billId && $billType) {
-                        $bill = ($billType === 'App\Models\Sales')
-                            ? Sales::find($billId)
-                            : Purchase::find($billId);
+                        if ($billType === 'App\Models\Account' || $billType === Account::class) {
+                            $targetAccount = Account::find($billId);
+                            if ($targetAccount) {
+                                $engine = new \App\Services\PaymentAllocationEngine();
+                                $rem = $engine->getRemainingOpeningBalance($targetAccount);
+                                if ($allocAmount > ($rem + 0.01)) {
+                                    $validator->errors()->add("allocations.{$idx}.amount", "Allocation for Opening Balance ({$allocAmount}) exceeds remaining balance ({$rem}).");
+                                }
+                            }
+                        } else {
+                            $bill = ($billType === 'App\Models\Sales')
+                                ? Sales::find($billId)
+                                : Purchase::find($billId);
 
-                        if ($bill) {
-                            $rem = (float)$bill->remaining_amount;
-                            if ($allocAmount > ($rem + 0.01)) {
-                                $validator->errors()->add("allocations.{$idx}.amount", "Allocation for invoice {$bill->invoice} ({$allocAmount}) exceeds remaining balance ({$rem}).");
+                            if ($bill) {
+                                $rem = (float)$bill->remaining_amount;
+                                if ($allocAmount > ($rem + 0.01)) {
+                                    $validator->errors()->add("allocations.{$idx}.amount", "Allocation for invoice {$bill->invoice} ({$allocAmount}) exceeds remaining balance ({$rem}).");
+                                }
                             }
                         }
                     }

@@ -450,9 +450,14 @@
                             </thead>
                             <tbody>
                                 @foreach($receipt->allocations as $alloc)
+                                    @php
+                                        $isOB = $alloc->bill_type === 'App\Models\Account';
+                                        $billRef = $isOB ? 'OPENING-BAL' : ($alloc->bill ? ($alloc->bill->invoice ?? 'Ref ' . $alloc->bill_id) : 'Ref ' . $alloc->bill_id);
+                                        $billTypeLabel = $isOB ? 'Opening Balance' : ($alloc->bill_type === 'App\Models\Sales' ? 'Sales' : 'Purchase');
+                                    @endphp
                                     <tr>
-                                        <td>{{ $alloc->bill ? $alloc->bill->invoice : 'Ref ' . $alloc->bill_id }}</td>
-                                        <td>{{ $alloc->bill_type === 'App\Models\Sales' ? 'Sales' : 'Purchase' }}</td>
+                                        <td>{{ $billRef }}</td>
+                                        <td>{{ $billTypeLabel }}</td>
                                         <td class="text-right">PKR {{ number_format($alloc->amount, 2) }}</td>
                                     </tr>
                                 @endforeach
@@ -477,9 +482,14 @@
                             </thead>
                             <tbody>
                                 @foreach($payment->allocations as $alloc)
+                                    @php
+                                        $isOB = $alloc->bill_type === 'App\Models\Account';
+                                        $billRef = $isOB ? 'OPENING-BAL' : ($alloc->bill ? ($alloc->bill->invoice ?? 'Ref ' . $alloc->bill_id) : 'Ref ' . $alloc->bill_id);
+                                        $billTypeLabel = $isOB ? 'Opening Balance' : ($alloc->bill_type === 'App\Models\Sales' ? 'Sales' : 'Purchase');
+                                    @endphp
                                     <tr>
-                                        <td>{{ $alloc->bill ? $alloc->bill->invoice : 'Ref ' . $alloc->bill_id }}</td>
-                                        <td>{{ $alloc->bill_type === 'App\Models\Sales' ? 'Sales' : 'Purchase' }}</td>
+                                        <td>{{ $billRef }}</td>
+                                        <td>{{ $billTypeLabel }}</td>
                                         <td class="text-right">PKR {{ number_format($alloc->amount, 2) }}</td>
                                     </tr>
                                 @endforeach

@@ -20,47 +20,83 @@ class FIFOAllocationService
         }
 
         DB::transaction(function () use ($return, $amountToAllocate) {
-            // Find all active sales with remaining debt, oldest first
-            $unpaidInvoices = Sales::where('customer_id', $return->customer_id)
-                ->where('remaining_amount', '>', 0)
-                ->whereNotIn('status', ['Canceled', 'Returned'])
-                ->orderBy('date', 'asc')
-                ->orderBy('id', 'asc')
-                ->lockForUpdate()
-                ->get();
-
             $remainingReturn = $amountToAllocate;
 
-            foreach ($unpaidInvoices as $invoice) {
-                if ($remainingReturn <= 0) {
-                    break;
-                }
-
-                $allocatedAmount = min($invoice->remaining_amount, $remainingReturn);
-
-                // Record allocation
-                SalesReturnAllocation::create([
-                    'sales_return_id' => $return->id,
-                    'sale_id' => $invoice->id,
-                    'amount' => $allocatedAmount,
-                ]);
-
-                // Update invoice
-                $invoice->remaining_amount -= $allocatedAmount;
-                $invoice->status = $this->determineInvoiceStatus($invoice);
-                $invoice->save();
-
-                $remainingReturn -= $allocatedAmount;
+            // 1. If this return is tied to a specific sale, FIRST allocate return amount to that source sale
+            $sourceSale = null;
+            if (!empty($return->sale_id)) {
+                $sourceSale = Sales::find($return->sale_id);
+            }
+            if (!$sourceSale && !empty($return->original_invoice)) {
+                $sourceSale = Sales::where('invoice', $return->original_invoice)->first();
             }
 
-            // If there's surplus return value, create a Customer Credit Note
+            if ($sourceSale && $sourceSale->remaining_amount > 0.005) {
+                $allocatedToSource = min($sourceSale->remaining_amount, $remainingReturn);
+                SalesReturnAllocation::create([
+                    'sales_return_id' => $return->id,
+                    'sale_id'         => $sourceSale->id,
+                    'amount'          => $allocatedToSource,
+                ]);
+
+                $sourceSale->remaining_amount = max(0, $sourceSale->remaining_amount - $allocatedToSource);
+                $sourceSale->status = $this->determineInvoiceStatus($sourceSale);
+                $sourceSale->save();
+
+                $remainingReturn -= $allocatedToSource;
+            } elseif ($sourceSale) {
+                // If source sale had 0 remaining (already paid), still ensure its status is updated to Returned/Partial Return
+                $sourceSale->status = $this->determineInvoiceStatus($sourceSale);
+                $sourceSale->save();
+            }
+
+            // 2. Allocate any surplus return value to older unpaid sales invoices (FIFO)
+            if ($remainingReturn > 0.005) {
+                $unpaidInvoicesQuery = Sales::where('customer_id', $return->customer_id)
+                    ->where('remaining_amount', '>', 0.005)
+                    ->whereNotIn('status', ['Canceled', 'Returned']);
+
+                if ($sourceSale) {
+                    $unpaidInvoicesQuery->where('id', '!=', $sourceSale->id);
+                }
+
+                $unpaidInvoices = $unpaidInvoicesQuery
+                    ->orderBy('date', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($unpaidInvoices as $invoice) {
+                    if ($remainingReturn <= 0.005) {
+                        break;
+                    }
+
+                    $allocatedAmount = min($invoice->remaining_amount, $remainingReturn);
+
+                    // Record allocation
+                    SalesReturnAllocation::create([
+                        'sales_return_id' => $return->id,
+                        'sale_id'         => $invoice->id,
+                        'amount'          => $allocatedAmount,
+                    ]);
+
+                    // Update invoice
+                    $invoice->remaining_amount = max(0, $invoice->remaining_amount - $allocatedAmount);
+                    $invoice->status = $this->determineInvoiceStatus($invoice);
+                    $invoice->save();
+
+                    $remainingReturn -= $allocatedAmount;
+                }
+            }
+
+            // 3. If there's surplus return value, create a Customer Credit Note
             if ($remainingReturn > 0.005) {
                 CustomerCredit::create([
-                    'customer_id' => $return->customer_id,
-                    'sales_return_id' => $return->id,
-                    'amount' => $remainingReturn,
+                    'customer_id'       => $return->customer_id,
+                    'sales_return_id'   => $return->id,
+                    'amount'            => $remainingReturn,
                     'available_balance' => $remainingReturn,
-                    'status' => 'Available',
+                    'status'            => 'Available',
                 ]);
             }
         });
@@ -111,23 +147,25 @@ class FIFOAllocationService
             ->sum('amount');
 
         // Check if returned items equals total items sold
-        $totalSoldQty = \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
-        $allReturnIds = SalesReturn::where('sale_id', $sale->id)->pluck('id');
-        $totalReturnedQty = \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+        $totalSoldQty = (float) \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+        $allReturnIds = SalesReturn::where('sale_id', $sale->id)
+            ->orWhere('original_invoice', $sale->invoice)
+            ->pluck('id');
+        $totalReturnedQty = (float) \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
 
         if ($totalReturnedQty >= $totalSoldQty && $totalSoldQty > 0) {
             return 'Returned';
         }
 
         if ($sale->remaining_amount <= 0.005) {
-            return ($totalReturns >= $sale->net_total) ? 'Returned' : 'Paid';
+            return ($totalReturns >= $sale->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
         }
 
-        if ($totalReturns > 0) {
+        if ($totalReturnedQty > 0) {
             return 'Partial Return';
         }
 
-        if ($totalPayments > 0) {
+        if ($totalPayments > 0 || $totalReturns > 0) {
             return 'Partial';
         }
 
@@ -144,47 +182,80 @@ class FIFOAllocationService
         }
 
         DB::transaction(function () use ($return, $amountToAllocate) {
-            // Find all active purchases with remaining debt, oldest first
-            $unpaidInvoices = \App\Models\Purchase::where('supplier_id', $return->supplier_id)
-                ->where('remaining_amount', '>', 0.005)
-                ->whereNotIn('status', ['Canceled', 'Returned'])
-                ->orderBy('date', 'asc')
-                ->orderBy('id', 'asc')
-                ->lockForUpdate()
-                ->get();
-
             $remainingReturn = $amountToAllocate;
 
-            foreach ($unpaidInvoices as $invoice) {
-                if ($remainingReturn <= 0) {
-                    break;
-                }
-
-                $allocatedAmount = min($invoice->remaining_amount, $remainingReturn);
-
-                // Record allocation
-                \App\Models\PurchaseReturnAllocation::create([
-                    'purchase_return_id' => $return->id,
-                    'purchase_id' => $invoice->id,
-                    'amount' => $allocatedAmount,
-                ]);
-
-                // Update invoice
-                $invoice->remaining_amount -= $allocatedAmount;
-                $invoice->status = $this->determinePurchaseInvoiceStatus($invoice);
-                $invoice->save();
-
-                $remainingReturn -= $allocatedAmount;
+            // 1. If this return is tied to a specific purchase, FIRST allocate return amount to that source purchase
+            $sourcePurchase = null;
+            if (!empty($return->purchase_id)) {
+                $sourcePurchase = \App\Models\Purchase::find($return->purchase_id);
+            }
+            if (!$sourcePurchase && !empty($return->original_invoice)) {
+                $sourcePurchase = \App\Models\Purchase::where('invoice', $return->original_invoice)->first();
             }
 
-            // If there's surplus return value, create a Supplier Credit Note
+            if ($sourcePurchase && $sourcePurchase->remaining_amount > 0.005) {
+                $allocatedToSource = min($sourcePurchase->remaining_amount, $remainingReturn);
+                \App\Models\PurchaseReturnAllocation::create([
+                    'purchase_return_id' => $return->id,
+                    'purchase_id'        => $sourcePurchase->id,
+                    'amount'             => $allocatedToSource,
+                ]);
+
+                $sourcePurchase->remaining_amount = max(0, $sourcePurchase->remaining_amount - $allocatedToSource);
+                $sourcePurchase->status = $this->determinePurchaseInvoiceStatus($sourcePurchase);
+                $sourcePurchase->save();
+
+                $remainingReturn -= $allocatedToSource;
+            } elseif ($sourcePurchase) {
+                $sourcePurchase->status = $this->determinePurchaseInvoiceStatus($sourcePurchase);
+                $sourcePurchase->save();
+            }
+
+            // 2. Allocate any surplus return value to older unpaid purchases (FIFO)
+            if ($remainingReturn > 0.005) {
+                $unpaidInvoicesQuery = \App\Models\Purchase::where('supplier_id', $return->supplier_id)
+                    ->where('remaining_amount', '>', 0.005)
+                    ->whereNotIn('status', ['Canceled', 'Returned']);
+
+                if ($sourcePurchase) {
+                    $unpaidInvoicesQuery->where('id', '!=', $sourcePurchase->id);
+                }
+
+                $unpaidInvoices = $unpaidInvoicesQuery
+                    ->orderBy('date', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($unpaidInvoices as $invoice) {
+                    if ($remainingReturn <= 0.005) {
+                        break;
+                    }
+
+                    $allocatedAmount = min($invoice->remaining_amount, $remainingReturn);
+
+                    \App\Models\PurchaseReturnAllocation::create([
+                        'purchase_return_id' => $return->id,
+                        'purchase_id'        => $invoice->id,
+                        'amount'             => $allocatedAmount,
+                    ]);
+
+                    $invoice->remaining_amount = max(0, $invoice->remaining_amount - $allocatedAmount);
+                    $invoice->status = $this->determinePurchaseInvoiceStatus($invoice);
+                    $invoice->save();
+
+                    $remainingReturn -= $allocatedAmount;
+                }
+            }
+
+            // 3. If there's surplus return value, create a Supplier Credit Note
             if ($remainingReturn > 0.005) {
                 \App\Models\SupplierCredit::create([
-                    'supplier_id' => $return->supplier_id,
+                    'supplier_id'        => $return->supplier_id,
                     'purchase_return_id' => $return->id,
-                    'amount' => $remainingReturn,
-                    'available_balance' => $remainingReturn,
-                    'status' => 'Available',
+                    'amount'             => $remainingReturn,
+                    'available_balance'  => $remainingReturn,
+                    'status'             => 'Available',
                 ]);
             }
         });
@@ -233,23 +304,27 @@ class FIFOAllocationService
             ->sum('amount');
 
         // Check if returned items equals total items purchased
-        $totalSoldQty = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)->sum('total_pcs');
-        $allReturnIds = \App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)->pluck('id');
-        $totalReturnedQty = \App\Models\PurchaseReturnItem::whereIn('purchase_return_id', $allReturnIds)->sum('total_pcs');
+        $totalSoldQty = (float) \App\Models\PurchaseItem::where('purchase_id', $purchase->id)->sum('total_pcs');
+        $allReturnIds = \App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)
+            ->orWhere('id', function($q) use ($purchase) {
+                $q->select('purchase_return_id')->from('purchase_return_allocations')->where('purchase_id', $purchase->id);
+            })
+            ->pluck('id');
+        $totalReturnedQty = (float) \App\Models\PurchaseReturnItem::whereIn('purchase_return_id', $allReturnIds)->sum('total_pcs');
 
         if ($totalReturnedQty >= $totalSoldQty && $totalSoldQty > 0) {
             return 'Returned';
         }
 
         if ($purchase->remaining_amount <= 0.005) {
-            return ($totalReturns >= $purchase->net_total) ? 'Returned' : 'Paid';
+            return ($totalReturns >= $purchase->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
         }
 
-        if ($totalReturns > 0) {
+        if ($totalReturnedQty > 0) {
             return 'Partial Return';
         }
 
-        if ($totalPayments > 0) {
+        if ($totalPayments > 0 || $totalReturns > 0) {
             return 'Partial';
         }
 

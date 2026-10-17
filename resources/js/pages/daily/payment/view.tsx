@@ -710,13 +710,16 @@ function mapPayment(raw: any): Payment {
     prepared_by:         typeof raw.prepared_by === 'string' ? raw.prepared_by : '',
     remarks:             typeof raw.remarks === 'string' ? raw.remarks : null,
     message_line:        messageLineVal,
-    allocations: Array.isArray(raw.allocations) ? raw.allocations.map((a: any) => ({
-      ref:            a.ref           ?? (a.bill_type ? `${a.bill_type.split('\\').pop()} #${a.bill_id}` : 'Invoice'),
-      invoice_ref:    a.invoice_ref   ?? (a.bill_id ? `INV-${String(a.bill_id).padStart(4, '0')}` : 'INV-0001'),
-      date:           a.date          ?? raw.date ?? '',
-      invoice_total:  a.invoice_total  !== undefined ? Number(a.invoice_total)  : Number(a.amount ?? 0),
-      amount_applied: a.amount_applied !== undefined ? Number(a.amount_applied) : Number(a.amount ?? 0),
-    })) : [],
+    allocations: Array.isArray(raw.allocations) ? raw.allocations.map((a: any) => {
+      const isOpeningBalance = a.bill_type === 'App\\Models\\Account' || a.bill_type?.endsWith('Account');
+      return {
+        ref:            a.ref           ?? (isOpeningBalance ? 'Opening Balance' : (a.bill_type ? `${a.bill_type.split('\\').pop()} #${a.bill_id}` : 'Invoice')),
+        invoice_ref:    a.invoice_ref   ?? (isOpeningBalance ? 'OPENING-BAL' : (a.bill_id ? `INV-${String(a.bill_id).padStart(4, '0')}` : 'INV-0001')),
+        date:           a.date          ?? raw.date ?? '',
+        invoice_total:  a.invoice_total  !== undefined ? Number(a.invoice_total)  : Number(a.amount ?? 0),
+        amount_applied: a.amount_applied !== undefined ? Number(a.amount_applied) : Number(a.amount ?? 0),
+      };
+    }) : [],
     company: {
       name:    companyName,
       tagline: companyTagline || 'Wholesale & Supply Chain',
