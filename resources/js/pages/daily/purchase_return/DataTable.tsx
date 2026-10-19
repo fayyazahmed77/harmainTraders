@@ -32,6 +32,8 @@ import {
     MoreHorizontal,
     ChevronDown,
     ChevronUp,
+    ChevronLeft,
+    ChevronRight,
     Clock,
     User,
     ArrowUpDown,
@@ -49,6 +51,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,
@@ -89,6 +98,14 @@ interface PurchaseReturn {
 
 interface DataTableProps {
     data: PurchaseReturn[];
+    pagination?: {
+        current_page: number;
+        last_page: number;
+        per_page?: number;
+        total: number;
+        links?: any[];
+    };
+    filters?: any;
 }
 
 const PREMIUM_ROUNDING = "rounded-xl";
@@ -98,12 +115,31 @@ const toNum = (v: any) => {
     return isNaN(n) ? 0 : n;
 };
 
-export default function DataTable({ data }: DataTableProps) {
+export default function DataTable({ data, pagination, filters = {} }: DataTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-    const [globalFilter, setGlobalFilter] = useState("");
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [returnToDelete, setReturnToDelete] = useState<PurchaseReturn | null>(null);
+
+    const handlePageChange = (url: string | null) => {
+        if (!url) return;
+        router.visit(url, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    const handlePerPageChange = (val: string) => {
+        router.get(
+            '/purchase-return',
+            { ...filters, per_page: val, page: 1 },
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
+    };
+
+    const currentPerPage = Number(pagination?.per_page) || 50;
+    const fromItem = !pagination || pagination.total === 0 ? 0 : (pagination.current_page - 1) * currentPerPage + 1;
+    const toItem = !pagination ? data.length : Math.min(pagination.current_page * currentPerPage, pagination.total);
 
     const columns: ColumnDef<PurchaseReturn>[] = [
         {
@@ -264,50 +300,22 @@ export default function DataTable({ data }: DataTableProps) {
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
-        onColumnFiltersChange: setColumnFilters,
-        getFilteredRowModel: getFilteredRowModel(),
-        onGlobalFilterChange: setGlobalFilter,
         state: {
             sorting,
-            columnFilters,
-            globalFilter,
         },
     });
 
     return (
         <div className="w-full space-y-4">
-            {/* Toolbar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
-                <div className="relative max-w-sm w-full group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
-                    <Input
-                        placeholder="Search returns..."
-                        className="h-10 pl-10 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 focus:ring-orange-500/20 text-[10px] uppercase font-bold tracking-widest transition-all"
-                        value={globalFilter}
-                        onChange={(e) => setGlobalFilter(e.target.value)}
-                    />
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" className="rounded-lg h-10 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-orange-500 transition-colors">
-                        <Filter className="mr-2 h-3.5 w-3.5" /> Filters
-                    </Button>
-                    <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-2" />
-                    <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
-                        <ShieldAlert className="h-4 w-4 text-orange-500" />
-                    </Button>
-                </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 overflow-hidden shadow-sm">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 overflow-hidden shadow-sm overflow-x-auto custom-scrollbar">
                 <Table>
                     <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id} className="hover:bg-transparent border-b border-zinc-200 dark:border-zinc-800">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id} className="h-14 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap">
+                                    <TableHead key={header.id} className="h-12 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap">
                                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                                     </TableHead>
                                 ))}
@@ -319,10 +327,10 @@ export default function DataTable({ data }: DataTableProps) {
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
-                                    className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-colors border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                                    className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/50 transition-all border-b border-zinc-100 dark:border-zinc-800 last:border-0"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="py-4">
+                                        <TableCell key={cell.id} className="py-3">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -342,31 +350,62 @@ export default function DataTable({ data }: DataTableProps) {
                 </Table>
             </div>
 
-            <div className="flex items-center justify-between py-2 px-1">
-                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                    Showing {table.getFilteredRowModel().rows.length} records in active cache
+            {/* Professional Pagination Footer Matching Journal Vouchers */}
+            {pagination && pagination.total > 0 && (
+                <div className="px-4 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-600 dark:text-zinc-400 shadow-xs">
+                    <div>
+                        Showing <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">{fromItem}</span> to <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">{toItem}</span> of <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">{pagination.total}</span> entries
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {/* Per Page Selector */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-500">Rows per page:</span>
+                            <Select value={String(currentPerPage)} onValueChange={handlePerPageChange}>
+                                <SelectTrigger className="h-7 w-16 text-xs font-medium rounded-md border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-lg">
+                                    <SelectItem value="15">15</SelectItem>
+                                    <SelectItem value="25">25</SelectItem>
+                                    <SelectItem value="50">50</SelectItem>
+                                    <SelectItem value="100">100</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Page Number Buttons */}
+                        {pagination.links && pagination.links.length > 3 && (
+                            <div className="flex items-center gap-1">
+                                {pagination.links.map((link: any, idx: number) => {
+                                    const isPrev = link.label.includes('&laquo;') || link.label.toLowerCase().includes('prev');
+                                    const isNext = link.label.includes('&raquo;') || link.label.toLowerCase().includes('next');
+                                    const label = isPrev ? <ChevronLeft className="h-3.5 w-3.5" /> : isNext ? <ChevronRight className="h-3.5 w-3.5" /> : link.label;
+
+                                    return (
+                                        <Button
+                                            key={idx}
+                                            size="sm"
+                                            variant={link.active ? "default" : "outline"}
+                                            disabled={!link.url}
+                                            onClick={() => handlePageChange(link.url)}
+                                            className={cn(
+                                                "h-7 min-w-7 px-2 text-xs font-medium rounded-md transition-colors",
+                                                link.active 
+                                                    ? "bg-orange-500 text-white dark:bg-orange-500 dark:text-white border-orange-500" 
+                                                    : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300",
+                                                !link.url && "opacity-40 cursor-not-allowed"
+                                            )}
+                                        >
+                                            {label}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-lg h-8 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-orange-500 transition-colors"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-lg h-8 px-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-orange-500 transition-colors"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </div>
+            )}
 
             {/* Deletion Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

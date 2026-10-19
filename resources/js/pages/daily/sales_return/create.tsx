@@ -94,6 +94,7 @@ interface Invoice {
     invoice: string;
     date: string;
     net_total: number;
+    returnable_amount?: number;
     remaining_amount: number;
     status: string;
     is_fully_returned?: boolean;
@@ -616,6 +617,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     });
                     setRows(loadedRows.length > 0 ? loadedRows : [getEmptyRow()]);
                     if (loadedRows.length > 0) setFocusedRowId(loadedRows[0].id);
+                    if (data.returnable_amount !== undefined) {
+                        setSelectedInvoice(prev => prev ? { ...prev, returnable_amount: data.returnable_amount } : prev);
+                    }
                     setInvoiceDialogOpen(false);
                 }
             });
@@ -785,13 +789,26 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             disc += r.computed_disc;
             tax += r.computed_tax;
         });
+
+        const grossVal = +gross.toFixed(2);
+        const discVal = +disc.toFixed(2);
+        const taxVal = +tax.toFixed(2);
+        let netVal = Math.round(grossVal - discVal + taxVal);
+
+        if (selectedInvoice) {
+            const maxReturnable = Number(selectedInvoice.returnable_amount ?? selectedInvoice.net_total ?? 0);
+            if (maxReturnable > 0 && netVal > maxReturnable && (netVal - maxReturnable) <= 2) {
+                netVal = maxReturnable;
+            }
+        }
+
         return {
-            gross: +gross.toFixed(2),
-            disc: +disc.toFixed(2),
-            tax: +tax.toFixed(2),
-            net: +(gross - disc + tax).toFixed(2),
+            gross: grossVal,
+            disc: discVal,
+            tax: taxVal,
+            net: netVal,
         };
-    }, [rowsWithAmount]);
+    }, [rowsWithAmount, selectedInvoice]);
 
     const filteredInvoices = useMemo(() => {
         const q = invoiceSearch.toLowerCase();

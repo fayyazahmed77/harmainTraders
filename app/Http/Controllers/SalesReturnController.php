@@ -32,11 +32,92 @@ class SalesReturnController extends Controller implements HasMiddleware
         ];
     }
     //index
-    public function index()
+    public function index(Request $request)
     {
-        $returns = SalesReturn::with('customer', 'salesman')->latest()->get();
+        $query = SalesReturn::with(['customer', 'salesman']);
+
+        // Search by Return Invoice, Original Invoice, Remarks, or Customer Title/Code
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice', 'like', "%{$search}%")
+                  ->orWhere('original_invoice', 'like', "%{$search}%")
+                  ->orWhere('remarks', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($sub) use ($search) {
+                      $sub->where('title', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Date Range
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('date', '>=', $request->start_date);
+        } elseif ($request->filled('end_date')) {
+            $query->where('date', '<=', $request->end_date);
+        }
+
+        // Customer / Account Filter
+        if ($request->filled('customer_id') && $request->customer_id !== 'all') {
+            $query->where('customer_id', $request->customer_id);
+        }
+        if ($request->filled('account_id') && $request->account_id !== 'all') {
+            $query->where('customer_id', $request->account_id);
+        }
+
+        // Salesman Filter
+        if ($request->filled('salesman_id') && $request->salesman_id !== 'all') {
+            $query->where('salesman_id', $request->salesman_id);
+        }
+
+        // Firm Filter
+        if ($request->filled('firm_id') && $request->firm_id !== 'all') {
+            $query->where('firm_id', $request->firm_id);
+        }
+
+        // Min & Max Amount Filter
+        if ($request->filled('min_amount')) {
+            $query->where('net_total', '>=', (float) $request->min_amount);
+        }
+        if ($request->filled('max_amount')) {
+            $query->where('net_total', '<=', (float) $request->max_amount);
+        }
+
+        // Summary KPI statistics reflecting active filters
+        $summary = [
+            'total_volume' => (int) (clone $query)->count(),
+            'total_amount' => (float) (clone $query)->sum('net_total'),
+            'total_items'  => (int) (clone $query)->sum('no_of_items'),
+        ];
+
+        // Pagination (Default 50 rows, matching Journal Vouchers)
+        $perPage = in_array((int) $request->input('per_page'), [15, 25, 50, 100]) ? (int) $request->input('per_page') : 50;
+        $returns = $query->orderBy('date', 'desc')
+                         ->orderBy('id', 'desc')
+                         ->paginate($perPage)
+                         ->withQueryString();
+
+        // Dropdown data for filter controls
+        $customers = Account::eligibleForSale()
+            ->select('id', 'title', 'code')
+            ->orderBy('title')
+            ->get();
+        if ($customers->isEmpty()) {
+            $customers = Account::where('sale', 1)->select('id', 'title', 'code')->orderBy('title')->get();
+        }
+
+        $salesmen = Saleman::select('id', 'name')->orderBy('name')->get();
+        $firms = \App\Models\Firm::select('id', 'name')->get();
+
         return Inertia::render("daily/sales_return/index", [
-            'returns' => $returns,
+            'returns'   => $returns,
+            'summary'   => $summary,
+            'customers' => $customers,
+            'salesmen'  => $salesmen,
+            'firms'     => $firms,
+            'filters'   => $request->all(['search', 'start_date', 'end_date', 'customer_id', 'account_id', 'salesman_id', 'firm_id', 'min_amount', 'max_amount', 'per_page']),
         ]);
     }
 
@@ -140,8 +221,17 @@ class SalesReturnController extends Controller implements HasMiddleware
             ]);
         }
 
-        $liveReturned = SalesReturn::where('sale_id', $sale->id)->sum('net_total');
-        $maxReturnable = max(0, $sale->net_total - $liveReturned);
+        $liveReturned = (float) SalesReturn::where('sale_id', $sale->id)->sum('net_total');
+        $maxReturnable = max(0, (float) $sale->net_total - $liveReturned);
+
+        // Auto-clamp small rounding differences (up to 2.00 Rupees) caused by whole-rupee rounding on sales invoices
+        $diff = round($request->net_total, 2) - round($maxReturnable, 2);
+        if ($diff > 0 && $diff <= 2.00) {
+            $request->merge([
+                'net_total' => $maxReturnable,
+                'remaining_amount' => max(0, $maxReturnable - (float)($request->extra_discount ?? 0) - (float)($request->paid_amount ?? 0)),
+            ]);
+        }
 
         if (round($request->net_total, 2) > round($maxReturnable, 2) + 0.01) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -286,11 +376,15 @@ class SalesReturnController extends Controller implements HasMiddleware
 
                     $status = $isFullyReturned ? 'Returned' : ($isPartialReturn ? 'Partial Return' : ($sale->status ?? 'Completed'));
 
+                    $saleLiveReturned = (float) SalesReturn::where('sale_id', $sale->id)->sum('net_total');
+                    $saleMaxReturnable = max(0, (float) $sale->net_total - $saleLiveReturned);
+
                     return [
                         'id'                => $sale->id,
                         'invoice'           => $sale->invoice,
                         'date'              => $sale->date,
                         'net_total'         => $sale->net_total,
+                        'returnable_amount' => $saleMaxReturnable,
                         'remaining_amount'  => $isFullyReturned ? 0.0 : max(0.0, (float)$sale->remaining_amount),
                         'status'            => $status,
                         'firm_id'           => $sale->firm_id,
@@ -338,11 +432,15 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ];
             });
 
+            $liveReturned = (float) SalesReturn::where('sale_id', $sale->id)->sum('net_total');
+            $maxReturnable = max(0, (float) $sale->net_total - $liveReturned);
+
             return response()->json([
-                'invoice'  => $sale->invoice,
-                'date'     => $sale->date,
-                'net_total' => $sale->net_total,
-                'items'    => $items,
+                'invoice'           => $sale->invoice,
+                'date'              => $sale->date,
+                'net_total'         => $sale->net_total,
+                'returnable_amount' => $maxReturnable,
+                'items'             => $items,
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -501,8 +599,17 @@ class SalesReturnController extends Controller implements HasMiddleware
             ]);
         }
 
-        $liveReturned = SalesReturn::where('sale_id', $newSale->id)->where('id', '!=', $id)->sum('net_total');
-        $maxReturnable = max(0, $newSale->net_total - $liveReturned);
+        $liveReturned = (float) SalesReturn::where('sale_id', $newSale->id)->where('id', '!=', $id)->sum('net_total');
+        $maxReturnable = max(0, (float) $newSale->net_total - $liveReturned);
+
+        // Auto-clamp small rounding differences (up to 2.00 Rupees) caused by whole-rupee rounding on sales invoices
+        $diff = round($request->net_total, 2) - round($maxReturnable, 2);
+        if ($diff > 0 && $diff <= 2.00) {
+            $request->merge([
+                'net_total' => $maxReturnable,
+                'remaining_amount' => max(0, $maxReturnable - (float)($request->extra_discount ?? 0) - (float)($request->paid_amount ?? 0)),
+            ]);
+        }
 
         if (round($request->net_total, 2) > round($maxReturnable, 2) + 0.01) {
             throw \Illuminate\Validation\ValidationException::withMessages([

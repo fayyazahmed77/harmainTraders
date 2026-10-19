@@ -2095,8 +2095,38 @@ class ReportBuilder
             $currentBal = (float)$account->current_balance;
             $signedOB = (float)$account->getSignedOpeningBalance();
 
-            // Compute remaining unpaid opening balance for supplier using PaymentAllocationEngine
-            $excessOverBills = round($currentBal - $billsRemaining, 2);
+            // If account is fully settled with zero balance, skip (no payable obligations)
+            if (abs($currentBal) <= 0.005) {
+                continue;
+            }
+
+            // If bills exceed current ledger balance, payments were made on account without bill allocation.
+            // Dynamically apply unallocated payment FIFO to oldest bills so only genuinely payable balances display:
+            $adjustedBills = collect();
+            if ($currentBal > 0.005) {
+                if ($billsRemaining > $currentBal) {
+                    $unallocatedPayment = round($billsRemaining - $currentBal, 2);
+                    $sortedPartyBills = $partyBills->sortBy('date')->values();
+                    foreach ($sortedPartyBills as $bill) {
+                        if ($unallocatedPayment > 0.005) {
+                            $canAbsorb = min($unallocatedPayment, $bill['remaining']);
+                            $bill['paid'] = round((float)$bill['paid'] + $canAbsorb, 2);
+                            $bill['remaining'] = round((float)$bill['remaining'] - $canAbsorb, 2);
+                            $unallocatedPayment = round($unallocatedPayment - $canAbsorb, 2);
+                        }
+                        if ($bill['remaining'] > 0.005) {
+                            $adjustedBills->push($bill);
+                        }
+                    }
+                } else {
+                    $adjustedBills = $partyBills;
+                }
+            } else {
+                $adjustedBills = $partyBills;
+            }
+
+            $billsRemainingAfter = (float)$adjustedBills->sum('remaining');
+            $excessOverBills = round($currentBal - $billsRemainingAfter, 2);
             $remainingOB = 0.0;
             if ($signedOB > 0) {
                 // Normal supplier payable (CR)
@@ -2108,7 +2138,7 @@ class ReportBuilder
             }
 
             // If no unpaid bills and no unpaid opening balance, skip this party
-            if ($partyBills->isEmpty() && abs($remainingOB) <= 0.005) {
+            if ($adjustedBills->isEmpty() && abs($remainingOB) <= 0.005) {
                 continue;
             }
 
@@ -2155,7 +2185,7 @@ class ReportBuilder
             }
 
             // Merge regular bills, keeping opening balance at the top, then chronological date & voucher
-            $sortedItems = $itemsForParty->concat($partyBills)->sort(function($a, $b) {
+            $sortedItems = $itemsForParty->concat($adjustedBills)->sort(function($a, $b) {
                 $aIsOb = !empty($a['is_opening_balance']) || str_starts_with($a['voucher_no'] ?? '', 'OPENING-BAL');
                 $bIsOb = !empty($b['is_opening_balance']) || str_starts_with($b['voucher_no'] ?? '', 'OPENING-BAL');
                 if ($aIsOb && !$bIsOb) return -1;
@@ -2190,6 +2220,10 @@ class ReportBuilder
                     'credit_days' => (int)($account->aging_days ?? 0),
                     'credit_limit' => (float)($account->credit_limit ?? 0),
                     'party_type' => 'payable',
+                    'current_balance' => (float)$account->current_balance,
+                    'total_outstanding' => round($cumulativeBalance, 2),
+                    'is_reconciled' => abs($cumulativeBalance - (float)$account->current_balance) < 0.05,
+                    'difference' => round($cumulativeBalance - (float)$account->current_balance, 2),
                 ];
 
                 $count = count($processedPartyItems);

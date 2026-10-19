@@ -452,28 +452,25 @@ function formatNum($num) {
             </table>
 
             <!-- Party Summary Bar -->
+            <!-- Party Summary Bar -->
             <table class="party-summary-bar">
                 <tr>
-                    <td width="13%" class="summary-bar-label text-center">Un-Due Amount</td>
-                    <td width="13%" class="summary-bar-val text-right">{{ formatNum($summary['party_un_due_amount']) }}</td>
+                    <td width="10%" class="summary-bar-label text-center">Un-Due</td>
+                    <td width="11%" class="summary-bar-val text-right">{{ formatNum($summary['party_un_due_amount']) }}</td>
                     
-                    <td width="13%" class="summary-bar-label text-center">Overdue Amount</td>
-                    <td width="13%" class="summary-bar-val text-right">{{ formatNum($summary['party_due_amount']) }}</td>
+                    <td width="10%" class="summary-bar-label text-center">Overdue</td>
+                    <td width="11%" class="summary-bar-val text-right">{{ formatNum($summary['party_due_amount']) }}</td>
                     
-                    <td width="10%" class="summary-bar-label text-center">Credit Days</td>
+                    <td width="8%" class="summary-bar-label text-center">Terms</td>
                     <td width="8%" class="summary-bar-val text-center">{{ $summary['credit_days'] }} Days</td>
                     
-                    <td width="10%" class="summary-bar-label text-center">Credit Limit</td>
-                    <td width="10%" class="summary-bar-val text-center">
-                        @if(!empty($summary['credit_limit']) && (float)$summary['credit_limit'] > 0 && (float)$summary['credit_limit'] < 90000000)
-                            Rs. {{ number_format((float)$summary['credit_limit'], 0) }}
-                        @else
-                            No Limit
-                        @endif
+                    <td width="11%" class="summary-bar-label text-center" style="background-color: #e2e8f0;">Ledger Bal</td>
+                    <td width="13%" class="summary-bar-val text-right font-bold" style="background-color: #f1f5f9;">
+                        Rs. {{ formatNum($summary['current_balance'] ?? $partyTotalRemaining) }}
                     </td>
                     
-                    <td width="10%" class="summary-bar-label text-center" style="background-color: #dedede;">Total Balance</td>
-                    <td width="10%" class="summary-bar-val text-right double-underline" style="background-color: #f0f0f0;">
+                    <td width="11%" class="summary-bar-label text-center" style="background-color: #dedede;">Outstanding</td>
+                    <td width="17%" class="summary-bar-val text-right double-underline font-bold" style="background-color: #f0f0f0;">
                         Rs. {{ formatNum($partyTotalRemaining) }}
                     </td>
                 </tr>

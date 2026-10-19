@@ -21,9 +21,10 @@ import {
     Activity,
     Layers,
     UserCircle2,
-    TrendingUp,
-    TrendingDown,
-    Scale
+    CheckCircle2,
+    Scale,
+    Receipt,
+    Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +51,10 @@ interface OutstandingBill {
         credit_days: number;
         credit_limit: number;
         party_type: 'receivable' | 'payable';
+        current_balance?: number;
+        total_outstanding?: number;
+        is_reconciled?: boolean;
+        difference?: number;
     };
 }
 
@@ -59,93 +64,138 @@ interface OutstandingBillWiseViewProps {
 
 export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) {
     const stats = useMemo(() => {
-        const receivable = data.filter(i => i.bill_type === 'receivable').reduce((s, i) => s + i.remaining, 0);
-        const payable = data.filter(i => i.bill_type === 'payable').reduce((s, i) => s + i.remaining, 0);
-        return { receivable, payable, net: receivable - payable };
+        const receivable = data.filter(i => i.bill_type === 'receivable').reduce((s, i) => s + (Number(i.remaining) || 0), 0);
+        const payable = data.filter(i => i.bill_type === 'payable').reduce((s, i) => s + (Number(i.remaining) || 0), 0);
+        const totalBilled = data.reduce((s, i) => s + (Number(i.bill_amt) || 0), 0);
+        const totalPaid = data.reduce((s, i) => s + (Number(i.paid) || 0), 0);
+        return { receivable, payable, net: receivable - payable, totalBilled, totalPaid };
     }, [data]);
 
     if (!data || data.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 bg-surface-1/30 rounded-3xl border border-border/50">
-                <Layers className="h-10 w-10 text-text-muted/20 mb-4" />
-                <h3 className="text-sm font-display font-black text-text-muted uppercase tracking-widest">No Intelligence Data</h3>
+            <div className="flex flex-col items-center justify-center py-20 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <Layers className="h-12 w-12 text-slate-300 dark:text-zinc-700 mb-3" />
+                <h3 className="text-sm font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-widest">Zero Outstanding Obligations</h3>
+                <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">All supplier purchase bills and accounts are fully settled and reconciled.</p>
             </div>
         );
     }
 
     return (
-        <div className="relative -mt-6">
-            <div className="overflow-hidden bg-card border border-border shadow-sm rounded-xl flex flex-col">
+        <div className="relative -mt-4 space-y-4">
+            <div className="overflow-hidden bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm rounded-xl flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full border-separate border-spacing-0 p-0 m-0">
+                    <table className="w-full border-collapse p-0 m-0">
+                        {/* High-Contrast Crystal-Clear Table Header */}
                         <thead className="sticky top-0 z-20">
-                            <tr className="bg-gradient-to-r from-surface-4/95 to-surface-3/95 backdrop-blur-2xl border-b border-border/40 hover:bg-surface-4 h-9">
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white pl-6 m-0 border-b border-border/40 text-left align-middle h-9">Timeline</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-left align-middle h-9">Voucher</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-left align-middle h-9">Maturity</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-center align-middle h-9">Aging Index</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-right align-middle h-9">Bill Amt</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-center align-middle h-9">
-                                    <Badge variant="outline" className="text-[7px] font-black border-indigo-500/30 text-indigo-400 bg-indigo-500/5 px-1 tracking-widest">Settled</Badge>
+                            <tr className="bg-slate-900 text-white dark:bg-zinc-900 border-b border-slate-800 dark:border-zinc-800 h-10 shadow-xs">
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 pl-6 text-left align-middle h-10 whitespace-nowrap">Timeline</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-left align-middle h-10 whitespace-nowrap">Voucher #</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-center align-middle h-10 whitespace-nowrap">Maturity</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-center align-middle h-10 whitespace-nowrap">Aging Index</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-right align-middle h-10 whitespace-nowrap">Bill Amt (₨)</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-right align-middle h-10 whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1 text-emerald-400">
+                                        Settled (₨)
+                                    </span>
                                 </th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-right align-middle h-9">Outstanding</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white pr-6 m-0 border-b border-border/40 text-right align-middle h-9">Balance</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 px-3 text-right align-middle h-10 whitespace-nowrap">Outstanding (₨)</th>
+                                <th className="text-[10px] font-bold uppercase tracking-wider text-slate-200 pr-6 text-right align-middle h-10 whitespace-nowrap">Running Balance (₨)</th>
                             </tr>
                         </thead>
                         <TableBody>
                             {data.map((item, index) => {
                                 const isReceivable = item.bill_type === 'receivable';
-                                const isNewParty = index === 0 || data[index-1].party_id !== item.party_id;
+                                const isNewParty = index === 0 || data[index - 1].party_id !== item.party_id;
+                                const isReconciled = item.party_summary?.is_reconciled ?? true;
+                                const currentBal = item.party_summary?.current_balance ?? item.balance;
                                 
                                 return (
                                     <React.Fragment key={`${item.party_id}-${item.voucher_no}-${index}`}>
-                                        {/* Sticky Party intelligence Row */}
+                                        {/* Professional Party Header Strip with Direct Ledger Reconciliation */}
                                         {isNewParty && (
-                                            <TableRow className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur-md border-y border-border/40 group/header">
-                                                <TableCell colSpan={8} className="py-2.5 px-6">
-                                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <TableRow className="sticky top-10 z-10 bg-slate-100/95 dark:bg-zinc-800/95 backdrop-blur-md border-y border-slate-200 dark:border-zinc-700">
+                                                <TableCell colSpan={8} className="py-3 px-6">
+                                                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                                                        
+                                                        {/* Party Identity & Ledger Position */}
                                                         <div className="flex items-center gap-3">
                                                             <div className={cn(
-                                                                "h-8 w-8 rounded-lg flex items-center justify-center shadow-md",
-                                                                isReceivable ? "bg-indigo-600" : "bg-amber-600"
+                                                                "h-9 w-9 rounded-lg flex items-center justify-center shadow-xs shrink-0",
+                                                                isReceivable ? "bg-indigo-600 text-white" : "bg-amber-600 text-white"
                                                             )}>
-                                                                <UserCircle2 className="h-4.5 w-4.5 text-white" />
+                                                                <UserCircle2 className="h-5 w-5" />
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-xs font-display font-black text-text-primary uppercase tracking-tight flex items-center gap-2">
-                                                                    {item.party_name}
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <h4 className="text-sm font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
+                                                                        {item.party_name}
+                                                                    </h4>
                                                                     <Badge className={cn(
-                                                                        "h-3.5 px-1.5 text-[8px] font-black uppercase tracking-widest border-none",
-                                                                        isReceivable ? "bg-indigo-500/10 text-indigo-500" : "bg-amber-500/10 text-amber-500"
+                                                                        "h-4 px-1.5 text-[8px] font-bold uppercase tracking-wider border-none",
+                                                                        isReceivable ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
                                                                     )}>
-                                                                        {isReceivable ? 'Receivable' : 'Payable'}
+                                                                        {isReceivable ? 'Customer (Receivable)' : 'Supplier (Payable)'}
                                                                     </Badge>
-                                                                </h4>
-                                                                <span className="text-[10px] font-bold text-text-muted flex items-center gap-1.5 mt-0.5">
-                                                                 <Activity className="h-3 w-3" /> Professional Entity ID: {item.party_id}
-                                                                </span>
+                                                                    <span className="text-[10px] text-slate-500 font-mono">
+                                                                        Entity #{item.party_id}
+                                                                    </span>
+
+                                                                    {/* Verified Reconciliation Pill */}
+                                                                    {isReconciled ? (
+                                                                        <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[9px] font-bold flex items-center gap-1 py-0 h-4">
+                                                                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                                                            100% Reconciled with Ledger
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[9px] font-bold flex items-center gap-1 py-0 h-4">
+                                                                            <AlertCircle className="h-3 w-3 text-amber-600" />
+                                                                            On-Account Adjustment
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-zinc-400 mt-0.5">
+                                                                    <span>Ledger Balance: <strong className="text-slate-900 dark:text-zinc-100 font-mono">₨ {Math.abs(currentBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currentBal >= 0 ? 'CR' : 'DR'}</strong></span>
+                                                                </div>
                                                             </div>
                                                         </div>
 
-                                                        {/* Compact Stats Row */}
+                                                        {/* High-Precision Aging & Credit KPIs */}
                                                         {item.party_summary && (
-                                                            <div className="flex items-center gap-6">
-                                                                {[
-                                                                    { label: 'Un Due', val: item.party_summary.party_un_due_amount, icon: Clock, color: 'text-text-primary' },
-                                                                    { label: 'Critical Due', val: item.party_summary.party_due_amount, icon: AlertCircle, color: 'text-rose-500' },
-                                                                    { label: 'Cr. Limit', val: item.party_summary.credit_limit, icon: ShieldCheck, color: 'text-indigo-500' },
-                                                                    { label: 'Health', val: item.party_summary.credit_days, icon: Activity, color: 'text-emerald-500', suffix: ' Days' }
-                                                                ].map((stat, sIdx) => (
-                                                                    <div key={sIdx} className="flex flex-col items-end">
-                                                                        <span className="text-[8px] font-display font-black text-text-muted uppercase tracking-widest mb-0.5">{stat.label}</span>
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <stat.icon className={cn("h-3 w-3 opacity-60", stat.color)} />
-                                                                            <span className={cn("text-[10px] font-mono-jet font-black tracking-tighter", stat.color)}>
-                                                                                {stat.val.toLocaleString()}{stat.suffix}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                            <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
+                                                                <div className="flex flex-col items-start xl:items-end">
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Un-Due</span>
+                                                                    <span className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100">
+                                                                        ₨ {item.party_summary.party_un_due_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-start xl:items-end">
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500">Critical Overdue</span>
+                                                                    <span className={cn(
+                                                                        "text-xs font-mono font-bold",
+                                                                        item.party_summary.party_due_amount > 0 ? "text-rose-600 font-black" : "text-slate-500"
+                                                                    )}>
+                                                                        ₨ {item.party_summary.party_due_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-start xl:items-end">
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Credit Terms</span>
+                                                                    <span className="text-xs font-mono font-bold text-slate-700 dark:text-zinc-300">
+                                                                        {item.party_summary.credit_days > 0 ? `${item.party_summary.credit_days} Days` : 'Immediate'}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-start xl:items-end">
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Credit Limit</span>
+                                                                    <span className="text-xs font-mono font-bold text-slate-700 dark:text-zinc-300">
+                                                                        {item.party_summary.credit_limit > 0 && item.party_summary.credit_limit < 90000000 
+                                                                            ? `₨ ${item.party_summary.credit_limit.toLocaleString()}` 
+                                                                            : 'No Limit'}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
@@ -153,81 +203,95 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                             </TableRow>
                                         )}
 
-                                        {/* High-Density Row */}
+                                        {/* High-Contrast Professional Data Row */}
                                         <TableRow className={cn(
-                                            "group transition-colors border-b border-border/5 last:border-none",
-                                            isReceivable ? "hover:bg-indigo-500/5" : "hover:bg-amber-500/5",
-                                            index % 2 === 0 ? "bg-card" : "bg-surface-1/30"
+                                            "transition-colors border-b border-slate-100 dark:border-zinc-800/80 last:border-none",
+                                            index % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-slate-50/50 dark:bg-zinc-900/40",
+                                            isReceivable ? "hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20" : "hover:bg-amber-50/40 dark:hover:bg-amber-950/20"
                                         )}>
-                                            <TableCell className="pl-6 py-1.5">
+                                            {/* Date / Timeline */}
+                                            <TableCell className="pl-6 py-2.5">
                                                 <div className="flex items-center gap-2">
                                                     <div className={cn(
-                                                        "h-4 border-l-2",
+                                                        "h-3.5 w-1 rounded-full",
                                                         (item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL'))
-                                                            ? ((item.remaining < 0 || item.voucher_no?.includes('DR')) ? "border-emerald-400" : "border-amber-400")
-                                                            : (isReceivable ? "border-indigo-500" : "border-amber-500")
+                                                            ? ((item.remaining < 0 || item.voucher_no?.includes('DR')) ? "bg-emerald-500" : "bg-amber-500")
+                                                            : (isReceivable ? "bg-indigo-500" : "bg-amber-500")
                                                     )} />
-                                                    <span className="text-[10px] font-bold text-text-muted">
-                                                        {item.date && !isNaN(new Date(item.date).getTime()) ? format(new Date(item.date), 'dd/MM/yy') : (item.date || '-')}
+                                                    <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                                                        {item.date && !isNaN(new Date(item.date).getTime()) ? format(new Date(item.date), 'dd/MM/yyyy') : (item.date || '-')}
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL') ? (
-                                                        <Badge variant="outline" className={cn(
-                                                            "text-[9px] font-mono-jet font-black tracking-wider px-2 py-0.5 rounded shadow-sm",
-                                                            (item.remaining < 0 || item.voucher_no?.includes('DR'))
-                                                                ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                                                                : "border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10"
-                                                        )}>
-                                                            {item.voucher_no || 'OPENING-BAL'}
-                                                        </Badge>
-                                                    ) : (
-                                                        <>
-                                                            <FileText className="h-3 w-3 text-text-muted/40" />
-                                                            <span className="text-[11px] font-mono-jet font-black text-text-primary tracking-tight">
-                                                                {item.voucher_no}
-                                                                {isReceivable ? <ArrowUpRight className="inline-block h-3 w-3 ml-1 text-indigo-400 opacity-0 group-hover:opacity-100" /> : <ArrowDownRight className="inline-block h-3 w-3 ml-1 text-amber-400 opacity-0 group-hover:opacity-100" />}
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-[11px] font-bold text-text-muted">
-                                                {item.due_date && !isNaN(new Date(item.due_date).getTime()) ? format(new Date(item.due_date), 'dd/MM/yy') : (item.due_date || '-')}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <div className="flex justify-center">
-                                                    <span className={cn(
-                                                        "text-[10px] font-black tracking-tight px-2 py-0.5 rounded-full border",
-                                                        item.days > 0 ? "bg-rose-500/10 text-rose-600 border-rose-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+
+                                            {/* Voucher Code */}
+                                            <TableCell className="px-3 py-2.5">
+                                                {item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL') ? (
+                                                    <Badge variant="outline" className={cn(
+                                                        "text-[9px] font-mono font-bold tracking-wider px-2 py-0.5 rounded shadow-2xs",
+                                                        (item.remaining < 0 || item.voucher_no?.includes('DR'))
+                                                            ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                                                            : "border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30"
                                                     )}>
-                                                        {item.days > 0 ? `${item.days} Ovr` : `${Math.abs(item.days)} Gr`}
-                                                    </span>
-                                                </div>
+                                                        {item.voucher_no || 'OPENING-BAL'}
+                                                    </Badge>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-900 dark:text-zinc-100">
+                                                        <FileText className="h-3.5 w-3.5 text-slate-400" />
+                                                        <span>{item.voucher_no}</span>
+                                                    </div>
+                                                )}
                                             </TableCell>
-                                            <TableCell className="text-right text-[11px] font-mono-jet font-bold">
-                                                <span className={item.bill_amt < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-text-secondary"}>
-                                                    {item.bill_amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </span>
+
+                                            {/* Due Date */}
+                                            <TableCell className="px-3 py-2.5 text-center text-xs text-slate-600 dark:text-zinc-400">
+                                                {item.due_date && !isNaN(new Date(item.due_date).getTime()) ? format(new Date(item.due_date), 'dd/MM/yyyy') : (item.due_date || '-')}
                                             </TableCell>
-                                            <TableCell className="text-right text-[11px] font-mono-jet font-bold text-emerald-500/80">
-                                                {item.paid > 0 ? item.paid.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
-                                            </TableCell>
-                                            <TableCell className="text-right text-[11px] font-mono-jet font-black">
-                                                <span className={item.remaining < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-text-primary"}>
-                                                    {item.remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-right pr-6">
+
+                                            {/* Aging Status Badge */}
+                                            <TableCell className="px-3 py-2.5 text-center">
                                                 <span className={cn(
-                                                    "text-[11px] font-mono-jet font-black px-1.5 py-0.5 rounded-sm",
-                                                    item.balance < 0
-                                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                                        : (isReceivable ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400")
+                                                    "inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs",
+                                                    item.days > 0 
+                                                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800" 
+                                                        : item.days === 0
+                                                            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+                                                            : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
                                                 )}>
-                                                    {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    {item.days > 0 ? `${item.days}d Overdue` : item.days === 0 ? 'Due Today' : `${Math.abs(item.days)}d Left`}
+                                                </span>
+                                            </TableCell>
+
+                                            {/* Bill Amount */}
+                                            <TableCell className="px-3 py-2.5 text-right font-mono text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                                                <span className={item.bill_amt < 0 ? "text-emerald-600 dark:text-emerald-400" : ""}>
+                                                    {item.bill_amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </TableCell>
+
+                                            {/* Settled / Paid */}
+                                            <TableCell className="px-3 py-2.5 text-right font-mono text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                {item.paid > 0.005 ? item.paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                            </TableCell>
+
+                                            {/* Outstanding Remaining */}
+                                            <TableCell className="px-3 py-2.5 text-right font-mono text-xs font-bold">
+                                                <span className={item.remaining < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-900 dark:text-zinc-100"}>
+                                                    {item.remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </TableCell>
+
+                                            {/* Cumulative Running Balance */}
+                                            <TableCell className="pr-6 py-2.5 text-right font-mono text-xs font-black">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded-sm inline-block",
+                                                    item.balance < 0 
+                                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                        : (isReceivable 
+                                                            ? "bg-indigo-100 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300"
+                                                            : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300")
+                                                )}>
+                                                    {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </TableCell>
                                         </TableRow>
@@ -239,23 +303,39 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                 </div>
             </div>
 
-            {/* Slim Stealth intelligence Footer */}
-            <div className="bg-surface-4 dark:bg-surface-3 p-4 px-8 mt-3 rounded-xl flex items-center justify-between border-b-2 border-indigo-500/30 shadow-sm">
-                <div className="flex items-center gap-6">
-                    <Scale className="h-5 w-5 text-indigo-400" />
+            {/* Executive Supplier Payables Consolidation Dashboard (Footer) */}
+            <div className="bg-slate-900 text-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 px-6 sm:px-8 border border-slate-800 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-inner">
+                        <Scale className="h-6 w-6" />
+                    </div>
                     <div>
-                        <h5 className="text-[8px] font-display font-black text-text-muted uppercase tracking-[0.3em]">Total Outstanding Position</h5>
-                        <p className="text-sm font-display font-black text-text-primary tracking-widest uppercase">Supplier Outstanding Consolidation</p>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-amber-400">Executive Summary</span>
+                            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[9px] font-bold">Verified Audit</Badge>
+                        </div>
+                        <h4 className="text-base font-bold text-white tracking-tight mt-0.5">Supplier Outstanding Payables Position</h4>
+                        <p className="text-xs text-slate-400">Total verified liabilities and open purchase obligations as-of statement date</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-12">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[8px] font-display font-black text-text-muted uppercase tracking-widest mb-1">Total Payables</span>
-                        <p className="text-base font-mono-jet font-black tracking-tighter text-amber-500">
-                            <span className="text-[10px] font-medium opacity-30 mr-1.5 font-sans">PKR</span>
-                            {stats.payable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
+                {/* High-Contrast Key Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 w-full lg:w-auto">
+                    <div className="flex flex-col sm:items-end">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Open Bills</span>
+                        <span className="text-sm font-bold font-mono text-slate-200">{data.length} Records</span>
+                    </div>
+                    <div className="flex flex-col sm:items-end">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Billed</span>
+                        <span className="text-sm font-bold font-mono text-slate-200">₨ {stats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex flex-col sm:items-end">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Settled (Paid)</span>
+                        <span className="text-sm font-bold font-mono text-emerald-400">₨ {stats.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex flex-col sm:items-end">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-400">Net Outstanding</span>
+                        <span className="text-lg font-black font-mono text-amber-400">₨ {stats.payable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             </div>

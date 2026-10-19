@@ -313,6 +313,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                 accounts={bootstrap.accounts}
                 selectedAccountId={data.accountId}
                 onSelect={(id) => handleChange('accountId', id)}
+                accountTypes={bootstrap.accountTypes}
             />
 
             <ReportSectionDialog 

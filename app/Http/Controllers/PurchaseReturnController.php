@@ -29,15 +29,93 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         ];
     }
     //index
-    public function index()
+    public function index(Request $request)
     {
-        $returns = PurchaseReturn::with('supplier', 'salesman')
+        $query = PurchaseReturn::with(['supplier', 'salesman', 'firm'])
             ->withSum('items as total_cartons', 'qty_carton')
-            ->withSum('items as total_pcs', 'total_pcs')
-            ->latest()
+            ->withSum('items as total_pcs', 'total_pcs');
+
+        // Search: Return Invoice, Original Invoice, Remarks, Supplier Title/Code
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice', 'like', "%{$search}%")
+                  ->orWhere('original_invoice', 'like', "%{$search}%")
+                  ->orWhere('remarks', 'like', "%{$search}%")
+                  ->orWhereHas('supplier', function ($sub) use ($search) {
+                      $sub->where('title', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Date Range
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('date', '>=', $request->start_date);
+        } elseif ($request->filled('end_date')) {
+            $query->where('date', '<=', $request->end_date);
+        }
+
+        // Supplier / Account Filter
+        if ($request->filled('supplier_id') && $request->supplier_id !== 'all') {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+        if ($request->filled('account_id') && $request->account_id !== 'all') {
+            $query->where('supplier_id', $request->account_id);
+        }
+
+        // Salesman Filter
+        if ($request->filled('salesman_id') && $request->salesman_id !== 'all') {
+            $query->where('salesman_id', $request->salesman_id);
+        }
+
+        // Firm Filter
+        if ($request->filled('firm_id') && $request->firm_id !== 'all') {
+            $query->where('firm_id', $request->firm_id);
+        }
+
+        // Min & Max Amount Filter
+        if ($request->filled('min_amount')) {
+            $query->where('net_total', '>=', (float) $request->min_amount);
+        }
+        if ($request->filled('max_amount')) {
+            $query->where('net_total', '<=', (float) $request->max_amount);
+        }
+
+        // Summary KPI statistics reflecting active filters
+        $summary = [
+            'total_volume' => (int) (clone $query)->count(),
+            'total_amount' => (float) (clone $query)->sum('net_total'),
+            'total_items'  => (int) (clone $query)->sum('no_of_items'),
+        ];
+
+        // Pagination (Default 50 rows, matching Journal Vouchers)
+        $perPage = in_array((int) $request->input('per_page'), [15, 25, 50, 100]) ? (int) $request->input('per_page') : 50;
+        $returns = $query->orderBy('date', 'desc')
+                         ->orderBy('id', 'desc')
+                         ->paginate($perPage)
+                         ->withQueryString();
+
+        $suppliers = Account::eligibleForPurchase()
+            ->select('id', 'title', 'code')
+            ->orderBy('title')
             ->get();
+        if ($suppliers->isEmpty()) {
+            $suppliers = Account::where('purchase', 1)->select('id', 'title', 'code')->orderBy('title')->get();
+        }
+
+        $salesmen = Saleman::select('id', 'name')->orderBy('name')->get();
+        $firms = \App\Models\Firm::select('id', 'name')->get();
+
         return Inertia::render("daily/purchase_return/index", [
-            'returns' => $returns,
+            'returns'   => $returns,
+            'summary'   => $summary,
+            'suppliers' => $suppliers,
+            'salesmen'  => $salesmen,
+            'firms'     => $firms,
+            'filters'   => $request->all(['search', 'start_date', 'end_date', 'supplier_id', 'account_id', 'salesman_id', 'firm_id', 'min_amount', 'max_amount', 'per_page']),
         ]);
     }
 

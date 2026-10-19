@@ -9,6 +9,7 @@ import { Plus, Receipt, History as HistoryIcon, Activity, Sparkles, Wallet } fro
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import DataTable from "./DataTable";
+import SalesReturnFilters from "./components/SalesReturnFilters";
 import { BreadcrumbItem } from "@/types";
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -40,13 +41,51 @@ interface SalesReturn {
     };
 }
 
+interface PaginatedReturns {
+    data: SalesReturn[];
+    current_page: number;
+    last_page: number;
+    per_page?: number;
+    total: number;
+    from?: number;
+    to?: number;
+    links?: any[];
+}
+
 interface Props {
-    returns: SalesReturn[];
+    returns: PaginatedReturns;
+    summary?: {
+        total_volume: number;
+        total_amount: number;
+        total_items: number;
+    };
+    customers?: Array<{ id: number; title: string }>;
+    salesmen?: Array<{ id: number; name: string }>;
+    firms?: Array<{ id: number; name: string }>;
+    filters?: Record<string, any>;
 }
 
 const PREMIUM_ROUNDING = "rounded-2xl";
 
-export default function Index({ returns }: Props) {
+export default function Index({
+    returns,
+    summary,
+    customers = [],
+    salesmen = [],
+    firms = [],
+    filters = {},
+}: Props) {
+    const totalVolume = summary?.total_volume ?? returns?.total ?? returns?.data?.length ?? 0;
+    const totalAmount = summary?.total_amount ?? 0;
+    const totalItems = summary?.total_items ?? 0;
+
+    const stats = [
+        { label: "Return Volume", value: totalVolume.toLocaleString(), icon: HistoryIcon, color: "orange" },
+        { label: "Credit Issued", value: `₨ ${Number(totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Wallet, color: "zinc" },
+        { label: "Item Reconciliation", value: totalItems.toLocaleString(), icon: Activity, color: "orange" },
+        { label: "Registry Health", value: "100%", icon: Sparkles, color: "emerald" },
+    ];
+
     return (
         <SidebarProvider>
             <Head title="Credit Note Ledger | Sales Systems" />
@@ -55,7 +94,7 @@ export default function Index({ returns }: Props) {
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
                 <div className="flex-1 w-full h-full overflow-y-auto custom-scrollbar">
-                    <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
+                    <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-6">
                         {/* Header Section */}
                         <motion.div
                             initial={{ opacity: 0, y: -20 }}
@@ -82,17 +121,12 @@ export default function Index({ returns }: Props) {
 
                         {/* Top Analytics Cards (Mini) */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            {[
-                                { label: "Return Volume", value: returns.length, icon: HistoryIcon, color: "orange" },
-                                { label: "Credit Issued", value: `₨ ${returns.reduce((acc, r) => acc + (Number(r.net_total) || 0), 0).toLocaleString()}`, icon: Wallet, color: "zinc" },
-                                { label: "Item Reconciliation", value: returns.reduce((acc, r) => acc + (Number(r.no_of_items) || 0), 0), icon: Activity, color: "orange" },
-                                { label: "Registry Health", value: "100%", icon: Sparkles, color: "emerald" },
-                            ].map((stat, i) => (
+                            {stats.map((stat, i) => (
                                 <motion.div
                                     key={stat.label}
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.1 }}
+                                    transition={{ delay: i * 0.05 }}
                                     className={cn(
                                         PREMIUM_ROUNDING,
                                         "p-4 bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 group hover:bg-white dark:hover:bg-zinc-900 transition-all shadow-sm"
@@ -114,11 +148,21 @@ export default function Index({ returns }: Props) {
                             ))}
                         </div>
 
+                        {/* Essential Core Filters Bar */}
+                        <SalesReturnFilters
+                            filters={filters}
+                            customers={customers}
+                            salesmen={salesmen}
+                            firms={firms}
+                            totalAmount={totalAmount}
+                            totalCount={totalVolume}
+                        />
+
                         {/* Main Content Area */}
                         <motion.div
                             initial={{ opacity: 0, scale: 0.98 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.4 }}
+                            transition={{ delay: 0.2 }}
                             className={cn(
                                 PREMIUM_ROUNDING,
                                 "border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl shadow-2xl shadow-zinc-200/50 dark:shadow-none overflow-hidden"
@@ -126,7 +170,7 @@ export default function Index({ returns }: Props) {
                         >
                             <div className="p-1 bg-gradient-to-r from-orange-500/20 via-transparent to-transparent" />
                             <div className="p-6">
-                                <DataTable data={returns} />
+                                <DataTable data={returns?.data || []} pagination={returns} filters={filters} />
                             </div>
                         </motion.div>
                     </div>
