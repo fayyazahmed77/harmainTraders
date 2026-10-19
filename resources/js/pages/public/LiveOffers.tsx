@@ -138,9 +138,16 @@ interface Props {
 export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, categories = [] }: Props) {
     const { appearance, updateAppearance } = useAppearance();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [groupBy, setGroupBy] = useState<'company' | 'category'>('company');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | number>('all');
     const [selectedCompany, setSelectedCompany] = useState<string>('all');
+
+    const handleGroupByChange = (mode: 'company' | 'category') => {
+        setGroupBy(mode);
+        setSelectedCompany('all');
+        setSelectedCategory('all');
+    };
     
     // Header customer login state
     const [customerId, setCustomerId] = useState('');
@@ -190,7 +197,30 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
         return items;
     }, [customerOffer, marketOffer]);
 
-    // Brands / Companies list
+    // Sorted Categories list (A-Z)
+    const sortedCategories = useMemo(() => {
+        return [...categories].sort((a, b) => 
+            (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+        );
+    }, [categories]);
+
+    // Categories with item counts for sidebar/dialogs
+    const categoriesWithCounts = useMemo(() => {
+        const counts: Record<string | number, number> = {};
+        allOfferItems.forEach(it => {
+            const catId = it.items?.category?.id || it.items?.category || (it.items as any)?.category_id;
+            if (catId) {
+                counts[catId] = (counts[catId] || 0) + 1;
+            }
+        });
+
+        return sortedCategories.map(cat => ({
+            ...cat,
+            count: counts[cat.id] || 0
+        }));
+    }, [allOfferItems, sortedCategories]);
+
+    // Brands / Companies list (A-Z)
     const companies = useMemo(() => {
         const counts: Record<string, { count: number; image: string | null }> = {};
         allOfferItems.forEach(it => {
@@ -206,27 +236,105 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
             name,
             count: data.count,
             image: data.image
-        })).sort((a, b) => b.count - a.count);
+        })).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     }, [allOfferItems]);
 
-    // Filtered Items
+    // Filtered Items (A-Z by item title)
     const filteredOfferItems = useMemo(() => {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase().trim();
         return allOfferItems.filter(it => {
             const item = it.items;
             const title = item?.title?.toLowerCase() ?? '';
             const code = item?.code?.toLowerCase() ?? '';
             const brand = (getItemBrandName(item) ?? '').toLowerCase();
-            const matchesSearch = title.includes(q) || code.includes(q) || brand.includes(q);
+            const matchesSearch = !q || title.includes(q) || code.includes(q) || brand.includes(q);
 
-            const catId = item?.category?.id || item?.category;
+            const catId = item?.category?.id || item?.category || (item as any)?.category_id;
             const matchesCategory = selectedCategory === 'all' || String(catId) === String(selectedCategory);
 
             const matchesCompany = selectedCompany === 'all' || getItemBrandName(item) === selectedCompany;
 
             return matchesSearch && matchesCategory && matchesCompany;
-        });
+        }).sort((a, b) => 
+            (a.items?.title || '').localeCompare(b.items?.title || '', undefined, { sensitivity: 'base' })
+        );
     }, [allOfferItems, searchQuery, selectedCategory, selectedCompany]);
+
+    // Grouped Products by Company or Category (Both Groups and Items A-Z)
+    const groupedProducts = useMemo(() => {
+        if (groupBy === 'company') {
+            const map = new Map<string, { title: string; image?: string | null; items: OfferItem[] }>();
+
+            filteredOfferItems.forEach(it => {
+                const compName = getItemBrandName(it.items) || 'Other Brands';
+                if (!map.has(compName)) {
+                    map.set(compName, {
+                        title: compName,
+                        image: getItemBrandImage(it.items),
+                        items: []
+                    });
+                }
+                map.get(compName)!.items.push(it);
+            });
+
+            const groups = Array.from(map.entries()).map(([name, data]) => {
+                const sortedItems = [...data.items].sort((a, b) => 
+                    (a.items?.title || '').localeCompare(b.items?.title || '', undefined, { sensitivity: 'base' })
+                );
+                return {
+                    id: name,
+                    title: data.title,
+                    image: data.image,
+                    items: sortedItems
+                };
+            });
+
+            return groups.sort((a, b) => {
+                if (a.title === 'Other Brands') return 1;
+                if (b.title === 'Other Brands') return -1;
+                return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+            });
+        } else {
+            // Group by Category
+            const map = new Map<string, { id: string | number; title: string; image?: string | null; items: OfferItem[] }>();
+
+            filteredOfferItems.forEach(it => {
+                const cat = it.items?.category;
+                const catName = cat?.name || (categories.find(c => c.id === cat?.id || c.id === (it.items as any)?.category_id)?.name) || 'General Category';
+                const catId = cat?.id || (it.items as any)?.category_id || catName;
+                const catImage = (categories.find(c => c.id === catId)?.image_url) || null;
+
+                const key = String(catName);
+                if (!map.has(key)) {
+                    map.set(key, {
+                        id: catId,
+                        title: catName,
+                        image: catImage,
+                        items: []
+                    });
+                }
+                map.get(key)!.items.push(it);
+            });
+
+            const groups = Array.from(map.entries()).map(([_, data]) => {
+                const sortedItems = [...data.items].sort((a, b) => 
+                    (a.items?.title || '').localeCompare(b.items?.title || '', undefined, { sensitivity: 'base' })
+                );
+                return {
+                    id: data.id,
+                    title: data.title,
+                    image: data.image,
+                    items: sortedItems
+                };
+            });
+
+            return groups.sort((a, b) => {
+                if (a.title === 'General Category') return 1;
+                if (b.title === 'General Category') return -1;
+                return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+            });
+        }
+    }, [filteredOfferItems, groupBy, categories]);
 
     // Auto-fix cart prices from localStorage if old zero-price items were stored
     useEffect(() => {
@@ -416,11 +524,11 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
             />
 
             <main className="flex-1">
-                {/* Category Carousel Bar (Desktop only) */}
-                {categories && categories.length > 0 && (
+                {/* Category Carousel Bar (Desktop only, Sorted A-Z) */}
+                {sortedCategories && sortedCategories.length > 0 && (
                     <div className="hidden sm:block">
                         <CategoryCarousel 
-                            categories={categories}
+                            categories={sortedCategories}
                             selectedCategory={selectedCategory}
                             setSelectedCategory={setSelectedCategory}
                             DEFAULT_IMAGE={DEFAULT_IMAGE}
@@ -431,75 +539,146 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 {/* Main Content Layout (Sidebar + Product Grid) */}
                 <div className="max-w-[1800px] mx-auto px-2.5 sm:px-4 py-3 sm:py-6">
                     <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
-                        {/* Sidebar: Shop By Brand (Visible on Desktop lg+) */}
+                        {/* Sidebar: Shop By Brand / Category (Visible on Desktop lg+) */}
                         <aside className="hidden lg:block lg:w-72 shrink-0">
                             <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden sticky top-[130px]">
                                 <div className="p-4 border-b border-border flex items-center justify-between bg-surface-2/50">
-                                    <h3 className="text-[11px] font-mono-jet font-black uppercase tracking-wider text-text-muted">Shop by Brand</h3>
-                                    <Badge className="bg-amber/15 text-amber border-none text-[9px] font-black">{companies.length}</Badge>
+                                    <div className="flex items-center gap-2">
+                                        {groupBy === 'company' ? (
+                                            <Building2 size={15} className="text-amber" />
+                                        ) : (
+                                            <Layers size={15} className="text-amber" />
+                                        )}
+                                        <h3 className="text-[11px] font-mono-jet font-black uppercase tracking-wider text-text-muted">
+                                            {groupBy === 'company' ? 'Shop by Brand' : 'Shop by Category'}
+                                        </h3>
+                                    </div>
+                                    <Badge className="bg-amber/15 text-amber border-none text-[9px] font-black">
+                                        {groupBy === 'company' ? companies.length : categoriesWithCounts.filter(c => c.count > 0).length}
+                                    </Badge>
                                 </div>
                                 
                                 <div className="p-2 max-h-[550px] overflow-y-auto custom-scrollbar space-y-1">
-                                    <button
-                                        onClick={() => setSelectedCompany('all')}
-                                        className={cn(
-                                            "w-full flex items-center justify-between p-3 rounded-xl transition-all",
-                                            selectedCompany === 'all' 
-                                                ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
-                                                : "hover:bg-surface-2 text-text-secondary"
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "w-8 h-8 rounded-lg flex items-center justify-center",
-                                                selectedCompany === 'all' ? "bg-surface-0/20" : "bg-surface-2"
-                                            )}>
-                                                <Box size={14} />
-                                            </div>
-                                            <span className="text-xs font-bold">All Brands</span>
-                                        </div>
-                                        <span className={cn("text-[10px] font-black", selectedCompany === 'all' ? "text-surface-0/80" : "text-text-muted")}>
-                                            {allOfferItems.length}
-                                        </span>
-                                    </button>
-
-                                    {companies.map((company) => (
-                                        <button
-                                            key={company.name}
-                                            onClick={() => setSelectedCompany(company.name)}
-                                            className={cn(
-                                                "w-full flex items-center justify-between p-3 rounded-xl transition-all",
-                                                selectedCompany === company.name 
-                                                    ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
-                                                    : "hover:bg-surface-2 text-text-secondary"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-3 text-left min-w-0">
-                                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0">
-                                                    {company.image ? (
-                                                        <img src={company.image} alt={company.name} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-[10px] font-black text-text-muted">{company.name.charAt(0)}</span>
-                                                    )}
+                                    {groupBy === 'company' ? (
+                                        <>
+                                            <button
+                                                onClick={() => setSelectedCompany('all')}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                                    selectedCompany === 'all' 
+                                                        ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                        : "hover:bg-surface-2 text-text-secondary"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn(
+                                                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                                                        selectedCompany === 'all' ? "bg-surface-0/20" : "bg-surface-2"
+                                                    )}>
+                                                        <Box size={14} />
+                                                    </div>
+                                                    <span className="text-xs font-bold">All Brands</span>
                                                 </div>
-                                                <span className="text-xs font-bold truncate">{company.name}</span>
-                                            </div>
-                                            <span className={cn("text-[10px] font-black shrink-0 ml-2", selectedCompany === company.name ? "text-surface-0/80" : "text-text-muted")}>
-                                                {company.count}
-                                            </span>
-                                        </button>
-                                    ))}
+                                                <span className={cn("text-[10px] font-black", selectedCompany === 'all' ? "text-surface-0/80" : "text-text-muted")}>
+                                                    {allOfferItems.length}
+                                                </span>
+                                            </button>
+
+                                            {companies.map((company) => (
+                                                <button
+                                                    key={company.name}
+                                                    onClick={() => setSelectedCompany(company.name)}
+                                                    className={cn(
+                                                        "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                                        selectedCompany === company.name 
+                                                            ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                            : "hover:bg-surface-2 text-text-secondary"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-3 text-left min-w-0">
+                                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0">
+                                                            {company.image ? (
+                                                                <img src={company.image} alt={company.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-[10px] font-black text-text-muted">{company.name.charAt(0)}</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-xs font-bold truncate">{company.name}</span>
+                                                    </div>
+                                                    <span className={cn("text-[10px] font-black shrink-0 ml-2", selectedCompany === company.name ? "text-surface-0/80" : "text-text-muted")}>
+                                                        {company.count}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => setSelectedCategory('all')}
+                                                className={cn(
+                                                    "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                                    selectedCategory === 'all' 
+                                                        ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                        : "hover:bg-surface-2 text-text-secondary"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn(
+                                                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                                                        selectedCategory === 'all' ? "bg-surface-0/20" : "bg-surface-2"
+                                                    )}>
+                                                        <Layers size={14} />
+                                                    </div>
+                                                    <span className="text-xs font-bold">All Categories</span>
+                                                </div>
+                                                <span className={cn("text-[10px] font-black", selectedCategory === 'all' ? "text-surface-0/80" : "text-text-muted")}>
+                                                    {allOfferItems.length}
+                                                </span>
+                                            </button>
+
+                                            {categoriesWithCounts.filter(cat => cat.count > 0).map((cat) => (
+                                                <button
+                                                    key={cat.id}
+                                                    onClick={() => setSelectedCategory(cat.id)}
+                                                    className={cn(
+                                                        "w-full flex items-center justify-between p-3 rounded-xl transition-all",
+                                                        selectedCategory === cat.id 
+                                                            ? "bg-amber text-surface-0 shadow-lg shadow-amber/20 font-bold" 
+                                                            : "hover:bg-surface-2 text-text-secondary"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-3 text-left min-w-0">
+                                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0">
+                                                            {cat.image_url ? (
+                                                                <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-[10px] font-black text-text-muted">{cat.name.charAt(0)}</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-xs font-bold truncate">{cat.name}</span>
+                                                    </div>
+                                                    <span className={cn("text-[10px] font-black shrink-0 ml-2", selectedCategory === cat.id ? "text-surface-0/80" : "text-text-muted")}>
+                                                        {cat.count}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </aside>
 
-                        {/* Main Product Grid */}
+                        {/* Main Product Section */}
                         <div className="flex-1 min-w-0">
                             {/* Sub-Header Toolbar */}
-                            <div className="flex items-center justify-between gap-2 mb-3 sm:mb-6 px-1">
+                            <div className="flex items-center justify-between gap-2 mb-3 sm:mb-6 px-1 flex-wrap">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <h2 className="text-base sm:text-2xl font-display font-black uppercase text-text-primary tracking-tight truncate">
-                                        {selectedCompany !== 'all' ? selectedCompany : (selectedCategory === 'all' ? 'All Live Offers' : categories.find(c => c.id === selectedCategory)?.name)}
+                                        {selectedCompany !== 'all' 
+                                            ? selectedCompany 
+                                            : (selectedCategory === 'all' 
+                                                ? (groupBy === 'company' ? 'All Live Offers (Company Wise)' : 'All Live Offers (Category Wise)') 
+                                                : categories.find(c => c.id === selectedCategory)?.name)}
                                     </h2>
                                     <Badge className="bg-amber/15 text-amber border-amber/30 font-black px-2 py-0.5 text-[9px] sm:text-[10px] shrink-0">
                                         {filteredOfferItems.length} ITEMS
@@ -517,6 +696,37 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                                         </button>
                                     )}
 
+                                    {/* Company | Category View Buttons */}
+                                    <div className="flex bg-surface-2 p-1 rounded-xl border border-border">
+                                        <button
+                                            onClick={() => handleGroupByChange('company')}
+                                            className={cn(
+                                                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                                                groupBy === 'company' 
+                                                    ? "bg-amber text-surface-0 shadow-sm" 
+                                                    : "text-text-muted hover:text-text-primary"
+                                            )}
+                                            title="Display Company wise (A-Z)"
+                                        >
+                                            <Building2 size={13} />
+                                            <span>Company</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleGroupByChange('category')}
+                                            className={cn(
+                                                "px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                                                groupBy === 'category' 
+                                                    ? "bg-amber text-surface-0 shadow-sm" 
+                                                    : "text-text-muted hover:text-text-primary"
+                                            )}
+                                            title="Display Category wise (A-Z)"
+                                        >
+                                            <Layers size={13} />
+                                            <span>Category</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Grid / List View Toggle */}
                                     <div className="flex bg-surface-2 p-1 rounded-xl border border-border">
                                         <button
                                             onClick={() => setViewMode('grid')}
@@ -542,32 +752,69 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                                 </div>
                             </div>
 
-                            {/* Grid / List View Render */}
+                            {/* Grouped Products View Render (Both Group & Items A-Z) */}
                             {filteredOfferItems.length === 0 ? (
                                 <EmptyState onClear={handleClearFilters} />
-                            ) : viewMode === 'grid' ? (
-                                /* AliExpress Style 2-Column Mobile Grid */
-                                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
-                                    {filteredOfferItems.map(it => (
-                                        <OfferProductCard 
-                                            key={it.id} 
-                                            offerItem={it}
-                                            cartItem={cart[it.id]}
-                                            onOpenModal={handleOpenItemModal}
-                                            formatCurrency={formatCurrency}
-                                        />
-                                    ))}
-                                </div>
                             ) : (
-                                <div className="flex flex-col gap-2 sm:gap-3">
-                                    {filteredOfferItems.map(it => (
-                                        <OfferProductRow 
-                                            key={it.id} 
-                                            offerItem={it}
-                                            cartItem={cart[it.id]}
-                                            onOpenModal={handleOpenItemModal}
-                                            formatCurrency={formatCurrency}
-                                        />
+                                <div className="space-y-6 sm:space-y-10">
+                                    {groupedProducts.map(group => (
+                                        <section key={group.id} className="space-y-3 sm:space-y-4">
+                                            {/* Group Section Header */}
+                                            <div className="flex items-center justify-between pb-2 border-b border-border/80">
+                                                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                                    {groupBy === 'company' ? (
+                                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0 shadow-2xs">
+                                                            {group.image ? (
+                                                                <img src={group.image} alt={group.title} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Building2 size={16} className="text-amber" />
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-amber/10 border border-amber/20 flex items-center justify-center shrink-0 shadow-2xs">
+                                                            <Layers size={16} className="text-amber" />
+                                                        </div>
+                                                    )}
+                                                    <h3 className="text-sm sm:text-lg font-display font-black uppercase text-text-primary tracking-tight truncate">
+                                                        {group.title}
+                                                    </h3>
+                                                    <Badge variant="outline" className="text-[10px] font-mono-jet font-bold border-border bg-surface-2 text-text-muted shrink-0">
+                                                        {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                                                    </Badge>
+                                                </div>
+
+                                                <span className="text-[10px] font-mono-jet uppercase font-bold text-text-muted/60 hidden sm:inline">
+                                                    {groupBy === 'company' ? 'Brand Showcase' : 'Category Section'}
+                                                </span>
+                                            </div>
+
+                                            {/* Products Grid or List */}
+                                            {viewMode === 'grid' ? (
+                                                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+                                                    {group.items.map(it => (
+                                                        <OfferProductCard 
+                                                            key={it.id} 
+                                                            offerItem={it}
+                                                            cartItem={cart[it.id]}
+                                                            onOpenModal={handleOpenItemModal}
+                                                            formatCurrency={formatCurrency}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-2 sm:gap-3">
+                                                    {group.items.map(it => (
+                                                        <OfferProductRow 
+                                                            key={it.id} 
+                                                            offerItem={it}
+                                                            cartItem={cart[it.id]}
+                                                            onOpenModal={handleOpenItemModal}
+                                                            formatCurrency={formatCurrency}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </section>
                                     ))}
                                 </div>
                             )}
@@ -591,7 +838,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
             <CategoryBottomDialog 
                 open={categorySheetOpen}
                 onClose={() => setCategorySheetOpen(false)}
-                categories={categories}
+                categories={sortedCategories}
                 selectedCategory={selectedCategory}
                 onSelectCategory={(id) => {
                     setSelectedCategory(id);

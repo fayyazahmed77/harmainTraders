@@ -39,7 +39,6 @@ import {
     Info,
     Sparkles,
     FileSearch,
-    DownloadCloud,
     Briefcase,
     Link as LinkIcon,
 } from "lucide-react";
@@ -306,11 +305,6 @@ export default function DataTable({ data }: DataTableProps) {
                                 <DropdownMenuItem onClick={() => window.open(`/offer-list/${offer.id}/pdf?group_by=company`, '_blank')} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
                                     <Briefcase className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
                                     Print (Company wise)
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem onClick={() => window.location.href = `/offer-list/${offer.id}/download`} className="rounded-lg text-xs font-bold gap-2 cursor-pointer group">
-                                    <DownloadCloud className="h-3.5 w-3.5 opacity-50 group-focus:text-orange-500" />
-                                    Download Vault
                                 </DropdownMenuItem>
 
                                 <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-1" />
