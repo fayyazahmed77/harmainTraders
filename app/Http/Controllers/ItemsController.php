@@ -27,7 +27,11 @@ class ItemsController extends Controller implements HasMiddleware
     }
     public function index(Request $request)
     {
-        $query = Items::with(['category', 'companyAccount', 'images']);
+        $query = Items::with([
+            'category:id,name',
+            'companyAccount:id,title',
+            'images:id,item_id,image_path,is_primary,sort_order',
+        ]);
 
         // Filter by Category
         if ($request->has('category_id') && $request->category_id && $request->category_id !== 'all') {
@@ -95,20 +99,24 @@ class ItemsController extends Controller implements HasMiddleware
             'created_at',
         ]);
 
-        // Calculate Summary (Based on filtered data)
+        // Calculate Summary via high-performance single SQL aggregation (Based on filtered data)
+        $sqlStats = (clone $query)->setEagerLoads([])->reorder()->selectRaw("
+            COUNT(*) as total_items,
+            COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active_items,
+            COALESCE(SUM(
+                (COALESCE(stock_1, 0) * COALESCE(trade_price, 0)) +
+                (COALESCE(stock_2, 0) * CEIL(COALESCE(trade_price, 0) / CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END))
+            ), 0) as stock_value,
+            COALESCE(SUM(CASE WHEN ((COALESCE(stock_1, 0) * CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END) + COALESCE(stock_2, 0)) <= 0 THEN 1 ELSE 0 END), 0) as out_of_stock,
+            COALESCE(SUM(CASE WHEN ((COALESCE(stock_1, 0) * CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END) + COALESCE(stock_2, 0)) <= COALESCE(reorder_level, 0) THEN 1 ELSE 0 END), 0) as low_stock
+        ")->first();
+
         $summary = [
-            'total_items' => $items->count(),
-            'active_items' => $items->where('is_active', 1)->count(),
-            'stock_value' => $items->sum(function ($item) {
-                // Stock value = (Full * Trade Price) + (Pcs * Price per Pc)
-                return (($item->stock_1 ?? 0) * ($item->trade_price ?? 0)) + (($item->stock_2 ?? 0) * ($item->price_per_pcs ?? 0));
-            }),
-            'out_of_stock' => $items->filter(function ($item) {
-                return $item->total_stock_pcs <= 0;
-            })->count(),
-            'low_stock' => $items->filter(function ($item) {
-                return $item->total_stock_pcs <= ($item->reorder_level ?? 0);
-            })->count(),
+            'total_items' => (int)($sqlStats->total_items ?? 0),
+            'active_items' => (int)($sqlStats->active_items ?? 0),
+            'stock_value' => round((float)($sqlStats->stock_value ?? 0), 2),
+            'out_of_stock' => (int)($sqlStats->out_of_stock ?? 0),
+            'low_stock' => (int)($sqlStats->low_stock ?? 0),
         ];
 
         $categories = ItemCategory::all();

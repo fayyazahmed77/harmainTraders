@@ -63,13 +63,13 @@ interface PageProps {
     accounts: Account[];
     firms: any[];
     salesmen: any[];
-    areas: any[];
-    subareas: any[];
+    areas?: any[];
+    subareas?: any[];
     account_types: any[];
     account_categories: any[];
     users: any[];
-    provinces: any[];
-    cities: any[];
+    provinces?: any[];
+    cities?: any[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -78,7 +78,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function AccountReports({ 
-    accounts, firms, salesmen, areas, subareas, account_types, account_categories, users, provinces, cities
+    accounts, firms, salesmen, areas = [], subareas = [], account_types, account_categories, users, provinces = [], cities = []
 }: PageProps) {
     // Large state object for all parameters
     const [params, setParams] = useState({

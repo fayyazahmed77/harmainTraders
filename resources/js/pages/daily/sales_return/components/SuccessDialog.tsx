@@ -185,8 +185,17 @@ export const SuccessDialog: React.FC<SuccessDialogProps> = ({
                 onClick={onReturn}
                 className="h-14 rounded-2xl border border-orange-500/30 bg-transparent text-orange-500 font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-orange-500/10 hover:border-orange-500 transition-all group"
               >
-                 <Plus size={18} className="text-orange-500 animate-pulse" />
-                 Create New
+                 {type === 'edit' ? (
+                    <>
+                       <Layout size={18} className="text-orange-500" />
+                       Back to List
+                    </>
+                 ) : (
+                    <>
+                       <Plus size={18} className="text-orange-500 animate-pulse" />
+                       Create New
+                    </>
+                 )}
               </Button>
            </div>
         </div>

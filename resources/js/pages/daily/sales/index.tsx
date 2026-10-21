@@ -9,6 +9,7 @@ import SalesFilters from "./SalesFilters";
 import DataTable from "./DataTable";
 import { Plus } from "lucide-react";
 import { router, usePage } from "@inertiajs/react";
+import { SuccessDialog } from "./components/SuccessDialog";
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Sales", href: "/sales" },
@@ -76,11 +77,20 @@ export default function Index({ sales, summary, filters, customers }: Props) {
     const { props } = usePage();
     const { flash } = props as any;
     const lastOpenedRef = React.useRef<string | null>(null);
+    const [showSuccessDialog, setShowSuccessDialog] = React.useState(false);
+    const [successData, setSuccessData] = React.useState<any>(null);
 
     useEffect(() => {
         if (flash?.pdf_url && flash.pdf_url !== lastOpenedRef.current) {
             window.open(flash.pdf_url, '_blank');
             lastOpenedRef.current = flash.pdf_url;
+        }
+    }, [flash]);
+
+    useEffect(() => {
+        if (flash?.success_dialog) {
+            setSuccessData(flash.success_dialog);
+            setShowSuccessDialog(true);
         }
     }, [flash]);
 
@@ -110,6 +120,28 @@ export default function Index({ sales, summary, filters, customers }: Props) {
 
                     <DataTable data={sales} />
                 </div>
+
+                {successData && (
+                    <SuccessDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        invoiceNo={successData.invoiceNo || String(successData.saleId)}
+                        saleId={successData.saleId}
+                        customerName={successData.customerName}
+                        totalAmount={successData.totalAmount}
+                        countItems={successData.countItems}
+                        countFull={successData.countFull}
+                        countPcs={successData.countPcs}
+                        totalDiscount={successData.totalDiscount}
+                        type={successData.type || 'create'}
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            if (successData.type !== 'edit') {
+                                router.visit("/sales/create");
+                            }
+                        }}
+                    />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

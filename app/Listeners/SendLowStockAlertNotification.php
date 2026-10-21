@@ -26,9 +26,28 @@ class SendLowStockAlertNotification implements ShouldQueue
      */
     public function handle(LowStockAlert $event): void
     {
-        $item = $event->item;
+        // 1. Guard against alerts if disabled via config/env
+        if (!config('services.alerts.low_stock', env('ENABLE_LOW_STOCK_ALERTS', false))) {
+            return;
+        }
 
-        // 1. Prepare payload for Pusher/DB notification
+        $item = $event->item;
+        if (!$item) {
+            return;
+        }
+
+        // 2. Guard against 0 or negative reorder_level
+        if (($item->reorder_level ?? 0) <= 0) {
+            return;
+        }
+
+        // 3. 24-hour rate limit/cooldown per item to prevent queue flooding
+        $cacheKey = "low_stock_alert_item_{$item->id}";
+        if (!\Illuminate\Support\Facades\Cache::add($cacheKey, true, now()->addHours(24))) {
+            return;
+        }
+
+        // 4. Prepare payload for Pusher/DB notification
         $payload = [
             'type' => 'App\Notifications\LowStockAlertNotification',
             'title' => 'Low Stock Warning',

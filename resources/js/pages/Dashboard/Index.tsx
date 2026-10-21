@@ -29,7 +29,7 @@ import {
 } from 'recharts';
 import * as React from "react"
 import { route } from "ziggy-js";
-import { router } from "@inertiajs/react";
+import { router, Deferred } from "@inertiajs/react";
 import {
     DollarSign,
     ShoppingCart,
@@ -67,6 +67,10 @@ interface DashboardProps {
     };
     totalReceivable?: number;
     totalPayable?: number;
+    financialPosition?: {
+        totalReceivable: number;
+        totalPayable: number;
+    };
     orderChartData: { day: string, orders: number }[];
     fundsData: { name: string, value: number, color: string }[];
     salesRecoveries: {
@@ -83,7 +87,7 @@ interface DashboardProps {
     recentTransactions: { date: string, paymentVia: string, status: "Success" | "Failed" | "Pending", amount: number, party: string }[];
 }
 
-export default function DashboardPage({ dailySummary, stats, totalReceivable, totalPayable, orderChartData, fundsData, salesRecoveries, postDateCheques, stockItems, stockSummary, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
+export default function DashboardPage({ dailySummary, stats, totalReceivable, totalPayable, financialPosition, orderChartData, fundsData, salesRecoveries, postDateCheques, stockItems, stockSummary, recentCustomers, recentPurchases, recentTransactions }: DashboardProps) {
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-PK", {
@@ -170,9 +174,15 @@ export default function DashboardPage({ dailySummary, stats, totalReceivable, to
                                                 Total Receivable
                                             </p>
                                         </div>
-                                        <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
-                                            {formatCurrency(stats.totalReceivable ?? totalReceivable ?? 0)}
-                                        </h3>
+                                        <Deferred data="financialPosition" fallback={
+                                            <div className="h-9 flex items-center mt-1">
+                                                <div className="h-7 w-36 bg-emerald-100/60 dark:bg-emerald-950/40 rounded animate-pulse" />
+                                            </div>
+                                        }>
+                                            <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
+                                                {formatCurrency(financialPosition?.totalReceivable ?? stats.totalReceivable ?? totalReceivable ?? 0)}
+                                            </h3>
+                                        </Deferred>
                                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
                                             Net customer balance to be collected
                                         </p>
@@ -209,9 +219,15 @@ export default function DashboardPage({ dailySummary, stats, totalReceivable, to
                                                 Total Payable
                                             </p>
                                         </div>
-                                        <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
-                                            {formatCurrency(stats.totalPayable ?? totalPayable ?? 0)}
-                                        </h3>
+                                        <Deferred data="financialPosition" fallback={
+                                            <div className="h-9 flex items-center mt-1">
+                                                <div className="h-7 w-36 bg-rose-100/60 dark:bg-rose-950/40 rounded animate-pulse" />
+                                            </div>
+                                        }>
+                                            <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
+                                                {formatCurrency(financialPosition?.totalPayable ?? stats.totalPayable ?? totalPayable ?? 0)}
+                                            </h3>
+                                        </Deferred>
                                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
                                             Net supplier balance to be paid
                                         </p>

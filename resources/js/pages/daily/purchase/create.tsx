@@ -339,6 +339,7 @@ export default function Purchase({
 
     const [advanceAvailable, setAdvanceAvailable] = useState<number>(0);
     const [useAdvance, setUseAdvance] = useState<boolean>(true);
+    const [supplierBalance, setSupplierBalance] = useState<number>(0);
     const accountTypeOptions: Option[] = useMemo(() => {
         return accounts.map((a) => ({
             value: String(a.id),
@@ -764,6 +765,9 @@ export default function Purchase({
         setIsPayNow(false);
         setPaymentSplits([]);
         setShowPaymentDialog(false);
+        setSupplierBalance(0);
+        setAdvanceAvailable(0);
+        setUseAdvance(false);
     };
 
     const resetForm = (nextInvoiceNo?: string) => {
@@ -869,14 +873,23 @@ console.log(lastPurchaseInfo);
                                                 const salemanId = selectedAccount.saleman_id ?? null;
                                                 setSalesman(salemanId);
                                                 
-                                                // Set Advance
-                                                const balance = toNumber(selectedAccount.current_balance);
-                                                setAdvanceAvailable(balance);
-                                                setUseAdvance(balance < 0);
+                                                // Fetch Supplier Balance On-Demand
+                                                axios.get(`/account/${id}/balance`).then((res) => {
+                                                    const balance = toNumber(res.data.balance);
+                                                    setSupplierBalance(balance);
+                                                    setAdvanceAvailable(balance);
+                                                    setUseAdvance(balance < 0);
+                                                }).catch((err) => {
+                                                    console.error("Failed to fetch balance", err);
+                                                    setSupplierBalance(0);
+                                                    setAdvanceAvailable(0);
+                                                    setUseAdvance(false);
+                                                });
                                             } else {
                                                 setCreditDays(0);
                                                 setCreditLimit("");
                                                 setSalesman(null);
+                                                setSupplierBalance(0);
                                                 setAdvanceAvailable(0);
                                                 setUseAdvance(false);
                                             }
@@ -973,15 +986,24 @@ console.log(lastPurchaseInfo);
                                             const salemanId = selectedAccount.saleman_id ?? null;
                                             setSalesman(salemanId);
                                             
-                                            // Set Advance
-                                            const balance = toNumber(selectedAccount.current_balance);
-                                            setAdvanceAvailable(balance);
-                                            setUseAdvance(balance < 0);
+                                            // Fetch Supplier Balance On-Demand
+                                            axios.get(`/account/${id}/balance`).then((res) => {
+                                                const balance = toNumber(res.data.balance);
+                                                setSupplierBalance(balance);
+                                                setAdvanceAvailable(balance);
+                                                setUseAdvance(balance < 0);
+                                            }).catch((err) => {
+                                                console.error("Failed to fetch balance", err);
+                                                setSupplierBalance(0);
+                                                setAdvanceAvailable(0);
+                                                setUseAdvance(false);
+                                            });
                                         } else {
                                             setCreditDays(0);
                                             setCreditLimit("");
                                             setMarkupPercentage(0);
                                             setSalesman(null);
+                                            setSupplierBalance(0);
                                             setAdvanceAvailable(0);
                                             setUseAdvance(false);
                                         }
@@ -1885,7 +1907,7 @@ console.log(lastPurchaseInfo);
                     }}
                     invoiceNo={invoiceNo}
                     supplierName={accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A"}
-                    previousBalance={toNumber(accounts.find(a => Number(a.id) === Number(accountType?.value))?.current_balance)}
+                    previousBalance={supplierBalance}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
                     extraDiscount={extraDiscount}

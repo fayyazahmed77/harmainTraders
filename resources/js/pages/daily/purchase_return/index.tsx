@@ -1,5 +1,5 @@
 import React from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import DataTable from "./DataTable";
 import PurchaseReturnFilters from "./components/PurchaseReturnFilters";
+import { SuccessDialog } from "./components/SuccessDialog";
 import { BreadcrumbItem } from "@/types";
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -75,6 +76,18 @@ export default function Index({
     firms = [],
     filters = {},
 }: Props) {
+    const { props } = usePage();
+    const { flash } = props as any;
+    const [showSuccessDialog, setShowSuccessDialog] = React.useState(false);
+    const [successData, setSuccessData] = React.useState<any>(null);
+
+    React.useEffect(() => {
+        if (flash?.success_dialog) {
+            setSuccessData(flash.success_dialog);
+            setShowSuccessDialog(true);
+        }
+    }, [flash]);
+
     const totalVolume = summary?.total_volume ?? returns?.total ?? returns?.data?.length ?? 0;
     const totalAmount = summary?.total_amount ?? 0;
     const totalItems = summary?.total_items ?? 0;
@@ -183,6 +196,28 @@ export default function Index({
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; border: 1px solid transparent; background-clip: padding-box; }
                     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f97316; }
                 `}</style>
+
+                {successData && (
+                    <SuccessDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        invoiceNo={successData.invoiceNo || String(successData.saleId)}
+                        saleId={successData.saleId}
+                        customerName={successData.customerName}
+                        totalAmount={successData.totalAmount}
+                        countItems={successData.countItems}
+                        countFull={successData.countFull}
+                        countPcs={successData.countPcs}
+                        totalDiscount={successData.totalDiscount}
+                        type={successData.type || 'create'}
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            if (successData.type !== 'edit') {
+                                router.visit("/purchase-return/create");
+                            }
+                        }}
+                    />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

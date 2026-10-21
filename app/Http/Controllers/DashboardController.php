@@ -348,10 +348,14 @@ class DashboardController extends Controller
             'recoveries' => (float)($yearlyRecGrouped[$y] ?? 0),
         ]);
 
-        // Total Receivables & Payables (Single-pass aggregate from ReportBuilder)
-        $accountSummary = $this->reportBuilder->summary();
-        $totalReceivable = (float)$accountSummary->sum('debit');
-        $totalPayable = (float)$accountSummary->sum('credit');
+        // Total Receivables & Payables (Deferred calculation preserving exact ReportBuilder::summary accounting formulas)
+        $financialPosition = Inertia::defer(function () {
+            $accountSummary = $this->reportBuilder->summary();
+            return [
+                'totalReceivable' => (float)$accountSummary->sum('debit'),
+                'totalPayable' => (float)$accountSummary->sum('credit'),
+            ];
+        });
 
         return Inertia::render('Dashboard/Index', [
             'stats' => [
@@ -363,11 +367,8 @@ class DashboardController extends Controller
                 'totalOrdersMonth' => $totalOrdersMonth,
                 'cancelledOrdersMonth' => $cancelledOrdersMonth,
                 'currentMonthName' => $currentMonthName,
-                'totalReceivable' => $totalReceivable,
-                'totalPayable' => $totalPayable,
             ],
-            'totalReceivable' => $totalReceivable,
-            'totalPayable' => $totalPayable,
+            'financialPosition' => $financialPosition,
             'orderChartData' => $orderChart,
             'fundsData' => $fundsData,
             'salesRecoveries' => $salesRecoveries,

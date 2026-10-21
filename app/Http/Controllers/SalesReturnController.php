@@ -347,7 +347,24 @@ class SalesReturnController extends Controller implements HasMiddleware
             $this->updateSaleStatusAndBalance($sale->invoice, $sale->id);
 
             DB::commit();
-            return redirect()->back()->with('success', 'Sales Return saved successfully!')->with('id', $return->id);
+
+            $return->load(['customer', 'items']);
+            $successDialogData = [
+                'customerName'  => $return->customer->title ?? 'Customer',
+                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                'countItems'    => $return->items->count(),
+                'countFull'     => (int) $return->items->sum('qty_carton'),
+                'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                'saleId'        => $return->id,
+                'invoiceNo'     => $return->invoice,
+                'type'          => 'create',
+            ];
+
+            return redirect()->route('sales_return.index')
+                ->with('success', 'Sales Return saved successfully!')
+                ->with('id', $return->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -737,7 +754,24 @@ class SalesReturnController extends Controller implements HasMiddleware
             $this->updateSaleStatusAndBalance($return->original_invoice, $return->sale_id);
 
             DB::commit();
-            return redirect()->route('sales_return.index')->with('success', 'Sales Return updated successfully!');
+
+            $return->load(['customer', 'items']);
+            $successDialogData = [
+                'customerName'  => $return->customer->title ?? 'Customer',
+                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                'countItems'    => $return->items->count(),
+                'countFull'     => (int) $return->items->sum('qty_carton'),
+                'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                'saleId'        => $return->id,
+                'invoiceNo'     => $return->invoice,
+                'type'          => 'edit',
+            ];
+
+            return redirect()->route('sales_return.index')
+                ->with('success', 'Sales Return updated successfully!')
+                ->with('id', $return->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());

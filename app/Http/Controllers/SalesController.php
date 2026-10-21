@@ -38,7 +38,15 @@ class SalesController extends Controller implements HasMiddleware
     //index
     public function index(Request $request)
     {
-        $query = Sales::with('customer', 'salesman', 'messageLine');
+        $query = Sales::select(
+            'id', 'invoice', 'code', 'date', 'created_at', 'status', 'is_online',
+            'customer_id', 'salesman_id', 'gross_total', 'courier_charges',
+            'discount_total', 'extra_discount', 'tax_total', 'net_total',
+            'paid_amount', 'remaining_amount', 'no_of_items'
+        )->with([
+            'customer:id,title',
+            'salesman:id,name',
+        ]);
 
         // Filter by Date Range
         if ($request->has('start_date') && $request->has('end_date') && $request->start_date && $request->end_date) {
@@ -557,21 +565,38 @@ class SalesController extends Controller implements HasMiddleware
                 \Illuminate\Support\Facades\Log::info("New stock for item " . $item->id . ": stock_1=" . $item->stock_1 . ", stock_2=" . $item->stock_2);
 
                 $item->refresh();
-                if ($item->total_stock_pcs < ($item->reorder_level ?? 0)) {
+                if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0 && $item->total_stock_pcs < $item->reorder_level) {
                     event(new \App\Events\LowStockAlert($item));
                 }
             }
 
             DB::commit();
 
+            $sale->load(['customer', 'items']);
+            $successDialogData = [
+                'customerName'  => $sale->customer->title ?? 'Walking Customer',
+                'totalAmount'   => (float) max(0, $sale->net_total - ($sale->extra_discount ?? 0)),
+                'countItems'    => $sale->items->count(),
+                'countFull'     => (int) $sale->items->sum('qty_carton'),
+                'countPcs'      => (int) $sale->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($sale->discount_total + ($sale->extra_discount ?? 0)),
+                'saleId'        => $sale->id,
+                'invoiceNo'     => $sale->invoice,
+                'type'          => 'create',
+            ];
+
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                return redirect()->back()
+                return redirect()->route('sale.index')
                     ->with('success', 'Sale saved successfully!')
                     ->with('id', $sale->id)
-                    ->with('pdf_url', route('sale.pdf', ['sale' => $sale->id, 'format' => $request->print_format]));
+                    ->with('pdf_url', route('sale.pdf', ['sale' => $sale->id, 'format' => $request->print_format]))
+                    ->with('success_dialog', $successDialogData);
             }
 
-            return redirect()->back()->with('success', 'Sale saved successfully!')->with('id', $sale->id);
+            return redirect()->route('sale.index')
+                ->with('success', 'Sale saved successfully!')
+                ->with('id', $sale->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -1040,14 +1065,31 @@ class SalesController extends Controller implements HasMiddleware
                     $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
 
                     $item->refresh();
-                    if ($item->total_stock_pcs < ($item->reorder_level ?? 0)) {
+                    if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0 && $item->total_stock_pcs < $item->reorder_level) {
                         event(new \App\Events\LowStockAlert($item));
                     }
                 }
             }
 
             DB::commit();
-            return redirect()->back()->with('success', 'Sale updated successfully!')->with('id', $id);
+
+            $sale = Sales::with(['customer', 'items'])->find($id);
+            $successDialogData = [
+                'customerName'  => $sale->customer->title ?? 'Walking Customer',
+                'totalAmount'   => (float) max(0, $sale->net_total - ($sale->extra_discount ?? 0)),
+                'countItems'    => $sale->items->count(),
+                'countFull'     => (int) $sale->items->sum('qty_carton'),
+                'countPcs'      => (int) $sale->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($sale->discount_total + ($sale->extra_discount ?? 0)),
+                'saleId'        => $sale->id,
+                'invoiceNo'     => $sale->invoice,
+                'type'          => 'edit',
+            ];
+
+            return redirect()->route('sale.index')
+                ->with('success', 'Sale updated successfully!')
+                ->with('id', $id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -1200,7 +1242,7 @@ class SalesController extends Controller implements HasMiddleware
                     $product->updateStockFromPcs($product->total_stock_pcs - $totalToDeduct);
 
                     $product->refresh();
-                    if ($product->total_stock_pcs < ($product->reorder_level ?? 0)) {
+                    if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($product->reorder_level ?? 0) > 0 && $product->total_stock_pcs < $product->reorder_level) {
                         event(new \App\Events\LowStockAlert($product));
                     }
                 }

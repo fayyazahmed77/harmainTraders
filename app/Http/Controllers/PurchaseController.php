@@ -35,7 +35,15 @@ class PurchaseController extends Controller implements HasMiddleware
 
     public function index(Request $request)
     {
-        $query = Purchase::with('supplier', 'salesman', 'messageLine');
+        $query = Purchase::select(
+            'id', 'invoice', 'code', 'date', 'created_at', 'status',
+            'supplier_id', 'salesman_id', 'gross_total', 'courier_charges',
+            'discount_total', 'extra_discount', 'tax_total', 'net_total',
+            'paid_amount', 'remaining_amount', 'no_of_items'
+        )->with([
+            'supplier:id,title',
+            'salesman:id,name',
+        ]);
 
         // Filter by Date Range — use end-of-day to include all records on the end date
         if (!empty($request->start_date) && !empty($request->end_date)) {
@@ -167,7 +175,6 @@ class PurchaseController extends Controller implements HasMiddleware
             ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id', 'opening_balance', 'opening_balance_type', 'purchase', 'sale')
             ->with(['accountType:id,name', 'accountCategory:id,name'])
             ->get();
-        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
 
         $salemans = Saleman::select('id', 'name', 'code')->get();
 
@@ -529,14 +536,32 @@ class PurchaseController extends Controller implements HasMiddleware
 
             DB::commit();
 
+            $purchase->load(['supplier', 'items']);
+            $successDialogData = [
+                'supplierName' => $purchase->supplier->title ?? 'N/A',
+                'totalItems'   => $purchase->items->count(),
+                'totalFull'    => (int) $purchase->items->sum('qty_carton'),
+                'totalPcs'     => (int) $purchase->items->sum('qty_pcs'),
+                'gross'        => (float) $purchase->gross_total,
+                'discount'     => (float) ($purchase->discount_total + ($purchase->extra_discount ?? 0)),
+                'net'          => (float) max(0, $purchase->net_total - ($purchase->extra_discount ?? 0)),
+                'purchaseId'   => $purchase->id,
+                'invoiceNo'    => $purchase->invoice,
+                'mode'         => 'create',
+            ];
+
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                return redirect()->back()
+                return redirect()->route('purchase.index')
                     ->with('success', 'Purchase saved successfully!')
                     ->with('id', $purchase->id)
-                    ->with('pdf_url', route('purchase.pdf', ['id' => $purchase->id, 'format' => $request->print_format]));
+                    ->with('pdf_url', route('purchase.pdf', ['id' => $purchase->id, 'format' => $request->print_format]))
+                    ->with('success_dialog', $successDialogData);
             }
 
-            return redirect()->back()->with('success', 'Purchase saved successfully!')->with('id', $purchase->id);
+            return redirect()->route('purchase.index')
+                ->with('success', 'Purchase saved successfully!')
+                ->with('id', $purchase->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -602,7 +627,6 @@ class PurchaseController extends Controller implements HasMiddleware
         $accounts = Account::eligibleForPurchase()
             ->with(['accountType', 'accountCategory'])
             ->get();
-        \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
         $salemans = Saleman::get();
         $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
             ->where('status', 'active')
@@ -961,10 +985,24 @@ class PurchaseController extends Controller implements HasMiddleware
 
             DB::commit();
             
-            // Stay on the same page so the frontend can show the 'SuccessDialog' just like Create.
-            return redirect()->back()
+            $purchase->load(['supplier', 'items']);
+            $successDialogData = [
+                'supplierName' => $purchase->supplier->title ?? 'N/A',
+                'totalItems'   => $purchase->items->count(),
+                'totalFull'    => (int) $purchase->items->sum('qty_carton'),
+                'totalPcs'     => (int) $purchase->items->sum('qty_pcs'),
+                'gross'        => (float) $purchase->gross_total,
+                'discount'     => (float) ($purchase->discount_total + ($purchase->extra_discount ?? 0)),
+                'net'          => (float) max(0, $purchase->net_total - ($purchase->extra_discount ?? 0)),
+                'purchaseId'   => $purchase->id,
+                'invoiceNo'    => $purchase->invoice,
+                'mode'         => 'edit',
+            ];
+
+            return redirect()->route('purchase.index')
                 ->with('success', 'Purchase updated successfully!')
-                ->with('id', $purchase->id);
+                ->with('id', $purchase->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());

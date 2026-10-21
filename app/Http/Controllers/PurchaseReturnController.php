@@ -301,7 +301,24 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             \App\Services\ActivityLogger::log('created', 'Purchase Return', "Created purchase return {$return->invoice} for supplier ID {$request->supplier_id}");
 
             DB::commit();
-            return redirect()->back()->with('success', 'Purchase Return saved successfully!')->with('id', $return->id);
+
+            $return->load(['supplier', 'items']);
+            $successDialogData = [
+                'customerName'  => $return->supplier->title ?? 'Supplier',
+                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                'countItems'    => $return->items->count(),
+                'countFull'     => (int) $return->items->sum('qty_carton'),
+                'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                'saleId'        => $return->id,
+                'invoiceNo'     => $return->invoice,
+                'type'          => 'create',
+            ];
+
+            return redirect()->route('purchase_return.index')
+                ->with('success', 'Purchase Return saved successfully!')
+                ->with('id', $return->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
@@ -706,7 +723,24 @@ class PurchaseReturnController extends Controller implements HasMiddleware
 
             \App\Services\ActivityLogger::log('updated', 'Purchase Return', "Updated purchase return {$return->invoice}");
             DB::commit();
-            return redirect()->back()->with('success', 'Purchase Return updated successfully!')->with('id', $return->id);
+
+            $return->load(['supplier', 'items']);
+            $successDialogData = [
+                'customerName'  => $return->supplier->title ?? 'Supplier',
+                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                'countItems'    => $return->items->count(),
+                'countFull'     => (int) $return->items->sum('qty_carton'),
+                'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                'saleId'        => $return->id,
+                'invoiceNo'     => $return->invoice,
+                'type'          => 'edit',
+            ];
+
+            return redirect()->route('purchase_return.index')
+                ->with('success', 'Purchase Return updated successfully!')
+                ->with('id', $return->id)
+                ->with('success_dialog', $successDialogData);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());

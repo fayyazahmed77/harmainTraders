@@ -9,6 +9,7 @@ import { BreadcrumbItem } from "@/types";
 import DataTable from "./DataTable";
 import PurchaseSummary from "./PurchaseSummary";
 import PurchaseFilters from "./PurchaseFilters";
+import { SuccessSummaryDialog } from "./components/SuccessSummaryDialog";
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: "Purchase", href: "/purchase" },
@@ -72,11 +73,20 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
     const { props } = usePage();
     const { flash } = props as any;
     const lastOpenedRef = React.useRef<string | null>(null);
+    const [showSuccessDialog, setShowSuccessDialog] = React.useState(false);
+    const [successData, setSuccessData] = React.useState<any>(null);
 
     React.useEffect(() => {
         if (flash?.pdf_url && flash.pdf_url !== lastOpenedRef.current) {
             window.open(flash.pdf_url, '_blank');
             lastOpenedRef.current = flash.pdf_url;
+        }
+    }, [flash]);
+
+    React.useEffect(() => {
+        if (flash?.success_dialog) {
+            setSuccessData(flash.success_dialog);
+            setShowSuccessDialog(true);
         }
     }, [flash]);
 
@@ -105,6 +115,28 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
 
                     <DataTable data={purchases} />
                 </div>
+
+                {successData && (
+                    <SuccessSummaryDialog
+                        open={showSuccessDialog}
+                        onOpenChange={setShowSuccessDialog}
+                        supplierName={successData.supplierName}
+                        totalItems={successData.totalItems}
+                        totalFull={successData.totalFull}
+                        totalPcs={successData.totalPcs}
+                        gross={successData.gross}
+                        discount={successData.discount}
+                        net={successData.net}
+                        purchaseId={successData.purchaseId}
+                        mode={successData.mode || 'create'}
+                        onReturn={() => {
+                            setShowSuccessDialog(false);
+                            if (successData.mode !== 'edit') {
+                                router.visit("/purchase/create");
+                            }
+                        }}
+                    />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

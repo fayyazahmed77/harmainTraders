@@ -79,6 +79,7 @@ class HandleInertiaRequests extends Middleware
                 'id'             => $request->session()->get('id'),
                 'print_id'       => $request->session()->get('print_id'),
                 'saved_payments' => $request->session()->get('saved_payments'),
+                'success_dialog' => $request->session()->get('success_dialog'),
             ],
         ];
     }

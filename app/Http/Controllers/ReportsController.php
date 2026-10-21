@@ -192,15 +192,15 @@ class ReportsController extends Controller implements HasMiddleware
         }
 
         return Inertia::render('reports/accounts/ledger', [
-            'accounts' => Account::active()->with(['accountType', 'area', 'subarea'])
+            'accounts' => Account::active()->with(['accountType:id,name', 'area:id,name', 'subarea:id,name'])
                 ->select('id', 'code', 'title', 'type', 'area_id', 'subarea_id')
                 ->get(),
             'firms' => Firm::select('id', 'name', 'code')->get(),
             'salesmen' => Saleman::select('id', 'name', 'code')->get(),
-            'areas' => Areas::select('id', 'name', 'city_id', 'province_id')->get(),
-            'subareas' => Subarea::select('id', 'name', 'area_id')->get(),
-            'provinces' => \App\Models\Province::select('id', 'name', 'country_id')->get(),
-            'cities' => \App\Models\City::select('id', 'name', 'province_id')->get(),
+            'areas' => Inertia::defer(fn () => Areas::select('id', 'name', 'city_id', 'province_id')->get()),
+            'subareas' => Inertia::defer(fn () => Subarea::select('id', 'name', 'area_id')->get()),
+            'provinces' => Inertia::defer(fn () => \App\Models\Province::select('id', 'name', 'country_id')->get()),
+            'cities' => Inertia::defer(fn () => \App\Models\City::select('id', 'name', 'province_id')->get()),
             'account_types' => AccountType::select('id', 'name')->get(),
             'account_categories' => AccountCategory::select('id', 'name')->get(),
             'users' => User::select('id', 'name')->get(),

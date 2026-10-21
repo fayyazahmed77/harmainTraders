@@ -19,9 +19,11 @@ $globalTotalPaid = (float)collect($data)->sum('paid');
 
 $groupedData = collect($data)->groupBy('party_id');
 
-function formatNum($num) {
-    if ($num === 0 || $num === 0.0 || $num == null) return '-';
-    return number_format((float)$num, 2);
+if (!function_exists('formatNum')) {
+    function formatNum($num) {
+        if ($num === 0 || $num === 0.0 || $num == null) return '-';
+        return number_format((float)$num, 2);
+    }
 }
 @endphp
 <!DOCTYPE html>
@@ -444,7 +446,7 @@ function formatNum($num) {
                                 {{ formatNum($bill['paid']) }}
                             </td>
                             <td class="text-right font-bold">
-                                {{ formatNum($bill['remaining']) }}
+                                {{ formatNum($bill['balance'] ?? $bill['remaining']) }}
                             </td>
                         </tr>
                     @endforeach
@@ -516,8 +518,12 @@ function formatNum($num) {
                             Net Balance: <strong>Rs. {{ number_format(abs($globalReceivable - $globalPayable), 2) }} {{ $globalReceivable >= $globalPayable ? '(Receivable)' : '(Payable)' }}</strong>
                         @elseif($globalPayable > 0.005)
                             Total Outbound Payables (Obligations to Suppliers): <strong>Rs. {{ number_format($globalPayable, 2) }}</strong>
+                        @elseif($globalPayable < -0.005)
+                            Total Outbound Advance (Prepayments to Suppliers): <strong>Rs. {{ number_format(abs($globalPayable), 2) }}</strong>
                         @elseif($globalReceivable > 0.005)
                             Total Inbound Receivables (Claims from Customers): <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong>
+                        @elseif($globalReceivable < -0.005)
+                            Total Inbound Advance (Customer Credits): <strong>Rs. {{ number_format(abs($globalReceivable), 2) }}</strong>
                         @else
                             Account is fully reconciled. Zero outstanding balance.
                         @endif

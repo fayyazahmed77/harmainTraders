@@ -344,11 +344,26 @@ export default function PurchaseEdit({
     const [advanceAvailable, setAdvanceAvailable] = useState<number>(() => {
         if (purchase?.supplier_id && accounts) {
             const acc = accounts.find(a => Number(a.id) === Number(purchase.supplier_id));
-            if (acc) return toNumber(acc.current_balance);
+            if (acc && acc.current_balance !== undefined) return toNumber(acc.current_balance);
         }
         return 0;
     });
     const [useAdvance, setUseAdvance] = useState<boolean>(true);
+    const [supplierBalance, setSupplierBalance] = useState<number>(0);
+
+    useEffect(() => {
+        const supId = purchase?.supplier_id;
+        if (supId) {
+            axios.get(`/account/${supId}/balance`).then(res => {
+                const bal = toNumber(res.data.balance);
+                setSupplierBalance(bal);
+                setAdvanceAvailable(bal);
+                setUseAdvance(bal < 0);
+            }).catch(err => {
+                console.error("Failed to fetch balance", err);
+            });
+        }
+    }, [purchase?.supplier_id]);
 
     const accountTypeOptions: Option[] = useMemo(() => {
         return accounts.map((a) => ({
@@ -867,10 +882,26 @@ export default function PurchaseEdit({
                                             setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
                                             const salemanId = selectedAccount.saleman_id ?? null;
                                             setSalesman(salemanId);
+
+                                            // Fetch Supplier Balance On-Demand
+                                            axios.get(`/account/${id}/balance`).then((res) => {
+                                                const balance = toNumber(res.data.balance);
+                                                setSupplierBalance(balance);
+                                                setAdvanceAvailable(balance);
+                                                setUseAdvance(balance < 0);
+                                            }).catch((err) => {
+                                                console.error("Failed to fetch balance", err);
+                                                setSupplierBalance(0);
+                                                setAdvanceAvailable(0);
+                                                setUseAdvance(false);
+                                            });
                                         } else {
                                             setCreditDays(0);
                                             setCreditLimit("");
                                             setSalesman(null);
+                                            setSupplierBalance(0);
+                                            setAdvanceAvailable(0);
+                                            setUseAdvance(false);
                                         }
                                     }}
                                 >
@@ -973,15 +1004,24 @@ export default function PurchaseEdit({
                                             const salemanId = selectedAccount.saleman_id ?? null;
                                             setSalesman(salemanId);
                                             
-                                            // Set Advance
-                                            const balance = toNumber(selectedAccount.current_balance);
-                                            setAdvanceAvailable(balance);
-                                            setUseAdvance(balance < 0);
+                                            // Fetch Supplier Balance On-Demand
+                                            axios.get(`/account/${id}/balance`).then((res) => {
+                                                const balance = toNumber(res.data.balance);
+                                                setSupplierBalance(balance);
+                                                setAdvanceAvailable(balance);
+                                                setUseAdvance(balance < 0);
+                                            }).catch((err) => {
+                                                console.error("Failed to fetch balance", err);
+                                                setSupplierBalance(0);
+                                                setAdvanceAvailable(0);
+                                                setUseAdvance(false);
+                                            });
                                         } else {
                                             setCreditDays(0);
                                             setCreditLimit("");
                                             setMarkupPercentage(0);
                                             setSalesman(null);
+                                            setSupplierBalance(0);
                                             setAdvanceAvailable(0);
                                             setUseAdvance(false);
                                         }
@@ -1848,7 +1888,7 @@ export default function PurchaseEdit({
                     }}
                     invoiceNo={invoiceNo}
                     supplierName={accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A"}
-                    previousBalance={toNumber(accounts.find(a => Number(a.id) === Number(accountType?.value))?.current_balance)}
+                    previousBalance={supplierBalance}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}
                     extraDiscount={extraDiscount}
