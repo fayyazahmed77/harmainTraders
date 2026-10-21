@@ -1442,8 +1442,19 @@ class ReportBuilder
             $currentBal = (float)$account->current_balance;
             $signedOB = (float)$account->getSignedOpeningBalance();
 
+            // If account is fully settled with zero balance, skip (no receivable obligations)
+            if (abs($currentBal) <= 0.005) {
+                continue;
+            }
+
             // Compute remaining unpaid opening balance for customer using PaymentAllocationEngine
             $excessOverBills = round($currentBal - $billsRemaining, 2);
+            $agingDays = (int)($account->aging_days ?? 0);
+            $remainingOB = 0.0;
+            $obType = strtoupper($account->opening_balance_type ?? '');
+            if (empty($obType)) {
+                $obType = $signedOB >= 0 ? 'DR' : 'CR';
+            }
 
             $itemsForParty = collect();
 
@@ -1623,6 +1634,10 @@ class ReportBuilder
 
             if (!empty($partyProcessedBills)) {
                 $lastIdx = count($partyProcessedBills) - 1;
+                $endingBalance = (float)($partyProcessedBills[$lastIdx]['balance'] ?? 0);
+                if (abs($endingBalance) <= 0.005) {
+                    continue;
+                }
                 $partyProcessedBills[$lastIdx]['is_last_for_customer'] = true;
                 $partyProcessedBills[$lastIdx]['party_summary'] = [
                     'party_un_due_amount' => round($partyUnDueAmount, 2),
@@ -2248,6 +2263,12 @@ class ReportBuilder
 
             $billsRemainingAfter = (float)$adjustedBills->sum('remaining');
             $excessOverBills = round($currentBal - $billsRemainingAfter, 2);
+            $agingDays = (int)($account->aging_days ?? 0);
+            $remainingOB = 0.0;
+            $obType = strtoupper($account->opening_balance_type ?? '');
+            if (empty($obType)) {
+                $obType = $signedOB >= 0 ? 'CR' : 'DR';
+            }
 
             $itemsForParty = collect();
 
