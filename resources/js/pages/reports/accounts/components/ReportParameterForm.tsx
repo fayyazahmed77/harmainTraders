@@ -78,6 +78,8 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
         : null;
     const selectedReportData = reports.find(rep => rep.id === data.reportId);
 
+    const isAsOfReport = ['due_bills', 'outstanding_billwise'].includes(data.reportId?.toLowerCase());
+
     return (
         <div className="space-y-4">
             {/* High-Fidelity Inline Command Bar */}
@@ -89,29 +91,56 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                         <div className="flex items-center gap-2 px-3 border-r border-border">
                              <CalendarIcon className="h-4 w-4 text-indigo-500" />
                         </div>
-                        <div className="flex flex-1 items-center gap-1 px-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="ghost" className="h-9 px-2 text-xs font-bold text-text-secondary hover:bg-surface-0 shadow-none truncate">
-                                        {format(data.fromDate, "MMM dd, yy")}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={data.fromDate} onSelect={(date) => handleChange('fromDate', date)} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                            <span className="text-text-muted/30 font-bold">→</span>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="ghost" className="h-9 px-2 text-xs font-bold text-text-secondary hover:bg-surface-0 shadow-none truncate">
-                                        {format(data.toDate, "MMM dd, yy")}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={data.toDate} onSelect={(date) => handleChange('toDate', date)} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                        {isAsOfReport ? (
+                            <div className="flex flex-1 items-center gap-2 px-2">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">As On:</span>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="ghost" className="h-9 px-2 text-xs font-bold text-text-primary hover:bg-surface-0 shadow-none truncate">
+                                            {format(data.toDate, "MMM dd, yyyy")}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar 
+                                            mode="single" 
+                                            selected={data.toDate} 
+                                            onSelect={(date) => {
+                                                if (date) {
+                                                    handleChange('toDate', date);
+                                                    handleChange('fromDate', date);
+                                                }
+                                            }} 
+                                            initialFocus 
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                                <span className="text-[9px] font-bold text-indigo-600/70 bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded ml-auto">Cutoff</span>
+                            </div>
+                        ) : (
+                            <div className="flex flex-1 items-center gap-1 px-2">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="ghost" className="h-9 px-2 text-xs font-bold text-text-secondary hover:bg-surface-0 shadow-none truncate">
+                                            {format(data.fromDate, "MMM dd, yy")}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={data.fromDate} onSelect={(date) => handleChange('fromDate', date)} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                                <span className="text-text-muted/30 font-bold">→</span>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="ghost" className="h-9 px-2 text-xs font-bold text-text-secondary hover:bg-surface-0 shadow-none truncate">
+                                            {format(data.toDate, "MMM dd, yy")}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={data.toDate} onSelect={(date) => handleChange('toDate', date)} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        )}
                     </div>
 
                     {/* Account Trigger */}

@@ -209,7 +209,7 @@ export default function PurchaseFilters({ filters, suppliers }: FilterProps) {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-2xl">
                             <SelectItem value="all" className="text-xs font-bold lowercase italic opacity-50">Search Status</SelectItem>
-                            {["Completed", "Partial Return", "Returned"].map((s) => (
+                            {["Completed", "Paid", "Partial", "Partial Return", "Returned"].map((s) => (
                                 <SelectItem key={s} value={s} className="text-xs font-bold">
                                     {s}
                                 </SelectItem>

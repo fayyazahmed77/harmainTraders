@@ -66,6 +66,7 @@ Route::get('/api/purchase/last-purchase-info', [PurchaseController::class, 'getL
 
 
 
+
 Route::get('/', function () {
     return Inertia::render('auth/login', [
         'canRegister' => Features::enabled(Features::registration()),

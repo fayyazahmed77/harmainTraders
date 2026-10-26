@@ -12,11 +12,12 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
     if (!data.length) return null;
 
     const totals = data.reduce((acc, row) => ({
+        opening: acc.opening + Number(row.opening_stock || 0),
         in: acc.in + Number(row.in_qty || 0),
         out: acc.out + Number(row.out_qty || 0),
         balance: acc.balance + Number(row.balance_qty || 0),
         amount: acc.amount + Number(row.amount || 0),
-    }), { in: 0, out: 0, balance: 0, amount: 0 });
+    }), { opening: 0, in: 0, out: 0, balance: 0, amount: 0 });
 
     return (
         <>
@@ -26,6 +27,7 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                     <TableHead className="py-4 px-4 text-left text-[10px] font-black text-text-primary uppercase tracking-widest italic min-w-[300px]">Item</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Rate</TableHead>
                     <TableHead className="py-4 px-4 text-center text-[10px] font-black text-text-primary uppercase tracking-widest italic">Packing</TableHead>
+                    <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Opening Stock</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">In</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Out</TableHead>
                     <TableHead className="py-4 px-4 text-right text-[10px] font-black text-text-primary uppercase tracking-widest italic">Balance</TableHead>
@@ -54,6 +56,9 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                         <TableCell className="py-4 px-4 text-center font-bold text-text-muted text-[11px] tabular-nums">
                             {row.packing_qty}
                         </TableCell>
+                        <TableCell className="py-4 px-4 text-right font-black text-indigo-600 text-[11px] tabular-nums">
+                            {Number(row.opening_stock || 0).toLocaleString()}
+                        </TableCell>
                         <TableCell className="py-4 px-4 text-right font-bold text-blue-600 text-[11px] tabular-nums">
                             {Number(row.in_qty).toLocaleString()}
                         </TableCell>
@@ -78,6 +83,9 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                 <TableRow>
                     <TableCell colSpan={4} className="py-4 px-6 text-right text-[10px] uppercase tracking-widest text-text-muted">
                         Page Totals
+                    </TableCell>
+                    <TableCell className="py-4 px-4 text-right text-[11px] text-indigo-600 tabular-nums">
+                        {totals.opening.toLocaleString()}
                     </TableCell>
                     <TableCell className="py-4 px-4 text-right text-[11px] text-blue-600 tabular-nums">
                         {totals.in.toLocaleString()}

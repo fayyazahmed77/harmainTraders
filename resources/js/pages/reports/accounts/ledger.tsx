@@ -257,7 +257,10 @@ export default function AccountReports({
         if (params.type && params.type !== 'ALL') queryParams.type = params.type;
         if (params.noteHead && params.noteHead !== 'ALL') queryParams.noteHead = params.noteHead;
         if (params.nature && params.nature !== 'ALL') queryParams.nature = params.nature;
+        if (params.contraId && params.contraId !== 'ALL') queryParams.contraId = params.contraId;
         if (params.remarks) queryParams.remarks = params.remarks;
+        if (params.sortBy && params.sortBy !== 'INV_DATE') queryParams.sortBy = params.sortBy;
+        if (params.dateType && params.dateType !== 'invdate') queryParams.dateType = params.dateType;
 
         return queryParams;
     };

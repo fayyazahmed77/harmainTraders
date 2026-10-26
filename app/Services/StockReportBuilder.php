@@ -142,7 +142,7 @@ class StockReportBuilder
                 'item_id', 
                 DB::raw('SUM(total_pcs) as total'),
                 DB::raw('AVG(trade_price) as avg_rate'),
-                DB::raw('(SELECT trade_price FROM purchase_items pi2 WHERE pi2.item_id = purchase_items.item_id ORDER BY id DESC LIMIT 1) as last_rate')
+                DB::raw('(SELECT trade_price FROM purchase_items pi2 WHERE pi2.item_id = purchase_items.item_id AND pi2.trade_price > 0 ORDER BY id DESC LIMIT 1) as last_rate')
             )
             ->whereDate('purchases.date', '<=', $toDate)
             ->groupBy('item_id');
@@ -179,9 +179,9 @@ class StockReportBuilder
             'items.stock_2 as opening_stock_pcs',
             DB::raw('COALESCE(p.total, 0) + COALESCE(sr.total, 0) as in_qty'),
             DB::raw('COALESCE(s.total, 0) + COALESCE(pr.total, 0) as out_qty'),
-            DB::raw('(COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
-            DB::raw('COALESCE(p.avg_rate, items.trade_price) as avg_rate'),
-            DB::raw('COALESCE(p.last_rate, items.trade_price) as last_rate')
+            DB::raw('(COALESCE(items.stock_1, 0) + COALESCE(p.total, 0) + COALESCE(sr.total, 0)) - (COALESCE(s.total, 0) + COALESCE(pr.total, 0)) as balance_qty'),
+            DB::raw('COALESCE(NULLIF(p.avg_rate, 0), items.trade_price) as avg_rate'),
+            DB::raw('COALESCE(NULLIF(p.last_rate, 0), items.trade_price) as last_rate')
         )
         ->leftJoinSub($purchaseQty, 'p', 'items.id', '=', 'p.item_id')
         ->leftJoinSub($saleReturnQty, 'sr', 'items.id', '=', 'sr.item_id')
@@ -192,23 +192,43 @@ class StockReportBuilder
         $data = $results->map(function($row) use ($filters) {
             $row = (array)$row;
             
+            $lastPurchaseRate = floatval($row['last_rate'] ?? 0);
+            $tradePrice = floatval($row['base_tp'] ?? $row['trade_price'] ?? 0);
+
             // Apply Valuation Logic
-            if ($filters['valuation'] === 'average') {
-                $row['rate'] = $row['avg_rate'];
+            if ($filters['valuation'] === 'average' && floatval($row['avg_rate'] ?? 0) > 0) {
+                $rate = floatval($row['avg_rate']);
             } elseif ($filters['valuation'] === 'opening_stock') {
-                $row['rate'] = $row['base_tp'];
+                $rate = $tradePrice;
             } else {
-                $row['rate'] = $row['last_rate'];
+                // Valuation: last_purchase (or default)
+                // If item does not have last purchase price, display trade price
+                $rate = $lastPurchaseRate > 0 ? $lastPurchaseRate : $tradePrice;
             }
-            if (!$row['rate'] || $row['rate'] == 0) $row['rate'] = $row['base_tp'];
+
+            // Fallback to trade price if rate is still 0 or empty
+            if ($rate <= 0) {
+                $rate = $tradePrice;
+            }
+
+            $row['rate'] = $rate;
+            $row['trade_price'] = $tradePrice;
+            $row['last_rate'] = $lastPurchaseRate;
+            $row['opening_stock'] = floatval($row['opening_stock'] ?? 0);
+
+            $packing = max(1, intval($row['packing_qty'] ?? 1));
+
+            // Balance Qty = Opening Stock + In - Out
+            $inQty = floatval($row['in_qty'] ?? 0);
+            $outQty = floatval($row['out_qty'] ?? 0);
+            $row['balance_qty'] = $row['opening_stock'] + $inQty - $outQty;
 
             if ($filters['valuation'] === 'opening_stock') {
-                $packing = max(1, intval($row['packing_qty'] ?? 1));
                 $opFull = floatval($row['opening_stock'] ?? 0);
                 $opPcs = floatval($row['opening_stock_pcs'] ?? 0);
                 $row['amount'] = ($opFull * floatval($row['rate'])) + ($packing > 0 ? ($opPcs / $packing) * floatval($row['rate']) : 0);
             } else {
-                $row['amount'] = ($row['balance_qty'] / ($row['packing_qty'] ?: 1)) * $row['rate'];
+                $row['amount'] = round(($row['balance_qty'] / $packing) * floatval($row['rate']), 2);
             }
             
             return $row;

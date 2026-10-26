@@ -74,7 +74,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-export type PurchaseStatus = "Completed" | "Partial Return" | "Returned" | "Pending Order" | "Canceled" | "Partial";
+export type PurchaseStatus = "Completed" | "Paid" | "Partial Return" | "Returned" | "Pending Order" | "Canceled" | "Partial";
 
 interface Purchases {
     id: number;
@@ -119,6 +119,10 @@ export default function DataTable({ data }: DataTableProps) {
     const statusMap: Record<string, { color: string; icon: JSX.Element }> = {
         Completed: {
             color: "bg-green-100 text-green-800 border-green-200",
+            icon: <CheckCircle size={14} />,
+        },
+        Paid: {
+            color: "bg-emerald-100 text-emerald-800 border-emerald-200",
             icon: <CheckCircle size={14} />,
         },
         "Partial Return": {

@@ -29,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 
 interface OutstandingBill {
+    type: string;
     date: string;
     voucher_no: string;
     bill_type: 'receivable' | 'payable';
@@ -64,8 +65,8 @@ interface OutstandingBillWiseViewProps {
 
 export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) {
     const stats = useMemo(() => {
-        const receivable = data.filter(i => i.bill_type === 'receivable').reduce((s, i) => s + (Number(i.remaining) || 0), 0);
-        const payable = data.filter(i => i.bill_type === 'payable').reduce((s, i) => s + (Number(i.remaining) || 0), 0);
+        const receivable = data.filter(i => i.bill_type === 'receivable').reduce((s, i) => s + Math.abs(Number(i.remaining) || 0), 0);
+        const payable = data.filter(i => i.bill_type === 'payable').reduce((s, i) => s + Math.abs(Number(i.remaining) || 0), 0);
         const totalBilled = data.reduce((s, i) => s + (Number(i.bill_amt) || 0), 0);
         const totalPaid = data.reduce((s, i) => s + (Number(i.paid) || 0), 0);
         return { receivable, payable, net: receivable - payable, totalBilled, totalPaid };
@@ -83,6 +84,22 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
 
     return (
         <div className="relative -mt-4 space-y-4">
+            {/* Statement Semantics Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 text-xs">
+                <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    <span className="font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[11px]">
+                        Statement As On Cutoff
+                    </span>
+                    <Badge variant="outline" className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 text-[10px] font-semibold">
+                        Cumulative As-Of Statement
+                    </Badge>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Includes all unpaid obligations, debit advances, and credit advances originating on or before statement cutoff.
+                </div>
+            </div>
+
             <div className="overflow-hidden bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm rounded-xl flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full border-collapse p-0 m-0">
@@ -105,7 +122,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                         </thead>
                         <TableBody>
                             {data.map((item, index) => {
-                                const isReceivable = item.bill_type === 'receivable';
+                                const isPartyReceivable = (item.party_summary?.party_type ?? (item.bill_type === 'receivable' ? 'receivable' : 'payable')) === 'receivable';
                                 const isNewParty = index === 0 || data[index - 1].party_id !== item.party_id;
                                 const isReconciled = item.party_summary?.is_reconciled ?? true;
                                 const currentBal = item.party_summary?.current_balance ?? item.balance;
@@ -122,7 +139,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                         <div className="flex items-center gap-3">
                                                             <div className={cn(
                                                                 "h-9 w-9 rounded-lg flex items-center justify-center shadow-xs shrink-0",
-                                                                isReceivable ? "bg-indigo-600 text-white" : "bg-amber-600 text-white"
+                                                                isPartyReceivable ? "bg-indigo-600 text-white" : "bg-amber-600 text-white"
                                                             )}>
                                                                 <UserCircle2 className="h-5 w-5" />
                                                             </div>
@@ -133,9 +150,9 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                                     </h4>
                                                                     <Badge className={cn(
                                                                         "h-4 px-1.5 text-[8px] font-bold uppercase tracking-wider border-none",
-                                                                        isReceivable ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                                                                        isPartyReceivable ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" : "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
                                                                     )}>
-                                                                        {isReceivable ? 'Customer (Receivable)' : 'Supplier (Payable)'}
+                                                                        {isPartyReceivable ? 'Customer (Receivable)' : 'Supplier (Payable)'}
                                                                     </Badge>
                                                                     <span className="text-[10px] text-slate-500 font-mono">
                                                                         Entity #{item.party_id}
@@ -156,7 +173,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                                 </div>
 
                                                                 <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-zinc-400 mt-0.5">
-                                                                    <span>Ledger Balance: <strong className="text-slate-900 dark:text-zinc-100 font-mono">₨ {Math.abs(currentBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currentBal >= 0 ? 'CR' : 'DR'}</strong></span>
+                                                                    <span>Ledger Balance: <strong className="text-slate-900 dark:text-zinc-100 font-mono">₨ {Math.abs(currentBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.party_summary?.party_type === 'receivable' ? (currentBal >= 0 ? 'DR' : 'CR') : (currentBal >= 0 ? 'CR' : 'DR')}</strong></span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -207,7 +224,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                         <TableRow className={cn(
                                             "transition-colors border-b border-slate-100 dark:border-zinc-800/80 last:border-none",
                                             index % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-slate-50/50 dark:bg-zinc-900/40",
-                                            isReceivable ? "hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20" : "hover:bg-amber-50/40 dark:hover:bg-amber-950/20"
+                                            isPartyReceivable ? "hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20" : "hover:bg-amber-50/40 dark:hover:bg-amber-950/20"
                                         )}>
                                             {/* Date / Timeline */}
                                             <TableCell className="pl-6 py-2.5">
@@ -216,7 +233,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                         "h-3.5 w-1 rounded-full",
                                                         (item.is_opening_balance || item.voucher_no?.startsWith('OPENING-BAL'))
                                                             ? ((item.remaining < 0 || item.voucher_no?.includes('DR')) ? "bg-emerald-500" : "bg-amber-500")
-                                                            : (isReceivable ? "bg-indigo-500" : "bg-amber-500")
+                                                            : (item.remaining < 0 || item.bill_amt < 0 ? "bg-emerald-500" : (isPartyReceivable ? "bg-indigo-500" : "bg-amber-500"))
                                                     )} />
                                                     <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
                                                         {item.date && !isNaN(new Date(item.date).getTime()) ? format(new Date(item.date), 'dd/MM/yyyy') : (item.date || '-')}
@@ -250,16 +267,22 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
 
                                             {/* Aging Status Badge */}
                                             <TableCell className="px-3 py-2.5 text-center">
-                                                <span className={cn(
-                                                    "inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs",
-                                                    item.days > 0 
-                                                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800" 
-                                                        : item.days === 0
-                                                            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
-                                                            : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
-                                                )}>
-                                                    {item.days > 0 ? `${item.days}d Overdue` : item.days === 0 ? 'Due Today' : `${Math.abs(item.days)}d Left`}
-                                                </span>
+                                                {item.type === 'PAYMENT' || item.type === 'RECEIPT' || item.voucher_no?.startsWith('ADVANCE') || item.remaining < 0 || item.bill_amt < 0 ? (
+                                                    <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                                                        Advance
+                                                    </span>
+                                                ) : (
+                                                    <span className={cn(
+                                                        "inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs",
+                                                        item.days > 0 
+                                                            ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800" 
+                                                            : item.days === 0
+                                                                ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+                                                                : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+                                                    )}>
+                                                        {item.days > 0 ? `${item.days}d Overdue` : item.days === 0 ? 'Due Today' : `${Math.abs(item.days)}d Left`}
+                                                    </span>
+                                                )}
                                             </TableCell>
 
                                             {/* Bill Amount */}
@@ -287,7 +310,7 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                                                     "px-2 py-0.5 rounded-sm inline-block",
                                                     item.balance < 0 
                                                         ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                                        : (isReceivable 
+                                                        : (isPartyReceivable 
                                                             ? "bg-indigo-100 text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300"
                                                             : "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300")
                                                 )}>
@@ -303,42 +326,119 @@ export function OutstandingBillWiseView({ data }: OutstandingBillWiseViewProps) 
                 </div>
             </div>
 
-            {/* Executive Supplier Payables Consolidation Dashboard (Footer) */}
-            <div className="bg-slate-900 text-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 px-6 sm:px-8 border border-slate-800 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-inner">
-                        <Scale className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-amber-400">Executive Summary</span>
-                            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[9px] font-bold">Verified Audit</Badge>
-                        </div>
-                        <h4 className="text-base font-bold text-white tracking-tight mt-0.5">Supplier Outstanding Payables Position</h4>
-                        <p className="text-xs text-slate-400">Total verified liabilities and open purchase obligations as-of statement date</p>
-                    </div>
-                </div>
+            {/* Executive Statement Summary Dashboard (Footer) */}
+            {(() => {
+                const uniqueParties = new Set(data.map(i => i.party_id));
+                const isMultiParty = uniqueParties.size > 1;
+                const primaryPartySummary = data[0]?.party_summary;
+                const hasBothStreams = stats.receivable > 0.005 && stats.payable > 0.005;
+                const isCustomer = !isMultiParty && primaryPartySummary?.party_type === 'receivable' && !hasBothStreams;
+                const isSupplier = !isMultiParty && primaryPartySummary?.party_type === 'payable' && !hasBothStreams;
 
-                {/* High-Contrast Key Metrics Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 w-full lg:w-auto">
-                    <div className="flex flex-col sm:items-end">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Open Bills</span>
-                        <span className="text-sm font-bold font-mono text-slate-200">{data.length} Records</span>
+                let title = "Supplier Outstanding Payables Position";
+                let subtitle = "Total verified liabilities and open purchase obligations as-of statement date";
+                let netSupplierBal = stats.payable - stats.receivable;
+                if (primaryPartySummary?.current_balance !== undefined) {
+                    netSupplierBal = primaryPartySummary.current_balance;
+                }
+                const isNetDebitSupplier = netSupplierBal < -0.005;
+
+                let accentColor = isNetDebitSupplier ? "text-emerald-400" : "text-amber-400";
+                let iconColor = isNetDebitSupplier 
+                    ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" 
+                    : "text-amber-500 bg-amber-500/10 border-amber-500/20";
+                let netLabel = isNetDebitSupplier ? "Net Advance (Debit Balance)" : "Net Outstanding";
+                let netValue = `₨ ${Math.abs(netSupplierBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isNetDebitSupplier ? 'DR' : 'CR'}`;
+
+                if (isCustomer) {
+                    let netCustomerBal = stats.receivable - stats.payable;
+                    if (primaryPartySummary?.current_balance !== undefined) {
+                        netCustomerBal = primaryPartySummary.current_balance;
+                    }
+                    const isNetCreditCustomer = netCustomerBal < -0.005;
+
+                    title = "Customer Outstanding Receivables Position";
+                    subtitle = "Total verified claims and open customer sales obligations as-of statement date";
+                    accentColor = isNetCreditCustomer ? "text-emerald-400" : "text-indigo-400";
+                    iconColor = isNetCreditCustomer
+                        ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                        : "text-indigo-500 bg-indigo-500/10 border-indigo-500/20";
+                    netLabel = isNetCreditCustomer ? "Net Advance (Credit Balance)" : "Net Receivables";
+                    netValue = `₨ ${Math.abs(netCustomerBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isNetCreditCustomer ? 'CR' : 'DR'}`;
+                } else if (hasBothStreams || isMultiParty) {
+                    title = isMultiParty ? "Consolidated Financial Portfolio Position" : "Hybrid Account (Customer & Supplier) Position";
+                    subtitle = "Total portfolio receivables, payables, and net position across all obligations as-of statement date";
+                    accentColor = stats.net >= 0 ? "text-indigo-400" : "text-amber-400";
+                    iconColor = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
+                    netLabel = "Net Balance";
+                    netValue = `₨ ${Math.abs(stats.net).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${stats.net >= 0 ? 'DR' : 'CR'}`;
+                }
+
+                return (
+                    <div className="bg-slate-900 text-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 px-6 sm:px-8 border border-slate-800 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className={cn("h-12 w-12 rounded-xl border flex items-center justify-center shadow-inner shrink-0", iconColor)}>
+                                <Scale className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className={cn("text-[9px] font-black uppercase tracking-[0.25em]", accentColor)}>Executive Summary</span>
+                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[9px] font-bold">Verified Audit</Badge>
+                                </div>
+                                <h4 className="text-base font-bold text-white tracking-tight mt-0.5">{title}</h4>
+                                <p className="text-xs text-slate-400">{subtitle}</p>
+                            </div>
+                        </div>
+
+                        {/* High-Contrast Key Metrics Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 w-full lg:w-auto">
+                            <div className="flex flex-col sm:items-end">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Open Bills</span>
+                                <span className="text-sm font-bold font-mono text-slate-200">{data.length} Records</span>
+                            </div>
+
+                            {hasBothStreams || isMultiParty ? (
+                                <>
+                                    <div className="flex flex-col sm:items-end">
+                                        <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400">Receivables (DR)</span>
+                                        <span className="text-sm font-bold font-mono text-indigo-300">
+                                            ₨ {stats.receivable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col sm:items-end">
+                                        <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400">Payables (CR)</span>
+                                        <span className="text-sm font-bold font-mono text-amber-300">
+                                            ₨ {stats.payable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex flex-col sm:items-end">
+                                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Billed</span>
+                                        <span className="text-sm font-bold font-mono text-slate-200">
+                                            ₨ {stats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col sm:items-end">
+                                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Settled (Paid)</span>
+                                        <span className="text-sm font-bold font-mono text-emerald-400">
+                                            ₨ {stats.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="flex flex-col sm:items-end">
+                                <span className={cn("text-[9px] font-black uppercase tracking-wider", accentColor)}>{netLabel}</span>
+                                <span className={cn("text-lg font-black font-mono", accentColor)}>
+                                    {netValue}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex flex-col sm:items-end">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Total Billed</span>
-                        <span className="text-sm font-bold font-mono text-slate-200">₨ {stats.totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex flex-col sm:items-end">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Settled (Paid)</span>
-                        <span className="text-sm font-bold font-mono text-emerald-400">₨ {stats.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex flex-col sm:items-end">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-400">Net Outstanding</span>
-                        <span className="text-lg font-black font-mono text-amber-400">₨ {stats.payable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                </div>
-            </div>
+                );
+            })()}
         </div>
     );
 }

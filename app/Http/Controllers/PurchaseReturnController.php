@@ -358,11 +358,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $purchase->status = 'Returned';
                 $purchase->remaining_amount = 0;
             } elseif ($totalReturnedQty > 0) {
-                if ($purchase->remaining_amount <= 0.005) {
-                    $purchase->status = ($totalReturns >= $purchase->net_total) ? 'Returned' : 'Paid';
-                } else {
-                    $purchase->status = 'Partial Return';
-                }
+                $purchase->status = 'Partial Return';
             } elseif ($purchase->remaining_amount <= 0.005) {
                 $purchase->status = 'Paid';
             } elseif ($totalPayments > 0 || $totalReturns > 0) {

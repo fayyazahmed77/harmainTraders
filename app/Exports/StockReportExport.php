@@ -39,9 +39,9 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
             $view = "pdf.stock.types.summary";
         }
 
-        $colspan = 7;
+        $colspan = 8;
         if (isset($this->params['withAmount']) && $this->params['withAmount']) {
-            $colspan = 8;
+            $colspan = 9;
         }
         if ($this->type === 'detail') {
             $colspan = 9;
@@ -93,10 +93,17 @@ class StockReportExport implements FromView, WithColumnWidths, WithStyles, WithC
                 ];
             default:
                 $widths = [
-                    'A' => 8, 'B' => 50, 'C' => 15, 'D' => 10, 'E' => 12, 'F' => 12, 'G' => 15,
+                    'A' => 8,  // S.#
+                    'B' => 45, // Item
+                    'C' => 15, // Rate
+                    'D' => 10, // Packing
+                    'E' => 12, // Opening
+                    'F' => 12, // In
+                    'G' => 12, // Out
+                    'H' => 15, // Balance
                 ];
                 if (isset($this->params['withAmount']) && $this->params['withAmount']) {
-                    $widths['H'] = 18;
+                    $widths['I'] = 18; // Amount
                 }
                 return $widths;
         }

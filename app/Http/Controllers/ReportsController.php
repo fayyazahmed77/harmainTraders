@@ -223,6 +223,7 @@ class ReportsController extends Controller implements HasMiddleware
             'account' => $account,
             'data' => $data,
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => false
         ];
 
@@ -247,11 +248,11 @@ class ReportsController extends Controller implements HasMiddleware
             'account' => $account,
             'data' => $data,
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => true
         ];
 
-        $pdf = PDF::loadView('pdf.due-bills', $pdfData);
-        return $pdf->stream('due-bills.pdf');
+        return view('pdf.due-bills', $pdfData);
     }
 
     public function accountLedgerExportPdf(Request $request)
@@ -794,6 +795,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => false
         ];
 
@@ -829,6 +831,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => true
         ];
 

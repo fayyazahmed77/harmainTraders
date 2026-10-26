@@ -157,12 +157,12 @@ class FIFOAllocationService
             return 'Returned';
         }
 
-        if ($sale->remaining_amount <= 0.005) {
-            return ($totalReturns >= $sale->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
-        }
-
         if ($totalReturnedQty > 0) {
             return 'Partial Return';
+        }
+
+        if ($sale->remaining_amount <= 0.005) {
+            return ($totalReturns >= $sale->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
         }
 
         if ($totalPayments > 0 || $totalReturns > 0) {
@@ -316,12 +316,12 @@ class FIFOAllocationService
             return 'Returned';
         }
 
-        if ($purchase->remaining_amount <= 0.005) {
-            return ($totalReturns >= $purchase->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
-        }
-
         if ($totalReturnedQty > 0) {
             return 'Partial Return';
+        }
+
+        if ($purchase->remaining_amount <= 0.005) {
+            return ($totalReturns >= $purchase->net_total || ($totalSoldQty > 0 && $totalReturnedQty >= $totalSoldQty)) ? 'Returned' : 'Paid';
         }
 
         if ($totalPayments > 0 || $totalReturns > 0) {

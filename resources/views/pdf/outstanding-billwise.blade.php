@@ -30,7 +30,7 @@ if (!function_exists('formatNum')) {
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Outstanding Bill-Wise Statement - {{ $account ? $account->title : 'Consolidated' }}</title>
+    <title>Outstanding Bill-Wise Report - {{ $account ? $account->title : 'Consolidated' }}</title>
     <style>
         @page {
             size: A4 portrait;
@@ -59,91 +59,48 @@ if (!function_exists('formatNum')) {
         .font-bold { font-weight: bold; }
         .uppercase { text-transform: uppercase; }
 
-        /* Document Header */
-        .header-container {
-            width: 100%;
-            border-bottom: 2px solid #000000;
-            padding-bottom: 6px;
-            margin-bottom: 8px;
+        .header {
+            margin-bottom: 15px;
         }
-        
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
+        .report-title {
+            font-size: 13px;
+            margin-bottom: 10px;
+            font-weight: bold;
         }
-        
-        .header-table td {
+
+        /* Logo Styles */
+        .logo-section {
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .logo-icon {
+            display: inline-block;
             vertical-align: middle;
-            padding: 0;
+            margin-right: 10px;
         }
-
-        .company-name {
+        .brand-text {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: left;
+        }
+        .brand-name {
             font-size: 20px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            color: #000000;
-            text-transform: uppercase;
-            line-height: 1.1;
+            font-weight: bold;
+            color: #444;
+            line-height: 1;
         }
-
-        .company-tagline {
-            font-size: 8.5px;
-            color: #333333;
+        .brand-tagline {
+            font-size: 9px;
+            color: #888;
             letter-spacing: 1px;
             text-transform: uppercase;
             margin-top: 2px;
         }
-
-        .report-main-title {
-            font-size: 14px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #000000;
-            text-align: right;
-            line-height: 1.2;
-        }
-
-        .report-sub-title {
-            font-size: 8.5px;
-            font-weight: 600;
-            color: #444444;
-            text-align: right;
-            text-transform: uppercase;
-            margin-top: 2px;
-        }
-
-        /* Metadata Strip */
-        .meta-strip {
-            width: 100%;
-            border: 1px solid #000000;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-            background-color: #f8f9fa;
-        }
-
-        .meta-strip td {
-            padding: 4px 6px;
-            font-size: 8.5px;
-            border-right: 1px solid #cccccc;
-        }
         
-        .meta-strip td:last-child {
-            border-right: none;
-        }
-
-        .meta-label {
+        .criteria-text {
+            font-size: 10.5px;
+            margin-bottom: 15px;
             font-weight: bold;
-            color: #333333;
-            text-transform: uppercase;
-            font-size: 7.5px;
-            margin-bottom: 1px;
-        }
-
-        .meta-value {
-            font-weight: bold;
-            color: #000000;
-            font-size: 9px;
         }
 
         /* Ledger Table */
@@ -178,7 +135,7 @@ if (!function_exists('formatNum')) {
         }
 
         table.ledger-table td {
-            border: 1px solid #b0b0b0;
+            border: 1px solid #1d1c1cff;
             padding: 4px 4px;
             font-size: 8.5px;
             vertical-align: middle;
@@ -310,56 +267,169 @@ if (!function_exists('formatNum')) {
 </head>
 <body>
 
-    <!-- Top Header -->
-    <div class="header-container">
-        <table class="header-table">
-            <tr>
-                <td width="55%">
-                    <div class="company-name">{{ $firm->name ?? 'Haramain Traders' }}</div>
-                    <div class="company-tagline">
-                        {{ $firm->address ?? 'Wholesale & Supply Chain Distribution ERP' }}
-                        @if(!empty($firm->phone)) | Tel: {{ $firm->phone }} @endif
-                    </div>
-                </td>
-                <td width="45%" align="right">
-                    <div class="report-main-title">Outstanding Bill-Wise Statement</div>
-                    <div class="report-sub-title">Financial Portfolio &amp; Bill Aging Audit</div>
-                </td>
-            </tr>
-        </table>
-    </div>
+    <!-- Header matching Due Bills style -->
+    <div class="header text-center">
+        <div class="logo-section">
+            <div class="logo-icon">
+                @if($logo_base64)
+                    <img src="{{ $logo_base64 }}" width="35" height="35">
+                @endif
+            </div>
+            <div class="brand-text">
+                <div class="brand-name">Haramain <span style="color:#000">Traders</span></div>
+                <div class="brand-tagline">Wholesale <span style="color:#000">&</span> Supply Chain</div>
+            </div>
+        </div>
+        
+        <div style="width: 100%; margin-top: 5px;">
+            <div class="report-title" style="border-top: 1px dashed #000; display: inline-block; padding: 5px 30px;">OUTSTANDING BILL REPORT</div>
+        </div>
 
-    <!-- Metadata Strip -->
-    <table class="meta-strip">
-        <tr>
-            <td width="30%">
-                <div class="meta-label">Party / Account Title</div>
-                <div class="meta-value">{{ $account ? strtoupper($account->title) : 'ALL PARTIES (CONSOLIDATED)' }}</div>
-            </td>
-            <td width="15%">
-                <div class="meta-label">Account Code / ID</div>
-                <div class="meta-value">{{ $account ? ($account->code ?? 'ACC-' . $account->id) : 'ALL' }}</div>
-            </td>
-            <td width="20%">
-                <div class="meta-label">Statement As On</div>
-                <div class="meta-value">{{ date('d-M-Y', strtotime($to_date)) }}</div>
-            </td>
-            <td width="20%">
-                <div class="meta-label">Date Filter Period</div>
-                <div class="meta-value">{{ date('d-M-Y', strtotime($from_date)) }} to {{ date('d-M-Y', strtotime($to_date)) }}</div>
-            </td>
-            <td width="15%">
-                <div class="meta-label">Classification</div>
-                <div class="meta-value">
-                    @if($account)
-                        {{ ($account->purchase || in_array($account->type, [4, 6])) ? 'Supplier (Payable)' : 'Customer (Receivable)' }}
-                    @else
-                        Consolidated
-                    @endif
-                </div>
-            </td>
-        </tr>
-    </table>
+        @php
+            $filterParams = $params ?? request()->all();
+            $criteriaList = [];
+
+            // 1. Date (Cutoff / Range)
+            if (!empty($from_date) && !empty($to_date) && $from_date !== $to_date) {
+                $criteriaList[] = 'Dated ' . strtoupper(date('d-M-Y', strtotime($from_date))) . ' To ' . strtoupper(date('d-M-Y', strtotime($to_date)));
+            } elseif (!empty($to_date)) {
+                $criteriaList[] = 'Dated As On ' . strtoupper(date('d-M-Y', strtotime($to_date)));
+            } elseif (!empty($filterParams['to'])) {
+                $criteriaList[] = 'Dated As On ' . strtoupper(date('d-M-Y', strtotime($filterParams['to'])));
+            }
+
+            // 2. Company / Account (Only if selected and not ALL)
+            if (!empty($account) && $account->id) {
+                $criteriaList[] = 'Company: ' . strtoupper($account->title);
+            } elseif (!empty($filterParams['account_id']) && $filterParams['account_id'] !== 'ALL') {
+                $acc = \App\Models\Account::find($filterParams['account_id']);
+                if ($acc) {
+                    $criteriaList[] = 'Company: ' . strtoupper($acc->title);
+                }
+            }
+
+            // 3. Firm (Only if selected and not ALL)
+            $fId = $filterParams['firmId'] ?? $filterParams['firm_id'] ?? null;
+            if (!empty($fId) && $fId !== 'ALL') {
+                $firmObj = \App\Models\Firm::find($fId);
+                if ($firmObj) {
+                    $criteriaList[] = 'Firm: ' . strtoupper($firmObj->name);
+                }
+            }
+
+            // 4. Salesman (Only if selected and not ALL)
+            $sId = $filterParams['salemanId'] ?? $filterParams['saleman_id'] ?? $filterParams['salesman_id'] ?? null;
+            if (!empty($sId) && $sId !== 'ALL') {
+                $salesmanObj = \App\Models\Saleman::find($sId);
+                if ($salesmanObj) {
+                    $criteriaList[] = 'Salesman: ' . strtoupper($salesmanObj->name);
+                }
+            }
+
+            // 5. Province (Only if selected and not ALL)
+            $pId = $filterParams['provinceId'] ?? $filterParams['province_id'] ?? null;
+            if (!empty($pId) && $pId !== 'ALL') {
+                $provinceObj = \App\Models\Province::find($pId);
+                if ($provinceObj) {
+                    $criteriaList[] = 'Province: ' . strtoupper($provinceObj->name);
+                }
+            }
+
+            // 6. City (Only if selected and not ALL)
+            $cId = $filterParams['cityId'] ?? $filterParams['city_id'] ?? null;
+            if (!empty($cId) && $cId !== 'ALL') {
+                $cityObj = \App\Models\City::find($cId);
+                if ($cityObj) {
+                    $criteriaList[] = 'City: ' . strtoupper($cityObj->name);
+                }
+            }
+
+            // 7. Area (Only if selected and not ALL)
+            $aId = $filterParams['areaId'] ?? $filterParams['area_id'] ?? null;
+            if (!empty($aId) && $aId !== 'ALL') {
+                $areaObj = \App\Models\Areas::find($aId);
+                if ($areaObj) {
+                    $criteriaList[] = 'Area: ' . strtoupper($areaObj->name);
+                }
+            }
+
+            // 8. Sub Area (Only if selected and not ALL)
+            $subId = $filterParams['subareaId'] ?? $filterParams['subarea_id'] ?? null;
+            if (!empty($subId) && $subId !== 'ALL') {
+                $subareaObj = \App\Models\Subarea::find($subId);
+                if ($subareaObj) {
+                    $criteriaList[] = 'Sub Area: ' . strtoupper($subareaObj->name);
+                }
+            }
+
+            // 9. Account Type (Only if selected and not ALL)
+            $typeId = $filterParams['type'] ?? $filterParams['account_type'] ?? null;
+            if (!empty($typeId) && $typeId !== 'ALL') {
+                if (is_numeric($typeId)) {
+                    $typeObj = \App\Models\AccountType::find($typeId);
+                    $typeName = $typeObj ? $typeObj->name : $typeId;
+                } else {
+                    $typeName = $typeId;
+                }
+                $criteriaList[] = 'Acc Type: ' . strtoupper($typeName);
+            }
+
+            // 10. Category (Only if selected and not ALL)
+            $catId = $filterParams['noteHead'] ?? $filterParams['note_head'] ?? null;
+            if (!empty($catId) && $catId !== 'ALL') {
+                if (is_numeric($catId)) {
+                    $catObj = \App\Models\AccountCategory::find($catId);
+                    $catName = $catObj ? $catObj->name : $catId;
+                } else {
+                    $catName = $catId;
+                }
+                $criteriaList[] = 'Category: ' . strtoupper($catName);
+            }
+
+            // 11. Nature (Only if selected and not ALL)
+            $natureId = $filterParams['nature'] ?? null;
+            if (!empty($natureId) && $natureId !== 'ALL') {
+                if (is_numeric($natureId)) {
+                    $natObj = \App\Models\AccountCategory::find($natureId);
+                    $natName = $natObj ? $natObj->name : $natureId;
+                } else {
+                    $natName = $natureId;
+                }
+                $criteriaList[] = 'Nature: ' . strtoupper($natName);
+            }
+
+            // 12. Contra (Only if selected and not ALL)
+            $contraId = $filterParams['contraId'] ?? $filterParams['contra_id'] ?? null;
+            if (!empty($contraId) && $contraId !== 'ALL') {
+                $contraObj = \App\Models\Account::find($contraId);
+                if ($contraObj) {
+                    $criteriaList[] = 'Contra: ' . strtoupper($contraObj->title);
+                }
+            }
+
+            // 13. Search Meta (Only if filled)
+            $remarks = trim($filterParams['remarks'] ?? '');
+            if ($remarks !== '') {
+                $criteriaList[] = 'Search: "' . $remarks . '"';
+            }
+
+            // 14. Sort By (Only if specified and not default INV_DATE)
+            $sortBy = $filterParams['sortBy'] ?? null;
+            if (!empty($sortBy) && $sortBy !== 'INV_DATE' && $sortBy !== 'ALL') {
+                $criteriaList[] = 'Sort By: ' . strtoupper($sortBy);
+            }
+
+            // 15. Ledger Logic (Only if specified and cleardate)
+            $dateType = $filterParams['dateType'] ?? null;
+            if (!empty($dateType) && $dateType === 'cleardate') {
+                $criteriaList[] = 'Logic: BY CLEARING';
+            }
+        @endphp
+
+        <div class="criteria-text text-left">
+            CRITERIA : {{ implode(' | ', $criteriaList) }}
+        </div>
+    </div>
 
     <!-- Ledger Tables Grouped by Party -->
     @foreach($groupedData as $partyId => $bills)
@@ -383,15 +453,15 @@ if (!function_exists('formatNum')) {
             <table class="ledger-table">
                 <thead>
                     <tr>
-                        <th width="9%" class="text-center">Date</th>
-                        <th width="13%" class="text-center">Voucher #</th>
-                        <th width="6%" class="text-center">Type</th>
-                        <th width="22%" class="text-left">Party / Account Name</th>
-                        <th width="9%" class="text-center">Due Date</th>
-                        <th width="11%" class="text-center">Aging / Status</th>
-                        <th width="10%" class="text-right">Bill Amt (Rs.)</th>
-                        <th width="10%" class="text-right">Paid (Rs.)</th>
-                        <th width="10%" class="text-right">Remaining (Rs.)</th>
+                        <th width="8%" class="text-center">Date</th>
+                        <th width="11%" class="text-center">Voucher #</th>
+                        <th width="20%" class="text-left">Party </th>
+                        <th width="8%" class="text-center">Due Date</th>
+                        <th width="10%" class="text-center">Aging </th>
+                        <th width="9%" class="text-right">Bill Amt </th>
+                        <th width="9%" class="text-right">Paid </th>
+                        <th width="9%" class="text-right">Remaining </th>
+                        <th width="10%" class="text-right">Balance </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -401,7 +471,9 @@ if (!function_exists('formatNum')) {
                             $daysVal = (int)($bill['days'] ?? 0);
                             
                             // Clear, unambiguous aging representation
-                            if ($daysVal > 0) {
+                            if ((!empty($bill['type']) && in_array($bill['type'], ['PAYMENT', 'RECEIPT'])) || ($bill['remaining'] ?? 0) < 0 || ($bill['bill_amt'] ?? 0) < 0) {
+                                $agingText = 'Advance';
+                            } elseif ($daysVal > 0) {
                                 $agingText = $daysVal . 'd Overdue';
                             } elseif ($daysVal === 0) {
                                 $agingText = 'Due Today';
@@ -427,9 +499,7 @@ if (!function_exists('formatNum')) {
                             <td class="text-center font-bold">
                                 {{ $bill['voucher_no'] }}
                             </td>
-                            <td class="text-center">
-                                <span class="type-badge-bw">{{ $typeBadge }}</span>
-                            </td>
+                          
                             <td class="text-left font-bold">
                                 {{ $bill['party_name'] }}
                             </td>
@@ -445,8 +515,11 @@ if (!function_exists('formatNum')) {
                             <td class="text-right">
                                 {{ formatNum($bill['paid']) }}
                             </td>
+                            <td class="text-right">
+                                {{ formatNum($bill['remaining']) }}
+                            </td>
                             <td class="text-right font-bold">
-                                {{ formatNum($bill['balance'] ?? $bill['remaining']) }}
+                                {{ formatNum($bill['balance']) }}
                             </td>
                         </tr>
                     @endforeach
@@ -457,9 +530,7 @@ if (!function_exists('formatNum')) {
             <!-- Party Summary Bar -->
             <table class="party-summary-bar">
                 <tr>
-                    <td width="10%" class="summary-bar-label text-center">Un-Due</td>
-                    <td width="11%" class="summary-bar-val text-right">{{ formatNum($summary['party_un_due_amount']) }}</td>
-                    
+                  
                     <td width="10%" class="summary-bar-label text-center">Overdue</td>
                     <td width="11%" class="summary-bar-val text-right">{{ formatNum($summary['party_due_amount']) }}</td>
                     
@@ -512,16 +583,23 @@ if (!function_exists('formatNum')) {
                 <tr>
                     <td colspan="4" class="text-left" style="background-color: #fafafa; font-size: 8px;">
                         <strong>Portfolio Position:</strong>
+                        @php
+                            $isSupplierParty = $account ? ((bool)($account->purchase ?? false) || (int)($account->type ?? 0) === 6 || strtolower($account->accountType->name ?? '') === 'supplier') : false;
+                        @endphp
                         @if($globalPayable > 0.005 && $globalReceivable > 0.005)
                             Total Outbound Payables: <strong>Rs. {{ number_format($globalPayable, 2) }}</strong> &nbsp;|&nbsp; 
                             Total Inbound Receivables: <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong> &nbsp;|&nbsp; 
-                            Net Balance: <strong>Rs. {{ number_format(abs($globalReceivable - $globalPayable), 2) }} {{ $globalReceivable >= $globalPayable ? '(Receivable)' : '(Payable)' }}</strong>
+                            Net Balance: <strong>Rs. {{ number_format(abs($globalReceivable - $globalPayable), 2) }} {{ $globalReceivable >= $globalPayable ? '(Receivable / Advance)' : '(Payable)' }}</strong>
                         @elseif($globalPayable > 0.005)
                             Total Outbound Payables (Obligations to Suppliers): <strong>Rs. {{ number_format($globalPayable, 2) }}</strong>
                         @elseif($globalPayable < -0.005)
                             Total Outbound Advance (Prepayments to Suppliers): <strong>Rs. {{ number_format(abs($globalPayable), 2) }}</strong>
                         @elseif($globalReceivable > 0.005)
-                            Total Inbound Receivables (Claims from Customers): <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong>
+                            @if($isSupplierParty)
+                                Total Outbound Advance (Prepayments to Suppliers): <strong>Rs. {{ number_format($globalReceivable, 2) }} DR</strong>
+                            @else
+                                Total Inbound Receivables (Claims from Customers): <strong>Rs. {{ number_format($globalReceivable, 2) }}</strong>
+                            @endif
                         @elseif($globalReceivable < -0.005)
                             Total Inbound Advance (Customer Credits): <strong>Rs. {{ number_format(abs($globalReceivable), 2) }}</strong>
                         @else

@@ -73,7 +73,17 @@ export function GeneralLedgerReportView({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-card rounded-lg border border-border border-l-4 border-l-indigo-500 p-5 shadow-sm">
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Opening Balance</p>
-                    <h3 className="text-2xl font-bold text-text-primary">{formatCurrency(openingBalance)}</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-text-primary">{formatCurrency(Math.abs(openingBalance))}</h3>
+                        {Math.abs(Number(openingBalance)) >= 0.01 && (
+                            <span className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] font-black text-white uppercase",
+                                (balanceType === 'cr' ? (openingBalance >= 0 ? "bg-rose-500" : "bg-sky-500") : (openingBalance >= 0 ? "bg-emerald-500" : "bg-rose-500"))
+                            )}>
+                                {balanceType === 'cr' ? (openingBalance >= 0 ? 'CR' : 'DR') : (openingBalance >= 0 ? 'DR' : 'CR')}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <div className="bg-card rounded-lg border border-border border-l-4 border-l-rose-500 p-5 shadow-sm">
                     <p className="text-[11px] font-bold tracking-wider text-text-muted uppercase">Total Debit</p>

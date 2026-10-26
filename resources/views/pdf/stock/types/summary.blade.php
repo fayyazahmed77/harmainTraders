@@ -7,10 +7,11 @@
             <th style="width: 30px;">S.#</th>
             <th>Item Description</th>
             <th style="width: 70px;">Rate</th>
-            <th style="width: 60px;">Packing</th>
-            <th style="width: 60px;">In</th>
-            <th style="width: 60px;">Out</th>
-            <th style="width: 60px;">Balance</th>
+            <th style="width: 50px;">Packing</th>
+            <th style="width: 55px;">Opening</th>
+            <th style="width: 55px;">In</th>
+            <th style="width: 55px;">Out</th>
+            <th style="width: 55px;">Balance</th>
             @if(isset($params['withAmount']) && $params['withAmount'])
                 <th style="width: 80px;">Amount</th>
             @endif
@@ -18,6 +19,7 @@
     </thead>
     <tbody>
         @php
+            $totalOpening = 0;
             $totalIn = 0;
             $totalOut = 0;
             $totalBalance = 0;
@@ -25,6 +27,7 @@
         @endphp
         @foreach($data as $idx => $row)
             @php
+                $totalOpening += $row['opening_stock'] ?? 0;
                 $totalIn += $row['in_qty'];
                 $totalOut += $row['out_qty'];
                 $totalBalance += $row['balance_qty'];
@@ -42,6 +45,7 @@
                 </td>
                 <td class="text-right">{{ number_format($row['rate'], 2) }}</td>
                 <td class="text-center">{{ $row['packing_qty'] }}</td>
+                <td class="text-right bold" style="color: #4f46e5;">{{ number_format($row['opening_stock'] ?? 0, 0) }}</td>
                 <td class="text-right">{{ number_format($row['in_qty'], 0) }}</td>
                 <td class="text-right">{{ number_format($row['out_qty'], 0) }}</td>
                 <td class="text-right bold {{ $row['balance_qty'] < 0 ? 'text-danger' : '' }}">
@@ -56,6 +60,7 @@
     <tfoot>
         <tr style="background-color: #f9fafb; font-weight: bold;">
             <td colspan="4" class="text-right">TOTALS</td>
+            <td class="text-right" style="color: #4f46e5;">{{ number_format($totalOpening, 0) }}</td>
             <td class="text-right">{{ number_format($totalIn, 0) }}</td>
             <td class="text-right">{{ number_format($totalOut, 0) }}</td>
             <td class="text-right" style="color: #059669;">{{ number_format($totalBalance, 0) }}</td>

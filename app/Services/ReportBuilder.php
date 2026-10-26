@@ -83,9 +83,15 @@ class ReportBuilder
         $purchases->selectRaw("'Purchase' as type, purchases.id, purchases.date, purchases.invoice as voucher_no, CONCAT('Purchase #', COALESCE(purchases.invoice, purchases.id)) as description, NULL as payment_method, 0 as debit, (purchases.net_total - COALESCE(purchases.extra_discount, 0)) as credit, purchases.created_at, NULL as cheque_no, NULL as cheque_date");
 
         // Determine which column to query in payments table
-        $isAsset = in_array((int)$account->type, [1, 2, 14])
+        $isParty = in_array((int)$account->type, [3, 6])
+            || in_array($type, ['supplier', 'customer', 'customers'])
+            || (bool)($account->purchase ?? false)
+            || (bool)($account->sale ?? false);
+
+        $isAsset = !$isParty && (
+            in_array((int)$account->type, [1, 2, 14])
             || in_array($type, ['cash', 'bank', 'cheque in hand'])
-            || (bool)($account->cashbank ?? false);
+        );
 
         if ($isAsset) {
             $payments = Payment::where(function($q) use ($accountId) {
@@ -93,12 +99,15 @@ class ReportBuilder
                       ->orWhere('account_id', $accountId);
                 })
                 ->whereBetween('payments.date', [$fromDate, $toDate])
-                ->whereNotIn('payments.cheque_status', ['Canceled', 'Returned'])
+                ->where(function($q) {
+                    $q->whereNotIn('payments.cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                      ->orWhereNull('payments.cheque_status');
+                })
                 ->where(function($q) {
                     $q->whereNotIn('payments.payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('payments.cheque_status')
                       ->orWhere('payments.cheque_status', '')
-                      ->orWhereIn('payments.cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']);
+                      ->orWhereIn('payments.cheque_status', ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal', 'Pending']);
                 });
 
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
@@ -144,7 +153,10 @@ class ReportBuilder
             $paymentColumn = 'account_id';
             $payments = Payment::where($paymentColumn, $accountId)
                 ->whereBetween('payments.date', [$fromDate, $toDate])
-                ->whereNotIn('payments.cheque_status', ['Canceled', 'Returned'])
+                ->where(function($q) {
+                    $q->whereNotIn('payments.cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                      ->orWhereNull('payments.cheque_status');
+                })
                 ->leftJoin('accounts as party_acc', 'party_acc.id', '=', 'payments.payment_account_id');
 
             if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
@@ -243,11 +255,22 @@ class ReportBuilder
             || (isset($params['remarks']) && trim($params['remarks']) !== '');
 
         if (!$hasCustomFilters && $toDate >= date('Y-m-d')) {
-            $closingBalance = (float)$account->current_balance;
-            if ($orientation === 'cr') {
-                $openingBalance = $closingBalance - ($totalCredit - $totalDebit);
+            $expectedClosing = $orientation === 'cr'
+                ? ($openingBalance + $totalCredit - $totalDebit)
+                : ($openingBalance + $totalDebit - $totalCredit);
+
+            if (abs($expectedClosing - (float)$account->current_balance) < 0.05) {
+                $closingBalance = (float)$account->current_balance;
             } else {
-                $openingBalance = $closingBalance - ($totalDebit - $totalCredit);
+                $closingBalance = (float)$account->current_balance;
+                if ($orientation === 'cr') {
+                    $recalculatedOpening = $closingBalance - ($totalCredit - $totalDebit);
+                } else {
+                    $recalculatedOpening = $closingBalance - ($totalDebit - $totalCredit);
+                }
+                if (($recalculatedOpening >= 0 && $openingBalance >= 0) || abs($recalculatedOpening - $openingBalance) < 1.0) {
+                    $openingBalance = $recalculatedOpening;
+                }
             }
         }
 
@@ -436,12 +459,23 @@ class ReportBuilder
         $purchases = $purchasesQuery->sum(DB::raw('net_total - COALESCE(extra_discount, 0)'));
 
         $type = strtolower($account->accountType->name ?? '');
-        $isAsset = in_array((int)$account->type, [1, 2, 14])
+        $isParty = in_array((int)$account->type, [3, 6])
+            || in_array($type, ['supplier', 'customer', 'customers'])
+            || (bool)($account->purchase ?? false)
+            || (bool)($account->sale ?? false);
+
+        $isAsset = !$isParty && (
+            in_array((int)$account->type, [1, 2, 14])
             || in_array($type, ['cash', 'bank', 'cheque in hand'])
-            || (bool)($account->cashbank ?? false);
+        );
         $paymentColumn = $isAsset ? 'payment_account_id' : 'account_id';
 
-        $pQuery = Payment::where($paymentColumn, $accountId)->where('date', '<', $date)->whereNotIn('cheque_status', ['Canceled', 'Returned']);
+        $pQuery = Payment::where($paymentColumn, $accountId)
+            ->where('date', '<', $date)
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                  ->orWhereNull('cheque_status');
+            });
         if (isset($params['contraId']) && $params['contraId'] !== 'ALL') {
             $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
             $pQuery->where($otherCol, $params['contraId']);
@@ -462,7 +496,10 @@ class ReportBuilder
         if ($isAsset) {
             $finPayments = Payment::where('payment_account_id', $accountId)
                 ->where('date', '<', $date)
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                      ->orWhereNull('cheque_status');
+                })
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
@@ -477,7 +514,10 @@ class ReportBuilder
 
             $partyPayments = Payment::where('account_id', $accountId)
                 ->where('date', '<', $date)
-                ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
+                ->where(function($q) {
+                    $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                      ->orWhereNull('cheque_status');
+                })
                 ->where(function($q) {
                     $q->whereNotIn('payment_method', ['Cheque', 'Online'])
                       ->orWhereNull('cheque_status')
@@ -1210,7 +1250,10 @@ class ReportBuilder
                 $paymentsQuery = DB::table('payments')
                     ->where($paymentColumn, $account->id)
                     ->where('date', '<=', $toDate)
-                    ->where('cheque_status', '!=', 'Canceled');
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                          ->orWhereNull('cheque_status');
+                    });
                 if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
                     $otherCol = $isAsset ? 'account_id' : 'payment_account_id';
                     $paymentsQuery->where($otherCol, $filters['contraId']);
@@ -1296,8 +1339,15 @@ class ReportBuilder
 
     public function dueBills($accountId = 'ALL', $toDate = null, $filters = [])
     {
+        if (is_array($accountId)) {
+            $accountId = $accountId['value'] ?? $accountId['id'] ?? $accountId['account_id'] ?? 'ALL';
+        }
+        if (($accountId === 'ALL' || empty($accountId)) && !empty($filters['account_id'])) {
+            $accountId = is_array($filters['account_id']) ? ($filters['account_id']['value'] ?? $filters['account_id']['id'] ?? 'ALL') : $filters['account_id'];
+        }
         $toDate = $toDate ?? date('Y-m-d');
 
+        // 1. Fetch Sales (Customer Receivables)
         $salesQuery = Sales::with(['customer' => function($q) {
                 $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
             }])
@@ -1330,7 +1380,9 @@ class ReportBuilder
                 'party_name' => $sale->customer->title ?? 'Unknown',
                 'party_id' => $sale->customer_id,
                 'customer_id' => $sale->customer_id,
+                'supplier_id' => $sale->customer_id,
                 'type' => $sale->type ?? 'CREDIT',
+                'bill_type' => 'receivable',
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,
                 'bill_amt' => (float)$sale->net_total - (float)$sale->extra_discount,
@@ -1338,11 +1390,12 @@ class ReportBuilder
                 'remaining' => (float)$sale->remaining_amount,
                 'credit_days' => $agingDays,
                 'credit_limit' => (float)($sale->customer->credit_limit ?? 0),
+                'is_opening_balance' => false,
                 'is_supplier' => false,
             ];
         });
 
-        // Sales returns with unallocated remaining amount only
+        // 2. Sales Returns
         $returnQuery = SalesReturn::with(['customer' => function($q) {
                 $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
             }])
@@ -1378,7 +1431,9 @@ class ReportBuilder
                 'party_name' => $return->customer->title ?? 'Unknown',
                 'party_id' => $return->customer_id,
                 'customer_id' => $return->customer_id,
+                'supplier_id' => $return->customer_id,
                 'type' => 'RETURN',
+                'bill_type' => 'receivable',
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,
                 'bill_amt' => -$netReturn,
@@ -1386,15 +1441,14 @@ class ReportBuilder
                 'remaining' => -$remReturn,
                 'credit_days' => $agingDays,
                 'credit_limit' => (float)($return->customer->credit_limit ?? 0),
+                'is_opening_balance' => false,
                 'is_supplier' => false,
             ];
         });
 
-        $allBills = $saleBills->concat($returnBills);
-        $groupedBills = $allBills->groupBy('customer_id');
-        $partyIdsFromBills = $allBills->pluck('customer_id')->unique()->filter()->values()->all();
+        // 3. Candidate Customer Accounts
+        $partyIdsFromBills = $saleBills->pluck('customer_id')->concat($returnBills->pluck('customer_id'))->unique()->filter()->values()->all();
 
-        // Query customer accounts: either have unpaid bills OR have opening_balance != 0
         $accountQuery = Account::with('accountType');
         if ($accountId !== 'ALL' && !empty($accountId)) {
             $accountQuery->where('id', $accountId);
@@ -1433,224 +1487,164 @@ class ReportBuilder
         // Preload real-time bulk balances efficiently
         PaymentAccountingService::attachBulkBalances($accounts);
 
+        // 4. Fetch Contra Purchases & Purchase Returns for these customer accounts
+        $customerAccountIds = $accounts->pluck('id')->all();
+        $purchaseBills = collect();
+        $purchaseReturnBills = collect();
+
+        if (!empty($customerAccountIds)) {
+            $purchaseQuery = Purchase::with(['supplier' => function($q) {
+                    $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
+                }])
+                ->where('remaining_amount', '>', 0.005)
+                ->whereIn('supplier_id', $customerAccountIds);
+            if (!empty($toDate)) {
+                $purchaseQuery->whereDate('date', '<=', $toDate);
+            }
+            if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+                $purchaseQuery->where('firm_id', $filters['firmId']);
+            }
+            $purchases = $purchaseQuery->orderBy('date', 'asc')->get();
+
+            $purchaseBills = $purchases->map(function($purchase) use ($toDate) {
+                $supplier = $purchase->supplier;
+                $agingDays = (int)($supplier->aging_days ?? 0);
+                $dueDate = \Carbon\Carbon::parse($purchase->date)->addDays($agingDays);
+                $asOn = \Carbon\Carbon::parse($toDate);
+                $days = (int) $dueDate->diffInDays($asOn, false);
+
+                return [
+                    'date' => $purchase->date,
+                    'voucher_no' => str_pad($purchase->invoice ?? $purchase->id, 6, "0", STR_PAD_LEFT),
+                    'party_name' => $supplier->title ?? 'Unknown',
+                    'party_id' => $purchase->supplier_id,
+                    'customer_id' => $purchase->supplier_id,
+                    'supplier_id' => $purchase->supplier_id,
+                    'type' => 'PURCHASE',
+                    'bill_type' => 'payable',
+                    'due_date' => $dueDate->format('Y-m-d'),
+                    'days' => $days,
+                    'bill_amt' => (float)$purchase->net_total - (float)($purchase->extra_discount ?? 0),
+                    'paid' => (float)$purchase->paid_amount,
+                    'remaining' => (float)$purchase->remaining_amount,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($supplier->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => false,
+                ];
+            });
+
+            $purchaseReturnQuery = PurchaseReturn::with(['supplier' => function($q) {
+                    $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
+                }])
+                ->where('remaining_amount', '>', 0.005)
+                ->whereIn('supplier_id', $customerAccountIds);
+            if (!empty($toDate)) {
+                $purchaseReturnQuery->whereDate('date', '<=', $toDate);
+            }
+            if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
+                $purchaseReturnQuery->where('firm_id', $filters['firmId']);
+            }
+            $purchaseReturns = $purchaseReturnQuery->orderBy('date', 'asc')->get();
+
+            $purchaseReturnBills = $purchaseReturns->map(function($return) use ($toDate) {
+                $supplier = $return->supplier;
+                $agingDays = (int)($supplier->aging_days ?? 0);
+                $dueDate = \Carbon\Carbon::parse($return->date);
+                $asOn = \Carbon\Carbon::parse($toDate);
+                $days = (int) $dueDate->diffInDays($asOn, false);
+
+                $netReturn = (float)$return->net_total - (float)($return->extra_discount ?? 0);
+                $remReturn = (float)$return->remaining_amount;
+
+                return [
+                    'date' => $return->date,
+                    'voucher_no' => str_pad($return->invoice ?? $return->id, 6, "0", STR_PAD_LEFT),
+                    'party_name' => $supplier->title ?? 'Unknown',
+                    'party_id' => $return->supplier_id,
+                    'customer_id' => $return->supplier_id,
+                    'supplier_id' => $return->supplier_id,
+                    'type' => 'RETURN',
+                    'bill_type' => 'payable',
+                    'due_date' => $dueDate->format('Y-m-d'),
+                    'days' => $days,
+                    'bill_amt' => -$netReturn,
+                    'paid' => -(float)($return->paid_amount ?? 0),
+                    'remaining' => -$remReturn,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($supplier->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => false,
+                ];
+            });
+        }
+
+        $allBills = $saleBills->concat($returnBills)->concat($purchaseBills)->concat($purchaseReturnBills);
+        $groupedBills = $allBills->groupBy('customer_id');
+
+        // Preload payments & receipts
+        $allPayments = Payment::whereIn('account_id', $customerAccountIds)
+            ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
+            ->when(!empty($toDate), fn($q) => $q->whereDate('date', '<=', $toDate))
+            ->with('allocations')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->groupBy('account_id');
+
         $finalData = [];
-        $allocationEngine = new PaymentAllocationEngine();
 
         foreach ($accounts as $partyId => $account) {
             $partyBills = $groupedBills->get($partyId, collect());
-            $billsRemaining = (float)$partyBills->sum('remaining');
-            $currentBal = (float)$account->current_balance;
-            $signedOB = (float)$account->getSignedOpeningBalance();
+            $accountPayments = $allPayments->get($partyId, collect());
+            $unallocatedPayments = $accountPayments->where('type', 'PAYMENT');
+            $unallocatedReceipts = $accountPayments->where('type', 'RECEIPT');
 
-            // If account is fully settled with zero balance, skip (no receivable obligations)
+            $currentBal = (float)$account->current_balance;
             if (abs($currentBal) <= 0.005) {
                 continue;
             }
 
-            // Compute remaining unpaid opening balance for customer using PaymentAllocationEngine
-            $excessOverBills = round($currentBal - $billsRemaining, 2);
-            $agingDays = (int)($account->aging_days ?? 0);
-            $remainingOB = 0.0;
-            $obType = strtoupper($account->opening_balance_type ?? '');
-            if (empty($obType)) {
-                $obType = $signedOB >= 0 ? 'DR' : 'CR';
+            $fifoRes = $this->settlePartyBillsFifo(
+                $account,
+                $partyBills,
+                $toDate,
+                $unallocatedPayments,
+                $unallocatedReceipts,
+                'receivable'
+            );
+
+            // General Due Bills report: only list parties with due customer receivables (DR)
+            if ($accountId === 'ALL' || empty($accountId)) {
+                if (empty($fifoRes['surviving_debits'])) {
+                    continue;
+                }
+                $partyBillsToOutput = $fifoRes['surviving_debits'];
+            } else {
+                // Filtered specifically for a single party: output surviving obligations
+                $partyBillsToOutput = !empty($fifoRes['surviving_debits']) ? $fifoRes['surviving_debits'] : $fifoRes['bills'];
             }
 
-            $itemsForParty = collect();
-
-            if ($excessOverBills > 0.005) {
-                // Net receivable excess (DR)
-                $remainingOB = $signedOB > 0 
-                    ? min($allocationEngine->getRemainingOpeningBalance($account, $toDate), $excessOverBills)
-                    : $excessOverBills;
-
-                if ($remainingOB > 0.005) {
-                    $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : \Carbon\Carbon::parse($toDate)->subDays(30)->format('Y-m-d');
-                    $agingDays = (int)($account->aging_days ?? 0);
-                    $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
-                    $asOn = \Carbon\Carbon::parse($toDate);
-                    $days = (int)$dueDate->diffInDays($asOn, false);
-
-                    $obPaid = round(abs($signedOB) - abs($remainingOB), 2);
-                    if ($obPaid < 0) $obPaid = 0.0;
-
-                    $itemsForParty->push([
-                        'date' => $obDate,
-                        'voucher_no' => 'OPENING-BAL (DR)',
-                        'party_name' => $account->title ?? 'Unknown',
-                        'party_id' => $account->id,
-                        'customer_id' => $account->id,
-                        'type' => 'OPENING',
-                        'due_date' => $dueDate->format('Y-m-d'),
-                        'days' => $days,
-                        'opening_balance' => abs($signedOB),
-                        'opening_balance_type' => 'DR',
-                        'bill_amt' => abs($signedOB),
-                        'paid' => $obPaid,
-                        'remaining' => $remainingOB,
-                        'credit_days' => $agingDays,
-                        'credit_limit' => (float)($account->credit_limit ?? 0),
-                        'is_opening_balance' => true,
-                        'is_supplier' => false,
-                    ]);
-                }
-            } elseif ($excessOverBills < -0.005) {
-                // Net advance received from customer (CR balance / overpayment)
-                $advanceNeeded = abs($excessOverBills);
-
-                if ($signedOB < -0.005) {
-                    $obAdv = min(abs($signedOB), $advanceNeeded);
-                    $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : \Carbon\Carbon::parse($toDate)->subDays(30)->format('Y-m-d');
-                    $agingDays = (int)($account->aging_days ?? 0);
-                    $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
-                    $asOn = \Carbon\Carbon::parse($toDate);
-                    $days = (int)$dueDate->diffInDays($asOn, false);
-
-                    $itemsForParty->push([
-                        'date' => $obDate,
-                        'voucher_no' => 'OPENING-BAL (CR)',
-                        'party_name' => $account->title ?? 'Unknown',
-                        'party_id' => $account->id,
-                        'customer_id' => $account->id,
-                        'type' => 'OPENING',
-                        'due_date' => $dueDate->format('Y-m-d'),
-                        'days' => $days,
-                        'opening_balance' => abs($signedOB),
-                        'opening_balance_type' => 'CR',
-                        'bill_amt' => -$obAdv,
-                        'paid' => 0.0,
-                        'remaining' => -$obAdv,
-                        'credit_days' => $agingDays,
-                        'credit_limit' => (float)($account->credit_limit ?? 0),
-                        'is_opening_balance' => true,
-                        'is_supplier' => false,
-                    ]);
-                    $advanceNeeded = round($advanceNeeded - $obAdv, 2);
-                }
-
-                if ($advanceNeeded > 0.005) {
-                    $unallocatedReceipts = Payment::where('account_id', $account->id)
-                        ->where('type', 'RECEIPT')
-                        ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
-                        ->when(!empty($toDate), fn($q) => $q->whereDate('date', '<=', $toDate))
-                        ->with('allocations')
-                        ->orderBy('date', 'desc')
-                        ->get();
-
-                    foreach ($unallocatedReceipts as $rec) {
-                        if ($advanceNeeded <= 0.005) break;
-                        $unallocCash = PaymentAccountingService::getUnallocatedCash($rec);
-                        if ($unallocCash > 0.005) {
-                            $claimAdv = min($unallocCash, $advanceNeeded);
-                            $recDate = $rec->date ? \Carbon\Carbon::parse($rec->date)->format('Y-m-d') : $toDate;
-                            $agingDays = (int)($account->aging_days ?? 0);
-                            $dueDate = \Carbon\Carbon::parse($recDate)->addDays($agingDays);
-                            $asOn = \Carbon\Carbon::parse($toDate);
-                            $days = (int)$dueDate->diffInDays($asOn, false);
-
-                            $itemsForParty->push([
-                                'date' => $recDate,
-                                'voucher_no' => $rec->voucher_no,
-                                'party_name' => $account->title ?? 'Unknown',
-                                'party_id' => $account->id,
-                                'customer_id' => $account->id,
-                                'type' => 'RECEIPT',
-                                'due_date' => $dueDate->format('Y-m-d'),
-                                'days' => $days,
-                                'opening_balance' => 0.0,
-                                'opening_balance_type' => 'CR',
-                                'bill_amt' => -$claimAdv,
-                                'paid' => 0.0,
-                                'remaining' => -$claimAdv,
-                                'credit_days' => $agingDays,
-                                'credit_limit' => (float)($account->credit_limit ?? 0),
-                                'is_opening_balance' => true,
-                                'is_supplier' => false,
-                            ]);
-                            $advanceNeeded = round($advanceNeeded - $claimAdv, 2);
-                        }
-                    }
-
-                    if ($advanceNeeded > 0.005) {
-                        $itemsForParty->push([
-                            'date' => $toDate,
-                            'voucher_no' => 'ADVANCE (CR)',
-                            'party_name' => $account->title ?? 'Unknown',
-                            'party_id' => $account->id,
-                            'customer_id' => $account->id,
-                            'type' => 'RECEIPT',
-                            'due_date' => $toDate,
-                            'days' => 0,
-                            'opening_balance' => 0.0,
-                            'opening_balance_type' => 'CR',
-                            'bill_amt' => -$advanceNeeded,
-                            'paid' => 0.0,
-                            'remaining' => -$advanceNeeded,
-                            'credit_days' => (int)($account->aging_days ?? 0),
-                            'credit_limit' => (float)($account->credit_limit ?? 0),
-                            'is_opening_balance' => true,
-                            'is_supplier' => false,
-                        ]);
-                    }
-                }
-            }
-
-            // If no unpaid bills and no synthesized rows, skip this party
-            if ($partyBills->isEmpty() && $itemsForParty->isEmpty()) {
+            if (empty($partyBillsToOutput)) {
                 continue;
             }
 
-            // Merge regular bills, keeping opening balance at the top
-            $sortedBills = $itemsForParty->concat($partyBills)->sortBy(function($item) {
-                $isOb = !empty($item['is_opening_balance']) ? 0 : 1;
-                return $isOb . '_' . strtotime($item['date']);
-            })->values();
-
-            $cumulativeBalance = 0.0;
-            $partyUnDueAmount = 0.0;
-            $partyDueAmount = 0.0;
             $agingDays = (int)($account->aging_days ?? 0);
+            $partySummary = [
+                'party_un_due_amount' => $fifoRes['undue_amount'],
+                'party_due_amount' => $fifoRes['due_amount'],
+                'credit_days' => $agingDays,
+                'credit_limit' => (float)($account->credit_limit ?? 0),
+                'opening_balance' => (float)$account->opening_balance,
+                'opening_balance_type' => $account->opening_balance_type ?? 'DR',
+            ];
 
-            $partyProcessedBills = [];
-
-            foreach ($sortedBills as $index => $bill) {
-                $rem = (float)$bill['remaining'];
-                $cumulativeBalance += $rem;
-                $bill['balance'] = round($cumulativeBalance, 2);
-
-                if (empty($bill['is_opening_balance'])) {
-                    $bill['opening_balance'] = 0;
-                    $bill['opening_balance_type'] = null;
+            $count = count($partyBillsToOutput);
+            for ($i = 0; $i < $count; $i++) {
+                $partyBillsToOutput[$i]['party_summary'] = $partySummary;
+                if ($i === $count - 1) {
+                    $partyBillsToOutput[$i]['is_last_for_customer'] = true;
                 }
-
-                if ($bill['days'] > 0) {
-                    $partyDueAmount += $rem;
-                } else {
-                    $partyUnDueAmount += $rem;
-                }
-
-                $partyProcessedBills[] = $bill;
-            }
-
-            if (!empty($partyProcessedBills)) {
-                $lastIdx = count($partyProcessedBills) - 1;
-                $endingBalance = (float)($partyProcessedBills[$lastIdx]['balance'] ?? 0);
-                if (abs($endingBalance) <= 0.005) {
-                    continue;
-                }
-                $partyProcessedBills[$lastIdx]['is_last_for_customer'] = true;
-                $partyProcessedBills[$lastIdx]['party_summary'] = [
-                    'party_un_due_amount' => round($partyUnDueAmount, 2),
-                    'party_due_amount' => round($partyDueAmount, 2),
-                    'credit_days' => $agingDays,
-                    'credit_limit' => (float)($account->credit_limit ?? 0),
-                    'opening_balance' => abs($remainingOB) > 0.005 ? abs($signedOB) : 0,
-                    'opening_balance_type' => $obType,
-                ];
-
-                foreach ($partyProcessedBills as $pb) {
-                    $finalData[] = $pb;
-                }
+                $finalData[] = $partyBillsToOutput[$i];
             }
         }
 
@@ -1665,6 +1659,7 @@ class ReportBuilder
                 }
                 return strtotime($a['date']) - strtotime($b['date']);
             }
+            return $cmp;
         });
 
         // Ensure is_last_for_customer is set accurately after sort
@@ -2022,7 +2017,10 @@ class ReportBuilder
 
         // Include discount to match aggregateAccountBalances() formula
         $payments = Payment::where('date', '<=', $toDate)
-            ->where('cheque_status', '!=', 'Canceled')
+            ->where(function($q) {
+                $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                  ->orWhereNull('cheque_status');
+            })
             ->groupBy('account_id')
             ->selectRaw('account_id,
                 SUM(CASE WHEN type = "RECEIPT" THEN (amount + discount) ELSE 0 END) as receipts,
@@ -2042,7 +2040,10 @@ class ReportBuilder
                 // Bank/Cash: use payment_account_id column
                 $payStats = DB::table('payments')->where('payment_account_id', $id)
                     ->where('date', '<=', $toDate)
-                    ->where('cheque_status', '!=', 'Canceled')
+                    ->where(function($q) {
+                        $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned'])
+                          ->orWhereNull('cheque_status');
+                    })
                     ->selectRaw('SUM(CASE WHEN type = "RECEIPT" THEN amount ELSE 0 END) as receipts,
                                  SUM(CASE WHEN type = "PAYMENT" THEN amount ELSE 0 END) as payments')
                     ->first();
@@ -2073,6 +2074,12 @@ class ReportBuilder
 
     public function outstandingBillWise($accountId = 'ALL', $fromDate = null, $toDate = null, $params = [])
     {
+        if (is_array($accountId)) {
+            $accountId = $accountId['value'] ?? $accountId['id'] ?? $accountId['account_id'] ?? 'ALL';
+        }
+        if (($accountId === 'ALL' || empty($accountId)) && !empty($params['account_id'])) {
+            $accountId = is_array($params['account_id']) ? ($params['account_id']['value'] ?? $params['account_id']['id'] ?? 'ALL') : $params['account_id'];
+        }
         $toDate = $toDate ?? date('Y-m-d');
 
         // 1. Fetch Purchases (Supplier Payables)
@@ -2114,6 +2121,7 @@ class ReportBuilder
                 'party_name' => $supplier->title ?? 'Unknown',
                 'party_id' => $purchase->supplier_id,
                 'supplier_id' => $purchase->supplier_id,
+                'customer_id' => $purchase->supplier_id,
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,
                 'bill_amt' => (float)$purchase->net_total - (float)($purchase->extra_discount ?? 0),
@@ -2122,10 +2130,11 @@ class ReportBuilder
                 'credit_days' => $agingDays,
                 'credit_limit' => (float)($supplier->credit_limit ?? 0),
                 'is_opening_balance' => false,
+                'is_supplier' => true,
             ];
         });
 
-        // 2. Fetch Purchase Returns (Unallocated returns with remaining amount)
+        // 2. Fetch Purchase Returns
         $returnQuery = PurchaseReturn::with(['supplier' => function($q) {
                 $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
             }])
@@ -2167,6 +2176,7 @@ class ReportBuilder
                 'party_name' => $supplier->title ?? 'Unknown',
                 'party_id' => $return->supplier_id,
                 'supplier_id' => $return->supplier_id,
+                'customer_id' => $return->supplier_id,
                 'due_date' => $dueDate->format('Y-m-d'),
                 'days' => $days,
                 'bill_amt' => -$netReturn,
@@ -2175,14 +2185,13 @@ class ReportBuilder
                 'credit_days' => $agingDays,
                 'credit_limit' => (float)($supplier->credit_limit ?? 0),
                 'is_opening_balance' => false,
+                'is_supplier' => true,
             ];
         });
 
-        $allBills = $purchaseBills->concat($returnBills);
-        $groupedBills = $allBills->groupBy('party_id');
-        $partyIdsFromBills = $allBills->pluck('party_id')->unique()->filter()->values()->all();
+        // 3. Candidate Supplier Accounts
+        $partyIdsFromBills = $purchaseBills->pluck('party_id')->concat($returnBills->pluck('party_id'))->unique()->filter()->values()->all();
 
-        // 3. Query Supplier Accounts: either have unpaid bills, active payments, OR opening_balance != 0
         $accountQuery = Account::with('accountType');
         if ($accountId !== 'ALL' && !empty($accountId)) {
             $accountQuery->where('id', $accountId);
@@ -2221,256 +2230,157 @@ class ReportBuilder
         // Preload real-time bulk balances efficiently
         PaymentAccountingService::attachBulkBalances($accounts);
 
+        // 4. Fetch Contra Sales & Sales Returns for these supplier accounts
+        $supplierAccountIds = $accounts->pluck('id')->all();
+        $saleBills = collect();
+        $saleReturnBills = collect();
+
+        if (!empty($supplierAccountIds)) {
+            $salesQuery = Sales::with(['customer' => function($q) {
+                    $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
+                }])
+                ->where('remaining_amount', '>', 0.005)
+                ->whereIn('customer_id', $supplierAccountIds);
+            if (!empty($toDate)) {
+                $salesQuery->whereDate('date', '<=', $toDate);
+            }
+            if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+                $salesQuery->where('firm_id', $params['firmId']);
+            }
+            $sales = $salesQuery->orderBy('date', 'asc')->get();
+
+            $saleBills = $sales->map(function($sale) use ($toDate) {
+                $agingDays = (int)($sale->customer->aging_days ?? 0);
+                $dueDate = \Carbon\Carbon::parse($sale->date)->addDays($agingDays);
+                $asOn = \Carbon\Carbon::parse($toDate);
+                $days = (int) $dueDate->diffInDays($asOn, false);
+
+                return [
+                    'date' => $sale->date,
+                    'voucher_no' => str_pad($sale->invoice ?? $sale->id, 6, "0", STR_PAD_LEFT),
+                    'party_name' => $sale->customer->title ?? 'Unknown',
+                    'party_id' => $sale->customer_id,
+                    'customer_id' => $sale->customer_id,
+                    'supplier_id' => $sale->customer_id,
+                    'type' => $sale->type ?? 'CREDIT',
+                    'bill_type' => 'receivable',
+                    'due_date' => $dueDate->format('Y-m-d'),
+                    'days' => $days,
+                    'bill_amt' => (float)$sale->net_total - (float)$sale->extra_discount,
+                    'paid' => (float)$sale->paid_amount,
+                    'remaining' => (float)$sale->remaining_amount,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($sale->customer->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => true,
+                ];
+            });
+
+            $salesReturnQuery = SalesReturn::with(['customer' => function($q) {
+                    $q->select('id', 'title', 'aging_days', 'credit_limit', 'purchase', 'sale', 'type', 'opening_date');
+                }])
+                ->where('remaining_amount', '>', 0.005)
+                ->whereIn('customer_id', $supplierAccountIds);
+            if (!empty($toDate)) {
+                $salesReturnQuery->whereDate('date', '<=', $toDate);
+            }
+            if (isset($params['firmId']) && $params['firmId'] !== 'ALL') {
+                $salesReturnQuery->where('firm_id', $params['firmId']);
+            }
+            $salesReturns = $salesReturnQuery->orderBy('date', 'asc')->get();
+
+            $saleReturnBills = $salesReturns->map(function($return) use ($toDate) {
+                $agingDays = (int)($return->customer->aging_days ?? 0);
+                $dueDate = \Carbon\Carbon::parse($return->date);
+                $asOn = \Carbon\Carbon::parse($toDate);
+                $days = (int) $dueDate->diffInDays($asOn, false);
+
+                $netReturn = (float)$return->net_total - (float)$return->extra_discount;
+                $remReturn = (float)$return->remaining_amount;
+
+                return [
+                    'date' => $return->date,
+                    'voucher_no' => str_pad($return->invoice ?? $return->id, 6, "0", STR_PAD_LEFT),
+                    'party_name' => $return->customer->title ?? 'Unknown',
+                    'party_id' => $return->customer_id,
+                    'customer_id' => $return->customer_id,
+                    'supplier_id' => $return->customer_id,
+                    'type' => 'RETURN',
+                    'bill_type' => 'receivable',
+                    'due_date' => $dueDate->format('Y-m-d'),
+                    'days' => $days,
+                    'bill_amt' => -$netReturn,
+                    'paid' => -(float)$return->paid_amount,
+                    'remaining' => -$remReturn,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($return->customer->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => true,
+                ];
+            });
+        }
+
+        $allBills = $purchaseBills->concat($returnBills)->concat($saleBills)->concat($saleReturnBills);
+        $groupedBills = $allBills->groupBy('party_id');
+
+        // Preload payments & receipts
+        $allPayments = Payment::whereIn('account_id', $supplierAccountIds)
+            ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
+            ->when(!empty($toDate), fn($q) => $q->whereDate('date', '<=', $toDate))
+            ->with('allocations')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->groupBy('account_id');
+
         $finalData = [];
-        $allocationEngine = new PaymentAllocationEngine();
 
         foreach ($accounts as $partyId => $account) {
             $partyBills = $groupedBills->get($partyId, collect());
-            $billsRemaining = (float)$partyBills->sum('remaining');
-            $currentBal = (float)$account->current_balance;
-            $signedOB = (float)$account->getSignedOpeningBalance();
+            $accountPayments = $allPayments->get($partyId, collect());
+            $unallocatedPayments = $accountPayments->where('type', 'PAYMENT');
+            $unallocatedReceipts = $accountPayments->where('type', 'RECEIPT');
 
-            // If account is fully settled with zero balance, skip (no payable obligations)
+            $currentBal = (float)$account->current_balance;
             if (abs($currentBal) <= 0.005) {
                 continue;
             }
 
-            // If bills exceed current ledger balance, payments were made on account without bill allocation.
-            // Dynamically apply unallocated payment FIFO to oldest bills so only genuinely payable balances display:
-            $adjustedBills = collect();
-            if ($currentBal > 0.005) {
-                if ($billsRemaining > $currentBal) {
-                    $unallocatedPayment = round($billsRemaining - $currentBal, 2);
-                    $sortedPartyBills = $partyBills->sortBy('date')->values();
-                    foreach ($sortedPartyBills as $bill) {
-                        if ($unallocatedPayment > 0.005) {
-                            $canAbsorb = min($unallocatedPayment, $bill['remaining']);
-                            $bill['paid'] = round((float)$bill['paid'] + $canAbsorb, 2);
-                            $bill['remaining'] = round((float)$bill['remaining'] - $canAbsorb, 2);
-                            $unallocatedPayment = round($unallocatedPayment - $canAbsorb, 2);
-                        }
-                        if ($bill['remaining'] > 0.005) {
-                            $adjustedBills->push($bill);
-                        }
-                    }
-                } else {
-                    $adjustedBills = $partyBills;
-                }
-            } else {
-                // Negative or zero current balance means all bills are fully covered by payments/credits
-                $adjustedBills = collect();
-            }
+            $fifoRes = $this->settlePartyBillsFifo(
+                $account,
+                $partyBills,
+                $toDate,
+                $unallocatedPayments,
+                $unallocatedReceipts,
+                'payable'
+            );
 
-            $billsRemainingAfter = (float)$adjustedBills->sum('remaining');
-            $excessOverBills = round($currentBal - $billsRemainingAfter, 2);
-            $agingDays = (int)($account->aging_days ?? 0);
-            $remainingOB = 0.0;
-            $obType = strtoupper($account->opening_balance_type ?? '');
-            if (empty($obType)) {
-                $obType = $signedOB >= 0 ? 'CR' : 'DR';
-            }
-
-            $itemsForParty = collect();
-
-            if ($excessOverBills > 0.005) {
-                // Net payable excess (CR)
-                $remainingOB = $signedOB > 0 
-                    ? min($allocationEngine->getRemainingOpeningBalance($account, $toDate), $excessOverBills)
-                    : $excessOverBills;
-
-                if ($remainingOB > 0.005) {
-                    $obDate = $account->opening_date 
-                        ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') 
-                        : \Carbon\Carbon::parse($toDate)->subDays(30)->format('Y-m-d');
-                    $agingDays = (int)($account->aging_days ?? 0);
-                    $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
-                    $asOn = \Carbon\Carbon::parse($toDate);
-                    $days = (int)$dueDate->diffInDays($asOn, false);
-
-                    $obPaid = round(abs($signedOB) - abs($remainingOB), 2);
-                    if ($obPaid < 0) $obPaid = 0.0;
-
-                    $itemsForParty->push([
-                        'date' => $obDate,
-                        'voucher_no' => 'OPENING-BAL (CR)',
-                        'bill_type' => 'payable',
-                        'party_name' => $account->title ?? 'Unknown',
-                        'party_id' => $account->id,
-                        'supplier_id' => $account->id,
-                        'due_date' => $dueDate->format('Y-m-d'),
-                        'days' => $days,
-                        'opening_balance' => abs($signedOB),
-                        'opening_balance_type' => 'CR',
-                        'bill_amt' => abs($remainingOB),
-                        'paid' => $obPaid,
-                        'remaining' => $remainingOB,
-                        'credit_days' => $agingDays,
-                        'credit_limit' => (float)($account->credit_limit ?? 0),
-                        'is_opening_balance' => true,
-                        'ob_type' => 'CR',
-                    ]);
-                }
-            } elseif ($excessOverBills < -0.005) {
-                // Net advance paid to supplier (DR balance / overpayment)
-                $advanceNeeded = abs($excessOverBills);
-
-                // Priority 1: Opening Balance DR (if account had a DR opening balance)
-                if ($signedOB < -0.005) {
-                    $obAdv = min(abs($signedOB), $advanceNeeded);
-                    $obDate = $account->opening_date 
-                        ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') 
-                        : \Carbon\Carbon::parse($toDate)->subDays(30)->format('Y-m-d');
-                    $agingDays = (int)($account->aging_days ?? 0);
-                    $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
-                    $asOn = \Carbon\Carbon::parse($toDate);
-                    $days = (int)$dueDate->diffInDays($asOn, false);
-
-                    $itemsForParty->push([
-                        'date' => $obDate,
-                        'voucher_no' => 'OPENING-BAL (DR)',
-                        'bill_type' => 'payable',
-                        'party_name' => $account->title ?? 'Unknown',
-                        'party_id' => $account->id,
-                        'supplier_id' => $account->id,
-                        'due_date' => $dueDate->format('Y-m-d'),
-                        'days' => $days,
-                        'opening_balance' => abs($signedOB),
-                        'opening_balance_type' => 'DR',
-                        'bill_amt' => -$obAdv,
-                        'paid' => 0.0,
-                        'remaining' => -$obAdv,
-                        'credit_days' => $agingDays,
-                        'credit_limit' => (float)($account->credit_limit ?? 0),
-                        'is_opening_balance' => true,
-                        'ob_type' => 'DR',
-                    ]);
-                    $advanceNeeded = round($advanceNeeded - $obAdv, 2);
-                }
-
-                // Priority 2: Unallocated cash from actual payment vouchers up to toDate
-                if ($advanceNeeded > 0.005) {
-                    $unallocatedPayments = Payment::where('account_id', $account->id)
-                        ->where('type', 'PAYMENT')
-                        ->whereNotIn('cheque_status', ['Canceled', 'Returned'])
-                        ->when(!empty($toDate), fn($q) => $q->whereDate('date', '<=', $toDate))
-                        ->with('allocations')
-                        ->orderBy('date', 'desc')
-                        ->get();
-
-                    foreach ($unallocatedPayments as $pay) {
-                        if ($advanceNeeded <= 0.005) break;
-                        $unallocCash = PaymentAccountingService::getUnallocatedCash($pay);
-                        if ($unallocCash > 0.005) {
-                            $claimAdv = min($unallocCash, $advanceNeeded);
-                            $payDate = $pay->date ? \Carbon\Carbon::parse($pay->date)->format('Y-m-d') : $toDate;
-                            $agingDays = (int)($account->aging_days ?? 0);
-                            $dueDate = \Carbon\Carbon::parse($payDate)->addDays($agingDays);
-                            $asOn = \Carbon\Carbon::parse($toDate);
-                            $days = (int)$dueDate->diffInDays($asOn, false);
-
-                            $itemsForParty->push([
-                                'date' => $payDate,
-                                'voucher_no' => $pay->voucher_no,
-                                'bill_type' => 'payable',
-                                'party_name' => $account->title ?? 'Unknown',
-                                'party_id' => $account->id,
-                                'supplier_id' => $account->id,
-                                'due_date' => $dueDate->format('Y-m-d'),
-                                'days' => $days,
-                                'opening_balance' => 0.0,
-                                'opening_balance_type' => 'DR',
-                                'bill_amt' => -$claimAdv,
-                                'paid' => 0.0,
-                                'remaining' => -$claimAdv,
-                                'credit_days' => $agingDays,
-                                'credit_limit' => (float)($account->credit_limit ?? 0),
-                                'is_opening_balance' => true,
-                                'ob_type' => 'DR',
-                            ]);
-                            $advanceNeeded = round($advanceNeeded - $claimAdv, 2);
-                        }
-                    }
-
-                    // Priority 3: Fallback generic ADVANCE (DR) row if any unallocated surplus remains
-                    if ($advanceNeeded > 0.005) {
-                        $itemsForParty->push([
-                            'date' => $toDate,
-                            'voucher_no' => 'ADVANCE (DR)',
-                            'bill_type' => 'payable',
-                            'party_name' => $account->title ?? 'Unknown',
-                            'party_id' => $account->id,
-                            'supplier_id' => $account->id,
-                            'due_date' => $toDate,
-                            'days' => 0,
-                            'opening_balance' => 0.0,
-                            'opening_balance_type' => 'DR',
-                            'bill_amt' => -$advanceNeeded,
-                            'paid' => 0.0,
-                            'remaining' => -$advanceNeeded,
-                            'credit_days' => (int)($account->aging_days ?? 0),
-                            'credit_limit' => (float)($account->credit_limit ?? 0),
-                            'is_opening_balance' => true,
-                            'ob_type' => 'DR',
-                        ]);
-                    }
-                }
-            }
-
-            // If no unpaid bills and no synthesized rows, skip this party
-            if ($adjustedBills->isEmpty() && $itemsForParty->isEmpty()) {
+            if (empty($fifoRes['bills'])) {
                 continue;
             }
 
-            // Merge regular bills, keeping opening balance at the top, then chronological date & voucher
-            $sortedItems = $itemsForParty->concat($adjustedBills)->sort(function($a, $b) {
-                $aIsOb = !empty($a['is_opening_balance']) || str_starts_with($a['voucher_no'] ?? '', 'OPENING-BAL');
-                $bIsOb = !empty($b['is_opening_balance']) || str_starts_with($b['voucher_no'] ?? '', 'OPENING-BAL');
-                if ($aIsOb && !$bIsOb) return -1;
-                if (!$aIsOb && $bIsOb) return 1;
-                $dateCmp = strtotime($a['date']) - strtotime($b['date']);
-                if ($dateCmp !== 0) return $dateCmp;
-                return strcmp($a['voucher_no'] ?? '', $b['voucher_no'] ?? '');
-            })->values();
+            $isSupplierAccount = in_array((int)$account->type, [6]) || strtolower($account->accountType->name ?? '') === 'supplier';
+            $payableBalance = $isSupplierAccount ? $currentBal : -$currentBal;
 
-            $processedPartyItems = [];
-            $cumulativeBalance = 0.0;
-            $partyUnDueAmount = 0.0;
-            $partyDueAmount = 0.0;
+            $partySummary = [
+                'party_un_due_amount' => $fifoRes['undue_amount'],
+                'party_due_amount' => $fifoRes['due_amount'],
+                'credit_days' => (int)($account->aging_days ?? 0),
+                'credit_limit' => (float)($account->credit_limit ?? 0),
+                'party_type' => 'payable',
+                'current_balance' => round($payableBalance, 2),
+                'total_outstanding' => round($fifoRes['cumulative_balance'], 2),
+                'is_reconciled' => abs($fifoRes['cumulative_balance'] - $payableBalance) < 0.05,
+                'difference' => round($fifoRes['cumulative_balance'] - $payableBalance, 2),
+            ];
 
-            foreach ($sortedItems as $item) {
-                $rem = (float)$item['remaining'];
-                $cumulativeBalance += $rem;
-                $item['balance'] = round($cumulativeBalance, 2);
-
-                if ($item['days'] > 0) {
-                    $partyDueAmount += $rem;
-                } else {
-                    $partyUnDueAmount += $rem;
+            $count = count($fifoRes['bills']);
+            for ($i = 0; $i < $count; $i++) {
+                $billItem = $fifoRes['bills'][$i];
+                $billItem['party_summary'] = $partySummary;
+                if ($i === $count - 1) {
+                    $billItem['is_last_for_party'] = true;
                 }
-                $processedPartyItems[] = $item;
-            }
-
-            if (!empty($processedPartyItems)) {
-                $partySummary = [
-                    'party_un_due_amount' => round($partyUnDueAmount, 2),
-                    'party_due_amount' => round($partyDueAmount, 2),
-                    'credit_days' => (int)($account->aging_days ?? 0),
-                    'credit_limit' => (float)($account->credit_limit ?? 0),
-                    'party_type' => 'payable',
-                    'current_balance' => (float)$account->current_balance,
-                    'total_outstanding' => round($cumulativeBalance, 2),
-                    'is_reconciled' => abs($cumulativeBalance - (float)$account->current_balance) < 0.05,
-                    'difference' => round($cumulativeBalance - (float)$account->current_balance, 2),
-                ];
-
-                $count = count($processedPartyItems);
-                for ($i = 0; $i < $count; $i++) {
-                    $processedPartyItems[$i]['party_summary'] = $partySummary;
-                    if ($i === $count - 1) {
-                        $processedPartyItems[$i]['is_last_for_party'] = true;
-                    }
-                    $finalData[] = $processedPartyItems[$i];
-                }
+                $finalData[] = $billItem;
             }
         }
 
@@ -2487,13 +2397,13 @@ class ReportBuilder
             $dateCmp = strtotime($a['date']) - strtotime($b['date']);
             if ($dateCmp !== 0) return $dateCmp;
 
-            return strcmp($a['voucher_no'], $b['voucher_no']);
+            return strcmp($a['voucher_no'] ?? '', $b['voucher_no'] ?? '');
         });
 
-        // Ensure is_last_for_party is set accurately after sort
-        $totalRows = count($finalData);
-        for ($i = 0; $i < $totalRows; $i++) {
-            $isLast = ($i === $totalRows - 1) || ($finalData[$i]['party_id'] !== $finalData[$i + 1]['party_id']);
+        // Ensure is_last_for_party flag is accurate after global sort
+        $count = count($finalData);
+        for ($i = 0; $i < $count; $i++) {
+            $isLast = ($i === $count - 1) || ($finalData[$i]['party_id'] !== $finalData[$i + 1]['party_id']);
             $finalData[$i]['is_last_for_party'] = $isLast;
         }
 
@@ -2503,49 +2413,33 @@ class ReportBuilder
     /**
      * Generate detailed payment report for a specific period.
      */
-    public function paymentDetail($accountId = null, $fromDate = null, $toDate = null, $filters = [])
+    public function paymentDetail($accountId = null, $fromDate = null, $toDate = null)
     {
-        return $this->processPaymentReport('PAYMENT', $accountId, $fromDate, $toDate, $filters);
+        return $this->processPaymentReport('PAYMENT', $accountId, $fromDate, $toDate);
     }
 
     /**
      * Generate detailed receiving report for a specific period.
      */
-    public function receivingDetail($accountId = null, $fromDate = null, $toDate = null, $filters = [])
+    public function receivingDetail($accountId = null, $fromDate = null, $toDate = null)
     {
-        return $this->processPaymentReport('RECEIPT', $accountId, $fromDate, $toDate, $filters);
+        return $this->processPaymentReport('RECEIPT', $accountId, $fromDate, $toDate);
     }
 
     /**
      * Internal helper to process payment/receipt reports.
      */
-    private function processPaymentReport($type, $accountId = null, $fromDate = null, $toDate = null, $filters = [])
+    private function processPaymentReport($type, $accountId = null, $fromDate = null, $toDate = null)
     {
         $fromDate = $fromDate ?? date('Y-m-d', strtotime('-30 days'));
         $toDate = $toDate ?? date('Y-m-d');
 
-        $query = Payment::with(['account.accountType', 'paymentAccount'])
+        $query = Payment::with(['account', 'paymentAccount'])
             ->where('type', $type)
             ->whereBetween('date', [$fromDate, $toDate]);
 
         if ($accountId && $accountId !== 'ALL') {
             $query->where('account_id', $accountId);
-        }
-
-        $query->whereHas('account', function($q) use ($filters) {
-            $this->applyAccountFilters($q, $filters);
-        });
-
-        if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
-            $query->where('payment_account_id', $filters['contraId']);
-        }
-        if (isset($filters['remarks']) && trim($filters['remarks']) !== '') {
-            $query->where(function($q) use ($filters) {
-                $q->where('remarks', 'like', "%{$filters['remarks']}%")
-                  ->orWhere('cheque_no', 'like', "%{$filters['remarks']}%")
-                  ->orWhere('voucher_no', 'like', "%{$filters['remarks']}%")
-                  ->orWhere('id', 'like', "%{$filters['remarks']}%");
-            });
         }
 
         $payments = $query->orderBy('date')->orderBy('created_at')->get();
@@ -2555,27 +2449,17 @@ class ReportBuilder
         $partyBalances = [];
         
         if (!empty($partyIds)) {
-            $salesQuery = Sales::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate);
-            $purchasesQuery = Purchase::whereIn('supplier_id', $partyIds)->where('date', '<=', $toDate);
-            
-            if (isset($filters['firmId']) && $filters['firmId'] !== 'ALL') {
-                $salesQuery->where('firm_id', $filters['firmId']);
-                $purchasesQuery->where('firm_id', $filters['firmId']);
-            }
+            $sales = Sales::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate)
+                ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
+                
+            $purchases = Purchase::whereIn('supplier_id', $partyIds)->where('date', '<=', $toDate)
+                ->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
 
-            $sales = $salesQuery->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
-            $purchases = $purchasesQuery->select('supplier_id', DB::raw('SUM(net_total) as total'))->groupBy('supplier_id')->pluck('total', 'supplier_id');
-
-            $paymentsRecQuery = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT');
-            $paymentsPaidQuery = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT');
-
-            if (isset($filters['contraId']) && $filters['contraId'] !== 'ALL') {
-                $paymentsRecQuery->where('payment_account_id', $filters['contraId']);
-                $paymentsPaidQuery->where('payment_account_id', $filters['contraId']);
-            }
-
-            $paymentsRec = $paymentsRecQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
-            $paymentsPaid = $paymentsPaidQuery->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+            $paymentsRec = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'RECEIPT')
+                ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
+                
+            $paymentsPaid = Payment::whereIn('account_id', $partyIds)->where('date', '<=', $toDate)->where('type', 'PAYMENT')
+                ->select('account_id', DB::raw('SUM(amount + discount) as total'))->groupBy('account_id')->pluck('total', 'account_id');
 
             $salesReturns = SalesReturn::whereIn('customer_id', $partyIds)->where('date', '<=', $toDate)
                 ->select('customer_id', DB::raw('SUM(net_total) as total'))->groupBy('customer_id')->pluck('total', 'customer_id');
@@ -2596,21 +2480,10 @@ class ReportBuilder
             
             $net = 0;
             if ($accId && isset($partyBalances[$accId])) {
-                // Use signed opening balance so DR/CR type is respected
-                $opening = $p->account ? $p->account->getSignedOpeningBalance() : 0.0;
+                $opening = (float)($p->account->opening_balance ?? 0);
+                // Calculate Net Balance: Opening + Net Debit - Net Credit
                 $balData = $partyBalances[$accId];
-                // Determine orientation from account type
-                $accType = strtolower($p->account?->accountType?->name ?? '');
-                $isCrNormal = in_array($accType, ['supplier', 'capital', 'amanat payable', 'reserve'])
-                    || in_array((int)($p->account?->type ?? 0), [6, 9, 17, 18]);
-
-                if ($isCrNormal) {
-                    // CR-normal (Supplier): CR - DR gives positive payable balance
-                    $net = $opening + $balData['cr'] - $balData['dr'];
-                } else {
-                    // DR-normal (Customer): DR - CR gives positive receivable balance
-                    $net = $opening + $balData['dr'] - $balData['cr'];
-                }
+                $net = $opening + $balData['dr'] - $balData['cr'];
             }
 
             return [
@@ -2650,9 +2523,6 @@ class ReportBuilder
         return $this->aggregateAccountBalances($toDate, 'all', $filters);
     }
 
-    /**
-     * Generate the complete Trial Balance 2 Column (includes Financial Assets).
-     */
     public function trialBalance($toDate = null, $filters = [])
     {
         return $this->aggregateAccountBalances($toDate, 'all', $filters, false);
@@ -3072,6 +2942,395 @@ class ReportBuilder
             'cash_in_hand' => $cashInHand,
             'from_date' => $fromDate,
             'to_date' => $toDate
+        ];
+    }
+
+    /**
+     * Chronological FIFO settlement of all party debits and credits.
+     * Settles oldest obligations first, omitting fully covered bills.
+     */
+    public function settlePartyBillsFifo(
+        Account $account,
+        \Illuminate\Support\Collection $partyBills,
+        string $toDate,
+        \Illuminate\Support\Collection $unallocatedPayments,
+        \Illuminate\Support\Collection $unallocatedReceipts,
+        string $partyType
+    ): array {
+        $agingDays = (int)($account->aging_days ?? 0);
+        $currentBal = (float)$account->current_balance;
+        $signedOB = (float)$account->getSignedOpeningBalance();
+        $rawOB = abs($signedOB);
+        $obType = strtoupper($account->opening_balance_type ?? '');
+        if (empty($obType)) {
+            $obType = $signedOB >= 0 ? ($partyType === 'payable' ? 'CR' : 'DR') : ($partyType === 'payable' ? 'DR' : 'CR');
+        }
+
+        $debits = [];
+        $credits = [];
+
+        // 1. Opening Balance
+        if ($rawOB > 0.005) {
+            $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : '2026-01-01';
+            $dueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
+            $days = (int)$dueDate->diffInDays(\Carbon\Carbon::parse($toDate), false);
+
+            $obItem = [
+                'date' => $obDate,
+                'voucher_no' => 'OPENING-BAL (' . $obType . ')',
+                'type' => 'OPENING',
+                'bill_type' => $obType === 'DR' ? 'receivable' : 'payable',
+                'party_name' => $account->title ?? 'Unknown',
+                'party_id' => $account->id,
+                'customer_id' => $account->id,
+                'supplier_id' => $account->id,
+                'bill_amt' => $rawOB,
+                'original_amt' => $rawOB,
+                'paid' => 0.0,
+                'remaining' => $rawOB,
+                'due_date' => $dueDate->format('Y-m-d'),
+                'days' => $days,
+                'credit_days' => $agingDays,
+                'credit_limit' => (float)($account->credit_limit ?? 0),
+                'is_opening_balance' => true,
+                'ob_type' => $obType,
+                'opening_balance' => $rawOB,
+                'opening_balance_type' => $obType,
+                'is_supplier' => ($partyType === 'payable'),
+            ];
+            if ($obType === 'DR') {
+                $debits[] = $obItem;
+            } else {
+                $credits[] = $obItem;
+            }
+        }
+
+        // 2. Regular Bills
+        foreach ($partyBills as $bill) {
+            $rem = (float)$bill['remaining'];
+            if (abs($rem) <= 0.005) continue;
+
+            $bType = $bill['bill_type'] ?? 'receivable';
+            $item = $bill;
+            $item['original_amt'] = abs($rem);
+
+            if ($bType === 'receivable') {
+                if ($rem > 0) {
+                    $item['remaining'] = $rem;
+                    $debits[] = $item;
+                } else {
+                    $item['remaining'] = abs($rem);
+                    $credits[] = $item;
+                }
+            } else {
+                // payable
+                if ($rem > 0) {
+                    $item['remaining'] = $rem;
+                    $credits[] = $item;
+                } else {
+                    $item['remaining'] = abs($rem);
+                    $debits[] = $item;
+                }
+            }
+        }
+
+        // 3. Unallocated Payments (DEBIT)
+        foreach ($unallocatedPayments as $pay) {
+            $unalloc = PaymentAccountingService::getUnallocatedCash($pay);
+            if ($unalloc > 0.005) {
+                $payDate = $pay->date ? \Carbon\Carbon::parse($pay->date)->format('Y-m-d') : $toDate;
+
+                $debits[] = [
+                    'date' => $payDate,
+                    'voucher_no' => $pay->voucher_no,
+                    'type' => 'PAYMENT',
+                    'bill_type' => 'receivable',
+                    'party_name' => $account->title ?? 'Unknown',
+                    'party_id' => $account->id,
+                    'customer_id' => $account->id,
+                    'supplier_id' => $account->id,
+                    'bill_amt' => $unalloc,
+                    'original_amt' => $unalloc,
+                    'paid' => 0.0,
+                    'remaining' => $unalloc,
+                    'due_date' => $payDate,
+                    'days' => 0,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => ($partyType === 'payable'),
+                ];
+            }
+        }
+
+        // 4. Unallocated Receipts (CREDIT)
+        foreach ($unallocatedReceipts as $rec) {
+            $unalloc = PaymentAccountingService::getUnallocatedCash($rec);
+            if ($unalloc > 0.005) {
+                $recDate = $rec->date ? \Carbon\Carbon::parse($rec->date)->format('Y-m-d') : $toDate;
+
+                $credits[] = [
+                    'date' => $recDate,
+                    'voucher_no' => $rec->voucher_no,
+                    'type' => 'RECEIPT',
+                    'bill_type' => 'payable',
+                    'party_name' => $account->title ?? 'Unknown',
+                    'party_id' => $account->id,
+                    'customer_id' => $account->id,
+                    'supplier_id' => $account->id,
+                    'bill_amt' => $unalloc,
+                    'original_amt' => $unalloc,
+                    'paid' => 0.0,
+                    'remaining' => $unalloc,
+                    'due_date' => $recDate,
+                    'days' => 0,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'is_opening_balance' => false,
+                    'is_supplier' => ($partyType === 'payable'),
+                ];
+            }
+        }
+
+        // 5. Chronological Sort
+        $sortFn = function($a, $b) {
+            $aOb = !empty($a['is_opening_balance']) ? 0 : 1;
+            $bOb = !empty($b['is_opening_balance']) ? 0 : 1;
+            if ($aOb !== $bOb) return $aOb <=> $bOb;
+            $d = strtotime($a['date']) <=> strtotime($b['date']);
+            if ($d !== 0) return $d;
+            return strcmp($a['voucher_no'] ?? '', $b['voucher_no'] ?? '');
+        };
+        usort($debits, $sortFn);
+        usort($credits, $sortFn);
+
+        // 6. Chronological FIFO Settlement
+        $dIdx = 0;
+        $cIdx = 0;
+        $dCount = count($debits);
+        $cCount = count($credits);
+
+        while ($dIdx < $dCount && $cIdx < $cCount) {
+            $match = min($debits[$dIdx]['remaining'], $credits[$cIdx]['remaining']);
+
+            $debits[$dIdx]['remaining'] = round($debits[$dIdx]['remaining'] - $match, 2);
+            $debits[$dIdx]['paid'] = round(($debits[$dIdx]['paid'] ?? 0) + $match, 2);
+
+            $credits[$cIdx]['remaining'] = round($credits[$cIdx]['remaining'] - $match, 2);
+            $credits[$cIdx]['paid'] = round(($credits[$cIdx]['paid'] ?? 0) + $match, 2);
+
+            if ($debits[$dIdx]['remaining'] <= 0.005) {
+                $dIdx++;
+            }
+            if ($credits[$cIdx]['remaining'] <= 0.005) {
+                $cIdx++;
+            }
+        }
+
+        $survivingDebits = array_values(array_filter($debits, fn($d) => $d['remaining'] > 0.005));
+        $survivingCredits = array_values(array_filter($credits, fn($c) => $c['remaining'] > 0.005));
+
+        // 7. Authoritative Ledger Reconciliation
+        $isSupplierAccount = in_array((int)$account->type, [6]) || strtolower($account->accountType->name ?? '') === 'supplier';
+        if ($isSupplierAccount) {
+            $isNetCredit = $currentBal > 0.005;
+            $isNetDebit = $currentBal < -0.005;
+        } else {
+            $isNetDebit = $currentBal > 0.005;
+            $isNetCredit = $currentBal < -0.005;
+        }
+        $targetBal = abs($currentBal);
+
+        if ($isNetDebit) {
+            // Net debit obligation
+            $survivingCredits = [];
+            if (!empty($survivingDebits)) {
+                $totalSurvivingDebits = (float)array_sum(array_column($survivingDebits, 'remaining'));
+                
+                if ($totalSurvivingDebits > $targetBal + 0.005) {
+                    // Excess payments/credits exist that reduce the balance below the open bills.
+                    // Apply this credit to the OLDEST bills first (top-down FIFO settlement):
+                    $excessCredit = round($totalSurvivingDebits - $targetBal, 2);
+                    $count = count($survivingDebits);
+                    for ($i = 0; $i < $count && $excessCredit > 0.005; $i++) {
+                        $rem = (float)$survivingDebits[$i]['remaining'];
+                        $deduct = min($rem, $excessCredit);
+                        
+                        $survivingDebits[$i]['paid'] = round(($survivingDebits[$i]['paid'] ?? 0) + $deduct, 2);
+                        $survivingDebits[$i]['remaining'] = round($rem - $deduct, 2);
+                        $excessCredit = round($excessCredit - $deduct, 2);
+                    }
+                    // Filter out fully cleared bills
+                    $survivingDebits = array_values(array_filter($survivingDebits, fn($d) => $d['remaining'] > 0.005));
+                } elseif ($totalSurvivingDebits < $targetBal - 0.005) {
+                    // Ledger balance is higher than the known open bills (e.g. unbilled opening balance)
+                    $diff = round($targetBal - $totalSurvivingDebits, 2);
+                    $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : '2026-01-01';
+                    $obDueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
+                    $obDays = (int)$obDueDate->diffInDays(\Carbon\Carbon::parse($toDate), false);
+
+                    $survivingDebits[] = [
+                        'date' => $obDate,
+                        'voucher_no' => 'OPENING-BAL (DR)',
+                        'type' => 'OPENING',
+                        'bill_type' => 'receivable',
+                        'party_name' => $account->title ?? 'Unknown',
+                        'party_id' => $account->id,
+                        'customer_id' => $account->id,
+                        'supplier_id' => $account->id,
+                        'bill_amt' => $diff,
+                        'original_amt' => $diff,
+                        'paid' => 0.0,
+                        'remaining' => $diff,
+                        'due_date' => $obDueDate->format('Y-m-d'),
+                        'days' => $obDays,
+                        'credit_days' => $agingDays,
+                        'credit_limit' => (float)($account->credit_limit ?? 0),
+                        'is_opening_balance' => true,
+                        'ob_type' => 'DR',
+                        'is_supplier' => ($partyType === 'payable'),
+                    ];
+                }
+            } else {
+                $survivingDebits[] = [
+                    'date' => $toDate,
+                    'voucher_no' => $partyType === 'payable' ? 'ADVANCE (DR)' : 'OPENING-BAL (DR)',
+                    'type' => $partyType === 'payable' ? 'PAYMENT' : 'OPENING',
+                    'bill_type' => 'receivable',
+                    'party_name' => $account->title ?? 'Unknown',
+                    'party_id' => $account->id,
+                    'customer_id' => $account->id,
+                    'supplier_id' => $account->id,
+                    'bill_amt' => $targetBal,
+                    'original_amt' => $targetBal,
+                    'paid' => 0.0,
+                    'remaining' => $targetBal,
+                    'due_date' => $toDate,
+                    'days' => 0,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'is_opening_balance' => true,
+                    'ob_type' => 'DR',
+                    'is_supplier' => ($partyType === 'payable'),
+                ];
+            }
+        } elseif ($isNetCredit) {
+            // Net credit obligation
+            $survivingDebits = [];
+            if (!empty($survivingCredits)) {
+                $totalSurvivingCredits = (float)array_sum(array_column($survivingCredits, 'remaining'));
+                
+                if ($totalSurvivingCredits > $targetBal + 0.005) {
+                    // Excess receipts/payments exist that reduce the balance below the open bills.
+                    // Apply this debit to the OLDEST bills first (top-down FIFO settlement):
+                    $excessDebit = round($totalSurvivingCredits - $targetBal, 2);
+                    $count = count($survivingCredits);
+                    for ($i = 0; $i < $count && $excessDebit > 0.005; $i++) {
+                        $rem = (float)$survivingCredits[$i]['remaining'];
+                        $deduct = min($rem, $excessDebit);
+                        
+                        $survivingCredits[$i]['paid'] = round(($survivingCredits[$i]['paid'] ?? 0) + $deduct, 2);
+                        $survivingCredits[$i]['remaining'] = round($rem - $deduct, 2);
+                        $excessDebit = round($excessDebit - $deduct, 2);
+                    }
+                    // Filter out fully cleared bills
+                    $survivingCredits = array_values(array_filter($survivingCredits, fn($c) => $c['remaining'] > 0.005));
+                } elseif ($totalSurvivingCredits < $targetBal - 0.005) {
+                    // Ledger balance is higher than the known open bills (e.g. unbilled opening balance)
+                    $diff = round($targetBal - $totalSurvivingCredits, 2);
+                    $obDate = $account->opening_date ? \Carbon\Carbon::parse($account->opening_date)->format('Y-m-d') : '2026-01-01';
+                    $obDueDate = \Carbon\Carbon::parse($obDate)->addDays($agingDays);
+                    $obDays = (int)$obDueDate->diffInDays(\Carbon\Carbon::parse($toDate), false);
+
+                    $survivingCredits[] = [
+                        'date' => $obDate,
+                        'voucher_no' => 'OPENING-BAL (CR)',
+                        'type' => 'OPENING',
+                        'bill_type' => 'payable',
+                        'party_name' => $account->title ?? 'Unknown',
+                        'party_id' => $account->id,
+                        'customer_id' => $account->id,
+                        'supplier_id' => $account->id,
+                        'bill_amt' => $diff,
+                        'original_amt' => $diff,
+                        'paid' => 0.0,
+                        'remaining' => $diff,
+                        'due_date' => $obDueDate->format('Y-m-d'),
+                        'days' => $obDays,
+                        'credit_days' => $agingDays,
+                        'credit_limit' => (float)($account->credit_limit ?? 0),
+                        'is_opening_balance' => true,
+                        'ob_type' => 'CR',
+                        'is_supplier' => ($partyType === 'payable'),
+                    ];
+                }
+            } else {
+                $survivingCredits[] = [
+                    'date' => $toDate,
+                    'voucher_no' => $partyType === 'payable' ? 'OPENING-BAL (CR)' : 'ADVANCE (CR)',
+                    'type' => $partyType === 'payable' ? 'OPENING' : 'RECEIPT',
+                    'bill_type' => 'payable',
+                    'party_name' => $account->title ?? 'Unknown',
+                    'party_id' => $account->id,
+                    'customer_id' => $account->id,
+                    'supplier_id' => $account->id,
+                    'bill_amt' => $targetBal,
+                    'original_amt' => $targetBal,
+                    'paid' => 0.0,
+                    'remaining' => $targetBal,
+                    'due_date' => $toDate,
+                    'days' => 0,
+                    'credit_days' => $agingDays,
+                    'credit_limit' => (float)($account->credit_limit ?? 0),
+                    'is_opening_balance' => true,
+                    'ob_type' => 'CR',
+                    'is_supplier' => ($partyType === 'payable'),
+                ];
+            }
+        } else {
+            $survivingDebits = [];
+            $survivingCredits = [];
+        }
+
+        $allSurviving = array_merge($survivingDebits, $survivingCredits);
+        usort($allSurviving, $sortFn);
+
+        // 8. Cumulative Running Balance
+        $cumulativeBalance = 0.0;
+        $partyDueAmount = 0.0;
+        $partyUnDueAmount = 0.0;
+
+        foreach ($allSurviving as &$item) {
+            $isSameType = ($item['bill_type'] === $partyType);
+            $signedRem = $isSameType ? (float)$item['remaining'] : -(float)$item['remaining'];
+            $cumulativeBalance += $signedRem;
+            $item['balance'] = round($cumulativeBalance, 2);
+
+            if (!$isSameType) {
+                $item['bill_amt'] = -(float)abs($item['bill_amt']);
+                $item['remaining'] = -(float)abs($item['remaining']);
+            }
+
+            if ($isSameType) {
+                if ($item['days'] > 0) {
+                    $partyDueAmount += (float)$item['remaining'];
+                } else {
+                    $partyUnDueAmount += (float)$item['remaining'];
+                }
+            }
+        }
+        unset($item);
+
+        $survivingDebits = array_values(array_filter($allSurviving, fn($b) => ($b['bill_type'] ?? '') === 'receivable'));
+        $survivingCredits = array_values(array_filter($allSurviving, fn($b) => ($b['bill_type'] ?? '') === 'payable'));
+
+        return [
+            'bills' => $allSurviving,
+            'surviving_debits' => $survivingDebits,
+            'surviving_credits' => $survivingCredits,
+            'cumulative_balance' => round($cumulativeBalance, 2),
+            'due_amount' => round($partyDueAmount, 2),
+            'undue_amount' => round($partyUnDueAmount, 2),
         ];
     }
 }
