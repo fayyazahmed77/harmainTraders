@@ -400,6 +400,202 @@ class ReportBuilder
         $base['data']->setCollection(collect($enrichedData));
         return $base;
     }
+//   Bank Ledger Report
+    public function bankLedger($accountId, $fromDate = null, $toDate = null, $perPage = 50, $params = [])
+    {
+        if ($accountId === 'ALL' || empty($accountId)) {
+            $defaultBank = Account::where('type', 2)
+                ->orWhereHas('accountType', fn($q) => $q->where('name', 'Bank'))
+                ->orderBy('id', 'asc')
+                ->first();
+            if ($defaultBank) {
+                $accountId = $defaultBank->id;
+            } else {
+                return [
+                    'opening_balance' => 0,
+                    'start_bank_balance' => 0,
+                    'total_debit' => 0,
+                    'total_credit' => 0,
+                    'total_cleared_deposits' => 0,
+                    'total_cleared_withdrawals' => 0,
+                    'total_uncleared_float' => 0,
+                    'closing_balance' => 0,
+                    'closing_bank_balance' => 0,
+                    'balance_type' => 'dr',
+                    'data' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage),
+                    'from_date' => $fromDate,
+                    'to_date' => $toDate,
+                    'account' => null,
+                ];
+            }
+        }
+
+        $fromDate = $fromDate ?? date('Y-m-d', strtotime('-30 days'));
+        $toDate = $toDate ?? date('Y-m-d');
+        $account = Account::with('accountType')->findOrFail($accountId);
+
+        $signedOB = (float)$account->getSignedOpeningBalance();
+
+        // 1. Calculate Cleared Prior Net before $fromDate
+        $priorQuery = Payment::where(function($q) use ($accountId) {
+                $q->where('payment_account_id', $accountId)
+                  ->orWhere('account_id', $accountId);
+            })
+            ->whereDate('date', '<', $fromDate)
+            ->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund']);
+
+        $priorItems = $priorQuery->get();
+        $priorClearedNet = 0.0;
+        foreach ($priorItems as $p) {
+            $status = $p->cheque_status;
+            $isBypassed = !in_array($p->payment_method, ['Cheque', 'Online']);
+            $isCleared = in_array($status, ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']) || empty($status);
+
+            if ($p->payment_account_id == $accountId) {
+                if ($isBypassed || $isCleared) {
+                    $priorClearedNet += ($p->type === 'RECEIPT') ? (float)$p->amount : -(float)$p->amount;
+                }
+            }
+            if ($p->account_id == $accountId) {
+                if ($isBypassed || $isCleared) {
+                    $priorClearedNet += ($p->type === 'PAYMENT') ? (float)$p->amount : -(float)$p->amount;
+                }
+            }
+        }
+
+        $startBankBalance = $signedOB + $priorClearedNet;
+
+        // 2. Fetch All Transactions in date range
+        $txQuery = Payment::where(function($q) use ($accountId) {
+                $q->where('payment_account_id', $accountId)
+                  ->orWhere('account_id', $accountId);
+            })
+            ->whereBetween('date', [$fromDate, $toDate])
+            ->whereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund'])
+            ->with(['account', 'paymentAccount']);
+
+        if (isset($params['remarks']) && trim($params['remarks']) !== '') {
+            $term = trim($params['remarks']);
+            $txQuery->where(function($q) use ($term) {
+                $q->where('remarks', 'like', "%{$term}%")
+                  ->orWhere('cheque_no', 'like', "%{$term}%")
+                  ->orWhere('voucher_no', 'like', "%{$term}%")
+                  ->orWhere('id', 'like', "%{$term}%");
+            });
+        }
+
+        $allTx = $txQuery->orderBy('date', 'asc')->orderBy('id', 'asc')->get();
+
+        // 3. Process each transaction and calculate running balance
+        $runningBalance = $startBankBalance;
+        $totalClearedDeposits = 0.0;
+        $totalClearedWithdrawals = 0.0;
+        $totalUnclearedFloat = 0.0;
+        $clearedCount = 0;
+        $pendingCount = 0;
+
+        $processedRows = [];
+
+        foreach ($allTx as $tx) {
+            $status = $tx->cheque_status;
+            $method = $tx->payment_method ?? 'Cash';
+            $isBypassed = !in_array($method, ['Cheque', 'Online']);
+            $isCleared = in_array($status, ['Clear', 'Cleared', 'Deposit', 'Withdrawal']) || (empty($status) && $isBypassed);
+
+            $deposit = 0.0;
+            $withdrawal = 0.0;
+
+            if ($tx->payment_account_id == $accountId) {
+                if ($tx->type === 'RECEIPT') {
+                    $deposit = (float)$tx->amount;
+                } else {
+                    $withdrawal = (float)$tx->amount;
+                }
+                $contraParty = $tx->account->title ?? ($tx->remarks ?: 'General Party');
+            } else {
+                if ($tx->type === 'PAYMENT') {
+                    $deposit = (float)$tx->amount;
+                } else {
+                    $withdrawal = (float)$tx->amount;
+                }
+                $contraParty = $tx->paymentAccount->title ?? ($tx->remarks ?: 'General Account');
+            }
+
+            if ($isCleared) {
+                $clearedCount++;
+                $totalClearedDeposits += $deposit;
+                $totalClearedWithdrawals += $withdrawal;
+                $runningBalance += ($deposit - $withdrawal);
+            } else {
+                $pendingCount++;
+                $totalUnclearedFloat += $withdrawal;
+            }
+
+            $processedRows[] = [
+                'id' => $tx->id,
+                'date' => $tx->date,
+                'voucher_no' => $tx->voucher_no,
+                'type' => $tx->type,
+                'method' => $method,
+                'description' => $contraParty,
+                'contra_party' => $contraParty,
+                'cheque_no' => $tx->cheque_no,
+                'cheque_date' => $tx->cheque_date,
+                'clear_date' => $tx->clear_date,
+                'cheque_status' => $status ?: ($isCleared ? 'Clear' : 'Pending'),
+                'is_cleared' => $isCleared,
+                'impacts_balance' => $isCleared,
+                'debit' => $deposit,
+                'credit' => $withdrawal,
+                'deposit' => $deposit,
+                'withdrawal' => $withdrawal,
+                'balance' => $runningBalance,
+                'running_balance' => $runningBalance,
+                'created_at' => $tx->created_at ? $tx->created_at->format('Y-m-d H:i:s') : null,
+            ];
+        }
+
+        // Pagination
+        $page = (int)request()->input('page', 1);
+        $totalItems = count($processedRows);
+        $offset = ($page - 1) * $perPage;
+        $pageItems = array_slice($processedRows, $offset, $perPage);
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pageItems,
+            $totalItems,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        return [
+            'opening_balance' => $startBankBalance,
+            'page_start_balance' => $offset > 0 && isset($processedRows[$offset - 1]) ? $processedRows[$offset - 1]['balance'] : $startBankBalance,
+            'start_bank_balance' => $startBankBalance,
+            'total_debit' => $totalClearedDeposits,
+            'total_credit' => $totalClearedWithdrawals,
+            'total_cleared_deposits' => $totalClearedDeposits,
+            'total_cleared_withdrawals' => $totalClearedWithdrawals,
+            'total_uncleared_float' => $totalUnclearedFloat,
+            'closing_balance' => $runningBalance,
+            'closing_bank_balance' => $runningBalance,
+            'balance_type' => $runningBalance >= 0 ? 'dr' : 'cr',
+            'data' => $paginator,
+            'cleared_count' => $clearedCount,
+            'pending_count' => $pendingCount,
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+            'account' => [
+                'id' => $account->id,
+                'title' => $account->title,
+                'code' => $account->code,
+                'type' => $account->accountType->name ?? 'Bank',
+            ],
+        ];
+    }
+
+  
 
     private function calculateBalanceChange($accountId, $fromDate, $toDate, $beforeId = null)
     {

@@ -93,11 +93,19 @@ export default function StockSummary({ data, formatCurrency, params }: Props) {
                     <TableCell className="py-4 px-4 text-right text-[11px] text-amber-600 tabular-nums">
                         {totals.out.toLocaleString()}
                     </TableCell>
-                    <TableCell className="py-4 px-4 text-right text-[12px] text-emerald-600 tabular-nums">
+                    <TableCell className={cn(
+                        "py-4 px-4 text-right text-[12px] tabular-nums font-black",
+                        totals.balance < 0 ? "text-rose-600" : "text-emerald-600"
+                    )}>
                         {totals.balance.toLocaleString()}
                     </TableCell>
                     {params.withAmount && (
-                        <TableCell className="py-4 px-4 text-right text-[13px] text-emerald-600 tabular-nums underline decoration-double decoration-emerald-600/30">
+                        <TableCell className={cn(
+                            "py-4 px-4 text-right text-[13px] tabular-nums underline decoration-double font-black",
+                            totals.amount < 0
+                                ? "text-rose-600 decoration-rose-600/30"
+                                : "text-emerald-600 decoration-emerald-600/30"
+                        )}>
                             {formatCurrency(totals.amount)}
                         </TableCell>
                     )}

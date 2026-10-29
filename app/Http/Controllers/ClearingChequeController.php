@@ -25,7 +25,18 @@ class ClearingChequeController extends Controller implements HasMiddleware
     public function index(Request $request)
     {
         $status = $request->input('status', 'Pending');
-        $accountId = $request->input('account_id');
+        $bankAccountId = $request->input('bank_account_id', $request->input('account_id'));
+        $partyId = $request->input('party_id');
+        $voucherNo = $request->input('voucher_no');
+        $chequeNo = $request->input('cheque_no');
+        $amount = $request->input('amount');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $dateType = $request->input('date_type', 'cheque_date');
+
+        if (!in_array($dateType, ['cheque_date', 'date', 'clear_date'])) {
+            $dateType = 'cheque_date';
+        }
 
         // Stats
         $stats = [
@@ -66,11 +77,92 @@ class ClearingChequeController extends Controller implements HasMiddleware
         }
 
         // Filter by Bank Account
-        if ($accountId) {
-            $query->where('payment_account_id', $accountId);
+        if ($bankAccountId && $bankAccountId !== 'all') {
+            $query->where('payment_account_id', $bankAccountId);
         }
 
-        $payments = $query->paginate(50)->withQueryString();
+        // Filter by Party (Account)
+        if ($partyId && $partyId !== 'all') {
+            $query->where('account_id', $partyId);
+        }
+
+        // Filter by Voucher No (partial match)
+        if (!empty($voucherNo)) {
+            $query->where('voucher_no', 'like', '%' . trim($voucherNo) . '%');
+        }
+
+        // Filter by Cheque No (partial match on payment cheque_no or linked chequebook cheque_no)
+        if (!empty($chequeNo)) {
+            $trimmedCheque = trim($chequeNo);
+            $query->where(function ($q) use ($trimmedCheque) {
+                $q->where('cheque_no', 'like', '%' . $trimmedCheque . '%')
+                  ->orWhereHas('cheque', function ($cq) use ($trimmedCheque) {
+                      $cq->where('cheque_no', 'like', '%' . $trimmedCheque . '%');
+                  });
+            });
+        }
+
+        // Filter by Amount
+        if (!empty($amount)) {
+            $query->where('amount', 'like', '%' . trim($amount) . '%');
+        }
+
+        // Filter by Date Range
+        if ($startDate && $endDate) {
+            $query->whereBetween($dateType, [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $query->whereDate($dateType, '>=', $startDate);
+        } elseif ($endDate) {
+            $query->whereDate($dateType, '<=', $endDate);
+        }
+
+        // Sub-tab definitions: Hand / Third Party Cheque vs Bank Cheque
+        $isHandCondition = function ($q) {
+            $q->where(function ($sub) {
+                $sub->whereIn('cheque_status', ['In Hand', 'Distributed'])
+                    ->orWhereNull('payment_account_id')
+                    ->orWhereHas('paymentAccount', function ($pa) {
+                        $pa->where('title', 'like', '%Cheque in hand%')
+                           ->orWhere('title', 'like', '%CHEQUE IN HAND%');
+                    });
+            });
+        };
+
+        $isBankCondition = function ($q) {
+            $q->whereNotIn('cheque_status', ['In Hand', 'Distributed'])
+              ->whereNotNull('payment_account_id')
+              ->whereDoesntHave('paymentAccount', function ($pa) {
+                  $pa->where('title', 'like', '%Cheque in hand%')
+                     ->orWhere('title', 'like', '%CHEQUE IN HAND%');
+              });
+        };
+
+        // Accurately compute tab totals matching all filters across database
+        $bankTotalsQuery = (clone $query)->where($isBankCondition);
+        $handTotalsQuery = (clone $query)->where($isHandCondition);
+
+        $tabTotals = [
+            'bank_count' => (int) $bankTotalsQuery->count(),
+            'bank_total' => (float) $bankTotalsQuery->sum('amount'),
+            'hand_count' => (int) $handTotalsQuery->count(),
+            'hand_total' => (float) $handTotalsQuery->sum('amount'),
+        ];
+
+        // Apply active sub-tab filter
+        $chequeType = $request->input('cheque_type', 'bank');
+        if ($chequeType === 'hand') {
+            $query->where($isHandCondition);
+        } else {
+            $chequeType = 'bank';
+            $query->where($isBankCondition);
+        }
+
+        $perPage = (int) $request->input('per_page', 50);
+        if (!in_array($perPage, [10, 25, 50, 100, 250])) {
+            $perPage = 50;
+        }
+
+        $payments = $query->paginate($perPage)->withQueryString();
 
         // Additional Summaries for Pending Tab
         $tomorrowAmount = 0;
@@ -98,18 +190,40 @@ class ClearingChequeController extends Controller implements HasMiddleware
                 ->groupBy('payments.payment_account_id', 'accounts.title')
                 ->get();
         }
+
         $accounts = Account::select('id', 'title')->with('accountType')
             ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['bank']);
+                $q->whereIn('name', ['bank', 'Bank']);
             })
+            ->orWhere('title', 'like', '%Bank%')
+            ->orderBy('title')
             ->get();
+
+        $parties = Account::active()
+            ->select('id', 'title', 'code')
+            ->orderBy('title', 'asc')
+            ->get();
+
         return Inertia::render('daily/clearingcheque/index', [
             'stats' => $stats,
             'payments' => $payments,
             'accounts' => $accounts,
+            'parties' => $parties,
+            'tab_totals' => $tabTotals,
             'filters' => [
                 'status' => $status,
-                'account_id' => $accountId,
+                'cheque_type' => $chequeType,
+                'account_id' => $bankAccountId,
+                'bank_account_id' => $bankAccountId,
+                'party_id' => $partyId,
+                'voucher_no' => $voucherNo,
+                'cheque_no' => $chequeNo,
+                'amount' => $amount,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'date_type' => $dateType,
+                'per_page' => (string) $perPage,
+                'page' => (string) $payments->currentPage(),
             ],
             'summaries' => [
                 'tomorrow_amount' => $tomorrowAmount,

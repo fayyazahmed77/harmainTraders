@@ -6,6 +6,7 @@ import {
     AlertCircle, 
     CalendarDays, 
     BookOpen, 
+    Landmark,
     Receipt, 
     CreditCard, 
     Wallet, 
@@ -68,8 +69,15 @@ export const reports: ReportOption[] = [
         category: 'Financial'
     },
     {
+        id: 'bank_ledger',
+        title: 'Bank Ledger',
+        description: 'Bank statement ledger showing real cleared bank transactions.',
+        icon: Landmark,
+        category: 'Financial'
+    },
+    {
         id: 'outstanding_billwise',
-        title: 'Outstanding Payment Bill Wise',
+        title: 'Outstanding Bill Wise',
         description: 'Outstanding balances grouped by individual bills.',
         icon: Receipt,
         category: 'Financial'

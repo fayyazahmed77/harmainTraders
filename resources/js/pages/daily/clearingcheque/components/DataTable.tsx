@@ -6,7 +6,6 @@ import {
     SortingState,
     VisibilityState,
     getCoreRowModel,
-    getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
     flexRender,
@@ -47,6 +46,7 @@ interface Payment {
     date: string;
     voucher_no: string;
     account: { title: string };
+    payment_account?: { title: string };
     cheque: { prefix: string, cheque_no: string };
     amount: number;
     type: string;
@@ -58,9 +58,21 @@ interface Payment {
 
 interface DataTableProps {
     data: Payment[];
+    currentPage?: number;
+    lastPage?: number;
+    perPage?: number;
+    total?: number;
+    filters?: Record<string, any>;
 }
 
-export default function DataTable({ data }: DataTableProps) {
+export default function DataTable({
+    data = [],
+    currentPage = 1,
+    lastPage = 1,
+    perPage = 50,
+    total = data?.length || 0,
+    filters = {},
+}: DataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState({});
@@ -88,7 +100,7 @@ export default function DataTable({ data }: DataTableProps) {
         setConfirmModal({
             isOpen: true,
             title: "Clear Cheque",
-            description: `Are you sure you want to mark the cheque ${payment.cheque?.prefix}-${payment.cheque?.cheque_no} as cleared? This will update the bank balance.`,
+            description: `Are you sure you want to mark the cheque ${payment.cheque?.prefix ? `${payment.cheque.prefix}-` : ''}${payment.cheque?.cheque_no || payment.cheque_no || ''} as cleared? This will update the bank balance.`,
             confirmText: "Clear Now",
             variant: 'success',
             onConfirm: () => router.put(`/clearing-cheque/${payment.id}/clear`)
@@ -99,11 +111,42 @@ export default function DataTable({ data }: DataTableProps) {
         setConfirmModal({
             isOpen: true,
             title: "Cancel Cheque",
-            description: `Are you sure you want to cancel the cheque ${payment.cheque?.prefix}-${payment.cheque?.cheque_no}? The bill balance will be restored to unpaid.`,
+            description: `Are you sure you want to cancel the cheque ${payment.cheque?.prefix ? `${payment.cheque.prefix}-` : ''}${payment.cheque?.cheque_no || payment.cheque_no || ''}? The bill balance will be restored to unpaid.`,
             confirmText: "Cancel Cheque",
             variant: 'destructive',
             onConfirm: () => router.put(`/clearing-cheque/${payment.id}/cancel`)
         });
+    };
+
+    const goToPage = (pageNumber: number) => {
+        router.get(
+            "/clearing-cheque",
+            {
+                ...filters,
+                page: String(pageNumber),
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
+    };
+
+    const handlePerPageChange = (val: string) => {
+        router.get(
+            "/clearing-cheque",
+            {
+                ...filters,
+                per_page: val,
+                page: "1",
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            }
+        );
     };
 
     const columns: ColumnDef<Payment>[] = [
@@ -270,7 +313,6 @@ export default function DataTable({ data }: DataTableProps) {
         columns,
         onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
@@ -338,7 +380,7 @@ export default function DataTable({ data }: DataTableProps) {
                             })
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-6">
+                                <TableCell colSpan={12} className="text-center py-8 text-sm text-muted-foreground">
                                     No Payment Records Found
                                 </TableCell>
                             </TableRow>
@@ -346,27 +388,48 @@ export default function DataTable({ data }: DataTableProps) {
                     </TableBody>
                 </Table>
 
-                {/* Pagination Footer */}
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                    <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-                        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                        {table.getFilteredRowModel().rows.length} row(s) selected.
+                {/* Server-Side Pagination Footer */}
+                <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t bg-card gap-4">
+                    <div className="text-xs font-medium text-muted-foreground">
+                        {total > 0 ? (
+                            <>
+                                Showing{" "}
+                                <span className="font-bold text-foreground">
+                                    {(currentPage - 1) * perPage + 1}
+                                </span>{" "}
+                                to{" "}
+                                <span className="font-bold text-foreground">
+                                    {Math.min(currentPage * perPage, total)}
+                                </span>{" "}
+                                of{" "}
+                                <span className="font-bold text-foreground">{total}</span> records
+                                {table.getFilteredSelectedRowModel().rows.length > 0 && (
+                                    <span className="ml-2 font-semibold text-primary">
+                                        ({table.getFilteredSelectedRowModel().rows.length} row(s) selected)
+                                    </span>
+                                )}
+                            </>
+                        ) : (
+                            "No records found"
+                        )}
                     </div>
 
-                    <div className="flex w-full items-center gap-8 lg:w-fit">
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                         {/* Rows per page */}
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <Label className="text-sm font-medium">Rows per page</Label>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                Rows per page
+                            </Label>
                             <Select
-                                value={`${table.getState().pagination.pageSize}`}
-                                onValueChange={(value) => table.setPageSize(Number(value))}
+                                value={String(perPage)}
+                                onValueChange={handlePerPageChange}
                             >
-                                <SelectTrigger size="sm" className="w-20">
-                                    <SelectValue placeholder={table.getState().pagination.pageSize} />
+                                <SelectTrigger size="sm" className="w-[75px] h-8 text-xs font-bold rounded-lg">
+                                    <SelectValue placeholder={String(perPage)} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {[10, 20, 30, 40, 50, 100].map((pageSize) => (
-                                        <SelectItem key={pageSize} value={`${pageSize}`}>
+                                    {[10, 25, 50, 100, 250].map((pageSize) => (
+                                        <SelectItem key={pageSize} value={String(pageSize)}>
                                             {pageSize}
                                         </SelectItem>
                                     ))}
@@ -375,44 +438,53 @@ export default function DataTable({ data }: DataTableProps) {
                         </div>
 
                         {/* Page info */}
-                        <div className="text-sm font-medium">
-                            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                        <div className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                            Page <span className="text-foreground">{currentPage}</span> of{" "}
+                            <span className="text-foreground">{Math.max(lastPage, 1)}</span>
                         </div>
 
                         {/* Pagination buttons */}
-                        <div className="ml-auto flex items-center gap-2 lg:ml-0">
+                        <div className="flex items-center gap-1">
                             <Button
                                 variant="outline"
-                                className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                onClick={() => goToPage(1)}
+                                disabled={currentPage <= 1}
+                                title="First page"
                             >
                                 <IconChevronsLeft className="h-4 w-4" />
                             </Button>
 
                             <Button
                                 variant="outline"
-                                className="size-8"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                onClick={() => goToPage(currentPage - 1)}
+                                disabled={currentPage <= 1}
+                                title="Previous page"
                             >
                                 <IconChevronLeft className="h-4 w-4" />
                             </Button>
 
                             <Button
                                 variant="outline"
-                                className="size-8"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                onClick={() => goToPage(currentPage + 1)}
+                                disabled={currentPage >= lastPage}
+                                title="Next page"
                             >
                                 <IconChevronRight className="h-4 w-4" />
                             </Button>
 
                             <Button
                                 variant="outline"
-                                className="hidden size-8 lg:flex"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
+                                size="icon"
+                                className="h-8 w-8 rounded-lg"
+                                onClick={() => goToPage(lastPage)}
+                                disabled={currentPage >= lastPage}
+                                title="Last page"
                             >
                                 <IconChevronsRight className="h-4 w-4" />
                             </Button>

@@ -26,6 +26,7 @@ class StockReportBuilder
             'show_zero' => filter_var($params['show_zero'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'reorder_level' => filter_var($params['reorder_level'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'remove_negative' => filter_var($params['remove_negative'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'display_negative' => filter_var($params['display_negative'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'all' => filter_var($params['all'] ?? true, FILTER_VALIDATE_BOOLEAN),
         ];
 
@@ -252,6 +253,9 @@ class StockReportBuilder
             }
             if ($filters['remove_negative']) {
                 $data = $data->filter(fn($r) => floatval($r['balance_qty']) >= 0);
+            }
+            if ($filters['display_negative']) {
+                $data = $data->filter(fn($r) => floatval($r['balance_qty']) < 0);
             }
         }
 

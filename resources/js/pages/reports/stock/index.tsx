@@ -71,6 +71,7 @@ export default function StockReportsIndex({ items, companies, parties = [], cate
         show_zero: false,
         reorder_level: false,
         remove_negative: false,
+        display_negative: false,
         sortBy: 'default',
         printOn: 'screen'
     });

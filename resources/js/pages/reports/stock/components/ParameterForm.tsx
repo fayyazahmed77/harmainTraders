@@ -167,6 +167,50 @@ export function ParameterForm({
         setParams({ ...params, [key]: value });
     };
 
+    const handleCalculationChange = (id: string, checked: boolean) => {
+        if (id === 'all') {
+            if (checked) {
+                setParams({
+                    ...params,
+                    all: true,
+                    remove_zero: false,
+                    show_zero: false,
+                    reorder_level: false,
+                    remove_negative: false,
+                    display_negative: false,
+                });
+            }
+            return;
+        }
+
+        const nextState = {
+            ...params,
+            all: false,
+            [id]: checked,
+        };
+
+        if (id === 'display_negative' && checked) {
+            nextState.remove_negative = false;
+        }
+
+        if (id === 'remove_negative' && checked) {
+            nextState.display_negative = false;
+        }
+
+        const hasAnyCalcActive = 
+            Boolean(nextState.remove_zero) ||
+            Boolean(nextState.show_zero) ||
+            Boolean(nextState.reorder_level) ||
+            Boolean(nextState.remove_negative) ||
+            Boolean(nextState.display_negative);
+
+        if (!hasAnyCalcActive) {
+            nextState.all = true;
+        }
+
+        setParams(nextState);
+    };
+
     const selectedReport = stockReports.find(r => r.id === params.reportId) || stockReports[0];
     const selectedItem = items.find(i => i.id.toString() === params.itemId);
     const selectedCompany = companies.find(c => c.id.toString() === params.companyId);
@@ -385,13 +429,13 @@ export function ParameterForm({
                                             { id: 'show_zero', label: 'Show Zero Stock' },
                                             { id: 'reorder_level', label: 'Below Re-Order Level' },
                                             { id: 'remove_negative', label: 'Remove Negative Stock' },
-                                           
+                                            { id: 'display_negative', label: 'Display Negative Stock' },
                                         ].map(opt => (
                                             <div key={opt.id} className="flex items-center space-x-4 group">
                                                 <Checkbox 
                                                     id={opt.id} 
-                                                    checked={params[opt.id]} 
-                                                    onCheckedChange={(checked) => updateParam(opt.id, checked)}
+                                                    checked={Boolean(params[opt.id])} 
+                                                    onCheckedChange={(checked) => handleCalculationChange(opt.id, Boolean(checked))}
                                                     className="h-4 w-4 rounded-none border-indigo-600/30 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 transition-all"
                                                 />
                                                 <Label htmlFor={opt.id} className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-indigo-600 cursor-pointer transition-colors leading-none">{opt.label}</Label>

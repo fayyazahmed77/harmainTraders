@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Plus, Calendar, TrendingUp, Building2, Clock } from "lucide-react";
+import { Building2, Clock } from "lucide-react";
 import { router } from '@inertiajs/react';
 import PaymentSummary from './components/PaymentSummary';
 import DataTable from './components/DataTable';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ClearingChequeFilters from './components/ClearingChequeFilters';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -26,11 +25,33 @@ interface Props {
     payments: {
         data: any[];
         links: any[];
+        total?: number;
+        current_page?: number;
+        last_page?: number;
+        per_page?: number;
     };
     accounts: any[];
+    parties?: any[];
+    tab_totals?: {
+        bank_count: number;
+        bank_total: number;
+        hand_count: number;
+        hand_total: number;
+    };
     filters: {
         status: string;
-        account_id: string;
+        cheque_type?: 'bank' | 'hand';
+        account_id?: string;
+        bank_account_id?: string;
+        party_id?: string;
+        voucher_no?: string;
+        cheque_no?: string;
+        amount?: string;
+        start_date?: string;
+        end_date?: string;
+        date_type?: string;
+        per_page?: string;
+        page?: string;
     };
     summaries: {
         tomorrow_amount: number;
@@ -39,40 +60,38 @@ interface Props {
     };
 }
 
-export default function ClearingChequeIndex({ stats, payments, accounts, filters, summaries }: Props) {
-
-    const [activeChequeType, setActiveChequeType] = useState<'bank' | 'hand'>('bank');
-
-    const paymentList = payments?.data || [];
-
-    const isChequeInHand = (p: any) => {
-        const title = p.payment_account?.title?.toUpperCase() || "";
-        const status = p.cheque_status;
-        return title.includes("CHEQUE IN HAND") || 
-               status === "In Hand" || 
-               status === "Distributed" ||
-               !p.payment_account;
-    };
-
-    const bankCheques = paymentList.filter(p => !isChequeInHand(p));
-    const handCheques = paymentList.filter(p => isChequeInHand(p));
-
-    const bankTotal = bankCheques.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const handTotal = handCheques.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+export default function ClearingChequeIndex({
+    stats,
+    payments,
+    accounts = [],
+    parties = [],
+    tab_totals = { bank_count: 0, bank_total: 0, hand_count: 0, hand_total: 0 },
+    filters,
+    summaries,
+}: Props) {
+    const activeChequeType = filters.cheque_type || 'bank';
 
     const handleTabChange = (value: string) => {
-        router.get('/clearing-cheque', { ...filters, status: value }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/clearing-cheque',
+            { ...filters, status: value, page: '1' },
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
     };
 
-    const handleAccountChange = (value: string) => {
-        router.get('/clearing-cheque', { ...filters, account_id: value === 'all' ? '' : value }, { preserveState: true, preserveScroll: true });
+    const handleChequeTypeChange = (type: 'bank' | 'hand') => {
+        router.get(
+            '/clearing-cheque',
+            { ...filters, cheque_type: type, page: '1' },
+            { preserveState: true, preserveScroll: true, replace: true }
+        );
     };
 
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
             <SidebarInset>
-                <SiteHeader breadcrumbs={[{ title: "Clearing Cheque", href: "/clearingcheque" }]} />
+                <SiteHeader breadcrumbs={[{ title: "Clearing Cheque", href: "/clearing-cheque" }]} />
                 <div className="mx-auto w-full max-w-[1720px] px-6 lg:px-10 py-10 space-y-8">
                     {/* PREMIUM HEADER */}
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-border pb-8">
@@ -94,29 +113,12 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                                 </p>
                             </div>
                         </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="w-[220px]">
-                                <Select value={filters.account_id || 'all'} onValueChange={handleAccountChange}>
-                                    <SelectTrigger className="h-11 rounded-xl bg-card border-border shadow-sm font-black text-[10px] uppercase tracking-widest text-[#9a3412]/60 dark:text-[#d6d3d1]/40">
-                                        <SelectValue placeholder="Filter by Bank" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Banks</SelectItem>
-                                        {accounts.map((account) => (
-                                            <SelectItem key={account.id} value={String(account.id)}>
-                                                {account.title}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
                     </div>
 
+                    {/* TOP STATS SUMMARY */}
                     <PaymentSummary stats={stats} />
 
-                    <Tabs defaultValue={filters.status} onValueChange={handleTabChange} className="w-full">
+                    <Tabs defaultValue={filters.status || 'Pending'} onValueChange={handleTabChange} className="w-full">
                         <TabsList>
                             <TabsTrigger value="Pending">Pending</TabsTrigger>
                             <TabsTrigger value="Clear">Clear</TabsTrigger>
@@ -131,7 +133,7 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                                     <CardContent className="p-6">
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="h-10 w-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center">
-                                                <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                                <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                                             </div>
                                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-700/60 dark:text-orange-400/40">Tomorrow</span>
                                         </div>
@@ -215,10 +217,20 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                             </div>
                         )}
 
+                        {/* COMPREHENSIVE FILTER BAR */}
+                        <div className="mt-8">
+                            <ClearingChequeFilters
+                                filters={filters}
+                                accounts={accounts}
+                                parties={parties}
+                            />
+                        </div>
+
+                        {/* TABLE TABS & DATA TABLE */}
                         <div className="mt-6 space-y-6">
                             <div className="flex border-b border-zinc-200 dark:border-zinc-800">
                                 <button
-                                    onClick={() => setActiveChequeType('bank')}
+                                    onClick={() => handleChequeTypeChange('bank')}
                                     className={cn(
                                         "px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
                                         activeChequeType === 'bank'
@@ -229,11 +241,11 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                                     <Building2 className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                                     Banks Cheque
                                     <span className="ml-1.5 px-2 py-0.5 text-[9px] font-black rounded-full bg-primary/10 text-primary border border-primary/20">
-                                        {bankCheques.length} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(bankTotal)}
+                                        {tab_totals.bank_count} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(tab_totals.bank_total)}
                                     </span>
                                 </button>
                                 <button
-                                    onClick={() => setActiveChequeType('hand')}
+                                    onClick={() => handleChequeTypeChange('hand')}
                                     className={cn(
                                         "px-6 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all flex items-center gap-2",
                                         activeChequeType === 'hand'
@@ -244,12 +256,19 @@ export default function ClearingChequeIndex({ stats, payments, accounts, filters
                                     <Clock className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                                     Cheque in hand / Third Party
                                     <span className="ml-1.5 px-2 py-0.5 text-[9px] font-black rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
-                                        {handCheques.length} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(handTotal)}
+                                        {tab_totals.hand_count} • Rs {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0 }).format(tab_totals.hand_total)}
                                     </span>
                                 </button>
                             </div>
 
-                            <DataTable data={activeChequeType === 'bank' ? bankCheques : handCheques} />
+                            <DataTable
+                                data={payments?.data || []}
+                                currentPage={payments?.current_page || 1}
+                                lastPage={payments?.last_page || 1}
+                                perPage={payments?.per_page || 50}
+                                total={payments?.total || 0}
+                                filters={filters}
+                            />
                         </div>
                     </Tabs>
                 </div>

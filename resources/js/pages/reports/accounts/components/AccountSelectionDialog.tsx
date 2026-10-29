@@ -32,6 +32,7 @@ interface AccountSelectionDialogProps {
     selectedAccountId: string;
     onSelect: (accountId: string) => void;
     accountTypes?: Array<{ id: number | string; name: string }>;
+    initialType?: string;
 }
 
 export function AccountSelectionDialog({
@@ -40,10 +41,17 @@ export function AccountSelectionDialog({
     accounts,
     selectedAccountId,
     onSelect,
-    accountTypes = []
+    accountTypes = [],
+    initialType
 }: AccountSelectionDialogProps) {
     const [accountSearch, setAccountSearch] = useState('');
-    const [selectedType, setSelectedType] = useState<string>('ALL');
+    const [selectedType, setSelectedType] = useState<string>(initialType || 'ALL');
+
+    React.useEffect(() => {
+        if (open && initialType) {
+            setSelectedType(initialType);
+        }
+    }, [open, initialType]);
 
     // Extract dynamic account types with account counts
     const availableAccountTypes = useMemo(() => {

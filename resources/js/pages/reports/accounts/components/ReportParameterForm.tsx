@@ -343,6 +343,7 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                 selectedAccountId={data.accountId}
                 onSelect={(id) => handleChange('accountId', id)}
                 accountTypes={bootstrap.accountTypes}
+                initialType={data.reportId === 'bank_ledger' ? 'Bank' : undefined}
             />
 
             <ReportSectionDialog 

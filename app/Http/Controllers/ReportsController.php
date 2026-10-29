@@ -170,6 +170,17 @@ class ReportsController extends Controller implements HasMiddleware
                  ]);
             }
 
+            if ($reportId === 'bank_ledger') {
+                $data = $this->reportBuilder->bankLedger(
+                    $accountId,
+                    $validated['from'] ?? null,
+                    $validated['to'] ?? null,
+                    $request->input('per_page', 50),
+                    $request->all()
+                );
+                return response()->json($data);
+            }
+
             if ($reportId === 'detail_ledger') {
                 $data = $this->reportBuilder->accountDetailLedger(
                     (int)$accountId,

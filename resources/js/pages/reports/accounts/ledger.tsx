@@ -48,6 +48,7 @@ import { AgingReportView } from './components/reports/AgingReportView';
 import { AccountListReportView } from './components/reports/AccountListReportView';
 import { DetailLedgerReportView } from './components/reports/DetailLedgerReportView';
 import { GeneralLedgerReportView } from './components/reports/GeneralLedgerReportView';
+import { BankLedgerReportView } from './components/reports/BankLedgerReportView';
 import { DueBillsReportView } from './components/reports/DueBillsReportView';
 import { DayBookReportView } from './components/reports/DayBookReportView';
 import { OutstandingBillWiseView } from './components/reports/OutstandingBillWiseView';
@@ -127,6 +128,7 @@ export default function AccountReports({
     const [pageStartBalance, setPageStartBalance] = useState(0);
     const [totalDebit, setTotalDebit] = useState(0);
     const [totalCredit, setTotalCredit] = useState(0);
+    const [totalUnclearedFloat, setTotalUnclearedFloat] = useState(0);
     const [closingBalance, setClosingBalance] = useState(0);
     const [loading, setLoading] = useState(false);
     const [pageCount, setPageCount] = useState(0);
@@ -171,6 +173,16 @@ export default function AccountReports({
                     tel: '',
                     typed: acc.account_type?.name || ''
                 })) || []);
+            } else if (reportId === 'bank_ledger') {
+                setLedgerData(response.data?.data?.data || []);
+                setPageCount(response.data?.data?.last_page || 0);
+                setOpeningBalance(response.data.opening_balance || 0);
+                setPageStartBalance(response.data.page_start_balance || 0);
+                setTotalDebit(response.data.total_cleared_deposits ?? response.data.total_debit ?? 0);
+                setTotalCredit(response.data.total_cleared_withdrawals ?? response.data.total_credit ?? 0);
+                setTotalUnclearedFloat(response.data.total_uncleared_float ?? 0);
+                setClosingBalance(response.data.closing_bank_balance ?? response.data.closing_balance ?? 0);
+                setBalanceType(response.data.balance_type || 'dr');
             } else if (params.reportId === 'detail_ledger' || params.reportId === 'general_ledger') {
                 setLedgerData(response.data?.data?.data || []);
                 setPageCount(response.data?.data?.last_page || 0);
@@ -424,6 +436,22 @@ export default function AccountReports({
                                             pagination={pagination}
                                             setPagination={setPagination}
                                             balanceType={balanceType}
+                                        />
+                                    </motion.div>
+                                ) : (params.reportId === 'bank_ledger') ? (
+                                    <motion.div key="bank-ledger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                                        <BankLedgerReportView 
+                                            data={ledgerData}
+                                            criteria={getCriteriaString()}
+                                            openingBalance={openingBalance}
+                                            totalDebit={totalDebit}
+                                            totalCredit={totalCredit}
+                                            totalUnclearedFloat={totalUnclearedFloat}
+                                            closingBalance={closingBalance}
+                                            pageCount={pageCount}
+                                            pagination={pagination}
+                                            setPagination={setPagination}
+                                            accountInfo={accounts.find(a => a.id.toString() === params.accountId)}
                                         />
                                     </motion.div>
                                 ) : (params.reportId === 'general_ledger') ? (
