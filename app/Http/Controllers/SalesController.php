@@ -15,6 +15,7 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\SalesReturnAllocation;
 use App\Models\CustomerCredit;
+use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -165,6 +166,9 @@ class SalesController extends Controller implements HasMiddleware
 
                 return $item;
             });
+
+        // Attach true real-time ledger balances
+        StockService::attachRealtimeBalances($items);
 
         $lastSale = Sales::select('id', 'invoice')->orderByDesc('id')->first();
         $nextInvoiceNo = 'SLS-000001';
@@ -557,16 +561,13 @@ class SalesController extends Controller implements HasMiddleware
                     'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock (total_pcs already includes billable + bonus units)
-                $totalToDeduct = (int)$it['total_pcs'];
-
-                \Illuminate\Support\Facades\Log::info("Deducting " . $totalToDeduct . " pcs from item " . $item->id . ". Current total_stock_pcs: " . $item->total_stock_pcs);
-                $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
-                \Illuminate\Support\Facades\Log::info("New stock for item " . $item->id . ": stock_1=" . $item->stock_1 . ", stock_2=" . $item->stock_2);
-
-                $item->refresh();
-                if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0 && $item->total_stock_pcs < $item->reorder_level) {
-                    event(new \App\Events\LowStockAlert($item));
+                // Inventory deduction is recorded transactionally in sales_items.
+                // Opening stock (items.stock_1/stock_2) remains immutable baseline.
+                if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0) {
+                    $itemBal = \App\Services\StockService::getItemBalance($item->id);
+                    if ($itemBal && (float)$itemBal->balance_pcs < $item->reorder_level) {
+                        event(new \App\Events\LowStockAlert($item));
+                    }
                 }
             }
 
@@ -687,6 +688,9 @@ class SalesController extends Controller implements HasMiddleware
 
                 return $item;
             });
+
+        // Attach true real-time ledger balances
+        StockService::attachRealtimeBalances($items);
 
         // Fetch Payment Accounts (Cash/Bank/Cheque in hand)
         $paymentAccounts = Account::active()->with('accountType')->whereHas('accountType', function ($q) {
@@ -1027,21 +1031,11 @@ class SalesController extends Controller implements HasMiddleware
             }
             $sale->save();
 
-            // Revert Stock for old items (total_pcs already includes bonus units)
-            $oldItems = SalesItem::where('sale_id', $id)->get();
-            foreach ($oldItems as $oldItem) {
-                $product = Items::find($oldItem->item_id);
-                if ($product) {
-                    $totalToRevert = (int)$oldItem->total_pcs;
-                    $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
-                }
-            }
-
-            // Delete old items
+            // Delete old items (transactional replacement updates ledger automatically)
             SalesItem::where('sale_id', $id)->delete();
 
-            \Illuminate\Support\Facades\Log::info("SalesController@update: Processing new stock for sale " . $id);
-            // Insert new items and update stock (Decrease)
+            \Illuminate\Support\Facades\Log::info("SalesController@update: Processing new items for sale " . $id);
+            // Insert new items
             foreach ($request->items as $it) {
                 SalesItem::create([
                     'sale_id'     => $sale->id,
@@ -1058,14 +1052,11 @@ class SalesController extends Controller implements HasMiddleware
                     'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
                 ]);
 
-                // Decrease Stock (total_pcs already includes billable + bonus units)
+                // Inventory tracked transactionally in sales_items.
                 $item = Items::find($it['item_id']);
-                if ($item) {
-                    $totalToDeduct = (int)$it['total_pcs'];
-                    $item->updateStockFromPcs($item->total_stock_pcs - $totalToDeduct);
-
-                    $item->refresh();
-                    if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0 && $item->total_stock_pcs < $item->reorder_level) {
+                if ($item && env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0) {
+                    $itemBal = \App\Services\StockService::getItemBalance($item->id);
+                    if ($itemBal && (float)$itemBal->balance_pcs < $item->reorder_level) {
                         event(new \App\Events\LowStockAlert($item));
                     }
                 }
@@ -1195,23 +1186,13 @@ class SalesController extends Controller implements HasMiddleware
         try {
             $sale = Sales::with('items')->findOrFail($id);
 
-            // Revert Stock (total_pcs already includes bonus units)
-            foreach ($sale->items as $item) {
-                $product = Items::find($item->item_id);
-                if ($product) {
-                    $totalToRevert = (int)$item->total_pcs;
-
-                    $product->updateStockFromPcs($product->total_stock_pcs + $totalToRevert);
-                }
-            }
-
-            // Delete Sale (Cascades to items if configured, or manual delete)
-            // Assuming manual delete for safety if cascade isn't set in DB
+            // Deleting sale items automatically restores available ledger stock.
+            // Opening stock (items.stock_1/stock_2) remains immutable.
             SalesItem::where('sale_id', $id)->delete();
             $sale->delete();
 
             DB::commit();
-            return redirect()->back()->with('success', 'Sale deleted and stock reverted successfully!');
+            return redirect()->back()->with('success', 'Sale deleted successfully!');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error deleting sale: ' . $e->getMessage());
@@ -1233,17 +1214,16 @@ class SalesController extends Controller implements HasMiddleware
 
             $courierCharges = (float) $request->input('courier_charges', 0);
 
-            // Deduct Stock (total_pcs already includes bonus units)
-            foreach ($sale->items as $item) {
-                $product = Items::find($item->item_id);
-                if ($product) {
-                    $totalToDeduct = (int)$item->total_pcs;
-
-                    $product->updateStockFromPcs($product->total_stock_pcs - $totalToDeduct);
-
-                    $product->refresh();
-                    if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($product->reorder_level ?? 0) > 0 && $product->total_stock_pcs < $product->reorder_level) {
-                        event(new \App\Events\LowStockAlert($product));
+            // Stock is tracked transactionally via sales_items.
+            // Check low stock alert if enabled
+            if (env('ENABLE_LOW_STOCK_ALERTS', false)) {
+                foreach ($sale->items as $item) {
+                    $product = Items::find($item->item_id);
+                    if ($product && ($product->reorder_level ?? 0) > 0) {
+                        $itemBal = \App\Services\StockService::getItemBalance($product->id);
+                        if ($itemBal && (float)$itemBal->balance_pcs < $product->reorder_level) {
+                            event(new \App\Events\LowStockAlert($product));
+                        }
                     }
                 }
             }

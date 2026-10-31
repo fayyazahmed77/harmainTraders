@@ -332,7 +332,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $totalToReturn = (int)$it['total_pcs'];
-                    $item->updateStockFromPcs($item->total_stock_pcs + $totalToReturn);
+                    // Inward stock recorded transactionally in sales_return_items
                 }
             }
 
@@ -686,7 +686,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $totalToRevert = (int)$oldItem->total_pcs;
-                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - $totalToRevert));
+                    // Reverting items handled automatically via ledger
                 }
             }
 
@@ -740,7 +740,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $totalToAdd = (int)$it['total_pcs'];
-                    $item->updateStockFromPcs($item->total_stock_pcs + $totalToAdd);
+                    // Inward stock recorded transactionally in sales_return_items
                 }
             }
 
@@ -798,7 +798,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 $product = Items::where('id', $si->item_id)->lockForUpdate()->first();
                 if ($product) {
                     $totalToRevert = (int)$si->total_pcs;
-                    $product->updateStockFromPcs(max(0, $product->total_stock_pcs - $totalToRevert));
+                    // Inward stock automatically removed when return items are deleted
                 }
             }
 

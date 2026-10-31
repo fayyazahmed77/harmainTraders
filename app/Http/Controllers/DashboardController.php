@@ -348,12 +348,38 @@ class DashboardController extends Controller
             'recoveries' => (float)($yearlyRecGrouped[$y] ?? 0),
         ]);
 
-        // Total Receivables & Payables (Deferred calculation preserving exact ReportBuilder::summary accounting formulas)
+        // Financial Position: Real Customer Receivables, Real Supplier Payables, and Capital (Equity)
         $financialPosition = Inertia::defer(function () {
             $accountSummary = $this->reportBuilder->summary();
+            $accounts = Account::select('id', 'type')->get()->keyBy('id');
+
+            $totalCustomerReceivable = 0;
+            $totalCustomerAdvances = 0;
+            $totalSupplierPayable = 0;
+            $totalSupplierAdvances = 0;
+            $totalCapital = 0;
+
+            foreach ($accountSummary as $row) {
+                $acc = $accounts[$row['id']] ?? null;
+                $type = $acc ? (int)$acc->type : 0;
+
+                if ($type === 3) { // Customer
+                    $totalCustomerReceivable += (float)$row['debit'];
+                    $totalCustomerAdvances += (float)$row['credit'];
+                } elseif ($type === 6) { // Supplier
+                    $totalSupplierPayable += (float)$row['credit'];
+                    $totalSupplierAdvances += (float)$row['debit'];
+                } elseif ($type === 9) { // Capital / Owner Equity
+                    $totalCapital += (float)$row['credit'];
+                }
+            }
+
             return [
-                'totalReceivable' => (float)$accountSummary->sum('debit'),
-                'totalPayable' => (float)$accountSummary->sum('credit'),
+                'totalReceivable' => (float)$totalCustomerReceivable,
+                'netCustomerReceivable' => (float)($totalCustomerReceivable - $totalCustomerAdvances),
+                'totalPayable' => (float)$totalSupplierPayable,
+                'netSupplierPayable' => (float)($totalSupplierPayable - $totalSupplierAdvances),
+                'totalCapital' => (float)$totalCapital,
             ];
         });
 

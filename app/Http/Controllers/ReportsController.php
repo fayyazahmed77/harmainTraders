@@ -283,6 +283,37 @@ class ReportsController extends Controller implements HasMiddleware
             return $this->accountListExportPdf($request);
         }
 
+        if ($reportId === 'bank_ledger') {
+            $data = $this->reportBuilder->bankLedger(
+                $accountId,
+                $validated['from'] ?? null,
+                $validated['to'] ?? null,
+                10000,
+                $request->all()
+            );
+
+            $pdfData = [
+                'account' => $account,
+                'data' => $data['data']->items(),
+                'opening_balance' => $data['opening_balance'],
+                'total_debit' => $data['total_debit'],
+                'total_credit' => $data['total_credit'],
+                'total_cleared_deposits' => $data['total_cleared_deposits'],
+                'total_cleared_withdrawals' => $data['total_cleared_withdrawals'],
+                'total_uncleared_float' => $data['total_uncleared_float'],
+                'closing_balance' => $data['closing_balance'],
+                'closing_bank_balance' => $data['closing_bank_balance'],
+                'balance_type' => $data['balance_type'],
+                'from_date' => $data['from_date'],
+                'to_date' => $data['to_date'],
+                'is_print_mode' => false
+            ];
+
+            $pdf = PDF::loadView('pdf.bank-ledger', $pdfData)->setPaper('a4', 'landscape');
+            $title = $account ? $account->title : 'ALL';
+            return $pdf->download('bank-ledger-' . $title . '-' . date('d-M-Y') . '.pdf');
+        }
+
         if ($reportId === 'detail_ledger') {
             $data = $this->reportBuilder->accountDetailLedger(
                 $accountId,
@@ -351,6 +382,35 @@ class ReportsController extends Controller implements HasMiddleware
 
         if ($reportId === 'account_list') {
             return $this->accountListPrint($request);
+        }
+
+        if ($reportId === 'bank_ledger') {
+            $data = $this->reportBuilder->bankLedger(
+                $accountId,
+                $validated['from'] ?? null,
+                $validated['to'] ?? null,
+                10000,
+                $request->all()
+            );
+
+            $pdfData = [
+                'account' => $account,
+                'data' => $data['data']->items(),
+                'opening_balance' => $data['opening_balance'],
+                'total_debit' => $data['total_debit'],
+                'total_credit' => $data['total_credit'],
+                'total_cleared_deposits' => $data['total_cleared_deposits'],
+                'total_cleared_withdrawals' => $data['total_cleared_withdrawals'],
+                'total_uncleared_float' => $data['total_uncleared_float'],
+                'closing_balance' => $data['closing_balance'],
+                'closing_bank_balance' => $data['closing_bank_balance'],
+                'balance_type' => $data['balance_type'],
+                'from_date' => $data['from_date'],
+                'to_date' => $data['to_date'],
+                'is_print_mode' => true
+            ];
+
+            return view('pdf.bank-ledger', $pdfData);
         }
 
         if ($reportId === 'detail_ledger') {

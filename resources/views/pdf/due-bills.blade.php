@@ -138,8 +138,18 @@ if (file_exists($logo_path)) {
        $globalUnDue = 0;
        $globalDue = 0;
        
-       // Re-group data by customer_id if it's not already structured
-       $groupedData = collect($data)->groupBy('customer_id');
+       // Re-group data by customer_id and ensure parties and bills with 0 balance are excluded
+       $groupedData = collect($data)
+           ->filter(function($row) {
+               return round((float)($row['remaining'] ?? 0)) > 0 || round((float)($row['balance'] ?? 0)) > 0;
+           })
+           ->groupBy('customer_id')
+           ->filter(function($bills) {
+               $lastBill = $bills->last();
+               $summary = $lastBill['party_summary'] ?? [];
+               $totalDue = round((float)($summary['party_due_amount'] ?? 0)) + round((float)($summary['party_un_due_amount'] ?? 0));
+               return $totalDue > 0;
+           });
 
        if (!function_exists('formatNum')) {
            function formatNum($num) {

@@ -42,7 +42,8 @@ import {
     ArrowDownLeft,
     ArrowUpRight,
     Wallet,
-    Receipt
+    Receipt,
+    Landmark
 } from "lucide-react";
 
 interface DashboardProps {
@@ -70,6 +71,9 @@ interface DashboardProps {
     financialPosition?: {
         totalReceivable: number;
         totalPayable: number;
+        totalCapital?: number;
+        netCustomerReceivable?: number;
+        netSupplierPayable?: number;
     };
     orderChartData: { day: string, orders: number }[];
     fundsData: { name: string, value: number, color: string }[];
@@ -160,8 +164,8 @@ export default function DashboardPage({ dailySummary, stats, totalReceivable, to
                     {/* Daily Summary Strip */}
                     <DailySummaryStrip dailySummary={dailySummary} />
 
-                    {/* Financial Position: Total Receivable & Total Payable */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {/* Financial Position: Total Receivable, Total Payable & Total Capital */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                         {/* Total Receivable Card */}
                         <Card className="relative overflow-hidden border-emerald-200/80 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-500/10 via-white to-white dark:from-emerald-950/25 dark:via-zinc-900 dark:to-zinc-900 shadow-sm hover:shadow-md transition-all group">
                             <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform" />
@@ -198,7 +202,7 @@ export default function DashboardPage({ dailySummary, stats, totalReceivable, to
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => router.get('/reports?report=receivable')}
+                                        onClick={() => router.get('/reports/accounts/ledger?report=receivable&type=3')}
                                         className="text-xs font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/10 h-7 px-2.5 rounded-lg"
                                     >
                                         View Report <ArrowRight className="w-3 h-3 ml-1" />
@@ -243,10 +247,55 @@ export default function DashboardPage({ dailySummary, stats, totalReceivable, to
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => router.get('/reports?report=payable')}
+                                        onClick={() => router.get('/reports/accounts/ledger?report=payable&type=6')}
                                         className="text-xs font-bold text-rose-700 hover:text-rose-800 dark:text-rose-400 hover:bg-rose-500/10 h-7 px-2.5 rounded-lg"
                                     >
                                         View Report <ArrowRight className="w-3 h-3 ml-1" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Total Capital / Equity Card */}
+                        <Card className="relative overflow-hidden border-blue-200/80 dark:border-blue-900/40 bg-gradient-to-br from-blue-500/10 via-white to-white dark:from-blue-950/25 dark:via-zinc-900 dark:to-zinc-900 shadow-sm hover:shadow-md transition-all group">
+                            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform" />
+                            <CardContent className="p-4 sm:p-5 relative z-10">
+                                <div className="flex items-start justify-between">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shadow-sm shadow-blue-500/50" />
+                                            <p className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                                                Total Capital (Equity)
+                                            </p>
+                                        </div>
+                                        <Deferred data="financialPosition" fallback={
+                                            <div className="h-9 flex items-center mt-1">
+                                                <div className="h-7 w-36 bg-blue-100/60 dark:bg-blue-950/40 rounded animate-pulse" />
+                                            </div>
+                                        }>
+                                            <h3 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight mt-1 truncate">
+                                                {formatCurrency(financialPosition?.totalCapital ?? 0)}
+                                            </h3>
+                                        </Deferred>
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
+                                            Total partner & owner capital invested
+                                        </p>
+                                    </div>
+                                    <div className="p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-2xl text-blue-600 dark:text-blue-400 shrink-0 ml-3">
+                                        <Landmark className="w-6 h-6" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-blue-100 dark:border-blue-900/30 flex items-center justify-between">
+                                    <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                                        <Landmark className="w-3.5 h-3.5" /> Partner Equity Reserves
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.get('/reports/accounts/ledger?report=summary&type=9')}
+                                        className="text-xs font-bold text-blue-700 hover:text-blue-800 dark:text-blue-400 hover:bg-blue-500/10 h-7 px-2.5 rounded-lg"
+                                    >
+                                        View Details <ArrowRight className="w-3 h-3 ml-1" />
                                     </Button>
                                 </div>
                             </CardContent>

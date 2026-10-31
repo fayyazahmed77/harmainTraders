@@ -22,7 +22,7 @@ class ItemsController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:view stock', only: ['index', 'show', 'getNextCode', 'searchSuggestions']),
-            new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive', 'bulkUpload', 'downloadSample', 'previewBulkUpload', 'processBulkImport']),
+            new Middleware('permission:manage stock', only: ['create', 'store', 'edit', 'update', 'toggleActive', 'bulkUpload', 'downloadSample', 'previewBulkUpload', 'processBulkImport', 'updateOpeningStock']),
         ];
     }
     public function index(Request $request)
@@ -38,6 +38,11 @@ class ItemsController extends Controller implements HasMiddleware
             $query->where('category', $request->category_id);
         }
 
+        // Filter by Company
+        if ($request->has('company_id') && $request->company_id && $request->company_id !== 'all') {
+            $query->where('company', $request->company_id);
+        }
+
         // Filter by Status
         if ($request->has('status') && $request->status !== 'all') {
             if ($request->status === 'active') {
@@ -47,18 +52,7 @@ class ItemsController extends Controller implements HasMiddleware
             }
         }
 
-        // Filter by Stock Status
-        if ($request->has('stock_status') && $request->stock_status !== 'all') {
-            $totalUnitsRaw = '(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0)';
-            if ($request->stock_status === 'out_of_stock') {
-                $query->whereRaw("$totalUnitsRaw <= 0");
-            } elseif ($request->stock_status === 'low_stock') {
-                $query->whereRaw("$totalUnitsRaw <= COALESCE(reorder_level, 0)")
-                      ->whereRaw("$totalUnitsRaw > 0");
-            } elseif ($request->stock_status === 'in_stock') {
-                $query->whereRaw("$totalUnitsRaw > 0");
-            }
-        }
+
 
         // Filter by Search (Code, Title, Company Category)
         if ($request->has('search') && $request->search) {
@@ -99,32 +93,68 @@ class ItemsController extends Controller implements HasMiddleware
             'created_at',
         ]);
 
-        // Calculate Summary via high-performance single SQL aggregation (Based on filtered data)
-        $sqlStats = (clone $query)->setEagerLoads([])->reorder()->selectRaw("
-            COUNT(*) as total_items,
-            COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) as active_items,
-            COALESCE(SUM(
-                (COALESCE(stock_1, 0) * COALESCE(trade_price, 0)) +
-                (COALESCE(stock_2, 0) * CEIL(COALESCE(trade_price, 0) / CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END))
-            ), 0) as stock_value,
-            COALESCE(SUM(CASE WHEN ((COALESCE(stock_1, 0) * CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END) + COALESCE(stock_2, 0)) <= 0 THEN 1 ELSE 0 END), 0) as out_of_stock,
-            COALESCE(SUM(CASE WHEN ((COALESCE(stock_1, 0) * CASE WHEN COALESCE(packing_qty, 0) > 0 THEN packing_qty ELSE 1 END) + COALESCE(stock_2, 0)) <= COALESCE(reorder_level, 0) THEN 1 ELSE 0 END), 0) as low_stock
-        ")->first();
+        // Attach real-time ledger balance and carton breakdown
+        \App\Services\StockService::attachRealtimeBalances($items);
+
+        // Filter by Stock Status (evaluated dynamically from real-time available stock)
+        if ($request->has('stock_status') && $request->stock_status && $request->stock_status !== 'all') {
+            $stockStatus = $request->stock_status;
+            $items = $items->filter(function ($item) use ($stockStatus) {
+                $avail = (float)($item->available_stock ?? 0);
+                $reorder = (float)($item->reorder_level ?? 0);
+                if ($stockStatus === 'out_of_stock') {
+                    return $avail <= 0;
+                } elseif ($stockStatus === 'low_stock') {
+                    return $avail <= $reorder && $avail > 0;
+                } elseif ($stockStatus === 'in_stock') {
+                    return $avail > 0;
+                }
+                return true;
+            })->values();
+        }
+
+        // Calculate Summary based on real-time available stock
+        $totalItems = $items->count();
+        $activeItems = $items->where('is_active', true)->count();
+        $outOfStock = 0;
+        $lowStock = 0;
+        $stockValue = 0.0;
+
+        foreach ($items as $item) {
+            $avail = (float)($item->available_stock ?? 0);
+            $reorder = (float)($item->reorder_level ?? 0);
+            $packing = max(1, (int)($item->packing_qty ?: 1));
+            $tp = (float)($item->trade_price ?? 0);
+
+            if ($avail <= 0) {
+                $outOfStock++;
+            } elseif ($avail <= $reorder) {
+                $lowStock++;
+            }
+
+            if ($avail > 0) {
+                $stockValue += ($avail / $packing) * $tp;
+            }
+        }
 
         $summary = [
-            'total_items' => (int)($sqlStats->total_items ?? 0),
-            'active_items' => (int)($sqlStats->active_items ?? 0),
-            'stock_value' => round((float)($sqlStats->stock_value ?? 0), 2),
-            'out_of_stock' => (int)($sqlStats->out_of_stock ?? 0),
-            'low_stock' => (int)($sqlStats->low_stock ?? 0),
+            'total_items' => $totalItems,
+            'active_items' => $activeItems,
+            'stock_value' => round($stockValue, 2),
+            'out_of_stock' => $outOfStock,
+            'low_stock' => $lowStock,
         ];
 
         $categories = ItemCategory::all();
+        $companies = Account::whereHas('accountType', function ($q) {
+            $q->whereIn('name', ['Company']);
+        })->orderBy('title')->get(['id', 'title']);
 
         return Inertia::render("setup/items/index", [
             'items' => $items,
             'categories' => $categories,
-            'filters' => $request->all(['category_id', 'status', 'search']),
+            'companies' => $companies,
+            'filters' => $request->all(['category_id', 'company_id', 'status', 'stock_status', 'search']),
             'summary' => $summary,
         ]);
     }
@@ -696,6 +726,36 @@ class ItemsController extends Controller implements HasMiddleware
             'result' => $result,
         ]);
     }
+
+    /**
+     * Update baseline opening stock for an item and recalculate on-hand balance.
+     */
+    public function updateOpeningStock(Request $request, $id)
+    {
+        $item = Items::findOrFail($id);
+
+        $validated = $request->validate([
+            'stock_1' => 'required|integer|min:0',
+            'stock_2' => 'required|integer|min:0',
+        ]);
+
+        $item->stock_1 = (int)$validated['stock_1'];
+        $item->stock_2 = (int)$validated['stock_2'];
+        $item->save();
+
+        // Attach updated real-time balances for this item
+        $collection = collect([$item]);
+        \App\Services\StockService::attachRealtimeBalances($collection);
+        $updatedItem = $collection->first();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Opening stock for {$item->title} updated successfully.",
+                'item' => $updatedItem,
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Opening stock for {$item->title} updated successfully.");
+    }
 }
-
-

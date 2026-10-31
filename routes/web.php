@@ -300,6 +300,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{items}/show', [ItemsController::class, 'show'])->name('items.show');
         Route::put('/{items}', [ItemsController::class, 'update'])->name('items.update');
         Route::patch('/{items}/toggle-active', [ItemsController::class, 'toggleActive'])->name('items.toggle-active');
+        Route::patch('/{items}/opening-stock', [ItemsController::class, 'updateOpeningStock'])->name('items.update-opening-stock');
         Route::delete('/{id}', [ItemsController::class, 'destroy'])->name('items.destroy');
     });
     // ---------------------Message Lines------------------------------------------------------------------

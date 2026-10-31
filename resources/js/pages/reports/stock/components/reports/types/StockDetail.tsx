@@ -38,7 +38,13 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                 </TableHeader>
                 <TableBody>
                     {data.map((row, idx) => (
-                        <TableRow key={idx} className="border-b border-border/10 hover:bg-surface-1/30 transition-all duration-200 group">
+                        <TableRow 
+                            key={idx} 
+                            className={cn(
+                                "border-b border-border/10 hover:bg-surface-1/30 transition-all duration-200 group",
+                                row.type === 'opening' && "bg-amber-500/[0.04] hover:bg-amber-500/[0.08] border-b-2 border-amber-500/20"
+                            )}
+                        >
                             <TableCell className="py-4 px-4 text-[10px] font-black text-text-muted uppercase tabular-nums">
                                 {formatSafeDate(row.date).toUpperCase()}
                             </TableCell>
@@ -47,6 +53,7 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                                     "font-black tracking-wider px-2 py-0.5 rounded text-[10px] border",
                                     row.type === 'sale' ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/20" :
                                     row.type === 'purchase' ? "text-blue-600 bg-blue-500/10 border-blue-500/20" :
+                                    row.type === 'opening' ? "text-amber-600 bg-amber-500/10 border-amber-500/30 font-black" :
                                     "text-rose-600 bg-rose-500/10 border-rose-500/20"
                                 )}>
                                     {row.voucher_no || row.invoice || '-'}
@@ -54,13 +61,17 @@ export default function StockDetail({ data, formatCurrency, params }: Props) {
                             </TableCell>
                             <TableCell className="py-4 px-4">
                                 <div className="flex flex-col">
-                                    <span className="text-[11px] font-black text-text-primary uppercase italic tracking-tighter">
+                                    <span className={cn(
+                                        "text-[11px] font-black uppercase italic tracking-tighter",
+                                        row.type === 'opening' ? "text-amber-600 dark:text-amber-400" : "text-text-primary"
+                                    )}>
                                         {row.account_name}
                                     </span>
                                     <span className={cn(
                                         "text-[8px] font-bold uppercase tracking-widest opacity-80",
                                         row.type === 'sale' ? "text-emerald-600" :
                                         row.type === 'purchase' ? "text-blue-600" :
+                                        row.type === 'opening' ? "text-amber-600 dark:text-amber-400" :
                                         "text-rose-600"
                                     )}>
                                         {(row.type || '').replace('_', ' ')}

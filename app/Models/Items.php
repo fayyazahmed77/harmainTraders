@@ -105,11 +105,7 @@ class Items extends Model
      */
     public function getStockBreakdownAttribute()
     {
-        $packingQty = $this->packing_qty ?: 1;
-        if ($packingQty <= 1) {
-            return ($this->stock_1 ?? 0) . ' Units';
-        }
-        return ($this->stock_1 ?? 0) . ' Full, ' . ($this->stock_2 ?? 0) . ' Pcs';
+        return \App\Services\StockService::formatBreakdown($this->total_stock_pcs ?? 0, (int)($this->packing_qty ?: 1))['formatted'];
     }
 
     /**
@@ -117,14 +113,9 @@ class Items extends Model
      */
     public function updateStockFromPcs(int $totalPcs)
     {
-        $packing = $this->packing_qty ?: 1;
-        if ($packing > 1) {
-            $this->stock_1 = floor($totalPcs / $packing);
-            $this->stock_2 = $totalPcs - ($this->stock_1 * $packing);
-        } else {
-            $this->stock_1 = $totalPcs;
-            $this->stock_2 = 0;
-        }
+        $breakdown = \App\Services\StockService::formatBreakdown($totalPcs, (int)($this->packing_qty ?: 1));
+        $this->stock_1 = $breakdown['full'];
+        $this->stock_2 = $breakdown['loose'];
         return $this->save();
     }
 

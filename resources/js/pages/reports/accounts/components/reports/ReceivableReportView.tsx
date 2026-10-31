@@ -11,11 +11,9 @@ import {
     Wallet, 
     Users, 
     TrendingUp, 
-    ShieldCheck,
-    Layers,
-    Search,
-    FileText,
-    ArrowUpRight
+    ShieldCheck, 
+    Layers, 
+    Receipt
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -30,15 +28,20 @@ interface ReceivableRow {
 
 interface ReceivableReportViewProps {
     data: ReceivableRow[];
+    reportType?: 'receivable' | 'payable';
 }
 
-export function ReceivableReportView({ data }: ReceivableReportViewProps) {
+export function ReceivableReportView({ data, reportType = 'receivable' }: ReceivableReportViewProps) {
+    const isPayable = reportType === 'payable';
+
     const stats = useMemo(() => {
-        const total = data.reduce((sum, item) => sum + item.debit, 0);
+        const totalDebit = data.reduce((sum, item) => sum + (Number(item.debit) || 0), 0);
+        const totalCredit = data.reduce((sum, item) => sum + (Number(item.credit) || 0), 0);
+        const primaryTotal = isPayable ? totalCredit : totalDebit;
         const count = data.length;
-        const avg = count > 0 ? total / count : 0;
-        return { total, count, avg };
-    }, [data]);
+        const avg = count > 0 ? primaryTotal / count : 0;
+        return { totalDebit, totalCredit, primaryTotal, count, avg };
+    }, [data, isPayable]);
 
     if (!data || data.length === 0) {
         return (
@@ -54,13 +57,21 @@ export function ReceivableReportView({ data }: ReceivableReportViewProps) {
             {/* Intel Summary Bar */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
                 <div className="bg-surface-2 border border-border/40 rounded-2xl p-4 flex items-center space-x-4">
-                    <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                        <Wallet className="h-5 w-5 text-orange-500" />
+                    <div className={cn(
+                        "h-10 w-10 rounded-xl flex items-center justify-center",
+                        isPayable ? "bg-rose-500/10 text-rose-500" : "bg-orange-500/10 text-orange-500"
+                    )}>
+                        {isPayable ? <Receipt className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Receivable</p>
-                        <p className="text-lg font-display font-black text-text tabular-nums leading-none mt-1">
-                            {stats.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">
+                            {isPayable ? 'Total Payable' : 'Total Receivable'}
+                        </p>
+                        <p className={cn(
+                            "text-lg font-display font-black tabular-nums leading-none mt-1",
+                            isPayable ? "text-rose-600 dark:text-rose-400" : "text-text"
+                        )}>
+                            {stats.primaryTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                     </div>
                 </div>
@@ -98,8 +109,12 @@ export function ReceivableReportView({ data }: ReceivableReportViewProps) {
                                 <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white pl-6 m-0 border-b border-border/40 text-left align-middle h-9">#</th>
                                 <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-left align-middle h-9">Account Description</th>
                                 <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-center align-middle h-9">Typed</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-right align-middle h-9">Debit (Receivable)</th>
-                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white pr-6 m-0 border-b border-border/40 text-right align-middle h-9">Credit</th>
+                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white m-0 border-b border-border/40 text-right align-middle h-9">
+                                    {isPayable ? 'Debit' : 'Debit (Receivable)'}
+                                </th>
+                                <th className="text-[9px] font-display font-black uppercase tracking-[0.2em] text-white pr-6 m-0 border-b border-border/40 text-right align-middle h-9">
+                                    {isPayable ? 'Credit (Payable)' : 'Credit'}
+                                </th>
                             </tr>
                         </thead>
                         <TableBody>
@@ -117,23 +132,49 @@ export function ReceivableReportView({ data }: ReceivableReportViewProps) {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right h-8 py-0">
-                                        <span className="text-sm font-display font-black text-emerald-500 tabular-nums lowercase tracking-tighter">
-                                            {item.debit.toLocaleString(undefined, { minimumFractionDigits: 0 })}
-                                        </span>
+                                        {Number(item.debit) > 0 ? (
+                                            <span className={cn(
+                                                "text-sm font-display font-black tabular-nums tracking-tighter",
+                                                !isPayable ? "text-emerald-500" : "text-text"
+                                            )}>
+                                                {Number(item.debit).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                            </span>
+                                        ) : (
+                                            <span className="text-text-muted/30">—</span>
+                                        )}
                                     </TableCell>
-                                    <TableCell className="text-right pr-6 h-8 py-0 text-text-muted/30">
-                                        —
+                                    <TableCell className="text-right pr-6 h-8 py-0">
+                                        {Number(item.credit) > 0 ? (
+                                            <span className={cn(
+                                                "text-sm font-display font-black tabular-nums tracking-tighter",
+                                                isPayable ? "text-rose-600 dark:text-rose-400 font-bold" : "text-text"
+                                            )}>
+                                                {Number(item.credit).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                                            </span>
+                                        ) : (
+                                            <span className="text-text-muted/30">—</span>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
                             
-                            {/* Final total row for UI completeness */}
+                            {/* Final total row */}
                             <TableRow className="bg-surface-1/80 font-bold border-t-2 border-border/50 h-10">
                                 <TableCell colSpan={3} className="pl-6 text-[10px] font-black text-text uppercase tracking-widest text-right">Grand Total Aggregate</TableCell>
-                                <TableCell className="text-right text-base font-display font-black text-text tabular-nums underline decoration-emerald-500/30 underline-offset-4 decoration-2">
-                                    {stats.total.toLocaleString()}
+                                <TableCell className="text-right text-base font-display font-black text-text tabular-nums">
+                                    {stats.totalDebit > 0 ? (
+                                        <span className={!isPayable ? "underline decoration-emerald-500/30 underline-offset-4 decoration-2" : ""}>
+                                            {stats.totalDebit.toLocaleString()}
+                                        </span>
+                                    ) : '—'}
                                 </TableCell>
-                                <TableCell className="pr-6 text-right text-text-muted/30">—</TableCell>
+                                <TableCell className="pr-6 text-right text-base font-display font-black text-text tabular-nums">
+                                    {stats.totalCredit > 0 ? (
+                                        <span className={isPayable ? "text-rose-600 dark:text-rose-400 underline decoration-rose-500/30 underline-offset-4 decoration-2" : ""}>
+                                            {stats.totalCredit.toLocaleString()}
+                                        </span>
+                                    ) : '—'}
+                                </TableCell>
                             </TableRow>
                         </TableBody>
                     </table>

@@ -21,9 +21,10 @@
             @php
                 $profitClass = $row['profit_loss'] >= 0 ? 'text-success' : 'text-danger';
                 $profitText = $row['profit_loss'] != 0 ? number_format($row['profit_loss'], 2) : '-';
-                $invColor = ($row['type'] === 'sale') ? '#059669' : (($row['type'] === 'purchase') ? '#2563eb' : '#dc2626');
+                $invColor = ($row['type'] === 'sale') ? '#059669' : (($row['type'] === 'purchase') ? '#2563eb' : (($row['type'] === 'opening') ? '#d97706' : '#dc2626'));
+                $rowBg = ($row['type'] === 'opening') ? 'background-color: #fef3c7; font-weight: 500;' : '';
             @endphp
-            <tr>
+            <tr style="{{ $rowBg }}">
                 <td style="padding: 5px; border: 1px solid #ddd;">{{ strtoupper(\Carbon\Carbon::parse($row['date'])->format('d M y')) }}</td>
                 <td style="padding: 5px; border: 1px solid #ddd; font-weight: bold; color: {{ $invColor }};">
                     {{ $row['voucher_no'] ?? $row['invoice'] ?? '-' }}

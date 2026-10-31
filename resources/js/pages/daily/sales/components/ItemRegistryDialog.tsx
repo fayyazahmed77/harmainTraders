@@ -21,7 +21,8 @@ import {
     MapPin,
     Info,
     ArrowUpRight,
-    CheckCircle
+    CheckCircle,
+    AlertTriangle
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -506,8 +507,10 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const stock = toNumber(item.total_stock_pcs);
                                     const packing = toNumber(item.packing_qty || 1);
-                                    const full = Math.floor(stock / packing);
-                                    const pcs = stock % packing;
+                                    const isNeg = stock < 0;
+                                    const absStock = Math.abs(stock);
+                                    const full = (isNeg ? -1 : 1) * Math.floor(absStock / packing);
+                                    const pcs = (isNeg ? -1 : 1) * (absStock % packing);
                                     const isSelected = currentRows.some(r => Number(r.item_id) === Number(item.id));
                                     const isFocused = idx === selectedIndex;
 
@@ -568,10 +571,21 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     {toNumber(item.retail).toFixed(0)}
                                                 </div>
                                                 <div className="col-span-2 text-right pr-2">
-                                                    <div className={cn("font-mono text-xs font-black", stock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
-                                                        {full}F / {pcs}P
+                                                    <div className={cn(
+                                                        "font-mono text-xs font-black inline-flex items-center justify-end gap-1.5",
+                                                        stock > 0
+                                                            ? "text-emerald-600 dark:text-emerald-400"
+                                                            : stock < 0
+                                                                ? "text-rose-600 dark:text-rose-400"
+                                                                : "text-zinc-500 dark:text-zinc-400"
+                                                    )}>
+                                                        <span>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`}</span>
+                                                        {stock < 0 && (
+                                                            <span className="px-1 py-0.5 rounded text-[8px] bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-black tracking-tight uppercase border border-rose-300 dark:border-rose-800">
+                                                                Deficit
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    
                                                 </div>
                                             </div>
 
@@ -590,7 +604,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         <span>#{item.id} |</span>
                                                         <span>Active Rate: <span className="font-bold text-orange-600 dark:text-orange-400">Rs {tpVal.toFixed(2)}</span> |</span>
                                                         <span>Trade Price: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {toNumber(item.trade_price).toFixed(2)}</span> |</span>
-                                                        <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-bold text-rose-500"}>{stock}</span></span>
+                                                        <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : stock < 0 ? "font-bold text-rose-600 dark:text-rose-400" : "font-bold text-zinc-500"}>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`} {stock < 0 ? '(Deficit)' : ''}</span></span>
                                                     </div>
                                                 </div>
                                                 <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
@@ -744,22 +758,30 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                         {(() => {
                                             const packing = toNumber(selectedItemForQty.packing_qty) || 1;
                                             const totalStock = toNumber(selectedItemForQty.total_stock_pcs);
-                                            const fullCtn = Math.floor(totalStock / packing);
-                                            const loosePcs = totalStock % packing;
+                                            const isNeg = totalStock < 0;
+                                            const absStock = Math.abs(totalStock);
+                                            const fullCtn = (isNeg ? -1 : 1) * Math.floor(absStock / packing);
+                                            const loosePcs = (isNeg ? -1 : 1) * (absStock % packing);
 
                                             return (
-                                                <div className="bg-zinc-50 dark:bg-zinc-950  rounded-xl border border-zinc-100 dark:border-zinc-800/80 space-y-2">
-
-                                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-800">
+                                                <div className="bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-100 dark:border-zinc-800/80 p-3 space-y-2">
+                                                    <div className="grid grid-cols-2 gap-2">
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{fullCtn} Full</span>
-                                                            <span className="text-[8px] font-bold text-zinc-700 uppercase">Full Cartons</span>
+                                                            <span className={cn("text-xs font-black", totalStock < 0 ? "text-rose-600 dark:text-rose-400" : "text-zinc-800 dark:text-zinc-200")}>{fullCtn} Full</span>
+                                                            <span className="text-[8px] font-bold text-zinc-500 uppercase">Full Cartons</span>
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs font-black text-zinc-800 dark:text-zinc-200">{loosePcs} PCS</span>
-                                                            <span className="text-[8px] font-bold text-zinc-700 uppercase">Loose Pieces</span>
+                                                            <span className={cn("text-xs font-black", totalStock < 0 ? "text-rose-600 dark:text-rose-400" : "text-zinc-800 dark:text-zinc-200")}>{loosePcs} PCS</span>
+                                                            <span className="text-[8px] font-bold text-zinc-500 uppercase">Loose Pieces</span>
                                                         </div>
                                                     </div>
+
+                                                    {totalStock < 0 && (
+                                                        <div className="mt-2 p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[10px] text-rose-700 dark:text-rose-300 font-medium flex items-center gap-1.5">
+                                                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                                            <span>Physical Stock Deficit: System inventory is negative ({totalStock} Pcs). A purchase bill or inventory adjustment is pending.</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })()}

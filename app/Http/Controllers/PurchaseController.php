@@ -12,6 +12,7 @@ use App\Models\Firm;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Chequebook;
+use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -170,6 +171,9 @@ class PurchaseController extends Controller implements HasMiddleware
 
                 return $item;
             });
+
+        // Attach true real-time ledger balances
+        StockService::attachRealtimeBalances($items);
 
         $accounts = Account::eligibleForPurchase()
             ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id', 'opening_balance', 'opening_balance_type', 'purchase', 'sale')
@@ -522,7 +526,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 // Increase Stock (total_pcs already includes purchased + bonus units)
                 $item = Items::find($it['item_id']);
                 if ($item) {
-                    $item->updateStockFromPcs($item->total_stock_pcs + (int)$it['total_pcs']);
+                    // Inward stock recorded in purchase_items, opening stock remains immutable.
 
                     // Auto-update trade price based on supplier category percentage if enabled
                     if ($request->update_prices && $percentage > 0) {
@@ -624,6 +628,10 @@ class PurchaseController extends Controller implements HasMiddleware
 
             return $item;
         });
+
+        // Attach true real-time ledger balances
+        StockService::attachRealtimeBalances($items);
+
         $accounts = Account::eligibleForPurchase()
             ->with(['accountType', 'accountCategory'])
             ->get();
@@ -942,7 +950,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 if ($delta !== 0) {
                     $item = Items::find($itemId);
                     if ($item) {
-                        $item->updateStockFromPcs(max(0, $item->total_stock_pcs + $delta));
+                        // Ledger adjusts automatically when purchase_items are updated
                     }
                 }
             }
@@ -1127,7 +1135,7 @@ class PurchaseController extends Controller implements HasMiddleware
             foreach ($purchase->items as $pi) {
                 $item = Items::find($pi->item_id);
                 if ($item) {
-                    $item->updateStockFromPcs(max(0, $item->total_stock_pcs - (int)$pi->total_pcs));
+                    // Inward stock automatically removed when purchase items are deleted
                 }
             }
 

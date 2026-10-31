@@ -75,12 +75,6 @@ class SupplierOrderController extends Controller implements HasMiddleware
             $companyIds = $supplier->assignedCompanies->pluck('id');
         }
 
-        // Calculate real-time stock based on transactions (matching report logic)
-        $purchased = DB::table('purchase_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchased'))->groupBy('item_id');
-        $sold = DB::table('sales_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sold'))->groupBy('item_id');
-        $purchaseReturned = DB::table('purchase_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchase_returned'))->groupBy('item_id');
-        $salesReturned = DB::table('sales_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sales_returned'))->groupBy('item_id');
-        
         // Sales in selected period (Aggregated for joining)
         $sales15Agg = DB::table('sales_items')
             ->join('sales', 'sales.id', '=', 'sales_items.sale_id')
@@ -90,39 +84,48 @@ class SupplierOrderController extends Controller implements HasMiddleware
 
         $query = Items::with(['lastPurchaseItem.purchase.supplier'])
             ->whereIn('items.company', $companyIds)
-            ->leftJoinSub($purchased, 'p', 'items.id', '=', 'p.item_id')
-            ->leftJoinSub($sold, 's', 'items.id', '=', 's.item_id')
-            ->leftJoinSub($purchaseReturned, 'pr', 'items.id', '=', 'pr.item_id')
-            ->leftJoinSub($salesReturned, 'sr', 'items.id', '=', 'sr.item_id')
             ->leftJoinSub($sales15Agg, 's15', 'items.id', '=', 's15.item_id')
             ->select('items.*')
             ->addSelect([
-                'calculated_total_pcs' => DB::raw('(COALESCE(p.total_purchased, 0) - COALESCE(pr.total_purchase_returned, 0)) - (COALESCE(s.total_sold, 0) - COALESCE(sr.total_sales_returned, 0))'),
                 'sales_15_days' => DB::raw('COALESCE(s15.total_sales_15, 0)')
             ]);
 
+        $items = $query->get();
+
+        // Attach live real-time available balances via StockService
+        \App\Services\StockService::attachRealtimeBalances($items);
+
         if ($mode === 'reorder') {
-            // Use stored stock_1/stock_2 values (same as Items List page) to filter
-            $query->whereRaw('(COALESCE(items.stock_1, 0) * COALESCE(items.packing_qty, 1)) + COALESCE(items.stock_2, 0) <= items.reorder_level * COALESCE(items.packing_qty, 1)');
+            // Live Available Stock <= Reorder Level (calculated dynamically)
+            $items = $items->filter(function ($item) {
+                $packing = max(1, (int) ($item->packing_qty ?: 1));
+                $reorderPcs = (float) ($item->reorder_level ?? 0) * $packing;
+                $availablePcs = (float) ($item->total_stock_pcs ?? 0);
+                return $availablePcs <= $reorderPcs;
+            })->values();
         } else {
-            // Sales Wise: Show all items with sales in the last 15 days, regardless of stock level
-            // This ensures you never miss a fast-moving item even if it's above reorder level.
-            $query->whereRaw('COALESCE(s15.total_sales_15, 0) > 0')
-                ->orderByDesc(DB::raw('COALESCE(s15.total_sales_15, 0)'));
+            // Sales Wise: Show all items with sales in the selected period, ordered by sales descending
+            $items = $items->filter(function ($item) {
+                return (float) ($item->sales_15_days ?? 0) > 0;
+            })->sortByDesc('sales_15_days')->values();
         }
 
-        $items = $query->get();
-        
-        // Map intelligence data
-        $itemsWithIntelligence = $items->map(function ($item) {
-            $lastPurchaseItem = $item->lastPurchaseItem;
-            $avgPurchaseRate = DB::table('purchase_items')->where('item_id', $item->id)->avg('trade_price');
+        // Pre-fetch average purchase rates for fast performance
+        $itemIds = $items->pluck('id')->toArray();
+        $avgPurchaseRates = DB::table('purchase_items')
+            ->whereIn('item_id', $itemIds)
+            ->select('item_id', DB::raw('AVG(trade_price) as avg_price'))
+            ->groupBy('item_id')
+            ->pluck('avg_price', 'item_id');
 
-            $totalPcs = (int) $item->calculated_total_pcs;
+        // Map intelligence data with live available stock
+        $itemsWithIntelligence = $items->map(function ($item) use ($avgPurchaseRates) {
+            $lastPurchaseItem = $item->lastPurchaseItem;
+            $avgPurchaseRate = $avgPurchaseRates[$item->id] ?? null;
+
             $packing = (int) ($item->packing_qty ?: 1);
 
-            // Use stored stock_1 / stock_2 directly — same source as the Items List page.
-            // This guarantees both pages always show identical stock values.
+            // Live available stock from StockService (handles negative deficits properly)
             $stock1 = (int) ($item->stock_1 ?? 0);
             $stock2 = (int) ($item->stock_2 ?? 0);
 
@@ -135,8 +138,9 @@ class SupplierOrderController extends Controller implements HasMiddleware
                 'code' => $item->code,
                 'title' => $item->title,
                 'packing_qty' => $packing,
-                'stock_1' => $stock1, // Calculated Available Full
-                'stock_2' => $stock2, // Calculated Available Pcs
+                'stock_1' => $stock1, // Live Available Full Cartons
+                'stock_2' => $stock2, // Live Available Loose Pcs
+                'total_stock_pcs' => (float) ($item->total_stock_pcs ?? 0),
                 'reorder_level' => $item->reorder_level,
                 
                 // Intelligence Data
@@ -232,29 +236,24 @@ class SupplierOrderController extends Controller implements HasMiddleware
 
     public function getAllItems()
     {
-        // Calculate stock and intelligence for all items in the database
-        $purchased = DB::table('purchase_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchased'))->groupBy('item_id');
-        $sold = DB::table('sales_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sold'))->groupBy('item_id');
-        $purchaseReturned = DB::table('purchase_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_purchase_returned'))->groupBy('item_id');
-        $salesReturned = DB::table('sales_return_items')->select('item_id', DB::raw('SUM(total_pcs) as total_sales_returned'))->groupBy('item_id');
+        $items = Items::with(['lastPurchaseItem.purchase.supplier'])->get();
 
-        $query = Items::with(['lastPurchaseItem.purchase.supplier'])
-            ->leftJoinSub($purchased, 'p', 'items.id', '=', 'p.item_id')
-            ->leftJoinSub($sold, 's', 'items.id', '=', 's.item_id')
-            ->leftJoinSub($purchaseReturned, 'pr', 'items.id', '=', 'pr.item_id')
-            ->leftJoinSub($salesReturned, 'sr', 'items.id', '=', 'sr.item_id')
-            ->select('items.*')
-            ->addSelect([
-                'calculated_total_pcs' => DB::raw('(COALESCE(p.total_purchased, 0) - COALESCE(pr.total_purchase_returned, 0)) - (COALESCE(s.total_sold, 0) - COALESCE(sr.total_sales_returned, 0))')
-            ]);
+        // Attach live real-time available stock via StockService (ledger calculation)
+        \App\Services\StockService::attachRealtimeBalances($items);
 
-        $items = $query->get();
+        // Pre-fetch average purchase rates in a single high-performance query
+        $avgPurchaseRates = DB::table('purchase_items')
+            ->select('item_id', DB::raw('AVG(trade_price) as avg_price'))
+            ->groupBy('item_id')
+            ->pluck('avg_price', 'item_id');
 
-        $mapped = $items->map(function ($item) {
+        $mapped = $items->map(function ($item) use ($avgPurchaseRates) {
             $lastPurchaseItem = $item->lastPurchaseItem;
-            $avgPurchaseRate = DB::table('purchase_items')->where('item_id', $item->id)->avg('trade_price');
+            $avgPurchaseRate = $avgPurchaseRates[$item->id] ?? null;
 
             $packing = (int) ($item->packing_qty ?: 1);
+
+            // Live available stock from StockService (handles negative deficits properly)
             $stock1 = (int) ($item->stock_1 ?? 0);
             $stock2 = (int) ($item->stock_2 ?? 0);
 
@@ -264,8 +263,9 @@ class SupplierOrderController extends Controller implements HasMiddleware
                 'title' => $item->title,
                 'company_id' => (int) $item->company,
                 'packing_qty' => $packing,
-                'stock_1' => $stock1, 
-                'stock_2' => $stock2, 
+                'stock_1' => $stock1, // Live Available Full Cartons
+                'stock_2' => $stock2, // Live Available Loose Pcs
+                'total_stock_pcs' => (float) ($item->total_stock_pcs ?? 0),
                 'reorder_level' => $item->reorder_level,
                 'last_purchase_rate' => (float) ($lastPurchaseItem?->trade_price ?? $item->trade_price),
                 'av_purchase_rate' => (float) ($avgPurchaseRate ? round($avgPurchaseRate, 2) : $item->trade_price),

@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface FilterProps {
     filters: {
         category_id?: string;
+        company_id?: string;
         status?: string;
         stock_status?: string;
         search?: string;
@@ -24,15 +25,22 @@ interface FilterProps {
         id: number;
         name: string;
     }[];
+    companies?: {
+        id: number;
+        title: string;
+    }[];
 }
 
-export default function ItemsFilters({ filters, categories }: FilterProps) {
+export default function ItemsFilters({ filters, categories, companies = [] }: FilterProps) {
     const [categoryId, setCategoryId] = useState(filters.category_id || "all");
+    const [companyId, setCompanyId] = useState(filters.company_id || "all");
     const [status, setStatus] = useState(filters.status || "all");
     const [stockStatus, setStockStatus] = useState(filters.stock_status || "all");
     const [search, setSearch] = useState(filters.search || "");
     const [categorySearchOpen, setCategorySearchOpen] = useState(false);
     const [categorySearchQuery, setCategorySearchQuery] = useState("");
+    const [companySearchOpen, setCompanySearchOpen] = useState(false);
+    const [companySearchQuery, setCompanySearchQuery] = useState("");
     const isFirstRender = useRef(true);
 
     useEffect(() => {
@@ -46,6 +54,7 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
                 "/items",
                 {
                     category_id: categoryId === "all" ? "" : categoryId,
+                    company_id: companyId === "all" ? "" : companyId,
                     status: status === "all" ? "" : status,
                     stock_status: stockStatus === "all" ? "" : stockStatus,
                     search: search,
@@ -59,10 +68,11 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [search, categoryId, status, stockStatus]);
+    }, [search, categoryId, companyId, status, stockStatus]);
 
     const clearFilters = () => {
         setCategoryId("all");
+        setCompanyId("all");
         setStatus("all");
         setStockStatus("all");
         setSearch("");
@@ -74,6 +84,12 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
     );
 
     const selectedCategory = categories.find((cat) => String(cat.id) === categoryId);
+
+    const filteredCompanies = companies.filter((company) =>
+        company.title.toLowerCase().includes(companySearchQuery.toLowerCase())
+    );
+
+    const selectedCompany = companies.find((comp) => String(comp.id) === companyId);
 
     return (
         <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
@@ -162,6 +178,89 @@ export default function ItemsFilters({ filters, categories }: FilterProps) {
                                             )}
                                         />
                                         {category.name}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            </div>
+
+            {/* Company Filter - Searchable */}
+            <div className="w-[200px]">
+                <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={companySearchOpen}
+                            className="w-full justify-between"
+                        >
+                            <span className="truncate">
+                                {companyId === "all"
+                                    ? "All Companies"
+                                    : selectedCompany?.title || "Select Company"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                        <div className="p-2 border-b">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search companies..."
+                                    value={companySearchQuery}
+                                    onChange={(e) => setCompanySearchQuery(e.target.value)}
+                                    className="pl-8"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto p-1">
+                            <div
+                                className={cn(
+                                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                    companyId === "all" && "bg-accent"
+                                )}
+                                onClick={() => {
+                                    setCompanyId("all");
+                                    setCompanySearchOpen(false);
+                                    setCompanySearchQuery("");
+                                }}
+                            >
+                                <Check
+                                    className={cn(
+                                        "mr-2 h-4 w-4",
+                                        companyId === "all" ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                                All Companies
+                            </div>
+                            {filteredCompanies.length === 0 ? (
+                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                    No companies found.
+                                </div>
+                            ) : (
+                                filteredCompanies.map((company) => (
+                                    <div
+                                        key={company.id}
+                                        className={cn(
+                                            "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                            companyId === String(company.id) && "bg-accent"
+                                        )}
+                                        onClick={() => {
+                                            setCompanyId(String(company.id));
+                                            setCompanySearchOpen(false);
+                                            setCompanySearchQuery("");
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mr-2 h-4 w-4",
+                                                companyId === String(company.id) ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="truncate">{company.title}</span>
                                     </div>
                                 ))
                             )}

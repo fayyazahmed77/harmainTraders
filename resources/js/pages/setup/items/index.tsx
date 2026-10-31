@@ -17,6 +17,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 interface FilterData {
   category_id?: string;
+  company_id?: string;
   status?: string;
   stock_status?: string;
   search?: string;
@@ -39,13 +40,26 @@ interface Item {
   type: string;
   trade_price: string;
   retail: string;
-  stock_1: string;
-  stock_2: string;
+  stock_1: string | number;
+  stock_2: string | number;
+  opening_stock_1?: number;
+  opening_stock_2?: number;
+  opening_total_pcs?: number;
+  available_stock?: number;
+  available_full?: number;
+  available_pcs?: number;
+  stock_breakdown?: string;
+  is_negative_stock?: boolean;
+  purchase_pcs?: number;
+  sale_pcs?: number;
+  sale_return_pcs?: number;
+  purchase_return_pcs?: number;
+  net_movement_pcs?: number;
   is_import: boolean;
   is_active: boolean;
   created_at: string;
-  packing_qty: string;
-  reorder_level: string;
+  packing_qty: string | number;
+  reorder_level: string | number;
   primary_image_url?: string;
 }
 
@@ -54,17 +68,23 @@ interface Category {
   name: string;
 }
 
+interface Company {
+  id: number;
+  title: string;
+}
+
 interface Props {
   items: Item[];
   summary: SummaryData;
   filters: FilterData;
   categories: Category[];
+  companies?: Company[];
 }
 
 import ItemsSummary from "./ItemsSummary";
 import ItemsFilters from "./ItemsFilters";
 
-export default function ItemsPage({ items, summary, filters, categories }: Props) {
+export default function ItemsPage({ items, summary, filters, categories, companies = [] }: Props) {
   function routeHelper(name: string): string {
     if (name === "items.create") return "/items/create";
     if (name === "items.bulk-upload") return "/items/bulk-upload";
@@ -119,7 +139,7 @@ export default function ItemsPage({ items, summary, filters, categories }: Props
 
           <ItemsSummary summary={summary} />
 
-          <ItemsFilters filters={filters} categories={categories} />
+          <ItemsFilters filters={filters} categories={categories} companies={companies} />
 
           {items.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">

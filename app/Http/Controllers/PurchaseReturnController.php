@@ -272,7 +272,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $totalReturnPcs = (float)($it['total_pcs']);
-                    $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
+                    // Outward stock recorded transactionally in purchase_return_items
                 }
             }
 
@@ -620,7 +620,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $oldItem->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $totalRevertPcs = (float)($oldItem->total_pcs);
-                    $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
+                    // Reverting items handled automatically via ledger
                 }
             }
 
@@ -677,7 +677,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
                 if ($item) {
                     $totalReturnPcs = (float)($it['total_pcs']);
-                    $item->updateStockFromPcs($item->total_stock_pcs - $totalReturnPcs);
+                    // Outward stock recorded transactionally in purchase_return_items
                 }
             }
 
@@ -759,7 +759,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 $item = Items::where('id', $ri->item_id)->lockForUpdate()->first();
                 if ($item) {
                     $totalRevertPcs = (float)($ri->total_pcs);
-                    $item->updateStockFromPcs($item->total_stock_pcs + $totalRevertPcs);
+                    // Reverting items handled automatically via ledger
                 }
             }
 

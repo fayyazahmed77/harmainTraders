@@ -81,33 +81,38 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function AccountReports({ 
     accounts, firms, salesmen, areas = [], subareas = [], account_types, account_categories, users, provinces = [], cities = []
 }: PageProps) {
-    // Large state object for all parameters
-    const [params, setParams] = useState({
-        fromDate: subMonths(new Date(), 1),
-        toDate: new Date(),
-        accountId: 'ALL',
-        reportId: 'general_ledger',
-        firmId: 'ALL',
-        salemanId: 'ALL',
-        areaId: 'ALL',
-        subareaId: 'ALL',
-        provinceId: 'ALL',
-        cityId: 'ALL',
-        type: 'ALL',
-        noteHead: 'ALL',
-        nature: 'ALL',
-        contraId: 'ALL',
-        parentId: 'ALL',
-        voucherType: 'ALL',
-        userId: 'ALL',
-        shift: 'ALL',
-        sortBy: 'INV_DATE',
-        remarks: '',
-        printOn: 'screen',
-        dateType: 'invdate',
-        ledgerDesc: 'contraa/c',
-        balanceCriteria: 'all',
-        identityType: 'code',
+    // Large state object for all parameters with URL pre-population
+    const [params, setParams] = useState(() => {
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlReport = urlParams?.get('report') || urlParams?.get('reportId');
+        const urlType = urlParams?.get('type');
+        return {
+            fromDate: subMonths(new Date(), 1),
+            toDate: new Date(),
+            accountId: 'ALL',
+            reportId: urlReport ? urlReport.toLowerCase() : 'general_ledger',
+            firmId: 'ALL',
+            salemanId: 'ALL',
+            areaId: 'ALL',
+            subareaId: 'ALL',
+            provinceId: 'ALL',
+            cityId: 'ALL',
+            type: urlType || 'ALL',
+            noteHead: 'ALL',
+            nature: 'ALL',
+            contraId: 'ALL',
+            parentId: 'ALL',
+            voucherType: 'ALL',
+            userId: 'ALL',
+            shift: 'ALL',
+            sortBy: 'INV_DATE',
+            remarks: '',
+            printOn: 'screen',
+            dateType: 'invdate',
+            ledgerDesc: 'contraa/c',
+            balanceCriteria: 'all',
+            identityType: 'code',
+        };
     });
 
     const [ledgerData, setLedgerData] = useState<LedgerRow[]>([]);
@@ -220,6 +225,14 @@ export default function AccountReports({
             setLoading(false);
         }
     };
+
+    // Auto-fetch if navigated with a specific report query
+    useEffect(() => {
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        if (urlParams?.get('report') || urlParams?.get('reportId')) {
+            fetchData();
+        }
+    }, []);
 
     useEffect(() => {
         if (hasSearched) {
@@ -499,7 +512,7 @@ export default function AccountReports({
                                     </motion.div>
                                 ) : (params.reportId.toLowerCase() === 'receivable' || params.reportId.toLowerCase() === 'payable') ? (
                                     <motion.div key="receivable-payable" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }}>
-                                        <ReceivableReportView data={receivableData} />
+                                        <ReceivableReportView data={receivableData} reportType={params.reportId.toLowerCase() === 'payable' ? 'payable' : 'receivable'} />
                                     </motion.div>
                                 ) : (params.reportId.toLowerCase() === 'roznamcha') ? (
                                     <motion.div key="roznamcha" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }}>

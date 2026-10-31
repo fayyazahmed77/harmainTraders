@@ -484,6 +484,22 @@ class ReportBuilder
             });
         }
 
+        if (isset($params['status']) && in_array(strtolower($params['status']), ['cleared', 'pending'])) {
+            $statusFilter = strtolower($params['status']);
+            if ($statusFilter === 'cleared') {
+                $txQuery->where(function($q) {
+                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal']);
+                });
+            } elseif ($statusFilter === 'pending') {
+                $txQuery->whereIn('payment_method', ['Cheque', 'Online'])
+                        ->where(function($q) {
+                            $q->whereNull('cheque_status')
+                              ->orWhereNotIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal', 'Canceled', 'Cancelled', 'Returned', 'Refund']);
+                        });
+            }
+        }
+
         $allTx = $txQuery->orderBy('date', 'asc')->orderBy('id', 'asc')->get();
 
         // 3. Process each transaction and calculate running balance
@@ -1796,7 +1812,7 @@ class ReportBuilder
             $unallocatedReceipts = $accountPayments->where('type', 'RECEIPT');
 
             $currentBal = (float)$account->current_balance;
-            if (abs($currentBal) <= 0.005) {
+            if (round($currentBal) <= 0) {
                 continue;
             }
 
@@ -1820,7 +1836,18 @@ class ReportBuilder
                 $partyBillsToOutput = !empty($fifoRes['surviving_debits']) ? $fifoRes['surviving_debits'] : $fifoRes['bills'];
             }
 
+            // Exclude bills that have 0 remaining and 0 balance when rounded
+            $partyBillsToOutput = array_values(array_filter($partyBillsToOutput, function($b) {
+                return round((float)($b['remaining'] ?? 0)) > 0 || round((float)($b['balance'] ?? 0)) > 0;
+            }));
+
             if (empty($partyBillsToOutput)) {
+                continue;
+            }
+
+            // Exclude parties whose total due + undue amount rounds to 0
+            $partyTotalDue = round((float)($fifoRes['due_amount'] ?? 0)) + round((float)($fifoRes['undue_amount'] ?? 0));
+            if ($partyTotalDue <= 0) {
                 continue;
             }
 
@@ -2537,7 +2564,7 @@ class ReportBuilder
             $unallocatedReceipts = $accountPayments->where('type', 'RECEIPT');
 
             $currentBal = (float)$account->current_balance;
-            if (abs($currentBal) <= 0.005) {
+            if (round(abs($currentBal)) <= 0) {
                 continue;
             }
 
@@ -2550,9 +2577,16 @@ class ReportBuilder
                 'payable'
             );
 
-            if (empty($fifoRes['bills'])) {
+            // Filter out 0 balance bills
+            $billsToOutput = array_values(array_filter($fifoRes['bills'] ?? [], function($b) {
+                return round(abs((float)($b['remaining'] ?? 0))) > 0 || round(abs((float)($b['balance'] ?? 0))) > 0;
+            }));
+
+            if (empty($billsToOutput)) {
                 continue;
             }
+
+            $fifoRes['bills'] = $billsToOutput;
 
             $isSupplierAccount = in_array((int)$account->type, [6]) || strtolower($account->accountType->name ?? '') === 'supplier';
             $payableBalance = $isSupplierAccount ? $currentBal : -$currentBal;

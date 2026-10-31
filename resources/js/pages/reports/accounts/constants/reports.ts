@@ -97,6 +97,13 @@ export const reports: ReportOption[] = [
         category: 'Financial'
     },
     {
+        id: 'payable',
+        title: 'Payable',
+        description: 'Summary of all outgoing payables.',
+        icon: Receipt,
+        category: 'Financial'
+    },
+    {
         id: 'receiving_detail',
         title: 'Receiving Detail',
         description: 'Detailed record of received payments.',

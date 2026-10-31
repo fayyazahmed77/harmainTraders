@@ -18,13 +18,19 @@ export function DueBillsReportView({
         }).format(amount);
     };
 
-    // Filter and group data by customer
+    // Filter and group data by customer, excluding 0-balance bills and parties
     const groupedData = useMemo(() => {
-        const filtered = data.filter((row: any) => 
-            !searchTerm || 
-            (row.party_name && row.party_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (row.voucher_no && row.voucher_no.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
+        const filtered = data.filter((row: any) => {
+            const rem = Math.round(Number(row.remaining) || 0);
+            const bal = Math.round(Number(row.balance) || 0);
+            if (rem <= 0 && bal <= 0) return false;
+
+            return (
+                !searchTerm || 
+                (row.party_name && row.party_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (row.voucher_no && row.voucher_no.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+        });
 
         const groups: Record<string, any[]> = {};
         filtered.forEach((row: any) => {
@@ -34,11 +40,31 @@ export function DueBillsReportView({
             groups[row.customer_id].push(row);
         });
 
-        return groups;
+        // Filter out groups where party has 0 due and 0 un-due amount
+        const result: Record<string, any[]> = {};
+        Object.entries(groups).forEach(([cid, bills]) => {
+            const lastBill = bills[bills.length - 1];
+            const summary = lastBill?.party_summary;
+            const partyTotal = Math.round(Number(summary?.party_due_amount) || 0) + Math.round(Number(summary?.party_un_due_amount) || 0);
+            if (partyTotal > 0) {
+                result[cid] = bills;
+            }
+        });
+
+        return result;
     }, [data, searchTerm]);
 
-    const totalUnDue = data.reduce((acc: number, cur: any) => cur.is_last_for_customer ? acc + cur.party_summary.party_un_due_amount : acc, 0);
-    const totalDue = data.reduce((acc: number, cur: any) => cur.is_last_for_customer ? acc + cur.party_summary.party_due_amount : acc, 0);
+    const totalUnDue = data.reduce((acc: number, cur: any) => {
+        if (!cur.is_last_for_customer) return acc;
+        const partyTotal = Math.round(Number(cur.party_summary?.party_due_amount) || 0) + Math.round(Number(cur.party_summary?.party_un_due_amount) || 0);
+        return partyTotal > 0 ? acc + (Number(cur.party_summary?.party_un_due_amount) || 0) : acc;
+    }, 0);
+
+    const totalDue = data.reduce((acc: number, cur: any) => {
+        if (!cur.is_last_for_customer) return acc;
+        const partyTotal = Math.round(Number(cur.party_summary?.party_due_amount) || 0) + Math.round(Number(cur.party_summary?.party_un_due_amount) || 0);
+        return partyTotal > 0 ? acc + (Number(cur.party_summary?.party_due_amount) || 0) : acc;
+    }, 0);
 
     return (
         <div className="space-y-6">
