@@ -21,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        if (file_exists(app_path('Helpers/helpers.php'))) {
+            require_once app_path('Helpers/helpers.php');
+        }
+
         if (class_exists(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class)) {
             $this->app->register(\Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class);
         }
@@ -56,6 +60,24 @@ class AppServiceProvider extends ServiceProvider
                             'broadcasting.connections.pusher.secret' => $settings->pusher_app_secret,
                             'broadcasting.connections.pusher.options.cluster' => $settings->pusher_app_cluster ?? 'ap1',
                             'broadcasting.connections.pusher.options.host' => 'api-' . ($settings->pusher_app_cluster ?? 'ap1') . '.pusher.com',
+                        ]);
+                    }
+
+                    if ($settings->mail_host) {
+                        config([
+                            'mail.default' => 'smtp',
+                            'mail.mailers.smtp.host' => $settings->mail_host,
+                            'mail.mailers.smtp.port' => $settings->mail_port ?: config('mail.mailers.smtp.port'),
+                            'mail.mailers.smtp.username' => $settings->mail_username ?: config('mail.mailers.smtp.username'),
+                            'mail.mailers.smtp.password' => $settings->mail_password ?: config('mail.mailers.smtp.password'),
+                            'mail.mailers.smtp.encryption' => $settings->mail_encryption ?: config('mail.mailers.smtp.encryption'),
+                        ]);
+                    }
+
+                    if ($settings->mail_from_address) {
+                        config([
+                            'mail.from.address' => $settings->mail_from_address,
+                            'mail.from.name' => $settings->mail_from_name ?: ($settings->company_name ?: config('mail.from.name')),
                         ]);
                     }
                 }

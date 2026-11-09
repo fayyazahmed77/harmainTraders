@@ -22,10 +22,12 @@ import {
     Info,
     ArrowUpRight,
     CheckCircle,
-    AlertTriangle
+    AlertTriangle,
+    Pencil
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { DuplicateItemActionPopover, ExistingLineMatch } from "./DuplicateItemActionPopover";
 
 interface Item {
     id: number;
@@ -64,7 +66,11 @@ interface ItemRegistryDialogProps {
     items: Item[];
     customerCategory: string | null;
     currentRows: any[];
-    onAddUpdate: (item: Item, data: { full: number; pcs: number; bonus_full: number; bonus_pcs: number; rate: number; discPercent: number }) => void;
+    onAddUpdate: (
+        item: Item,
+        data: { full: number; pcs: number; bonus_full: number; bonus_pcs: number; rate: number; discPercent: number },
+        options?: { mode: 'add' | 'edit'; targetRowId?: number | null }
+    ) => void;
 }
 
 const toNumber = (v: any) => {
@@ -92,6 +98,9 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
     const [itemSearch, setItemSearch] = useState("");
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [selectedItemForQty, setSelectedItemForQty] = useState<Item | null>(null);
+    const [editorMode, setEditorMode] = useState<'add' | 'edit'>('add');
+    const [targetRowId, setTargetRowId] = useState<number | null>(null);
+    const [duplicatePromptItem, setDuplicatePromptItem] = useState<Item | null>(null);
 
     const [dialogFull, setDialogFull] = useState<number>(0);
     const [dialogPcs, setDialogPcs] = useState<number>(0);
@@ -164,12 +173,18 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
         });
     }, [items, itemSearch]);
 
-    // Active item for telemetry display (either quantity tray item or keyboard focused item)
-    const activeDisplayItem = selectedItemForQty || filteredItems[selectedIndex] || null;
+    // Active item for telemetry display (either quantity tray item, duplicate prompt item, or keyboard focused item)
+    const activeDisplayItem = selectedItemForQty || duplicatePromptItem || filteredItems[selectedIndex] || null;
 
     // Reset keyboard selection index when items or open state changes
     useEffect(() => {
         setSelectedIndex(0);
+        if (!open) {
+            setDuplicatePromptItem(null);
+            setSelectedItemForQty(null);
+            setEditorMode('add');
+            setTargetRowId(null);
+        }
     }, [itemSearch, open]);
 
     // Auto-scroll focused item into view
@@ -198,55 +213,112 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                 fullInputRef.current?.focus();
                 fullInputRef.current?.select();
             }, 50);
-        } else {
+        } else if (!duplicatePromptItem) {
             setTimeout(() => {
                 searchInputRef.current?.focus();
             }, 50);
         }
-    }, [selectedItemForQty]);
+    }, [selectedItemForQty, duplicatePromptItem]);
 
-    const handleItemClick = (item: Item) => {
-        setSelectedItemForQty(item);
-
-        const existing = currentRows.find(r => Number(r.item_id) === Number(item.id));
-
+    const getDefaultRateForItem = (item: Item) => {
         let tpVal = toNumber(item.trade_price);
         if (customerCategory && customerCategory !== "1") {
             const priceKey = `pt${customerCategory}` as keyof Item;
             const percentage = toNumber(item[priceKey]);
             if (percentage !== 0) tpVal = Math.round(tpVal * (1 + percentage / 100));
         }
+        return tpVal;
+    };
 
-        if (existing) {
-            setDialogFull(toNumber(existing.full));
-            setDialogPcs(toNumber(existing.pcs));
-            setDialogBonusFull(toNumber(existing.bonus_full));
-            setDialogBonusPcs(toNumber(existing.bonus_pcs));
-            setDialogRate(toNumber(existing.rate));
-            setDialogDiscount(toNumber(existing.discPercent));
-        } else {
-            setDialogFull(0);
-            setDialogPcs(0);
-            setDialogBonusFull(0);
-            setDialogBonusPcs(0);
-            setDialogRate(tpVal);
-            setDialogDiscount(toNumber(item.discount || 0));
+    const getMatchingLinesForItem = (item: Item): ExistingLineMatch[] => {
+        const packing = Math.max(1, toNumber(item.packing_qty || 1));
+        const matches: ExistingLineMatch[] = [];
+        currentRows.forEach((r, idx) => {
+            if (Number(r.item_id) === Number(item.id)) {
+                matches.push({
+                    rowId: r.id,
+                    lineNumber: idx + 1,
+                    full: toNumber(r.full),
+                    pcs: toNumber(r.pcs),
+                    bonus_full: toNumber(r.bonus_full),
+                    bonus_pcs: toNumber(r.bonus_pcs),
+                    rate: toNumber(r.rate),
+                    discPercent: toNumber(r.discPercent),
+                    packingQty: packing,
+                });
+            }
+        });
+        return matches;
+    };
+
+    const openAddModeForItem = (item: Item) => {
+        setDuplicatePromptItem(null);
+        setEditorMode('add');
+        setTargetRowId(null);
+        setSelectedItemForQty(item);
+        setDialogFull(0);
+        setDialogPcs(0);
+        setDialogBonusFull(0);
+        setDialogBonusPcs(0);
+        setDialogRate(getDefaultRateForItem(item));
+        setDialogDiscount(toNumber(item.discount || 0));
+    };
+
+    const openEditModeForItem = (item: Item, rowId: number) => {
+        const existing = currentRows.find(r => r.id === rowId) || currentRows.find(r => Number(r.item_id) === Number(item.id));
+        if (!existing) {
+            openAddModeForItem(item);
+            return;
         }
+        setDuplicatePromptItem(null);
+        setEditorMode('edit');
+        setTargetRowId(existing.id);
+        setSelectedItemForQty(item);
+        setDialogFull(toNumber(existing.full));
+        setDialogPcs(toNumber(existing.pcs));
+        setDialogBonusFull(toNumber(existing.bonus_full));
+        setDialogBonusPcs(toNumber(existing.bonus_pcs));
+        setDialogRate(toNumber(existing.rate));
+        setDialogDiscount(toNumber(existing.discPercent));
+    };
+
+    const handleItemClick = (item: Item) => {
+        const matchingRows = currentRows.filter(r => Number(r.item_id) === Number(item.id));
+        if (matchingRows.length > 0) {
+            setSelectedItemForQty(null);
+            setDuplicatePromptItem(item);
+            return;
+        }
+        openAddModeForItem(item);
     };
 
     const handleCommit = () => {
         if (!selectedItemForQty) return;
-
-        onAddUpdate(selectedItemForQty, {
-            full: dialogFull,
-            pcs: dialogPcs,
-            bonus_full: dialogBonusFull,
-            bonus_pcs: dialogBonusPcs,
-            rate: dialogRate,
-            discPercent: dialogDiscount
-        });
+        const itemToCommit = selectedItemForQty;
+        const modeToCommit = editorMode;
+        const rowIdToCommit = targetRowId;
 
         setSelectedItemForQty(null);
+        setDuplicatePromptItem(null);
+        setEditorMode('add');
+        setTargetRowId(null);
+
+        onAddUpdate(
+            itemToCommit,
+            {
+                full: dialogFull,
+                pcs: dialogPcs,
+                bonus_full: dialogBonusFull,
+                bonus_pcs: dialogBonusPcs,
+                rate: dialogRate,
+                discPercent: dialogDiscount
+            },
+            {
+                mode: modeToCommit,
+                targetRowId: rowIdToCommit
+            }
+        );
+
         setItemSearch("");
         setTimeout(() => {
             searchInputRef.current?.focus();
@@ -254,10 +326,21 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (duplicatePromptItem) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setDuplicatePromptItem(null);
+                setTimeout(() => searchInputRef.current?.focus(), 50);
+            }
+            return;
+        }
+
         if (selectedItemForQty) {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 setSelectedItemForQty(null);
+                setEditorMode('add');
+                setTargetRowId(null);
                 setTimeout(() => searchInputRef.current?.focus(), 50);
             }
             return;
@@ -511,7 +594,8 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     const absStock = Math.abs(stock);
                                     const full = (isNeg ? -1 : 1) * Math.floor(absStock / packing);
                                     const pcs = (isNeg ? -1 : 1) * (absStock % packing);
-                                    const isSelected = currentRows.some(r => Number(r.item_id) === Number(item.id));
+                                    const matchingLines = getMatchingLinesForItem(item);
+                                    const isSelected = matchingLines.length > 0;
                                     const isFocused = idx === selectedIndex;
 
                                     let tpVal = toNumber(item.trade_price);
@@ -521,97 +605,112 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     }
 
                                     return (
-                                        <button
-                                            key={item.id}
-                                            ref={el => { itemRefs.current[idx] = el; }}
-                                            onClick={() => handleItemClick(item)}
-                                            onMouseEnter={() => setSelectedIndex(idx)}
-                                            className={`w-full text-left transition-all px-4 py-2.5 group border-l-4 ${
-                                                isSelected
-                                                    ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
-                                                    : isFocused
-                                                        ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
-                                                        : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
-                                            }`}
-                                        >
-                                            <div className="hidden md:grid grid-cols-12 items-center py-0.5">
-                                                <div className="col-span-1 pl-1">
-                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
-                                                        #{String(item.id).padStart(4, '0')}
-                                                    </span>
-                                                </div>
-                                                <div className="col-span-4 flex items-center gap-2 pr-2">
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className={`font-black uppercase tracking-tight truncate text-xs ${
-                                                            isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
-                                                        }`}>
-                                                            {item.title}
+                                        <React.Fragment key={item.id}>
+                                            <button
+                                                ref={el => { itemRefs.current[idx] = el; }}
+                                                onClick={() => handleItemClick(item)}
+                                                onMouseEnter={() => setSelectedIndex(idx)}
+                                                className={`w-full text-left transition-all px-4 py-2.5 group border-l-4 ${
+                                                    isSelected
+                                                        ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
+                                                        : isFocused
+                                                            ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
+                                                            : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
+                                                }`}
+                                            >
+                                                <div className="hidden md:grid grid-cols-12 items-center py-0.5">
+                                                    <div className="col-span-1 pl-1">
+                                                        <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
+                                                            #{String(item.id).padStart(4, '0')}
                                                         </span>
-                                                        
                                                     </div>
-                                                    {isSelected && (
-                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[8px] font-black uppercase tracking-wider shrink-0">
-                                                            <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
-                                                            Added
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="col-span-2 text-center">
-                                                    <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                                        <span className="text-[9px] text-zinc-700 mr-1">Rs</span>
-                                                        {toNumber(item.trade_price).toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-2 flex justify-center">
-                                                    <div className="px-3 py-1 rounded-md border border-orange-200 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-black italic shadow-xs text-xs">
-                                                        <span className="text-[9px] opacity-70 not-italic mr-0.5">Rs</span>{tpVal.toFixed(2)}
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
-                                                    {toNumber(item.retail).toFixed(0)}
-                                                </div>
-                                                <div className="col-span-2 text-right pr-2">
-                                                    <div className={cn(
-                                                        "font-mono text-xs font-black inline-flex items-center justify-end gap-1.5",
-                                                        stock > 0
-                                                            ? "text-emerald-600 dark:text-emerald-400"
-                                                            : stock < 0
-                                                                ? "text-rose-600 dark:text-rose-400"
-                                                                : "text-zinc-500 dark:text-zinc-400"
-                                                    )}>
-                                                        <span>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`}</span>
-                                                        {stock < 0 && (
-                                                            <span className="px-1 py-0.5 rounded text-[8px] bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-black tracking-tight uppercase border border-rose-300 dark:border-rose-800">
-                                                                Deficit
+                                                    <div className="col-span-4 flex items-center gap-2 pr-2">
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className={`font-black uppercase tracking-tight truncate text-xs ${
+                                                                isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
+                                                            }`}>
+                                                                {item.title}
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Mobile View Item */}
-                                            <div className="md:hidden flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
+                                                        </div>
                                                         {isSelected && (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
-                                                                <Check className="w-2.5 h-2.5 stroke-[3]" /> Added
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[8px] font-black uppercase tracking-wider shrink-0">
+                                                                <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                                                                {matchingLines.length > 1 ? `Added (${matchingLines.length})` : "Added"}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
-                                                        <span>#{item.id} |</span>
-                                                        <span>Active Rate: <span className="font-bold text-orange-600 dark:text-orange-400">Rs {tpVal.toFixed(2)}</span> |</span>
-                                                        <span>Trade Price: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {toNumber(item.trade_price).toFixed(2)}</span> |</span>
-                                                        <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : stock < 0 ? "font-bold text-rose-600 dark:text-rose-400" : "font-bold text-zinc-500"}>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`} {stock < 0 ? '(Deficit)' : ''}</span></span>
+                                                    <div className="col-span-2 text-center">
+                                                        <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                                                            <span className="text-[9px] text-zinc-700 mr-1">Rs</span>
+                                                            {toNumber(item.trade_price).toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-2 flex justify-center">
+                                                        <div className="px-3 py-1 rounded-md border border-orange-200 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-black italic shadow-xs text-xs">
+                                                            <span className="text-[9px] opacity-70 not-italic mr-0.5">Rs</span>{tpVal.toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-1 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
+                                                        {toNumber(item.retail).toFixed(0)}
+                                                    </div>
+                                                    <div className="col-span-2 text-right pr-2">
+                                                        <div className={cn(
+                                                            "font-mono text-xs font-black inline-flex items-center justify-end gap-1.5",
+                                                            stock > 0
+                                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                                : stock < 0
+                                                                    ? "text-rose-600 dark:text-rose-400"
+                                                                    : "text-zinc-500 dark:text-zinc-400"
+                                                        )}>
+                                                            <span>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`}</span>
+                                                            {stock < 0 && (
+                                                                <span className="px-1 py-0.5 rounded text-[8px] bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-black tracking-tight uppercase border border-rose-300 dark:border-rose-800">
+                                                                    Deficit
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
-                                                    {isSelected ? <Check size={14} /> : <Plus size={14} />}
+
+                                                {/* Mobile View Item */}
+                                                <div className="md:hidden flex justify-between items-center">
+                                                    <div className="flex flex-col">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
+                                                            {isSelected && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
+                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" /> {matchingLines.length > 1 ? `Added (${matchingLines.length})` : "Added"}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
+                                                            <span>#{item.id} |</span>
+                                                            <span>Active Rate: <span className="font-bold text-orange-600 dark:text-orange-400">Rs {tpVal.toFixed(2)}</span> |</span>
+                                                            <span>Trade Price: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {toNumber(item.trade_price).toFixed(2)}</span> |</span>
+                                                            <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : stock < 0 ? "font-bold text-rose-600 dark:text-rose-400" : "font-bold text-zinc-500"}>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`} {stock < 0 ? '(Deficit)' : ''}</span></span>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
+                                                        {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </button>
+                                            </button>
+
+                                            {duplicatePromptItem?.id === item.id && (
+                                                <DuplicateItemActionPopover
+                                                    itemTitle={item.title}
+                                                    itemId={item.id}
+                                                    packingQty={packing}
+                                                    matchingLines={matchingLines}
+                                                    onAddNewLine={() => openAddModeForItem(item)}
+                                                    onEditLine={(rowId) => openEditModeForItem(item, rowId)}
+                                                    onCancel={() => {
+                                                        setDuplicatePromptItem(null);
+                                                        setTimeout(() => searchInputRef.current?.focus(), 50);
+                                                    }}
+                                                />
+                                            )}
+                                        </React.Fragment>
                                     );
                                 }) : (
                                     <div className="p-12 text-center flex flex-col items-center gap-3">
@@ -632,6 +731,23 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     >
                                         <div className="flex items-center justify-between w-full md:w-auto min-w-0 md:max-w-[280px]">
                                             <div className="flex flex-col min-w-0">
+                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                    {editorMode === 'edit' ? (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                                            <Pencil size={9} />
+                                                            Editing Line #{(() => {
+                                                                const validRows = currentRows.filter(r => r.item_id !== null);
+                                                                const idx = validRows.findIndex(r => r.id === targetRowId);
+                                                                return idx >= 0 ? idx + 1 : 1;
+                                                            })()}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                                            <Plus size={9} />
+                                                            New Line
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <h3 className="text-sm sm:text-lg font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tight italic">
                                                     {selectedItemForQty.title}
                                                 </h3>
@@ -641,7 +757,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => setSelectedItemForQty(null)}
+                                                onClick={() => {
+                                                    setSelectedItemForQty(null);
+                                                    setTargetRowId(null);
+                                                    setEditorMode('add');
+                                                }}
                                                 className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
                                                 title="Close input panel"
                                             >
@@ -709,6 +829,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                     <Input
                                                         ref={rateInputRef}
                                                         type="number"
+                                                        step="any"
                                                         value={dialogRate || ""}
                                                         onChange={e => setDialogRate(toNumber(e.target.value))}
                                                         onKeyDown={handleRateKeyDown}
@@ -729,15 +850,24 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Add button - full width on mobile, inline on desktop */}
+                                            {/* Add / Update button - full width on mobile, inline on desktop */}
                                             <Button
                                                 ref={addButtonRef}
                                                 onClick={handleCommit}
                                                 onKeyDown={handleAddButtonKeyDown}
                                                 className="w-full sm:w-auto h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all shrink-0 flex items-center justify-center gap-1.5"
                                             >
-                                                <Plus size={16} className="stroke-[3]" />
-                                                Add Item
+                                                {editorMode === 'edit' ? (
+                                                    <>
+                                                        <Pencil size={15} className="stroke-[2.5]" />
+                                                        Update Line
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus size={16} className="stroke-[3]" />
+                                                        Add Item
+                                                    </>
+                                                )}
                                             </Button>
                                         </div>
                                     </motion.div>

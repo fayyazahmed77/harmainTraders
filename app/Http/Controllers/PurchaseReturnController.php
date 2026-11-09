@@ -129,10 +129,14 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             ->get();
         $salemans = Saleman::get();
         $items = Items::get();
+        \App\Services\StockService::attachRealtimeBalances($items);
 
         $purchase = null;
         if ($request->has('purchase_id')) {
             $purchase = Purchase::with(['items.item', 'supplier', 'salesman'])->find($request->purchase_id);
+            if ($purchase && $purchase->items) {
+                \App\Services\StockService::attachRealtimeBalances($purchase->items->pluck('item')->filter());
+            }
         }
 
         $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
@@ -191,15 +195,15 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ]);
             }
             
-            // Fetch original purchase item
-            $purchaseItem = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
-                ->where('item_id', $it['item_id'])
-                ->first();
-            if (!$purchaseItem) {
+            // Fetch original purchase items (summed across any duplicate lines of the same item)
+            $purchaseItemsQuery = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
+                ->where('item_id', $it['item_id']);
+            if (!$purchaseItemsQuery->exists()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => 'Item was not purchased on the original purchase invoice.'
                 ]);
             }
+            $originalPurchasedTotalPcs = (float) $purchaseItemsQuery->sum('total_pcs');
 
             // Calculate already returned pieces for this item on this purchase
             $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
@@ -213,7 +217,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
             $totalToReturn = $it['total_pcs'] + $bonusUnits;
 
-            $maxReturnableQty = $purchaseItem->total_pcs - $alreadyReturnedPcs;
+            $maxReturnableQty = $originalPurchasedTotalPcs - $alreadyReturnedPcs;
 
             if ($totalToReturn > $maxReturnableQty) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -425,6 +429,10 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 return response()->json(['error' => 'Invoice not found'], 404);
             }
 
+            if ($purchase->items) {
+                \App\Services\StockService::attachRealtimeBalances($purchase->items->pluck('item')->filter());
+            }
+
             $items = $purchase->items->map(function ($pi) use ($purchase) {
                 $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
                     ->where('purchase_returns.original_invoice', $purchase->invoice)
@@ -465,14 +473,17 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         try {
             $purchases = Purchase::where('supplier_id', $supplierId)->pluck('id');
 
-            $purchasedItems = \App\Models\PurchaseItem::select('purchase_items.*')
+            $rawPurchasedItems = \App\Models\PurchaseItem::select('purchase_items.*')
                 ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
                 ->whereIn('purchase_items.purchase_id', $purchases)
                 ->orderBy('purchases.date', 'desc')
                 ->orderBy('purchases.id', 'desc')
                 ->with(['item', 'purchase:id,invoice,date'])
-                ->get()
-                ->map(function ($pi) use ($supplierId) {
+                ->get();
+
+            \App\Services\StockService::attachRealtimeBalances($rawPurchasedItems->pluck('item')->filter());
+
+            $purchasedItems = $rawPurchasedItems->map(function ($pi) use ($supplierId) {
                     $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
                         ->where('purchase_returns.original_invoice', $pi->purchase->invoice)
                         ->where('purchase_returns.supplier_id', $supplierId)
@@ -532,6 +543,10 @@ class PurchaseReturnController extends Controller implements HasMiddleware
         }
         $salemans = Saleman::get();
         $items = Items::get();
+        \App\Services\StockService::attachRealtimeBalances($items);
+        if ($return && $return->items) {
+            \App\Services\StockService::attachRealtimeBalances($return->items->pluck('item')->filter());
+        }
         $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
 
         return Inertia::render("daily/purchase_return/edit", [
@@ -575,15 +590,15 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 ]);
             }
             
-            // Fetch original purchase item
-            $purchaseItem = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
-                ->where('item_id', $it['item_id'])
-                ->first();
-            if (!$purchaseItem) {
+            // Fetch original purchase items (summed across any duplicate lines of the same item)
+            $purchaseItemsQuery = \App\Models\PurchaseItem::where('purchase_id', $purchase->id)
+                ->where('item_id', $it['item_id']);
+            if (!$purchaseItemsQuery->exists()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => 'Item was not purchased on the original purchase invoice.'
                 ]);
             }
+            $originalPurchasedTotalPcs = (float) $purchaseItemsQuery->sum('total_pcs');
 
             // Calculate already returned pieces (excluding this return instance)
             $alreadyReturnedPcs = \App\Models\PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
@@ -598,7 +613,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
             $totalToReturn = $it['total_pcs'] + $bonusUnits;
 
-            $maxReturnableQty = $purchaseItem->total_pcs - $alreadyReturnedPcs;
+            $maxReturnableQty = $originalPurchasedTotalPcs - $alreadyReturnedPcs;
 
             if ($totalToReturn > $maxReturnableQty) {
                 throw \Illuminate\Validation\ValidationException::withMessages([

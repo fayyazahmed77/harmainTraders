@@ -1220,7 +1220,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 )}
                               </div>
                               <div className="col-span-1">
-                                <Input type="number" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-right font-mono text-[10px] border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                <Input type="number" step="any" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-right font-mono text-[10px] border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
                               </div>
                               <div className="col-span-1 bg-rose-50/10 dark:bg-rose-900/5 rounded px-1">
                                 <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
@@ -1684,10 +1684,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             items={items}
             customerCategory={customerCategory}
             currentRows={rows}
-            onAddUpdate={(item, data) => {
-              const existingRow = rows.find(r => Number(r.item_id) === Number(item.id));
-              if (existingRow) {
-                updateRow(existingRow.id, data);
+            onAddUpdate={(item, data, options) => {
+              if (options?.mode === 'edit' && options.targetRowId != null) {
+                updateRow(options.targetRowId, data);
               } else {
                 const newRowId = Date.now() + Math.random();
                 setRows((prev) => {

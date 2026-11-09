@@ -195,9 +195,7 @@ if (file_exists($logo_path)) {
         </div>
     </div>
 
-    <div class="criteria-row">
-        <span class="criteria-label">CRITERIA:</span> {{ $criteria }}
-    </div>
+    @include('pdf.partials.criteria')
 
     <table class="accounts-table">
         <thead>

@@ -99,6 +99,14 @@
             margin-bottom: 5px;
         }
 
+        .items-table thead {
+            display: table-header-group;
+        }
+
+        .items-table tr {
+            page-break-inside: avoid;
+        }
+
         .items-table th {
             border-bottom: 1px solid #000;
             padding: 2px 0;
@@ -118,6 +126,7 @@
             padding: 2px 0;
             font-size: 9px;
             vertical-align: top;
+            word-wrap: break-word;
         }
 
         .border-top {
@@ -135,6 +144,7 @@
         .totals-section {
             width: 100%;
             font-size: 10px;
+            page-break-inside: avoid;
         }
 
         .total-row {
@@ -247,8 +257,8 @@
                     <td class="text-center" style="border-left: 1px solid #000;">{{ $bonusText ?: '-' }}</td>
                     @endif
                     <td style="border-left: 1px solid #000;">{{ $item->item->title }}</td>
-                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->item->retail, 0) }}</td>
-                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($item->trade_price, 0) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ format_rate($item->item->retail ?? $item->retail_price) }}</td>
+                    <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ format_rate($item->trade_price) }}</td>
                     <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm;">{{ number_format($disc_percent, 2) }}</td>
                     <td class="text-right" style="border-left: 1px solid #000; padding-right: 1mm; border-right: 1px solid #000;">{{ number_format($item->subtotal - $item->discount, 2) }}</td>
                 </tr>

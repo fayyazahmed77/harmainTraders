@@ -48,8 +48,10 @@ if (file_exists($logo_path)) {
             <img src="{{ $logo_base64 }}" alt="Logo" style="height: 50px; margin-bottom: 10px;">
         @endif
         <div class="brand-name">Haramain Traders</div>
-        <div class="report-title">SUMMARY FOR THE PERIOD ENDED {{ strtoupper(date('d-M-Y', strtotime($to_date))) }}</div>
+        <div class="report-title">SUMMARY FOR THE PERIOD ENDED {{ strtoupper(date('d-M-Y', strtotime($to_date ?? date('Y-m-d')))) }}</div>
     </div>
+
+    @include('pdf.partials.criteria')
 
     <table class="t-account-container">
         <tr>

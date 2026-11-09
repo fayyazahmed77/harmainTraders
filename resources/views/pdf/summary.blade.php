@@ -150,8 +150,8 @@ if (file_exists($logo_path)) {
         </div>
     </div>
 
-    <div class="criteria">
-        <strong>CRITERIA :</strong> Dated As On {{ date('d-M-Y', strtotime($to_date)) }}
+    <div style="padding: 0 20px;">
+        @include('pdf.partials.criteria')
     </div>
 
     <div class="container">

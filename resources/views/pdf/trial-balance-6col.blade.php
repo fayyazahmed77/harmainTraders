@@ -135,11 +135,10 @@ if (file_exists($logo_path)) {
         
         <div class="report-info">
             <div class="report-title">{{ $report_title ?? 'TRIAL BALANCE 6 COLUMN' }}</div>
-            <div class="date-range">
-                Period: {{ \Carbon\Carbon::parse($from_date)->format('d-M-Y') }} To {{ \Carbon\Carbon::parse($to_date)->format('d-M-Y') }}
-            </div>
         </div>
     </div>
+
+    @include('pdf.partials.criteria')
 
     <table>
         <thead>

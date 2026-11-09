@@ -47,24 +47,7 @@ if (file_exists($logo_path)) {
         <div class="report-title">Receiving Detail Analysis</div>
     </div>
 
-    <div class="criteria">
-        <table class="criteria-table">
-            <tr>
-                <td width="33%">
-                    <div class="criteria-label">Reporting Period</div>
-                    <div class="criteria-value">{{ date('d M, Y', strtotime($from_date)) }} - {{ date('d M, Y', strtotime($to_date)) }}</div>
-                </td>
-                <td width="33%" align="center">
-                    <div class="criteria-label">Execution Type</div>
-                    <div class="criteria-value">INBOUND RECEIPTS</div>
-                </td>
-                <td width="33%" align="right">
-                    <div class="criteria-label">Primary Account</div>
-                    <div class="criteria-value">{{ $account ? strtoupper($account->title) : 'ALL CONSOLIDATED UNITS' }}</div>
-                </td>
-            </tr>
-        </table>
-    </div>
+    @include('pdf.partials.criteria')
 
     <table class="data-table">
         <thead>

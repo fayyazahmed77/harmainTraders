@@ -47,21 +47,31 @@ class HandleInertiaRequests extends Middleware
                 'user' => function() use ($request) {
                     $user = $request->user();
                     if (!$user) return null;
-                    return $user->loadMissing('shift:id,name,start_time,end_time,break_duration_minutes,overtime_limit_minutes,color');
+                    if ($user instanceof \App\Models\User) {
+                        return $user->loadMissing('shift:id,name,start_time,end_time,break_duration_minutes,overtime_limit_minutes,color');
+                    }
+                    return $user;
                 },
                 'permissions' => function() use ($request) {
                     $user = $request->user();
-                    if (!$user) return [];
+                    if (!$user || !method_exists($user, 'getAllPermissions')) return [];
                     return \Illuminate\Support\Facades\Cache::remember('user_perms_' . $user->id, 300, function() use ($user) {
                         return $user->getAllPermissions()->pluck('name');
                     });
                 },
                 'roles' => function() use ($request) {
                     $user = $request->user();
-                    if (!$user) return [];
+                    if (!$user || !method_exists($user, 'getRoleNames')) return [];
                     return \Illuminate\Support\Facades\Cache::remember('user_roles_' . $user->id, 300, function() use ($user) {
                         return $user->getRoleNames();
                     });
+                },
+                'customer' => function() {
+                    $cust = \Illuminate\Support\Facades\Auth::guard('customer')->user();
+                    if ($cust && $cust->account_id) {
+                        $cust->load('account:id,code,title');
+                    }
+                    return $cust;
                 },
             ],
             'ziggy' => fn(): array => [

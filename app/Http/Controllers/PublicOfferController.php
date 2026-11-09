@@ -160,180 +160,175 @@ class PublicOfferController extends Controller
     }
 
     /**
-     * Place order from live offer catalog
+     * Place order from live offer catalog into isolated online_orders staging
      */
     public function checkoutOfferOrder(Request $request)
     {
         $request->validate([
             'offer_id' => 'nullable|exists:price_offer_to,id',
-            'auth_type' => 'required|in:existing,new',
-            'customer_code' => 'required_if:auth_type,existing|nullable|string',
-            'name' => 'required_if:auth_type,new|nullable|string|max:255',
-            'phone' => 'required_if:auth_type,new|nullable|string|max:50',
+            'auth_type' => 'nullable|in:existing,new,authenticated',
+            'customer_code' => 'nullable|string',
+            'username' => 'nullable|string',
+            'password' => 'nullable|string',
+            'name' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:50',
             'business_name' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
+            'customer_notes' => 'nullable|string|max:1000',
+            'idempotency_key' => 'nullable|string|max:64',
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|exists:items,id',
             'items.*.qty_carton' => 'required|numeric|min:0',
             'items.*.qty_pcs' => 'required|numeric|min:0',
-            'items.*.price_carton' => 'nullable|numeric|min:0',
-            'items.*.price_piece' => 'nullable|numeric|min:0',
         ]);
 
-        DB::beginTransaction();
-        try {
-            $offer = null;
-            if ($request->offer_id) {
-                $offer = PriceOfferTo::find($request->offer_id);
-            }
+        // 1. Resolve Customer User
+        $customer = \Illuminate\Support\Facades\Auth::guard('customer')->user();
 
-            $defaultSalesman = \App\Models\Saleman::first();
-            $defaultSalesmanId = $defaultSalesman ? $defaultSalesman->id : 1;
+        if (!$customer) {
+            $authType = $request->input('auth_type', 'existing');
 
-            // Determine Customer Account
-            $account = null;
-            if ($request->auth_type === 'existing') {
-                $query = trim($request->customer_code);
-                $account = Account::where(function($q) use ($query) {
-                        $q->where('code', $query)
-                          ->orWhere('telephone1', $query)
-                          ->orWhere('mobile', $query);
-                    })
-                    ->whereHas('accountType', function ($q) {
-                        $q->where('name', 'Customers');
+            if ($authType === 'existing') {
+                $loginInput = trim($request->input('customer_code') ?? $request->input('username') ?? $request->input('phone') ?? '');
+                $password = $request->input('password');
+
+                $normalizedMobile = \App\Services\PhoneNormalizer::normalizeLocal($loginInput);
+
+                $customer = \App\Models\CustomerUser::where('username', $loginInput)
+                    ->orWhere('email', $loginInput)
+                    ->when($normalizedMobile, function ($q) use ($normalizedMobile) {
+                        $q->orWhere('mobile', $normalizedMobile);
                     })
                     ->first();
 
-                if (!$account) {
+                // If customer exists and password is provided, check password
+                if ($customer && $password) {
+                    if (!\Illuminate\Support\Facades\Hash::check($password, $customer->password)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Invalid password for existing customer account.',
+                        ], 401);
+                    }
+                }
+
+                // If no CustomerUser exists yet, but an ERP account exists with this code/mobile:
+                if (!$customer) {
+                    $erpAccount = \App\Models\Account::where(function($q) use ($loginInput, $normalizedMobile) {
+                            $q->where('code', $loginInput);
+                            if ($normalizedMobile) {
+                                $q->orWhere('mobile', $normalizedMobile)->orWhere('telephone1', $normalizedMobile);
+                            }
+                        })
+                        ->whereHas('accountType', function ($q) {
+                            $q->where('name', 'Customers');
+                        })
+                        ->first();
+
+                    if ($erpAccount) {
+                        // Create customer_user on the fly for this existing verified ERP account
+                        $newUsername = 'cust_' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $erpAccount->code ?: $erpAccount->id));
+                        $counter = 1;
+                        $baseUsername = $newUsername;
+                        while (\App\Models\CustomerUser::where('username', $newUsername)->exists()) {
+                            $newUsername = $baseUsername . '_' . $counter++;
+                        }
+
+                        $customer = \App\Models\CustomerUser::create([
+                            'account_id' => $erpAccount->id,
+                            'name' => $erpAccount->title,
+                            'username' => $newUsername,
+                            'mobile' => $normalizedMobile ?: ($erpAccount->mobile ?: '03000000000'),
+                            'email' => $erpAccount->email,
+                            'password' => $password ?: 'welcome123',
+                            'approval_status' => 'approved', // already existing verified ERP account
+                            'approved_at' => now(),
+                            'business_name' => $erpAccount->title,
+                            'address' => $erpAccount->address1,
+                        ]);
+                    }
+                }
+
+                if (!$customer) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Invalid Customer Code or Mobile number.',
+                        'message' => 'Customer account not found. Please register as a new customer or verify your mobile number.',
                     ], 404);
                 }
+
+                \Illuminate\Support\Facades\Auth::guard('customer')->login($customer);
+
             } else {
-                // New Customer Registration
-                $customerType = \App\Models\AccountType::where('name', 'Customers')->first();
-                $customerTypeId = $customerType ? $customerType->id : 1;
-
-                // Generate unique customer code C-XXXX
-                $maxCode = Account::where('code', 'LIKE', 'C-%')->count() + 1;
-                $code = 'C-' . str_pad($maxCode, 4, '0', STR_PAD_LEFT);
-                while (Account::where('code', $code)->exists()) {
-                    $maxCode++;
-                    $code = 'C-' . str_pad($maxCode, 4, '0', STR_PAD_LEFT);
+                // New Customer Registration during checkout
+                $normalizedMobile = \App\Services\PhoneNormalizer::normalizeLocal($request->phone);
+                if (!$normalizedMobile) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Please enter a valid Pakistani mobile number (e.g. 03323228684).',
+                    ], 422);
                 }
 
-                // Target TP / item_category derived from offer or default to 1
-                $offerTp = '1';
-                if ($offer && $offer->offertype) {
-                    $offerTp = (string)$offer->offertype;
+                $existingMobileUser = \App\Models\CustomerUser::where('mobile', $normalizedMobile)->first();
+                if ($existingMobileUser) {
+                    $customer = $existingMobileUser;
+                    \Illuminate\Support\Facades\Auth::guard('customer')->login($customer);
+                } else {
+                    $name = trim($request->name ?: 'New Customer');
+                    $username = $request->username ? strtolower(trim($request->username)) : ('user_' . substr($normalizedMobile, -7));
+                    $counter = 1;
+                    $baseUsername = $username;
+                    while (\App\Models\CustomerUser::where('username', $username)->exists()) {
+                        $username = $baseUsername . $counter++;
+                    }
+
+                    $customer = \App\Models\CustomerUser::create([
+                        'name' => $name,
+                        'username' => $username,
+                        'mobile' => $normalizedMobile,
+                        'email' => $request->email ? strtolower(trim($request->email)) : null,
+                        'password' => $request->password ?: 'customer123',
+                        'approval_status' => 'pending',
+                        'business_name' => $request->business_name ? trim($request->business_name) : null,
+                        'address' => $request->address ? trim($request->address) : null,
+                    ]);
+
+                    \Illuminate\Support\Facades\Auth::guard('customer')->login($customer);
                 }
-
-                $account = Account::create([
-                    'code' => $code,
-                    'title' => trim($request->name . ($request->business_name ? " ({$request->business_name})" : '')),
-                    'type' => $customerTypeId,
-                    'saleman_id' => $defaultSalesmanId,
-                    'mobile' => $request->phone,
-                    'telephone1' => $request->phone,
-                    'address1' => $request->address,
-                    'item_category' => $offerTp,
-                    'status' => true,
-                    'guest_token' => (string) Str::uuid(),
-                    'opening_date' => now(),
-                ]);
             }
+        }
 
-            // Calculate order totals and save items
-            $invoiceNo = 'OFF-' . strtoupper(Str::random(8));
-            $grossTotal = 0;
-            $orderItems = [];
+        // 2. Delegate order placement to OnlineOrderPlacementService
+        $placementService = app(\App\Services\OnlineOrderPlacementService::class);
+        [$success, $message, $order, $extra] = $placementService->placeOrder(
+            customer: $customer,
+            offerId: $request->offer_id,
+            itemsInput: $request->items,
+            customerNotes: $request->customer_notes,
+            idempotencyKey: $request->idempotency_key
+        );
 
-            foreach ($request->items as $it) {
-                $item = Items::find($it['item_id']);
-                if (!$item) continue;
-
-                $qtyCarton = (float)($it['qty_carton'] ?? 0);
-                $qtyPcs = (float)($it['qty_pcs'] ?? 0);
-
-                if ($qtyCarton <= 0 && $qtyPcs <= 0) continue;
-
-                $packing = $item->packing_qty ?: 1;
-                $totalPcs = ($qtyCarton * $packing) + $qtyPcs;
-
-                $priceCarton = (float)($it['price_carton'] ?? 0);
-                $pricePiece = (float)($it['price_piece'] ?? 0);
-
-                $subtotal = ($qtyCarton * $priceCarton) + ($qtyPcs * $pricePiece);
-                if ($subtotal <= 0) {
-                    $subtotal = $totalPcs * ($item->trade_price ?: 0);
-                }
-
-                $grossTotal += $subtotal;
-
-                $orderItems[] = [
-                    'item_id' => $item->id,
-                    'qty_carton' => $qtyCarton,
-                    'qty_pcs' => $qtyPcs,
-                    'total_pcs' => $totalPcs,
-                    'trade_price' => $pricePiece > 0 ? $pricePiece : ($item->trade_price ?: 0),
-                    'retail_price' => $item->retail,
-                    'subtotal' => $subtotal,
-                ];
-            }
-
-            if (empty($orderItems)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cart is empty or item quantities are invalid.',
-                ], 422);
-            }
-
-            $firm = $offer?->firm ?? Firm::first();
-            $firmId = $firm ? $firm->id : 1;
-            $salesmanId = $account->saleman_id ?: $defaultSalesmanId;
-
-            $sale = Sales::create([
-                'date' => now(),
-                'invoice' => $invoiceNo,
-                'customer_id' => $account->id,
-                'salesman_id' => $salesmanId,
-                'firm_id' => $firmId,
-                'no_of_items' => count($orderItems),
-                'gross_total' => $grossTotal,
-                'discount_total' => 0,
-                'tax_total' => 0,
-                'courier_charges' => 0,
-                'extra_discount' => 0,
-                'net_total' => $grossTotal,
-                'total_receivable' => $grossTotal + (float)$account->current_balance,
-                'paid_amount' => 0,
-                'remaining_amount' => $grossTotal,
-                'status' => 'Pending Order',
-                'is_online' => true,
-            ]);
-
-            foreach ($orderItems as $oi) {
-                $oi['sale_id'] = $sale->id;
-                SalesItem::create($oi);
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'invoice' => $invoiceNo,
-                'customer_code' => $account->code,
-                'guest_token' => $account->guest_token,
-                'message' => 'Order placed successfully!',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+        if (!$success) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to place order: ' . $e->getMessage(),
+                'message' => $message,
+                'reason_code' => $extra['reason_code'] ?? 'ORDER_FAILED',
             ], 422);
         }
+
+        // 3. Generate WhatsApp click-to-send link
+        $whatsAppUrl = \App\Services\WhatsAppNotificationService::generateCustomerToCompanyOrderLink($order);
+
+        return response()->json([
+            'success' => true,
+            'order_no' => $order->order_no,
+            'invoice' => $order->order_no, // backward-compat with UI
+            'final_total' => $order->final_total,
+            'status' => $order->status,
+            'approval_status' => $customer->approval_status,
+            'customer_name' => $customer->name,
+            'customer_code' => $customer->username,
+            'whatsapp_url' => $whatsAppUrl,
+            'message' => $message,
+        ]);
     }
 }
 

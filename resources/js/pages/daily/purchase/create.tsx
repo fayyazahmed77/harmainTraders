@@ -115,7 +115,7 @@ interface RowData {
     pcs: number; // single pcs
     bonus_full: number;
     bonus_pcs: number;
-    rate: number;
+    rate: number | string;
     discPercent: number;
     trade_price: number;
     amount: number;
@@ -693,7 +693,7 @@ export default function Purchase({
                     qty_carton: toNumber(r.full),
                     qty_pcs: toNumber(r.pcs),
                     total_pcs: totalPCS,
-                    trade_price: r.rate,
+                    trade_price: toNumber(r.rate),
                     discount: (r.discPercent / 100) * r.amount,
                     gst_amount: 0,
                     subtotal: r.amount
@@ -777,7 +777,7 @@ export default function Purchase({
 
     const handleSave = async () => {
         if (isSubmittingRef.current) return;
-        const updates: PriceUpdateInfo[] = [];
+        const updatesMap = new Map<number, PriceUpdateInfo>();
 
         rowsWithComputed.forEach(r => {
             if (!r.item_id) return;
@@ -785,13 +785,13 @@ export default function Purchase({
             if (!item) return;
 
             const mPercent = toNumber(markupPercentage);
-            const mAmount = r.rate * (mPercent / 100);
-            const newTP = r.rate + mAmount;
+            const mAmount = toNumber(r.rate) * (mPercent / 100);
+            const newTP = toNumber(r.rate) + mAmount;
             const currentTP = toNumber(item.trade_price);
 
             // If calculated TP differs from current item TP (handle float diff)
             if (Math.abs(newTP - currentTP) > 0.01) {
-                updates.push({
+                updatesMap.set(Number(r.item_id), {
                     item_id: r.item_id,
                     title: item.title,
                     old_trade_price: currentTP,
@@ -802,6 +802,8 @@ export default function Purchase({
                 });
             }
         });
+
+        const updates = Array.from(updatesMap.values());
 
         if (updates.length > 0) {
             setPriceUpdates(updates);
@@ -1266,9 +1268,19 @@ console.log(lastPurchaseInfo);
                                                                             <div className="flex flex-col">
                                                                                 <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Rate</label>
                                                                                 <Input
-                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && row.rate > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
+                                                                                    type="text"
+                                                                                    inputMode="decimal"
+                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && toNumber(row.rate) > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
                                                                                     value={row.rate}
-                                                                                    onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value;
+                                                                                        if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                                                            updateRow(row.id, { rate: val });
+                                                                                        }
+                                                                                    }}
+                                                                                    onBlur={() => {
+                                                                                        updateRow(row.id, { rate: toNumber(row.rate) });
+                                                                                    }}
                                                                                     onClick={() => row.item_id && setSelectedItemId(row.item_id)}
                                                                                 />
                                                                             </div>
@@ -1364,12 +1376,22 @@ console.log(lastPurchaseInfo);
                                                                     </div>
                                                                     <div className="col-span-1 relative">
                                                                         <Input
-                                                                            className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
+                                                                            type="text"
+                                                                            inputMode="decimal"
+                                                                            className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
                                                                             value={row.rate}
-                                                                            onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                                                    updateRow(row.id, { rate: val });
+                                                                                }
+                                                                            }}
+                                                                            onBlur={() => {
+                                                                                updateRow(row.id, { rate: toNumber(row.rate) });
+                                                                            }}
                                                                             onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />
-                                                                        {(row.last_purchase_rate ?? 0) > 0 && row.rate > (row.last_purchase_rate ?? 0) && (
+                                                                        {(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) && (
                                                                             <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
                                                                                 High Rate! Last: {row.last_purchase_rate}
                                                                                 <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
@@ -1389,7 +1411,7 @@ console.log(lastPurchaseInfo);
                                                                     <div className="col-span-1">
                                                                         <Input
                                                                             className="h-8 px-1 text-center bg-secondary/20"
-                                                                            value={(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
+                                                                            value={(toNumber(row.rate) * (1 - toNumber(row.discPercent) / 100)).toFixed(2)}
                                                                             readOnly
                                                                             onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />

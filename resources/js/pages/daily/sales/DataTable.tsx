@@ -219,12 +219,25 @@ export default function DataTable({ data }: DataTableProps) {
         {
             accessorKey: "customer.title",
             header: "Customer",
-            cell: ({ row }) => (
-                <div>
-                    <div>{row.original.customer.title}</div>
-                    <div className="text-xs text-muted-foreground">Salesman: {row.original.salesman?.name}</div>
-                </div>
-            )
+            cell: ({ row }) => {
+                const isOnline = Boolean(Number(row.original.is_online));
+                const salesmanName = row.original.salesman?.name;
+                return (
+                    <div>
+                        <div>{row.original.customer?.title}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <span>Salesman:</span>
+                            {isOnline ? (
+                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                    {salesmanName ? `${salesmanName} (ONLINE)` : "ONLINE"}
+                                </span>
+                            ) : (
+                                <span>{salesmanName || "-"}</span>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
         },
         { accessorKey: "no_of_items", header: "Items" },
         { 
@@ -382,12 +395,14 @@ export default function DataTable({ data }: DataTableProps) {
                             >
                                 <Printer size={14} className="mr-2" /> Print A4
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
-                                className="font-medium focus:bg-slate-50"
-                                onClick={() => router.visit(`/sales/${sale.id}/edit`)}
-                            >
-                                <Edit2 size={14} className="mr-2 text-slate-500" /> Edit Invoice
-                            </DropdownMenuItem>
+                            {!Boolean(Number(sale.is_online)) && (
+                                <DropdownMenuItem 
+                                    className="font-medium focus:bg-slate-50"
+                                    onClick={() => router.visit(`/sales/${sale.id}/edit`)}
+                                >
+                                    <Edit2 size={14} className="mr-2 text-slate-500" /> Edit Invoice
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 className="text-rose-600 font-bold focus:text-rose-700 focus:bg-rose-50"
                                 onSelect={(e) => {

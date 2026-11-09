@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { 
     Search, 
     ArrowRight, 
@@ -37,7 +37,12 @@ import {
     User,
     Settings,
     LogOut,
-    KeyRound
+    KeyRound,
+    LayoutDashboard,
+    Package,
+    Receipt,
+    BookOpen,
+    ChevronDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from "@/lib/utils";
@@ -45,10 +50,19 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CategoryCarousel, Category } from './components/CategoryCarousel';
 import { OfferCheckoutDialog } from './components/OfferCheckoutDialog';
 import { OfferSuccessDialog } from './components/OfferSuccessDialog';
 import { OfferItemDialog } from './components/OfferItemDialog';
+import { CustomerAuthDialog } from './components/CustomerAuthDialog';
 
 const DEFAULT_IMAGE = "https://placehold.co/400x400/f8fafc/cbd5e1?text=No+Image";
 
@@ -136,6 +150,8 @@ interface Props {
 }
 
 export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, categories = [] }: Props) {
+    const pageProps = usePage().props as any;
+    const authCustomer = pageProps?.auth?.customer;
     const { appearance, updateAppearance } = useAppearance();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [groupBy, setGroupBy] = useState<'company' | 'category'>('company');
@@ -158,6 +174,15 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
     const [categorySheetOpen, setCategorySheetOpen] = useState(false);
     const [brandSheetOpen, setBrandSheetOpen] = useState(false);
     const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
+
+    // Customer Auth Dialog State
+    const [customerAuthDialogOpen, setCustomerAuthDialogOpen] = useState(false);
+    const [customerAuthDialogTab, setCustomerAuthDialogTab] = useState<'login' | 'register' | 'code'>('login');
+
+    const handleOpenAuth = (tab: 'login' | 'register' | 'code' = 'login') => {
+        setCustomerAuthDialogTab(tab);
+        setCustomerAuthDialogOpen(true);
+    };
 
     // Cart state
     const [cart, setCart] = useState<Record<number, any>>(() => {
@@ -477,12 +502,18 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
         }).format(value).replace('PKR', 'Rs');
     };
 
-    const handleSuccess = (invoice: string, customerCode: string, token: string) => {
-        const finalAmount = cartTotal;
+    const handleSuccess = (invoice: string, customerCode: string, token: string, extra?: any) => {
+        const finalAmount = extra?.final_total !== undefined ? extra.final_total : cartTotal;
         setCheckoutOpen(false);
         setCartDrawerOpen(false);
         setCart({});
-        setSuccessData({ invoice, customerCode, guestToken: token, amount: finalAmount });
+        setSuccessData({ 
+            invoice, 
+            customerCode, 
+            guestToken: token, 
+            amount: finalAmount,
+            whatsappUrl: extra?.whatsapp_url,
+        });
     };
 
     const handleOpenItemModal = (offerItem: OfferItem) => {
@@ -521,6 +552,8 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 onOpenCart={() => setCartDrawerOpen(true)}
                 onOpenAccount={() => setAccountDrawerOpen(true)}
                 sharedOfferId={sharedOfferId}
+                customer={authCustomer}
+                onOpenAuth={handleOpenAuth}
             />
 
             <main className="flex-1">
@@ -871,6 +904,8 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 setError={setAccessError}
                 appearance={appearance}
                 updateAppearance={updateAppearance}
+                customer={authCustomer}
+                onOpenAuth={handleOpenAuth}
             />
 
             {/* Cart Drawer (Right to Left) */}
@@ -994,7 +1029,15 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 customerCode={successData?.customerCode || null}
                 guestToken={successData?.guestToken || null}
                 amount={successData?.amount}
+                whatsappUrl={successData?.whatsappUrl || null}
                 formatCurrency={formatCurrency}
+            />
+
+            {/* Customer Authentication (Login / Register / Code) Dialog */}
+            <CustomerAuthDialog 
+                open={customerAuthDialogOpen}
+                onOpenChange={setCustomerAuthDialogOpen}
+                defaultTab={customerAuthDialogTab}
             />
 
             {/* Site Footer */}
@@ -1005,7 +1048,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
 
 // --- AliExpress Inspired Components ---
 
-function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, accessLoading, setAccessLoading, accessError, setAccessError, appearance, updateAppearance, cartCount, onOpenCart, onOpenAccount, sharedOfferId }: {
+function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, accessLoading, setAccessLoading, accessError, setAccessError, appearance, updateAppearance, cartCount, onOpenCart, onOpenAccount, sharedOfferId, customer, onOpenAuth }: {
     searchQuery: string;
     setSearchQuery: (v: string) => void;
     customerId: string;
@@ -1020,6 +1063,8 @@ function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, ac
     onOpenCart: () => void;
     onOpenAccount: () => void;
     sharedOfferId?: string | number | null;
+    customer?: any;
+    onOpenAuth: (tab?: 'login' | 'register' | 'code') => void;
 }) {
     const handleAccessRequest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1097,21 +1142,110 @@ function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, ac
 
                     {/* Top Right: Desktop Form & Mobile Account Button ONLY */}
                     <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                        {/* Desktop Customer ID Portal Form (Hidden on Mobile) */}
-                        <form onSubmit={handleAccessRequest} className="hidden sm:flex items-center gap-2 max-w-xs">
-                            <Input 
-                                placeholder="Customer ID / Code"
-                                value={customerId}
-                                onChange={(e) => setCustomerId(e.target.value)}
-                                className="bg-surface-2 border-border rounded-xl h-[36px] font-mono-jet text-xs px-3 text-text-primary focus:border-amber"
-                            />
-                            <Button 
-                                disabled={accessLoading}
-                                className="bg-amber text-surface-0 font-display font-black text-xs uppercase h-[36px] px-3.5 rounded-xl hover:bg-amber-bright shrink-0"
-                            >
-                                {accessLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Portal'}
-                            </Button>
-                        </form>
+                        {/* Customer Profile Dropdown (Logged in) OR Customer ID Portal Form (Guest) */}
+                        {customer ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="hidden sm:flex items-center gap-2 h-[38px] px-2.5 rounded-xl border border-border bg-surface-2 hover:bg-surface-3 transition-all text-left">
+                                        <div className="size-6 rounded-lg bg-amber text-surface-0 font-display font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
+                                            {customer.name?.charAt(0)?.toUpperCase() || "C"}
+                                        </div>
+                                        <div className="text-left leading-tight">
+                                            <div className="text-xs font-bold text-text-primary flex items-center gap-1">
+                                                <span className="truncate max-w-[110px]">{customer.name}</span>
+                                                {String(customer.approval_status || '').toLowerCase() === 'approved' ? (
+                                                    <span className="size-1.5 rounded-full bg-emerald-500" title="Approved Wholesale Customer" />
+                                                ) : (
+                                                    <span className="size-1.5 rounded-full bg-amber" title="Pending Approval" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] text-text-muted truncate block max-w-[110px]">
+                                                {customer.business_name || customer.username}
+                                            </span>
+                                        </div>
+                                        <ChevronDown className="w-3.5 h-3.5 text-text-muted ml-0.5" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-64 p-2 bg-surface-1 border-border shadow-xl">
+                                    <DropdownMenuLabel className="font-normal p-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-black text-sm text-text-primary">
+                                                {customer.name}
+                                            </span>
+                                            {String(customer.approval_status || '').toLowerCase() === 'approved' ? (
+                                                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-[10px] px-1.5 py-0 font-bold">
+                                                    <ShieldCheck className="w-2.5 h-2.5 mr-0.5 inline" /> Approved
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="bg-amber/15 text-amber border-amber/30 text-[10px] px-1.5 py-0 font-bold">
+                                                    Pending Approval
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        {customer.business_name && (
+                                            <div className="text-xs text-text-muted flex items-center gap-1 mt-0.5">
+                                                <Building2 className="w-3 h-3 text-text-muted" />
+                                                <span>{customer.business_name}</span>
+                                            </div>
+                                        )}
+                                        <div className="text-[11px] font-mono-jet text-text-muted mt-1">
+                                            @{customer.username} • {customer.mobile}
+                                        </div>
+                                        {customer.account && (
+                                            <div className="mt-1.5 pt-1.5 border-t border-border text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                                ERP Code: [{customer.account.code}]
+                                            </div>
+                                        )}
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator className="bg-border" />
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/customer/dashboard" className="flex items-center gap-2 font-semibold text-xs py-2 cursor-pointer text-text-primary hover:bg-surface-2 rounded-lg">
+                                            <LayoutDashboard className="w-4 h-4 text-amber" />
+                                            <span>Customer Dashboard</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/customer/orders" className="flex items-center gap-2 font-semibold text-xs py-2 cursor-pointer text-text-primary hover:bg-surface-2 rounded-lg">
+                                            <Package className="w-4 h-4 text-amber" />
+                                            <span>My Wholesale Orders</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/customer/invoices" className="flex items-center gap-2 font-semibold text-xs py-2 cursor-pointer text-text-primary hover:bg-surface-2 rounded-lg">
+                                            <Receipt className="w-4 h-4 text-amber" />
+                                            <span>Invoices & Paid Bills</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/customer/ledger" className="flex items-center gap-2 font-semibold text-xs py-2 cursor-pointer text-text-primary hover:bg-surface-2 rounded-lg">
+                                            <BookOpen className="w-4 h-4 text-amber" />
+                                            <span>Account Statement / Ledger</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-border" />
+                                    <DropdownMenuItem
+                                        onClick={async () => {
+                                            await router.post('/customer/logout');
+                                            window.location.reload();
+                                        }}
+                                        className="text-rose-600 dark:text-rose-400 font-semibold text-xs py-2 cursor-pointer rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                    >
+                                        <LogOut className="w-4 h-4 mr-2" />
+                                        <span>Sign Out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : (
+                            <div className="hidden sm:flex items-center gap-2">
+                                <button
+                                    onClick={() => onOpenAuth('login')}
+                                    className="flex items-center gap-2 h-[38px] px-3.5 rounded-xl border border-amber/40 bg-amber/15 hover:bg-amber/25 text-amber font-display font-black text-xs uppercase tracking-wider transition-all shadow-sm active:scale-95 shrink-0"
+                                >
+                                    <User className="w-4 h-4" />
+                                    <span>Login / Register</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Desktop Cart Button (Hidden on Mobile) */}
                         <button
@@ -1136,13 +1270,19 @@ function SiteHeader({ searchQuery, setSearchQuery, customerId, setCustomerId, ac
                             {appearance === 'dark' ? <Sun className="w-4 h-4 text-amber" /> : <Moon className="w-4 h-4 text-amber" />}
                         </button>
 
-                        {/* Mobile ONLY: Single Account Button (Triggers Left Drawer) */}
+                        {/* Mobile ONLY: Single Account Button (Triggers Left Drawer or Auth Dialog) */}
                         <button
-                            onClick={onOpenAccount}
+                            onClick={() => {
+                                if (customer) {
+                                    onOpenAccount();
+                                } else {
+                                    onOpenAuth('login');
+                                }
+                            }}
                             className="sm:hidden bg-amber text-surface-0 font-display font-bold text-xs uppercase h-[34px] px-3 rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform shrink-0"
                         >
                             <User size={15} />
-                            <span>Account</span>
+                            <span>{customer ? customer.name.split(' ')[0] : 'Sign In'}</span>
                         </button>
                     </div>
                 </div>
@@ -1246,7 +1386,7 @@ function MobileBottomNav({ cartCount, activeCategory, activeBrand, onHomeClick, 
 
 // --- Left-to-Right Mobile Account & Settings Drawer ---
 
-function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, setLoading, error, setError, appearance, updateAppearance }: {
+function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, setLoading, error, setError, appearance, updateAppearance, customer, onOpenAuth }: {
     open: boolean;
     onClose: () => void;
     customerId: string;
@@ -1257,6 +1397,8 @@ function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, 
     setError: (v: string | null) => void;
     appearance: string;
     updateAppearance: (v: any) => void;
+    customer?: any;
+    onOpenAuth: (tab?: 'login' | 'register' | 'code') => void;
 }) {
     const handleAccessRequest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1328,30 +1470,124 @@ function AccountLeftDrawer({ open, onClose, customerId, setCustomerId, loading, 
                         </div>
 
                         <div className="p-4 space-y-6 flex-1">
-                            {/* Section 1: Customer Portal Access */}
-                            <div className="bg-surface-2/70 p-4 rounded-xl border border-border/70 space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <KeyRound className="w-4 h-4 text-amber" />
-                                    <h4 className="font-display font-black text-xs uppercase text-text-primary tracking-wider">Customer Portal Login</h4>
+                            {/* Section 1: Customer Portal Access / Profile */}
+                            {customer ? (
+                                <div className="bg-surface-2/70 p-4 rounded-xl border border-border/70 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="font-display font-black text-sm text-text-primary">
+                                            {customer.name}
+                                        </div>
+                                        {String(customer.approval_status || '').toLowerCase() === 'approved' ? (
+                                            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-[10px] px-1.5 py-0 font-bold">
+                                                <ShieldCheck className="w-2.5 h-2.5 mr-0.5 inline" /> Approved
+                                            </Badge>
+                                        ) : (
+                                            <Badge className="bg-amber/15 text-amber border-amber/30 text-[10px] px-1.5 py-0 font-bold">
+                                                Pending
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    {customer.business_name && (
+                                        <div className="text-xs text-text-muted flex items-center gap-1">
+                                            <Building2 className="w-3.5 h-3.5 text-text-muted" />
+                                            <span>{customer.business_name}</span>
+                                        </div>
+                                    )}
+                                    <div className="text-[11px] font-mono-jet text-text-muted">
+                                        @{customer.username} • {customer.mobile}
+                                    </div>
+                                    {customer.account && (
+                                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                            ERP Code: [{customer.account.code}]
+                                        </div>
+                                    )}
+                                    <div className="pt-2 border-t border-border space-y-1.5">
+                                        <Link
+                                            href="/customer/dashboard"
+                                            onClick={onClose}
+                                            className="flex items-center gap-2 p-2 rounded-lg bg-surface-1 hover:bg-surface-3 text-text-primary text-xs font-bold transition-colors"
+                                        >
+                                            <LayoutDashboard className="w-4 h-4 text-amber" />
+                                            <span>Customer Dashboard</span>
+                                        </Link>
+                                        <Link
+                                            href="/customer/orders"
+                                            onClick={onClose}
+                                            className="flex items-center gap-2 p-2 rounded-lg bg-surface-1 hover:bg-surface-3 text-text-primary text-xs font-bold transition-colors"
+                                        >
+                                            <Package className="w-4 h-4 text-amber" />
+                                            <span>My Wholesale Orders</span>
+                                        </Link>
+                                        <Link
+                                            href="/customer/invoices"
+                                            onClick={onClose}
+                                            className="flex items-center gap-2 p-2 rounded-lg bg-surface-1 hover:bg-surface-3 text-text-primary text-xs font-bold transition-colors"
+                                        >
+                                            <Receipt className="w-4 h-4 text-amber" />
+                                            <span>Invoices & Paid Bills</span>
+                                        </Link>
+                                        <Link
+                                            href="/customer/ledger"
+                                            onClick={onClose}
+                                            className="flex items-center gap-2 p-2 rounded-lg bg-surface-1 hover:bg-surface-3 text-text-primary text-xs font-bold transition-colors"
+                                        >
+                                            <BookOpen className="w-4 h-4 text-amber" />
+                                            <span>Account Statement / Ledger</span>
+                                        </Link>
+                                        <button
+                                            onClick={async () => {
+                                                await router.post('/customer/logout');
+                                                window.location.reload();
+                                            }}
+                                            className="w-full flex items-center gap-2 p-2 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold transition-colors mt-2"
+                                        >
+                                            <LogOut className="w-4 h-4" />
+                                            <span>Sign Out</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <p className="text-[11px] text-text-muted">Enter your Customer ID or Code to access personalized wholesale rates.</p>
+                            ) : (
+                                <div className="bg-surface-2/70 p-4 rounded-xl border border-border/70 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <User className="w-4 h-4 text-amber" />
+                                        <h4 className="font-display font-black text-xs uppercase text-text-primary tracking-wider">Wholesale Portal</h4>
+                                    </div>
+                                    <p className="text-[11px] text-text-muted">Sign in or register an account to access personalized wholesale rates and manage your orders.</p>
 
-                                <form onSubmit={handleAccessRequest} className="space-y-2.5">
-                                    <Input 
-                                        placeholder="Enter Customer ID / Code"
-                                        value={customerId}
-                                        onChange={(e) => setCustomerId(e.target.value)}
-                                        className="bg-surface-1 border-border rounded-xl h-10 font-mono-jet text-xs px-3 text-text-primary focus:border-amber"
-                                    />
-                                    {error && <p className="text-[10px] text-rose-500 font-bold">{error}</p>}
                                     <Button 
-                                        disabled={loading}
-                                        className="w-full bg-amber text-surface-0 font-display font-black text-xs uppercase h-10 rounded-xl hover:bg-amber-bright shadow-md shadow-amber/20"
+                                        onClick={() => {
+                                            onClose();
+                                            onOpenAuth('login');
+                                        }}
+                                        className="w-full bg-amber text-surface-0 font-display font-black text-xs uppercase h-10 rounded-xl hover:bg-amber-bright shadow-md shadow-amber/20 flex items-center justify-center gap-2"
                                     >
-                                        {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Login to Portal'}
+                                        <User className="w-4 h-4" />
+                                        <span>Login / Register</span>
                                     </Button>
-                                </form>
-                            </div>
+
+                                    <div className="pt-2 border-t border-border/70 space-y-2">
+                                        <span className="text-[10px] font-mono-jet uppercase text-text-muted font-bold block">
+                                            Or Quick Code Access:
+                                        </span>
+                                        <form onSubmit={handleAccessRequest} className="space-y-2">
+                                            <Input 
+                                                placeholder="Customer ID / Code"
+                                                value={customerId}
+                                                onChange={(e) => setCustomerId(e.target.value)}
+                                                className="bg-surface-1 border-border rounded-xl h-9 font-mono-jet text-xs px-3 text-text-primary focus:border-amber"
+                                            />
+                                            {error && <p className="text-[10px] text-rose-500 font-bold">{error}</p>}
+                                            <Button 
+                                                disabled={loading}
+                                                variant="outline"
+                                                className="w-full font-display font-black text-xs uppercase h-9 rounded-xl border-border hover:bg-surface-3"
+                                            >
+                                                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Access by Code'}
+                                            </Button>
+                                        </form>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Section 2: Appearance & Theme Switcher */}
                             <div className="bg-surface-2/70 p-4 rounded-xl border border-border/70 space-y-3">

@@ -201,10 +201,12 @@ $net_margin = $data['financial']['net_margin'] ?? 0;
         <div class="float-right text-right">
             <div class="report-badge">DAY END SUMMARY</div>
             <div style="font-size: 7.5px; color: #64748b; font-weight: bold; margin-top: 3px;" class="uppercase">
-                {{ date('d M Y', strtotime($from_date)) }} — {{ date('d M Y', strtotime($to_date)) }}
+                {{ date('d M Y', strtotime($from_date ?? date('Y-m-d'))) }} — {{ date('d M Y', strtotime($to_date ?? date('Y-m-d'))) }}
             </div>
         </div>
     </div>
+
+    @include('pdf.partials.criteria')
 
     <div class="container clearfix">
         

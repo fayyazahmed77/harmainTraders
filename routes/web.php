@@ -346,6 +346,29 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{id}/sync-prices', [OfferListController::class, 'syncPrices'])->name('offer-list.sync-prices');
         Route::delete('/{id}', [OfferListController::class, 'destroy'])->name('offerlist.destroy');
     });
+
+    //--------------------------------------------Online Orders Admin---------------------------------
+    Route::prefix('/online-orders')->group(function () {
+        Route::get('/search-items', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'searchRevisionItems'])->name('online-orders.search-items');
+        Route::get('/', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'index'])->name('online-orders.index');
+        Route::get('/{id}', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'show'])->name('online-orders.show');
+        Route::post('/{id}/start-review', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'startReview'])->name('online-orders.start-review');
+        Route::post('/{id}/revision', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'createRevision'])->name('online-orders.revision');
+        Route::post('/{id}/cancel', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'cancel'])->name('online-orders.cancel');
+        Route::post('/{id}/confirm', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'confirm'])->name('online-orders.confirm');
+        Route::get('/{id}/whatsapp-link', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'whatsappLink'])->name('online-orders.whatsapp-link');
+    });
+
+    //--------------------------------------------Customer Approvals Admin----------------------------
+    Route::prefix('/customers/approvals')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'index'])->name('customer-approvals.index');
+        Route::get('/search-accounts', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'searchAccounts'])->name('customer-approvals.search-accounts');
+        Route::post('/{id}/approve', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'approve'])->name('customer-approvals.approve');
+        Route::post('/{id}/reject', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'reject'])->name('customer-approvals.reject');
+        Route::post('/{id}/link-account', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'linkAccount'])->name('customer-approvals.link-account');
+        Route::post('/{id}/create-link-erp', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'createAndLinkErpAccount'])->name('customer-approvals.create-link-erp');
+    });
+
     //--------------------------------------------Sales-----------------------------------------------
     Route::prefix('/sales')->group(function () {
         Route::get('/', [SalesController::class, 'index'])->name('sale.index');
@@ -682,6 +705,30 @@ Route::get('/live-offers', [App\Http\Controllers\PublicOfferController::class, '
 Route::post('/api/access-my-offer', [App\Http\Controllers\PublicOfferController::class, 'accessMyOffer'])->name('public.access-my-offer');
 Route::post('/api/verify-customer', [App\Http\Controllers\PublicOfferController::class, 'verifyCustomer'])->name('public.verify-customer');
 Route::post('/api/place-offer-order', [App\Http\Controllers\PublicOfferController::class, 'checkoutOfferOrder'])->name('public.place-offer-order');
+
+// ============================================================================
+// CUSTOMER AUTHENTICATION ROUTES (auth:customer)
+// ============================================================================
+Route::prefix('/customer')->group(function () {
+    Route::post('/login', [App\Http\Controllers\Customer\CustomerAuthController::class, 'login'])->name('customer.login');
+    Route::post('/register', [App\Http\Controllers\Customer\CustomerAuthController::class, 'register'])->name('customer.register');
+    Route::post('/logout', [App\Http\Controllers\Customer\CustomerAuthController::class, 'logout'])->name('customer.logout');
+    Route::get('/me', [App\Http\Controllers\Customer\CustomerAuthController::class, 'me'])->name('customer.me');
+
+    // Customer Portal (Requires Customer Authentication)
+    Route::middleware(['auth:customer'])->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\Customer\CustomerPortalController::class, 'dashboard'])->name('customer.dashboard');
+        Route::get('/orders', [App\Http\Controllers\Customer\CustomerPortalController::class, 'orders'])->name('customer.orders');
+        Route::get('/orders/{orderNo}', [App\Http\Controllers\Customer\CustomerPortalController::class, 'showOrder'])->name('customer.orders.show');
+        Route::get('/orders/{orderNo}/invoice-pdf', [App\Http\Controllers\Customer\CustomerPortalController::class, 'downloadInvoicePdf'])->name('customer.orders.invoice-pdf');
+        Route::get('/invoices', [App\Http\Controllers\Customer\CustomerPortalController::class, 'invoices'])->name('customer.invoices');
+        Route::get('/invoices/{saleId}/pdf', [App\Http\Controllers\Customer\CustomerPortalController::class, 'downloadSalesInvoicePdf'])->name('customer.invoices.pdf');
+        Route::get('/ledger', [App\Http\Controllers\Customer\CustomerPortalController::class, 'ledger'])->name('customer.ledger');
+        Route::get('/ledger/pdf', [App\Http\Controllers\Customer\CustomerPortalController::class, 'exportLedgerPdf'])->name('customer.ledger.pdf');
+        Route::post('/orders/{id}/accept-revision', [App\Http\Controllers\Customer\CustomerPortalController::class, 'acceptRevision'])->name('customer.orders.accept-revision');
+        Route::post('/orders/{id}/reject-revision', [App\Http\Controllers\Customer\CustomerPortalController::class, 'rejectRevision'])->name('customer.orders.reject-revision');
+    });
+});
 
 Route::get('/test-403', function () {
     abort(403);

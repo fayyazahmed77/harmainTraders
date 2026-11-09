@@ -607,7 +607,11 @@ class SalesController extends Controller implements HasMiddleware
     //edit
     public function edit($id)
     {
-        $sale = Sales::with('customer', 'salesman', 'items.item')->find($id);
+        $sale = Sales::with('customer', 'salesman', 'items.item')->findOrFail($id);
+
+        if ($sale->is_online) {
+            return redirect()->route('sales.index')->with('error', 'Online wholesale orders cannot be edited from manual sales.');
+        }
 
         // Fetch associated payments (splits) linked to this sale via allocations
         // with the allocated amount for this bill rather than the global payment voucher amount
@@ -719,6 +723,11 @@ class SalesController extends Controller implements HasMiddleware
     //update
     public function update(Request $request, $id)
     {
+        $existingSale = Sales::findOrFail($id);
+        if ($existingSale->is_online) {
+            return redirect()->route('sales.index')->with('error', 'Online wholesale orders cannot be edited from manual sales.');
+        }
+
         $request->validate([
             'date'            => 'required|date',
             'customer_id'     => [

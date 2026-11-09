@@ -27,6 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'api/v1/signed-action/*',
+            'api/place-offer-order',
+            'api/verify-customer',
+            'api/access-my-offer',
+            'customer/login',
+            'customer/register',
+            'customer/logout',
         ]);
 
         $middleware->web(append: [

@@ -11,6 +11,7 @@ interface OfferSuccessDialogProps {
     guestToken: string | null;
     amount?: number | null;
     formatCurrency?: (amount: number) => string;
+    whatsappUrl?: string | null;
 }
 
 const FireworksCanvas: React.FC = () => {
@@ -134,6 +135,7 @@ export const OfferSuccessDialog: React.FC<OfferSuccessDialogProps> = ({
     guestToken,
     amount,
     formatCurrency,
+    whatsappUrl,
 }) => {
     const defaultFormatCurrency = (val: number) => {
         return new Intl.NumberFormat('en-PK', {
@@ -146,6 +148,10 @@ export const OfferSuccessDialog: React.FC<OfferSuccessDialogProps> = ({
     const formatter = formatCurrency || defaultFormatCurrency;
 
     const handleWhatsApp = () => {
+        if (whatsappUrl) {
+            window.open(whatsappUrl, '_blank');
+            return;
+        }
         const amtStr = amount ? ` (Total: ${formatter(amount)})` : '';
         const message = `Hello Haramain Traders, I have placed order #${invoice}${amtStr} under Customer Code ${customerCode || 'GUEST'}. Please confirm my order!`;
         window.open(`https://wa.me/923323218684?text=${encodeURIComponent(message)}`, '_blank');
@@ -233,16 +239,14 @@ export const OfferSuccessDialog: React.FC<OfferSuccessDialogProps> = ({
                                     Confirm via WhatsApp
                                 </Button>
 
-                                {guestToken && (
-                                    <Button 
-                                        variant="outline"
-                                        onClick={() => window.location.href = `/g/${guestToken}`}
-                                        className="w-full border-border bg-surface-2 hover:bg-surface-3 text-text-primary font-bold text-xs uppercase h-11 rounded-xl flex items-center justify-center gap-2"
-                                    >
-                                        View Order Portal
-                                        <ExternalLink className="w-4 h-4" />
-                                    </Button>
-                                )}
+                                <Button 
+                                    variant="outline"
+                                    onClick={() => window.location.href = '/customer/orders'}
+                                    className="w-full border-border bg-surface-2 hover:bg-surface-3 text-text-primary font-bold text-xs uppercase h-11 rounded-xl flex items-center justify-center gap-2"
+                                >
+                                    View My Order History
+                                    <ExternalLink className="w-4 h-4" />
+                                </Button>
 
                                 <Button 
                                     variant="ghost" 

@@ -12,7 +12,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
 import {
-    Trash2, Plus, CalendarIcon, RotateCcw, FileText,
+    Trash2, Plus, Minus, CalendarIcon, RotateCcw, FileText,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
     ArrowDownToLine, Clock, Banknote, Database, ShieldCheck, History, Tags, ListRestart, Building2
@@ -172,10 +172,16 @@ const SignalBadge = ({ text, type = 'blue' }: { text: string, type?: 'green' | '
 };
 
 const ItemDetailCard = ({ row }: { row: RowData }) => {
-    const mainReturnPcs = (row.full || 0) * (row.packing || 1) + (row.pcs || 0);
-    const bonusReturnPcs = (row.bonus_full || 0) * (row.packing || 1) + (row.bonus_pcs || 0);
+    const packing = row.packing > 0 ? row.packing : 1;
+    const mainReturnPcs = (row.full || 0) * packing + (row.pcs || 0);
+    const bonusReturnPcs = (row.bonus_full || 0) * packing + (row.bonus_pcs || 0);
     const totalReturnPcs = mainReturnPcs + bonusReturnPcs;
-    const updatedStock = (row.current_stock || 0) - totalReturnPcs; // For Purchase Return, stock decreases
+    const currentStockPcs = toNum(row.current_stock);
+    const updatedStock = currentStockPcs - totalReturnPcs; // For Purchase Return, stock decreases
+    const isExceeded = updatedStock < 0;
+
+    const curFull = Math.floor(currentStockPcs / packing);
+    const curPcs = currentStockPcs % packing;
 
     return (
         <Card className={`p-0 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden relative group hover:border-orange-500/50 transition-all border-l-4 border-l-orange-500 w-full shadow-lg shadow-black/5`}>
@@ -257,8 +263,8 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
                     </div>
                 </div>
 
-                {/* Sec 4: Asset Intelligence */}
-                <div className="p-4 flex-1 min-w-[260px] bg-zinc-50/30 dark:bg-zinc-900/10">
+                {/* Sec 4: Asset Intelligence & Live Stock */}
+                <div className="p-4 flex-1 min-w-[280px] bg-zinc-50/30 dark:bg-zinc-900/10">
                     <div className="grid grid-cols-2 gap-4 h-full">
                         <div className="flex flex-col justify-between truncate">
                             <div className="space-y-1">
@@ -276,25 +282,36 @@ const ItemDetailCard = ({ row }: { row: RowData }) => {
                                 <div className="text-xs font-bold text-zinc-500 font-mono tracking-tighter">Rs {row.tp}</div>
                             </div>
                         </div>
-                        <div className="flex flex-col justify-end items-end h-full">
-                            <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-live-pulse" />
-                                Live Stock
-                            </div>
-                            <div className="flex flex-col items-end">
-                                {totalReturnPcs > 0 && (
-                                    <motion.div initial={{ y: 5, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                                        className="text-[10px] font-black text-rose-500 flex items-center gap-1 mb-1">
-                                        <Plus size={8} /> -{totalReturnPcs} PCS
-                                    </motion.div>
-                                )}
-                                <div className="flex items-baseline gap-1">
-                                    <span className="text-xl font-black text-emerald-600 tracking-tighter leading-none">{updatedStock}</span>
-                                    <span className="text-[9px] font-black text-emerald-600/50 uppercase">Pcs</span>
+                        <div className="flex flex-col justify-between items-end h-full">
+                            <div className="flex flex-col items-end w-full">
+                                <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5 flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-live-pulse" />
+                                    Live On-Hand Stock
+                                </div>
+                                <div className="text-xs font-black font-mono text-zinc-700 dark:text-zinc-200">
+                                    {currentStockPcs} PCS <span className="text-[9px] font-medium text-zinc-400">({curFull}F • {curPcs}P)</span>
                                 </div>
                             </div>
-                            <div className="mt-2 flex items-center gap-2">
-                                <Database size={12} className="text-zinc-300 dark:text-zinc-700" />
+                            <div className="flex flex-col items-end my-1 w-full">
+                                {totalReturnPcs > 0 && (
+                                    <motion.div initial={{ y: 3, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                        className="text-[10px] font-black text-rose-500 flex items-center gap-0.5">
+                                        <Minus size={9} className="stroke-[3]" /> {totalReturnPcs} PCS
+                                    </motion.div>
+                                )}
+                                <div className="flex items-baseline gap-1 mt-0.5">
+                                    <span className="text-[8px] font-bold text-zinc-400 uppercase mr-1">Projected:</span>
+                                    <span className={`text-lg font-black tracking-tighter leading-none ${isExceeded ? 'text-rose-600' : 'text-emerald-600'}`}>{updatedStock}</span>
+                                    <span className={`text-[9px] font-black uppercase ${isExceeded ? 'text-rose-600/60' : 'text-emerald-600/50'}`}>Pcs</span>
+                                </div>
+                                {isExceeded && (
+                                    <div className="text-[8px] font-black uppercase tracking-tighter text-rose-500 bg-rose-500/10 px-1 py-0.5 rounded mt-0.5 text-right">
+                                        Exceeds by {Math.abs(updatedStock)} PCS
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Database size={11} className="text-zinc-300 dark:text-zinc-700" />
                                 <span className="text-[8px] font-black text-zinc-400 uppercase tracking-[0.2em]">{row.packing} PCS/PK</span>
                             </div>
                         </div>
@@ -445,7 +462,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         has_bonus_available: true,
                         purchase_date: purchase.date,
                         purchase_invoice: purchase.invoice,
-                        current_stock: toNum(it?.stock_1),
+                        current_stock: toNum(it?.available_stock ?? it?.total_stock_pcs ?? (toNum(it?.stock_1) * packing + toNum(it?.stock_2))),
                         tp: toNum(it?.trade_price),
                         supplier_name: acc?.title ?? "N/A",
                     };
@@ -565,7 +582,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                             returnable_pcs: returnablePcs,
                             purchase_date: inv.date,
                             purchase_invoice: inv.invoice,
-                            current_stock: toNum(it?.stock_1),
+                            current_stock: toNum(it?.available_stock ?? it?.total_stock_pcs ?? (toNum(it?.stock_1) * packing + toNum(it?.stock_2))),
                             tp: toNum(it?.trade_price),
                             supplier_name: selectedAccount?.title ?? "N/A",
                             salesman: pi.salesman_name ?? pi.salesman?.name ?? "N/A",
@@ -599,7 +616,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             packing: packing,
             purchase_date: found.date,
             purchase_invoice: found.invoice_no,
-            current_stock: toNum(it?.stock_1),
+            current_stock: toNum(it?.available_stock ?? it?.total_stock_pcs ?? (toNum(it?.stock_1) * packing + toNum(it?.stock_2))),
             tp: toNum(it?.trade_price),
             bonus_full: 0,
             bonus_pcs: 0,
@@ -661,7 +678,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 returnable_pcs: bReturnable,
                 purchase_date: pi.date,
                 purchase_invoice: pi.invoice_no,
-                current_stock: toNum(it?.stock_1),
+                current_stock: toNum(it?.available_stock ?? it?.total_stock_pcs ?? (toNum(it?.stock_1) * packing + toNum(it?.stock_2))),
                 tp: toNum(it?.trade_price),
                 supplier_name: selectedAccount?.title ?? "N/A",
                 salesman: pi.salesman_name ?? pi.salesman?.name ?? "N/A",
@@ -1601,6 +1618,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 <span>Rate: Rs {toNum(pi.last_trade_price ?? pi.item?.trade_price).toLocaleString()}</span>
                                                 <span className="w-px h-2 bg-zinc-200 dark:bg-zinc-800" />
                                                 <span>Inv: {toNum(pi.qty_carton)}F {toNum(pi.qty_pcs)}P</span>
+                                                <span className="w-px h-2 bg-zinc-200 dark:bg-zinc-800" />
+                                                <span className="text-emerald-600 font-bold">Live: {toNum(pi.item?.available_stock ?? pi.item?.total_stock_pcs ?? 0)} Pcs</span>
                                             </div>
                                             <div className="text-[10px] font-mono text-zinc-600/100 mt-1 uppercase">Purchased: <span className="text-zinc-600 dark:text-zinc-300 font-bold">{fmtDate(pi.date)}</span></div>
                                         </div>

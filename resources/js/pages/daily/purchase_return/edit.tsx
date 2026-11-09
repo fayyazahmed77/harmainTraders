@@ -12,7 +12,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbItem } from "@/types";
 import {
-    Trash2, Plus, CalendarIcon, RotateCcw, FileText,
+    Trash2, Plus, Minus, CalendarIcon, RotateCcw, FileText, ShieldCheck, History, Tags,
     Search, ChevronRight, Hash, User as UserIcon,
     ArrowRightLeft, BadgePercent, Calculator, Package, Info, CheckCircle2,
     ArrowDownToLine, Database, Clock, Banknote, Building2
@@ -68,6 +68,12 @@ interface RowData {
     packing: number;
     bonus_full: number;
     bonus_pcs: number;
+    current_stock?: number;
+    original_return_pcs?: number;
+    purchase_date?: string;
+    purchase_invoice?: string;
+    tp?: number;
+    supplier_name?: string;
 }
 
 interface Account {
@@ -124,6 +130,160 @@ const fmtDate = (d: string) => {
     if (!d) return "";
     const dt = new Date(d);
     return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const ItemDetailCard = ({ row }: { row: RowData }) => {
+    const packing = row.packing > 0 ? row.packing : 1;
+    const mainReturnPcs = (row.full || 0) * packing + (row.pcs || 0);
+    const bonusReturnPcs = (row.bonus_full || 0) * packing + (row.bonus_pcs || 0);
+    const totalReturnPcs = mainReturnPcs + bonusReturnPcs;
+    const currentStockPcs = toNum(row.current_stock);
+    const origReturnPcs = toNum(row.original_return_pcs);
+    // Effective on-hand stock before this return transaction was committed:
+    const effectiveStock = currentStockPcs + origReturnPcs;
+    const updatedStock = effectiveStock - totalReturnPcs;
+    const isExceeded = updatedStock < 0;
+
+    const curFull = Math.floor(currentStockPcs / packing);
+    const curPcs = currentStockPcs % packing;
+
+    return (
+        <Card className={`p-0 ${CARD_BASE} ${PREMIUM_ROUNDING_MD} overflow-hidden relative group hover:border-orange-500/50 transition-all border-l-4 border-l-orange-500 w-full shadow-lg shadow-black/5`}>
+            <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-zinc-100 dark:divide-zinc-800">
+                {/* Sec 1: Identity & Traceability */}
+                <div className="p-4 flex-1 min-w-[260px] relative overflow-hidden group/id">
+                    <div className="absolute -right-4 -top-4 opacity-[0.03] dark:opacity-[0.07] group-hover/id:scale-110 transition-transform duration-700">
+                        <ShieldCheck size={96} />
+                    </div>
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1.5 text-zinc-400">
+                                <Hash size={10} className="text-orange-500 shadow-sm" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">Registry Identity</span>
+                            </div>
+                            <span className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tighter leading-tight block truncate">
+                                {row.item_title}
+                            </span>
+                        </div>
+                        <div className="mt-3">
+                            <span className="bg-orange-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase flex items-center w-fit gap-1 shadow-sm">
+                                <History size={10} />
+                                INV: {row.purchase_invoice}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 2: Historical Context */}
+                <div className="p-4 flex-1 min-w-[220px] bg-zinc-50/30 dark:bg-zinc-900/10">
+                    <div className="flex flex-col h-full justify-between gap-4">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <CalendarIcon size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Transaction Date</div>
+                            </div>
+                            <div className="text-sm font-black text-zinc-800 dark:text-zinc-200 font-mono italic">
+                                {fmtDate(row.purchase_date || "")}
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <UserIcon size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Supplier</div>
+                            </div>
+                            <div className="text-xs font-black text-zinc-700 dark:text-zinc-300 truncate tracking-tight uppercase">
+                                {row.supplier_name}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 3: Tactical Delta */}
+                <div className="p-4 flex-1 min-w-[220px]">
+                    <div className="flex flex-col h-full justify-between gap-4">
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                                <Package size={10} />
+                                <div className="text-[9px] font-black uppercase tracking-widest">Purchased Qty</div>
+                            </div>
+                            <div className="text-sm font-black text-zinc-600 dark:text-zinc-400 font-mono">
+                                {row.sold_full}F <span className="text-[10px] opacity-40">&bull;</span> {row.sold_pcs}P
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 text-orange-500/50">
+                                <ArrowRightLeft size={10} className="text-orange-500" />
+                                <div className="text-[9px] font-black uppercase tracking-widest text-orange-600">Return Qty</div>
+                            </div>
+                            <div className="text-sm font-black text-orange-600 font-mono">
+                                {row.full}F <span className="text-[10px] opacity-40">&bull;</span> {row.pcs}P
+                                {bonusReturnPcs > 0 && (
+                                    <span className="ml-2 text-emerald-600 text-[10px]">
+                                        (+{row.bonus_full}F {row.bonus_pcs}P Bonus)
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sec 4: Asset Intelligence & Live Stock */}
+                <div className="p-4 flex-1 min-w-[280px] bg-zinc-50/30 dark:bg-zinc-900/10">
+                    <div className="grid grid-cols-2 gap-4 h-full">
+                        <div className="flex flex-col justify-between truncate">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-zinc-400">
+                                    <Banknote size={10} />
+                                    <div className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Purch Price</div>
+                                </div>
+                                <div className="text-sm font-black text-zinc-900 dark:text-white font-mono tracking-tighter">Rs {row.rate}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-zinc-400 opacity-60">
+                                    <Tags size={10} />
+                                    <div className="text-[8px] font-black uppercase tracking-widest ">Cost T.P</div>
+                                </div>
+                                <div className="text-xs font-bold text-zinc-500 font-mono tracking-tighter">Rs {row.tp}</div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col justify-between items-end h-full">
+                            <div className="flex flex-col items-end w-full">
+                                <div className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5 flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-live-pulse" />
+                                    Live On-Hand Stock
+                                </div>
+                                <div className="text-xs font-black font-mono text-zinc-700 dark:text-zinc-200">
+                                    {currentStockPcs} PCS <span className="text-[9px] font-medium text-zinc-400">({curFull}F • {curPcs}P)</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end my-1 w-full">
+                                {totalReturnPcs > 0 && (
+                                    <motion.div initial={{ y: 3, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                        className="text-[10px] font-black text-rose-500 flex items-center gap-0.5">
+                                        <Minus size={9} className="stroke-[3]" /> {totalReturnPcs} PCS
+                                    </motion.div>
+                                )}
+                                <div className="flex items-baseline gap-1 mt-0.5">
+                                    <span className="text-[8px] font-bold text-zinc-400 uppercase mr-1">Projected:</span>
+                                    <span className={`text-lg font-black tracking-tighter leading-none ${isExceeded ? 'text-rose-600' : 'text-emerald-600'}`}>{updatedStock}</span>
+                                    <span className={`text-[9px] font-black uppercase ${isExceeded ? 'text-rose-600/60' : 'text-emerald-600/50'}`}>Pcs</span>
+                                </div>
+                                {isExceeded && (
+                                    <div className="text-[8px] font-black uppercase tracking-tighter text-rose-500 bg-rose-500/10 px-1 py-0.5 rounded mt-0.5 text-right">
+                                        Exceeds by {Math.abs(updatedStock)} PCS
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Database size={11} className="text-zinc-300 dark:text-zinc-700" />
+                                <span className="text-[8px] font-black text-zinc-400 uppercase tracking-[0.2em]">{row.packing} PCS/PK</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const TechLabel = ({ children, icon: Icon, label }: { children: React.ReactNode, icon?: any, label: string }) => (
@@ -241,13 +401,14 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                 const discAmt = toNum(it.discount);
                 const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
 
+                const origReturnPcs = (toNum(it.qty_carton) * packing + toNum(it.qty_pcs)) + (toNum(it.bonus_qty_carton || 0) * packing + toNum(it.bonus_qty_pcs || 0));
                 return {
                     id: it.id,
                     item_id: it.item_id,
                     item_title: it.item?.title ?? "Unknown Item",
                     full: toNum(it.qty_carton),
                     pcs: toNum(it.qty_pcs),
-                    sold_full: toNum(it.qty_carton), // simplified for edit
+                    sold_full: toNum(it.qty_carton),
                     sold_pcs: toNum(it.qty_pcs),
                     rate: toNum(it.trade_price),
                     discPercent: discVal,
@@ -256,6 +417,12 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                     packing: packing,
                     bonus_full: toNum(it.bonus_qty_carton || 0),
                     bonus_pcs: toNum(it.bonus_qty_pcs || 0),
+                    current_stock: toNum(it.item?.available_stock ?? it.item?.total_stock_pcs ?? 0),
+                    original_return_pcs: origReturnPcs,
+                    purchase_date: returnData.date,
+                    purchase_invoice: returnData.original_invoice,
+                    tp: toNum(it.item?.trade_price),
+                    supplier_name: (returnData as any).supplier?.title ?? "Supplier",
                 };
             });
             setRows(initialRows);
@@ -342,7 +509,13 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                             amount: 0,
                             packing: packing,
                             bonus_full: 0,
-                            bonus_pcs: 0
+                            bonus_pcs: 0,
+                            current_stock: toNum(it?.available_stock ?? it?.total_stock_pcs ?? 0),
+                            original_return_pcs: 0,
+                            purchase_date: inv.date,
+                            purchase_invoice: inv.invoice,
+                            tp: toNum(it?.trade_price),
+                            supplier_name: selectedAccount?.title ?? "Supplier",
                         };
                     });
                     setRows(loadedRows.length > 0 ? loadedRows : [getEmptyRow()]);
@@ -680,6 +853,21 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                                     <Plus size={12} className="mr-1.5" /> Assign Bulk
                                 </Button>
                             </div>
+
+                            {/* Active Item Intelligence */}
+                            {rowsWithAmount.some(r => r.item_id && r.item_id === selectedRowItemId) && (
+                                <div className="p-2.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10 shrink-0">
+                                    <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                                        <Info size={13} className="text-orange-500" />
+                                        <span className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em]">Active Item Intelligence</span>
+                                    </div>
+                                    <div className="w-full">
+                                        {rowsWithAmount.filter(r => r.item_id && r.item_id === selectedRowItemId).map((row) => (
+                                            <ItemDetailCard key={row.id} row={row} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

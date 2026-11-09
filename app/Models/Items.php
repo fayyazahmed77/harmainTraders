@@ -65,11 +65,17 @@ class Items extends Model
     ];
 
     protected $appends = [
+        'name',
         'price_per_pcs',
         'total_stock_pcs',
         'stock_breakdown',
         'primary_image_url',
     ];
+
+    public function getNameAttribute()
+    {
+        return $this->title;
+    }
 
     public function scopeActive($query)
     {

@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Box, Search, Plus, Check, PackageSearch, X, Layers, History, Calendar, Building2, TrendingUp, ShieldCheck } from "lucide-react";
+import { Box, Search, Plus, Check, PackageSearch, X, Layers, History, Calendar, Building2, TrendingUp, ShieldCheck, Pencil } from "lucide-react";
+import { DuplicateItemActionPopover, ExistingLineMatch } from "../../sales/components/DuplicateItemActionPopover";
 
 interface Item {
     id: number;
@@ -47,7 +48,7 @@ interface RowData {
     pcs: number;
     bonus_full: number;
     bonus_pcs: number;
-    rate: number;
+    rate: number | string;
     discPercent: number;
     trade_price: number;
     amount: number;
@@ -96,12 +97,15 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
     // Keyboard Navigation & Focus States
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [selectedItemForQty, setSelectedItemForQty] = useState<Item | null>(null);
+    const [editorMode, setEditorMode] = useState<'add' | 'edit'>('add');
+    const [targetRowId, setTargetRowId] = useState<number | null>(null);
+    const [duplicatePromptItem, setDuplicatePromptItem] = useState<Item | null>(null);
 
     const [dialogFull, setDialogFull] = useState<number>(0);
     const [dialogPcs, setDialogPcs] = useState<number>(0);
     const [dialogBonusFull, setDialogBonusFull] = useState<number>(0);
     const [dialogBonusPcs, setDialogBonusPcs] = useState<number>(0);
-    const [dialogRate, setDialogRate] = useState<number>(0);
+    const [dialogRate, setDialogRate] = useState<number | string>(0);
     const [dialogDiscount, setDialogDiscount] = useState<number>(0);
 
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +123,15 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
     useEffect(() => {
         setSelectedIndex(0);
     }, [itemSearch, open]);
+
+    useEffect(() => {
+        if (!open) {
+            setSelectedItemForQty(null);
+            setDuplicatePromptItem(null);
+            setTargetRowId(null);
+            setEditorMode('add');
+        }
+    }, [open]);
 
     // Auto-scroll focused item into view
     useEffect(() => {
@@ -141,49 +154,95 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         }
     }, [selectedItemForQty]);
 
-    const handleItemClick = (item: Item) => {
-        setSelectedItemForQty(item);
+    const getDefaultRateForItem = (item: Item): number => {
+        return toNumber(item.last_purchase_rate) > 0
+            ? toNumber(item.last_purchase_rate)
+            : toNumber(item.trade_price);
+    };
 
-        const existing = rows.find(r => Number(r.item_id) === Number(item.id));
-        if (existing) {
-            setDialogFull(toNumber(existing.full));
-            setDialogPcs(toNumber(existing.pcs));
-            setDialogBonusFull(toNumber(existing.bonus_full));
-            setDialogBonusPcs(toNumber(existing.bonus_pcs));
-            setDialogRate(toNumber(existing.rate));
-            setDialogDiscount(toNumber(existing.discPercent));
-        } else {
-            setDialogFull(0);
-            setDialogPcs(0);
-            setDialogBonusFull(0);
-            setDialogBonusPcs(0);
-            setDialogDiscount(toNumber(item.discount || 0));
-            
-            const defaultRate = toNumber(item.last_purchase_rate) > 0 
-                ? toNumber(item.last_purchase_rate) 
-                : toNumber(item.trade_price);
-            setDialogRate(defaultRate);
+    const getMatchingLinesForItem = (item: Item): ExistingLineMatch[] => {
+        const packing = Math.max(1, toNumber(item.packing_qty || 1));
+        const validRows = rows.filter(r => r.item_id !== null);
+        return validRows
+            .map((r, index) => ({ row: r, lineNumber: index + 1 }))
+            .filter(({ row }) => Number(row.item_id) === Number(item.id))
+            .map(({ row, lineNumber }) => {
+                const full = toNumber(row.full);
+                const pcs = toNumber(row.pcs);
+                const rate = toNumber(row.rate);
+                const disc = toNumber(row.discPercent);
+                const gross = (full * rate) + ((pcs / packing) * rate);
+                const subtotal = Math.round((gross * (1 - disc / 100)) * 100) / 100;
+                return {
+                    rowId: row.id,
+                    lineNumber,
+                    full,
+                    pcs,
+                    bonus_full: toNumber(row.bonus_full),
+                    bonus_pcs: toNumber(row.bonus_pcs),
+                    rate,
+                    discPercent: disc,
+                    packingQty: packing,
+                    subtotal,
+                };
+            });
+    };
+
+    const openAddModeForItem = (item: Item) => {
+        setDuplicatePromptItem(null);
+        setEditorMode('add');
+        setTargetRowId(null);
+        setSelectedItemForQty(item);
+        setDialogFull(0);
+        setDialogPcs(0);
+        setDialogBonusFull(0);
+        setDialogBonusPcs(0);
+        setDialogDiscount(toNumber(item.discount || 0));
+        setDialogRate(getDefaultRateForItem(item));
+    };
+
+    const openEditModeForItem = (item: Item, rowId: number) => {
+        const existing = rows.find(r => r.id === rowId);
+        if (!existing) {
+            openAddModeForItem(item);
+            return;
         }
+        setDuplicatePromptItem(null);
+        setEditorMode('edit');
+        setTargetRowId(rowId);
+        setSelectedItemForQty(item);
+        setDialogFull(toNumber(existing.full));
+        setDialogPcs(toNumber(existing.pcs));
+        setDialogBonusFull(toNumber(existing.bonus_full));
+        setDialogBonusPcs(toNumber(existing.bonus_pcs));
+        setDialogRate(toNumber(existing.rate));
+        setDialogDiscount(toNumber(existing.discPercent));
+    };
+
+    const handleItemClick = (item: Item) => {
+        const matchingRows = rows.filter(r => Number(r.item_id) === Number(item.id));
+        if (matchingRows.length > 0) {
+            setSelectedItemForQty(null);
+            setDuplicatePromptItem(item);
+            return;
+        }
+        openAddModeForItem(item);
     };
 
     const handleCommit = () => {
         if (!selectedItemForQty) return;
 
         const itemId = selectedItemForQty.id;
-        const existingRow = rows.find(r => Number(r.item_id) === Number(itemId));
+        const effectiveLastRate = getDefaultRateForItem(selectedItemForQty);
 
-        const effectiveLastRate = toNumber(selectedItemForQty.last_purchase_rate) > 0
-            ? toNumber(selectedItemForQty.last_purchase_rate)
-            : toNumber(selectedItemForQty.trade_price);
-
-        if (existingRow) {
-            setRows(prev => prev.map(r => r.id === existingRow.id ? {
+        if (editorMode === 'edit' && targetRowId !== null) {
+            setRows(prev => prev.map(r => r.id === targetRowId ? {
                 ...r,
                 full: dialogFull,
                 pcs: dialogPcs,
                 bonus_full: dialogBonusFull,
                 bonus_pcs: dialogBonusPcs,
-                rate: dialogRate,
+                rate: toNumber(dialogRate),
                 discPercent: dialogDiscount,
                 amount: 0,
                 last_purchase_rate: effectiveLastRate
@@ -198,7 +257,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                     pcs: dialogPcs,
                     bonus_full: dialogBonusFull,
                     bonus_pcs: dialogBonusPcs,
-                    rate: dialogRate,
+                    rate: toNumber(dialogRate),
                     discPercent: dialogDiscount,
                     trade_price: toNumber(selectedItemForQty.trade_price),
                     amount: 0,
@@ -214,7 +273,7 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                         pcs: dialogPcs,
                         bonus_full: dialogBonusFull,
                         bonus_pcs: dialogBonusPcs,
-                        rate: dialogRate,
+                        rate: toNumber(dialogRate),
                         discPercent: dialogDiscount,
                         trade_price: toNumber(selectedItemForQty.trade_price),
                         amount: 0,
@@ -224,6 +283,9 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
             }
         }
         setSelectedItemForQty(null);
+        setTargetRowId(null);
+        setEditorMode('add');
+        setDuplicatePromptItem(null);
         setItemSearch("");
         setTimeout(() => {
             searchInputRef.current?.focus();
@@ -231,10 +293,21 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (duplicatePromptItem) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setDuplicatePromptItem(null);
+                setTimeout(() => searchInputRef.current?.focus(), 50);
+            }
+            return;
+        }
+
         if (selectedItemForQty) {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 setSelectedItemForQty(null);
+                setTargetRowId(null);
+                setEditorMode('add');
                 setTimeout(() => searchInputRef.current?.focus(), 50);
             }
             return;
@@ -265,6 +338,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && !e.shiftKey) {
             e.preventDefault();
@@ -280,6 +355,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && e.shiftKey) {
             e.preventDefault();
@@ -295,6 +372,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && e.shiftKey) {
             e.preventDefault();
@@ -315,6 +394,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && e.shiftKey) {
             e.preventDefault();
@@ -330,6 +411,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && e.shiftKey) {
             e.preventDefault();
@@ -350,6 +433,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         } else if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && !e.shiftKey) {
             e.preventDefault();
@@ -365,6 +450,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
         if (e.key === 'Escape') {
             e.preventDefault();
             setSelectedItemForQty(null);
+            setTargetRowId(null);
+            setEditorMode('add');
             setTimeout(() => searchInputRef.current?.focus(), 50);
         } else if (e.key === 'Tab' && e.shiftKey) {
             e.preventDefault();
@@ -426,82 +513,99 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                 {filteredItems.length > 0 ? filteredItems.map((item, idx) => {
                                     const tradePrice = toNumber(item.trade_price);
                                     const avgPurchPrice = item.has_purchases && toNumber(item.avg_purchase_rate) > 0 ? toNumber(item.avg_purchase_rate) : 0;
-                                    const isSelected = rows.some(r => Number(r.item_id) === Number(item.id));
+                                    const matchingLines = getMatchingLinesForItem(item);
+                                    const isSelected = matchingLines.length > 0;
                                     const isFocused = idx === selectedIndex;
 
                                     return (
-                                        <button
-                                            key={item.id}
-                                            ref={el => { itemRefs.current[idx] = el; }}
-                                            onClick={() => handleItemClick(item)}
-                                            className={`w-full text-left transition-all px-4 py-2.5 group border-l-4 ${
-                                                isSelected
-                                                    ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
-                                                    : isFocused
-                                                        ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
-                                                        : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
-                                                }`}
-                                        >
-                                            <div className="hidden md:grid grid-cols-12 items-center py-0.5">
-                                                <div className="col-span-1 pl-1">
-                                                    <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
-                                                        #{String(item.id).padStart(4, '0')}
-                                                    </span>
-                                                </div>
-                                                <div className="col-span-5 flex items-center gap-2">
-                                                    <span className={`font-black uppercase tracking-tight truncate text-sm ${
-                                                        isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
-                                                    }`}>
-                                                        {item.title}
-                                                    </span>
-                                                    {isSelected && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[9px] font-black uppercase tracking-wider shadow-2xs shrink-0">
-                                                            <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
-                                                            Synced
+                                        <React.Fragment key={item.id}>
+                                            <button
+                                                ref={el => { itemRefs.current[idx] = el; }}
+                                                onClick={() => handleItemClick(item)}
+                                                className={`w-full text-left transition-all px-4 py-2.5 group border-l-4 ${
+                                                    isSelected
+                                                        ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
+                                                        : isFocused
+                                                            ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
+                                                            : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
+                                                    }`}
+                                            >
+                                                <div className="hidden md:grid grid-cols-12 items-center py-0.5">
+                                                    <div className="col-span-1 pl-1">
+                                                        <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
+                                                            #{String(item.id).padStart(4, '0')}
                                                         </span>
-                                                    )}
-                                                </div>
-                                                <div className="col-span-2 text-center">
-                                                    <div className="text-xs font-black text-zinc-800 dark:text-zinc-200">
-                                                        <span className="text-[9px] text-zinc-700 mr-1 font-semibold">Rs</span>
-                                                        {tradePrice.toFixed(2)}
                                                     </div>
-                                                </div>
-                                                <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
-                                                    {avgPurchPrice > 0 ? (
-                                                        avgPurchPrice.toFixed(0)
-                                                    ) : (
-                                                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-normal italic">New Item</span>
-                                                    )}
-                                                </div>
-                                                <div className="col-span-2 text-right pr-2 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
-                                                    {item.stock_1 ? `${item.stock_1} units` : '0 units'}
-                                                </div>
-                                            </div>
-
-                                            {/* Mobile View Item */}
-                                            <div className="md:hidden flex justify-between items-center">
-                                                <div className="flex flex-col min-w-0 pr-2">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
+                                                    <div className="col-span-5 flex items-center gap-2">
+                                                        <span className={`font-black uppercase tracking-tight truncate text-sm ${
+                                                            isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
+                                                        }`}>
+                                                            {item.title}
+                                                        </span>
                                                         {isSelected && (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
-                                                                <Check className="w-2.5 h-2.5 stroke-[3]" /> Synced
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[9px] font-black uppercase tracking-wider shadow-2xs shrink-0">
+                                                                <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                                                                {matchingLines.length > 1 ? `Synced (${matchingLines.length})` : "Synced"}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
-                                                        <span>#{item.id} |</span>
-                                                        <span>Avg Price: <span className="font-bold text-orange-600 dark:text-orange-400">{avgPurchPrice > 0 ? `Rs ${avgPurchPrice.toFixed(2)}` : 'New'}</span> |</span>
-                                                        <span>Trade: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {tradePrice.toFixed(2)}</span> |</span>
-                                                        <span>Stock: <span className={item.stock_1 ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-rose-500'}>{item.stock_1 || 0}</span></span>
+                                                    <div className="col-span-2 text-center">
+                                                        <div className="text-xs font-black text-zinc-800 dark:text-zinc-200">
+                                                            <span className="text-[9px] text-zinc-700 mr-1 font-semibold">Rs</span>
+                                                            {tradePrice.toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-2 text-center font-mono text-xs font-semibold text-zinc-700 dark:text-zinc-400">
+                                                        {avgPurchPrice > 0 ? (
+                                                            avgPurchPrice.toFixed(0)
+                                                        ) : (
+                                                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-normal italic">New Item</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="col-span-2 text-right pr-2 font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                                        {item.stock_1 ? `${item.stock_1} units` : '0 units'}
                                                     </div>
                                                 </div>
-                                                <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 shrink-0 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
-                                                    {isSelected ? <Check size={14} /> : <Plus size={14} />}
+
+                                                {/* Mobile View Item */}
+                                                <div className="md:hidden flex justify-between items-center">
+                                                    <div className="flex flex-col min-w-0 pr-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
+                                                            {isSelected && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
+                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" /> {matchingLines.length > 1 ? `Synced (${matchingLines.length})` : "Synced"}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex flex-wrap items-center gap-x-1 gap-y-0.5 mt-0.5">
+                                                            <span>#{item.id} |</span>
+                                                            <span>Avg Price: <span className="font-bold text-orange-600 dark:text-orange-400">{avgPurchPrice > 0 ? `Rs ${avgPurchPrice.toFixed(2)}` : 'New'}</span> |</span>
+                                                            <span>Trade: <span className="font-bold text-zinc-700 dark:text-zinc-300">Rs {tradePrice.toFixed(2)}</span> |</span>
+                                                            <span>Stock: <span className={item.stock_1 ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-rose-500'}>{item.stock_1 || 0}</span></span>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 shrink-0 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
+                                                        {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </button>
+                                            </button>
+
+                                            {duplicatePromptItem?.id === item.id && (
+                                                <DuplicateItemActionPopover
+                                                    itemTitle={item.title}
+                                                    itemId={item.id}
+                                                    packingQty={toNumber(item.packing_qty || 1)}
+                                                    matchingLines={matchingLines}
+                                                    onAddNewLine={() => openAddModeForItem(item)}
+                                                    onEditLine={(rowId) => openEditModeForItem(item, rowId)}
+                                                    onCancel={() => {
+                                                        setDuplicatePromptItem(null);
+                                                        setTimeout(() => searchInputRef.current?.focus(), 50);
+                                                    }}
+                                                />
+                                            )}
+                                        </React.Fragment>
                                     );
                                 }) : (
                                     <div className="p-12 text-center flex flex-col items-center gap-3">
@@ -523,6 +627,23 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                             >
                                 <div className="flex items-center justify-between w-full md:w-auto min-w-0 md:max-w-[220px]">
                                     <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                            {editorMode === 'edit' ? (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                                    <Pencil size={9} />
+                                                    Editing Line #{(() => {
+                                                        const validRows = rows.filter(r => r.item_id !== null);
+                                                        const idx = validRows.findIndex(r => r.id === targetRowId);
+                                                        return idx >= 0 ? idx + 1 : 1;
+                                                    })()}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                                    <Plus size={9} />
+                                                    New Line
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping shrink-0" />
                                             <span className="text-xs sm:text-sm font-black uppercase tracking-wide truncate leading-tight italic">
@@ -537,6 +658,8 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         type="button"
                                         onClick={() => {
                                             setSelectedItemForQty(null);
+                                            setTargetRowId(null);
+                                            setEditorMode('add');
                                             setTimeout(() => searchInputRef.current?.focus(), 50);
                                         }}
                                         className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
@@ -604,9 +727,16 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Rate (Rs)</span>
                                         <Input
                                             ref={rateInputRef}
-                                            type="number"
-                                            value={dialogRate || ""}
-                                            onChange={e => setDialogRate(toNumber(e.target.value))}
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={dialogRate ?? ""}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                    setDialogRate(val);
+                                                }
+                                            }}
+                                            onBlur={() => setDialogRate(toNumber(dialogRate))}
                                             onKeyDown={handleRateKeyDown}
                                             className="w-full sm:w-28 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
                                         />
@@ -631,8 +761,17 @@ export const ItemSelectionDialog: React.FC<ItemSelectionDialogProps> = ({
                                         onKeyDown={handleSyncButtonKeyDown}
                                         className="w-full sm:w-auto h-10 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-lg shadow-xl shadow-orange-500/20 active:scale-95 transition-all shrink-0 flex items-center justify-center gap-1.5"
                                     >
-                                        <Plus size={16} className="stroke-[3]" />
-                                        Sync Node
+                                        {editorMode === 'edit' ? (
+                                            <>
+                                                <Pencil size={15} className="stroke-[2.5]" />
+                                                Update Line
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus size={16} className="stroke-[3]" />
+                                                Sync Node
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
                             </motion.div>

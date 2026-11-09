@@ -62,13 +62,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         'view areas', 'edit areas', 'delete areas',
         'view firms', 'manage firms',
         'view stock', 'manage stock', 'adjust stock',
-        'manage staff', 'manage cheques'
+        'manage staff', 'manage cheques',
+        'view customer approvals'
       ],
       items: [
         {
           title: "Accounts",
           url: "/account",
           permissions: ['view accounts', 'manage accounts'],
+        },
+        {
+          title: "Customer Approvals",
+          url: "/customers/approvals",
+          permissions: ['view customer approvals', 'approve customer accounts', 'manage accounts'],
         },
         {
           title: "Account Types",
@@ -133,9 +139,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         'view purchase returns', 'create purchase returns', 'edit purchase returns', 'delete purchase returns',
         'view payments', 'create payments', 'edit payments', 'delete payments',
         'view jv', 'create jv', 'manage jv', 'delete jv',
-        'view_journal_vouchers'
+        'view_journal_vouchers',
+        'view online orders'
       ],
       items: [
+        {
+          title: "Online Orders",
+          url: "/online-orders",
+          permissions: ['view online orders', 'view sales'],
+        },
         {
           title: "Offer List",
           url: "/offer-list",

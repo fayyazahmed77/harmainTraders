@@ -15,7 +15,7 @@ if (file_exists($logo_path)) {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Bank Ledger - {{ $account ? $account->title : 'ALL' }}</title>
+    <title>Bank Ledger - {{ !empty($account) ? $account->title : 'ALL' }}</title>
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -220,18 +220,7 @@ if (file_exists($logo_path)) {
         </div>
     </div>
 
-    <!-- Filter Bar Header -->
-    <table class="filter-info">
-        <tr>
-            <td width="10%"><span class="font-bold">Period From:</span></td>
-            <td width="15%" class="font-bold">{{ $from_date ? date('d M Y', strtotime($from_date)) : '---' }}</td>
-            <td width="5%" class="text-center"><span class="font-bold">To:</span></td>
-            <td width="15%" class="font-bold">{{ $to_date ? date('d M Y', strtotime($to_date)) : '---' }}</td>
-            <td width="12%"><span class="font-bold">Bank Account:</span></td>
-            <td width="28%" class="font-bold">{{ $account ? strtoupper($account->title) : 'ALL BANKS' }}</td>
-            <td width="15%" class="text-right font-bold">{{ $account && $account->code ? 'A/C: ' . $account->code : '' }}</td>
-        </tr>
-    </table>
+    @include('pdf.partials.criteria')
 
     <!-- 5 KPI Cards Grid Matching the UI -->
     <table class="kpi-table">

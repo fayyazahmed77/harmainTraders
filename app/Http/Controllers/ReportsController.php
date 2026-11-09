@@ -306,7 +306,8 @@ class ReportsController extends Controller implements HasMiddleware
                 'balance_type' => $data['balance_type'],
                 'from_date' => $data['from_date'],
                 'to_date' => $data['to_date'],
-                'is_print_mode' => false
+                'is_print_mode' => false,
+                'params' => $request->all(),
             ];
 
             $pdf = PDF::loadView('pdf.bank-ledger', $pdfData)->setPaper('a4', 'landscape');
@@ -355,7 +356,8 @@ class ReportsController extends Controller implements HasMiddleware
             'balance_type' => $data['balance_type'],
             'from_date' => $data['from_date'],
             'to_date' => $data['to_date'],
-            'is_print_mode' => false
+            'is_print_mode' => false,
+            'params' => $request->all(),
         ];
 
         if ($reportId === 'detail_ledger') {
@@ -407,7 +409,8 @@ class ReportsController extends Controller implements HasMiddleware
                 'balance_type' => $data['balance_type'],
                 'from_date' => $data['from_date'],
                 'to_date' => $data['to_date'],
-                'is_print_mode' => true
+                'is_print_mode' => true,
+                'params' => $request->all(),
             ];
 
             return view('pdf.bank-ledger', $pdfData);
@@ -454,7 +457,8 @@ class ReportsController extends Controller implements HasMiddleware
             'balance_type' => $data['balance_type'],
             'from_date' => $data['from_date'],
             'to_date' => $data['to_date'],
-            'is_print_mode' => true
+            'is_print_mode' => true,
+            'params' => $request->all(),
         ];
 
         if ($reportId === 'detail_ledger') {
@@ -484,7 +488,8 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'to_date' => $validated['to'] ?? date('Y-m-d'),
             'account_id' => $accountTitle,
-            'firm' => $firm
+            'firm' => $firm,
+            'params' => $request->all(),
         ];
 
         $pdf = PDF::loadView('pdf.accounts-aging', $pdfData)->setPaper('a4', 'landscape');
@@ -513,7 +518,8 @@ class ReportsController extends Controller implements HasMiddleware
             'to_date' => $validated['to'] ?? date('Y-m-d'),
             'account_id' => $accountTitle,
             'is_print_mode' => true,
-            'firm' => $firm
+            'firm' => $firm,
+            'params' => $request->all(),
         ];
 
         return view('pdf.accounts-aging', $pdfData);
@@ -542,6 +548,7 @@ class ReportsController extends Controller implements HasMiddleware
             'criteria' => $this->buildAccountListCriteria($request),
             'from_date' => $validated['from'] ?? null,
             'to_date' => $validated['to'] ?? null,
+            'params' => $request->all(),
             'is_print_mode' => false,
         ];
 
@@ -572,6 +579,7 @@ class ReportsController extends Controller implements HasMiddleware
             'criteria' => $this->buildAccountListCriteria($request),
             'from_date' => $validated['from'] ?? null,
             'to_date' => $validated['to'] ?? null,
+            'params' => $request->all(),
             'is_print_mode' => true,
         ];
 
@@ -635,6 +643,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => false
         ];
 
@@ -655,6 +664,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'is_print_mode' => true
         ];
 
@@ -949,6 +959,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $validated['from'] ?? date('Y-m-d'),
             'to_date' => $validated['to'] ?? date('Y-m-d'),
+            'params' => $request->all(),
             'type' => $type,
             'is_print_mode' => $isPrint
         ];
@@ -1000,6 +1011,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'to_date' => $toDate,
             'type' => $type,
+            'params' => $request->all(),
             'is_print_mode' => $isPrint
         ];
 
@@ -1040,6 +1052,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $fromDate,
             'to_date' => $toDate,
+            'params' => $request->all(),
             'is_print_mode' => $isPrint
         ];
 
@@ -1076,6 +1089,7 @@ class ReportsController extends Controller implements HasMiddleware
         $pdfData = [
             'data' => $data,
             'to_date' => $toDate,
+            'params' => $request->all(),
             'is_print_mode' => $isPrint,
             'report_title' => 'SUMMARY REPORT'
         ];
@@ -1113,6 +1127,7 @@ class ReportsController extends Controller implements HasMiddleware
         $pdfData = [
             'data' => $data,
             'to_date' => $toDate,
+            'params' => $request->all(),
             'is_print_mode' => $isPrint,
             'report_title' => 'TRIAL BALANCE 2 COLUMN'
         ];
@@ -1153,6 +1168,7 @@ class ReportsController extends Controller implements HasMiddleware
             'data' => $data,
             'from_date' => $fromDate,
             'to_date' => $toDate,
+            'params' => $request->all(),
             'is_print_mode' => $isPrint,
             'report_title' => 'TRIAL BALANCE 6 COLUMN'
         ];

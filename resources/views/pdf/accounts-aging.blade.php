@@ -131,13 +131,13 @@ foreach($groupedData as $type => $accounts) {
     @endif
 </head>
 <body>
-    @if($firm && $firm->name == 'Haramain Traders')
+    @if(!empty($firm) && $firm->name == 'Haramain Traders')
     <div class="watermark-container"><img src="{{ $logo_base64 }}" width="400"></div>
     @endif
 
     <div class="top-section content-padding clearfix">
         <div style="float: left; width: 60%;">
-            @if($firm && $firm->name == 'Haramain Traders')
+            @if(!empty($firm) && $firm->name == 'Haramain Traders')
             <div class="logo-section">
                 <div class="logo-icon"><img src="{{ $logo_base64 }}" width="35" height="35"></div>
                 <div class="brand-text">
@@ -165,13 +165,8 @@ foreach($groupedData as $type => $accounts) {
 
     <div class="banner-row"><div class="report-title">Accounts Aging Wise Detail</div></div>
 
-    <div class="content-padding info-section">
-        <table class="info-table">
-            <tr>
-                <td style="width: 50%;"><strong>Criteria:</strong> AS ON {{ \Carbon\Carbon::parse($to_date)->format('d/M/Y') }} | ACCOUNT: {{ $account_id }}</td>
-                <td style="text-align: right;"><strong>Status:</strong> Active Accounts Only</td>
-            </tr>
-        </table>
+    <div class="content-padding info-section" style="padding-top: 10px; padding-bottom: 5px;">
+        @include('pdf.partials.criteria')
     </div>
 
     <div class="content-padding">

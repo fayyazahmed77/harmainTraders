@@ -15,7 +15,7 @@ if (file_exists($logo_path)) {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Ledger - {{ $account ? $account->title : 'ALL' }}</title>
+    <title>Ledger - {{ !empty($account) ? $account->title : 'ALL' }}</title>
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -176,17 +176,7 @@ if (file_exists($logo_path)) {
         </div>
     </div>
 
-    <table class="filter-info">
-        <tr>
-            <td width="10%"><span class="font-bold">Date From</span></td>
-            <td width="15%" class="font-bold">{{ $from_date ? date('d M Y', strtotime($from_date)) : '---' }}</td>
-            <td width="5%" class="text-center"><span class="font-bold">To</span></td>
-            <td width="15%" class="font-bold">{{ $to_date ? date('d M Y', strtotime($to_date)) : '---' }}</td>
-            <td width="10%"><span class="font-bold">Account</span></td>
-            <td width="30%" class="font-bold">{{ $account ? strtoupper($account->title) : 'ALL' }}</td>
-            <td width="15%" class="font-bold text-right">{{ isset($account->area) ? strtoupper($account->area->name) : '' }}</td>
-        </tr>
-    </table>
+    @include('pdf.partials.criteria')
 
     <table class="ledger">
         <thead>

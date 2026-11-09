@@ -247,15 +247,15 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ]);
             }
             
-            // Fetch original sales item
-            $saleItem = \App\Models\SalesItem::where('sale_id', $sale->id)
-                ->where('item_id', $it['item_id'])
-                ->first();
-            if (!$saleItem) {
+            // Fetch original sales items (summed across any duplicate lines of the same item)
+            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $sale->id)
+                ->where('item_id', $it['item_id']);
+            if (!$saleItemsQuery->exists()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => 'Item was not purchased on the original invoice.'
                 ]);
             }
+            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
 
             // Calculate already returned pieces for this item on this sale
             $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
@@ -268,7 +268,7 @@ class SalesReturnController extends Controller implements HasMiddleware
             $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
             $totalToReturn = $it['total_pcs'] + $bonusUnits;
 
-            $maxReturnableQty = $saleItem->total_pcs - $alreadyReturnedPcs;
+            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
 
             if ($totalToReturn > $maxReturnableQty) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -426,6 +426,10 @@ class SalesReturnController extends Controller implements HasMiddleware
                 return response()->json(['error' => 'Invoice not found'], 404);
             }
 
+            if ($sale->items) {
+                \App\Services\StockService::attachRealtimeBalances($sale->items->pluck('item')->filter());
+            }
+
             $items = $sale->items->map(function ($saleItem) use ($sale) {
                 $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
                     ->where('sales_returns.sale_id', $sale->id)
@@ -470,14 +474,17 @@ class SalesReturnController extends Controller implements HasMiddleware
         try {
             $sales = Sales::where('customer_id', $customerId)->pluck('id');
 
-            $purchasedItems = SalesItem::select('sales_items.*')
+            $rawPurchasedItems = SalesItem::select('sales_items.*')
                 ->join('sales', 'sales.id', '=', 'sales_items.sale_id')
                 ->whereIn('sales_items.sale_id', $sales)
                 ->orderBy('sales.date', 'desc')
                 ->orderBy('sales.id', 'desc')
                 ->with(['item', 'sale:id,invoice,date'])
-                ->get()
-                ->map(function ($si) {
+                ->get();
+
+            \App\Services\StockService::attachRealtimeBalances($rawPurchasedItems->pluck('item')->filter());
+
+            $purchasedItems = $rawPurchasedItems->map(function ($si) {
                     $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
                         ->where('sales_returns.sale_id', $si->sale_id)
                         ->where('sales_return_items.item_id', $si->item_id)
@@ -521,6 +528,9 @@ class SalesReturnController extends Controller implements HasMiddleware
     public function edit($id)
     {
         $return = SalesReturn::with(['customer', 'salesman', 'items.item', 'firm'])->findOrFail($id);
+        if ($return && $return->items) {
+            \App\Services\StockService::attachRealtimeBalances($return->items->pluck('item')->filter());
+        }
 
         $accounts = Account::with('accountType')
             ->whereHas('accountType', function ($q) {
@@ -642,15 +652,15 @@ class SalesReturnController extends Controller implements HasMiddleware
                 ]);
             }
             
-            // Fetch original sales item
-            $saleItem = \App\Models\SalesItem::where('sale_id', $newSale->id)
-                ->where('item_id', $it['item_id'])
-                ->first();
-            if (!$saleItem) {
+            // Fetch original sales items (summed across any duplicate lines of the same item)
+            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $newSale->id)
+                ->where('item_id', $it['item_id']);
+            if (!$saleItemsQuery->exists()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => 'Item was not purchased on the original invoice.'
                 ]);
             }
+            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
 
             // Calculate already returned pieces for this item on this sale (excluding current return)
             $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
@@ -664,7 +674,7 @@ class SalesReturnController extends Controller implements HasMiddleware
             $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
             $totalToReturn = $it['total_pcs'] + $bonusUnits;
 
-            $maxReturnableQty = $saleItem->total_pcs - $alreadyReturnedPcs;
+            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
 
             if ($totalToReturn > $maxReturnableQty) {
                 throw \Illuminate\Validation\ValidationException::withMessages([

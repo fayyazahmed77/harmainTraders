@@ -12,10 +12,13 @@ export function DueBillsReportView({
 
     const formatCurrency = (amount: number) => {
         if (!amount && amount !== 0) return '';
-        return new Intl.NumberFormat('en-PK', {
+        const num = Number(amount);
+        if (num === 0) return '0';
+        const formatted = new Intl.NumberFormat('en-PK', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
-        }).format(amount);
+        }).format(Math.abs(num));
+        return num < 0 ? `-${formatted} CR` : formatted;
     };
 
     // Filter and group data by customer, excluding 0-balance bills and parties
@@ -23,7 +26,7 @@ export function DueBillsReportView({
         const filtered = data.filter((row: any) => {
             const rem = Math.round(Number(row.remaining) || 0);
             const bal = Math.round(Number(row.balance) || 0);
-            if (rem <= 0 && bal <= 0) return false;
+            if (rem === 0 && bal === 0) return false;
 
             return (
                 !searchTerm || 
@@ -40,13 +43,14 @@ export function DueBillsReportView({
             groups[row.customer_id].push(row);
         });
 
-        // Filter out groups where party has 0 due and 0 un-due amount
+        // Filter out groups where party has 0 due and 0 un-due amount AND 0 balance
         const result: Record<string, any[]> = {};
         Object.entries(groups).forEach(([cid, bills]) => {
             const lastBill = bills[bills.length - 1];
             const summary = lastBill?.party_summary;
             const partyTotal = Math.round(Number(summary?.party_due_amount) || 0) + Math.round(Number(summary?.party_un_due_amount) || 0);
-            if (partyTotal > 0) {
+            const partyBal = Math.round(Number(lastBill?.balance) || 0);
+            if (partyTotal !== 0 || partyBal !== 0) {
                 result[cid] = bills;
             }
         });
@@ -57,13 +61,13 @@ export function DueBillsReportView({
     const totalUnDue = data.reduce((acc: number, cur: any) => {
         if (!cur.is_last_for_customer) return acc;
         const partyTotal = Math.round(Number(cur.party_summary?.party_due_amount) || 0) + Math.round(Number(cur.party_summary?.party_un_due_amount) || 0);
-        return partyTotal > 0 ? acc + (Number(cur.party_summary?.party_un_due_amount) || 0) : acc;
+        return Math.abs(partyTotal) > 0 ? acc + (Number(cur.party_summary?.party_un_due_amount) || 0) : acc;
     }, 0);
 
     const totalDue = data.reduce((acc: number, cur: any) => {
         if (!cur.is_last_for_customer) return acc;
         const partyTotal = Math.round(Number(cur.party_summary?.party_due_amount) || 0) + Math.round(Number(cur.party_summary?.party_un_due_amount) || 0);
-        return partyTotal > 0 ? acc + (Number(cur.party_summary?.party_due_amount) || 0) : acc;
+        return Math.abs(partyTotal) > 0 ? acc + (Number(cur.party_summary?.party_due_amount) || 0) : acc;
     }, 0);
 
     return (
@@ -132,6 +136,7 @@ export function DueBillsReportView({
                                                             row.type === 'RETURN' ? "bg-rose-500/10 text-rose-600 border border-rose-500/20" :
                                                             row.type === 'OPENING' ? "bg-amber-500/10 text-amber-600 border border-amber-500/20" :
                                                             row.type === 'PAYABLE' ? "bg-purple-500/10 text-purple-600 border border-purple-500/20" :
+                                                            row.type === 'RECEIPT' || row.type === 'PAYMENT' ? "bg-teal-500/10 text-teal-600 border border-teal-500/20" :
                                                             "bg-blue-500/10 text-blue-600 border border-blue-500/20"
                                                         )}>
                                                             {row.type || 'CREDIT'}
@@ -141,7 +146,7 @@ export function DueBillsReportView({
                                                     <td className="px-3 py-2 text-center font-bold tabular-nums border-r border-border/10">{row.days}</td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-secondary border-r border-border/10">
                                                         {row.is_opening_balance 
-                                                            ? `${formatCurrency(row.bill_amt)}${row.opening_balance_type === 'CR' ? ' CR' : ''}` 
+                                                            ? `${formatCurrency(row.bill_amt)}${!String(formatCurrency(row.bill_amt)).includes('CR') && row.opening_balance_type === 'CR' ? ' CR' : ''}` 
                                                             : '—'}
                                                     </td>
                                                     <td className="px-4 py-2 text-right tabular-nums text-text-muted border-r border-border/10">{formatCurrency(row.bill_amt)}</td>
@@ -150,7 +155,10 @@ export function DueBillsReportView({
                                                         "px-4 py-2 text-right tabular-nums font-bold border-r border-border/10",
                                                         row.remaining < 0 ? "text-emerald-600" : "text-rose-500"
                                                     )}>{formatCurrency(row.remaining)}</td>
-                                                    <td className="px-4 py-2 text-right tabular-nums font-black text-text-primary">{formatCurrency(row.balance)}</td>
+                                                    <td className={cn(
+                                                        "px-4 py-2 text-right tabular-nums font-black",
+                                                        row.balance < 0 ? "text-emerald-600" : "text-text-primary"
+                                                    )}>{formatCurrency(row.balance)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
