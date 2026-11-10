@@ -117,7 +117,7 @@ interface RowData {
     bonus_full: number;
     bonus_pcs: number;
     rate: number | string;
-    discPercent: number;
+    discPercent: number | string;
     trade_price: number;
     amount: number;
     last_purchase_rate?: number;
@@ -745,7 +745,7 @@ export default function PurchaseEdit({
                     qty_pcs: toNumber(r.pcs),
                     total_pcs: totalPCS,
                     trade_price: toNumber(r.rate),
-                    discount: (r.discPercent / 100) * r.amount,
+                    discount: (toNumber(r.discPercent) / 100) * r.amount,
                     gst_amount: 0,
                     subtotal: r.amount
                 };
@@ -1306,9 +1306,19 @@ export default function PurchaseEdit({
                                                                             <div className="flex flex-col">
                                                                                 <label className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-center">Disc%</label>
                                                                                 <Input
+                                                                                    type="text"
+                                                                                    inputMode="decimal"
                                                                                     className="h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center"
                                                                                     value={row.discPercent}
-                                                                                    onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                                    onChange={(e) => {
+                                                                                        const val = e.target.value;
+                                                                                        if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                                                            updateRow(row.id, { discPercent: val });
+                                                                                        }
+                                                                                    }}
+                                                                                    onBlur={() => {
+                                                                                        updateRow(row.id, { discPercent: toNumber(row.discPercent) });
+                                                                                    }}
                                                                                     onClick={() => row.item_id && setSelectedItemId(row.item_id)}
                                                                                 />
                                                                             </div>
@@ -1419,9 +1429,19 @@ export default function PurchaseEdit({
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            type="text"
+                                                                            inputMode="decimal"
                                                                             className="h-8 px-1 text-center"
                                                                             value={row.discPercent}
-                                                                            onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                                                    updateRow(row.id, { discPercent: val });
+                                                                                }
+                                                                            }}
+                                                                            onBlur={() => {
+                                                                                updateRow(row.id, { discPercent: toNumber(row.discPercent) });
+                                                                            }}
                                                                             onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />
                                                                     </div>
@@ -1437,7 +1457,7 @@ export default function PurchaseEdit({
                                                                     <div className="col-span-1">
                                                                         <Input
                                                                             className="h-8 px-1 text-right font-bold text-orange-600 bg-orange-50/10"
-                                                                            value={((row.amount - (row.amount * row.discPercent / 100)) || 0).toFixed(2)}
+                                                                            value={((row.amount - (row.amount * toNumber(row.discPercent) / 100)) || 0).toFixed(2)}
                                                                             readOnly
                                                                             onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />

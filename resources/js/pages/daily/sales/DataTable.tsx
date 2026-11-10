@@ -563,14 +563,56 @@ export default function DataTable({ data }: DataTableProps) {
 
             {/* Deletion Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete invoice <span className="font-bold text-foreground">{saleToDelete?.invoice}</span>?
-                            This action will revert technical stock levels and cannot be undone.
+                        <DialogTitle className="text-destructive flex items-center gap-2">
+                            <Trash2 className="size-5 text-rose-600" />
+                            Confirm Permanent Deletion
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground pt-1">
+                            Are you sure you want to permanently delete invoice <span className="font-bold text-foreground">{saleToDelete?.invoice}</span>?
                         </DialogDescription>
                     </DialogHeader>
+
+                    {saleToDelete && (
+                        <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2.5 text-xs">
+                            <div className="space-y-1 pb-2 border-b border-border/50">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Customer:</span>
+                                    <span className="font-semibold text-foreground">{saleToDelete.customer?.title || "N/A"}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Bill Net Total:</span>
+                                    <span className="font-semibold text-foreground">Rs. {Number(saleToDelete.net_total || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Paid Amount:</span>
+                                    <span className={`font-semibold ${Number(saleToDelete.paid_amount || 0) > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted-foreground"}`}>
+                                        Rs. {Number(saleToDelete.paid_amount || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5 text-[11px]">
+                                <div className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                    <AlertCircle className="size-3.5 shrink-0" />
+                                    <span>What will happen upon deletion:</span>
+                                </div>
+                                <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-1">
+                                    <li>Sold quantities ({saleToDelete.no_of_items} item lines) will be automatically returned back to warehouse inventory.</li>
+                                    {Number(saleToDelete.paid_amount || 0) > 0 ? (
+                                        <li className="text-rose-600 dark:text-rose-400 font-medium">
+                                            Instant checkout payment voucher (Rs. {Number(saleToDelete.paid_amount || 0).toLocaleString()}) will be safely deleted, restoring customer and cash/bank ledger balances.
+                                        </li>
+                                    ) : (
+                                        <li>No checkout payment was recorded on this bill; customer debit charge will simply be removed.</li>
+                                    )}
+                                    <li>Salesman commission from this sale (if credited) will be automatically reversed.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
                             Cancel

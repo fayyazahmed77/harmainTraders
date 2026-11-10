@@ -1195,13 +1195,143 @@ class SalesController extends Controller implements HasMiddleware
         try {
             $sale = Sales::with('items')->findOrFail($id);
 
+            // 1. Guard against deleting a sale if sales return(s) exist against it
+            $hasReturns = \App\Models\SalesReturn::where('sale_id', $sale->id)
+                ->orWhere('original_invoice', $sale->invoice)
+                ->exists();
+
+            if ($hasReturns) {
+                return redirect()->back()->with('error', "Cannot delete sale {$sale->invoice} because sales return(s) have already been processed for this bill.");
+            }
+
+            // 2. Restore any Sales Return credits (CustomerCredit) used on this bill
+            $returnAllocs = SalesReturnAllocation::where('sale_id', $sale->id)->get();
+            foreach ($returnAllocs as $rAlloc) {
+                $credit = CustomerCredit::where('sales_return_id', $rAlloc->sales_return_id)->first();
+                if ($credit) {
+                    $credit->available_balance += (float)$rAlloc->amount;
+                    $credit->status = 'Available';
+                    $credit->save();
+                }
+                $rAlloc->delete();
+            }
+
+            // 3. Roll back Salesman commission from wallet
+            $walletTxs = \App\Models\WalletTransaction::where('sale_id', $sale->id)->get();
+            foreach ($walletTxs as $wTx) {
+                if ($wTx->type === 'credit') {
+                    $salesman = Saleman::find($wTx->salesman_id);
+                    if ($salesman) {
+                        $salesman->wallet_balance = max(0, (float)$salesman->wallet_balance - (float)$wTx->amount);
+                        $salesman->save();
+                    }
+                }
+                $wTx->delete();
+            }
+
+            // 4. Handle Payment Allocations and Auto-generated Instant Checkout Payments
+            $allocations = PaymentAllocation::where('bill_id', $sale->id)
+                ->where(function ($q) {
+                    $q->where('bill_type', 'App\Models\Sales')
+                      ->orWhere('bill_type', Sales::class)
+                      ->orWhere('bill_type', 'Sales');
+                })
+                ->get();
+
+            $processedPaymentIds = [];
+
+            foreach ($allocations as $alloc) {
+                $payment = Payment::find($alloc->payment_id);
+                if ($payment) {
+                    $isAutoCheckoutPayment = (
+                        str_contains($payment->remarks ?? '', $sale->invoice) ||
+                        str_contains($payment->remarks ?? '', 'Instance Checkout') ||
+                        str_contains($payment->remarks ?? '', 'Instant Checkout')
+                    );
+
+                    if ($isAutoCheckoutPayment) {
+                        $processedPaymentIds[] = $payment->id;
+
+                        // Revert any cheque status if chequebook was used
+                        if (!empty($payment->cheque_id)) {
+                            \App\Models\Chequebook::where('id', $payment->cheque_id)->update(['status' => 'unused']);
+                        }
+
+                        // If this payment had surplus distributed to older bills (FIFO), revert older bills
+                        $surplusAllocs = PaymentAllocation::where('payment_id', $payment->id)
+                            ->where('id', '!=', $alloc->id)
+                            ->get();
+
+                        foreach ($surplusAllocs as $sAlloc) {
+                            if ($sAlloc->bill_type === 'App\Models\Sales' || $sAlloc->bill_type === Sales::class) {
+                                $olderBill = Sales::find($sAlloc->bill_id);
+                                if ($olderBill && $olderBill->id !== $sale->id) {
+                                    $olderBill->paid_amount = max(0, round((float)$olderBill->paid_amount - (float)$sAlloc->amount, 2));
+                                    $netPayable = max(0, (float)$olderBill->net_total - (float)($olderBill->extra_discount ?? 0));
+                                    $olderBill->remaining_amount = max(0, round($netPayable - $olderBill->paid_amount, 2));
+                                    $olderBill->save();
+                                }
+                            }
+                            $sAlloc->delete();
+                        }
+
+                        $alloc->delete();
+                        $payment->delete();
+                    } else {
+                        // Pre-existing advance or manual payment allocation — remove allocation so advance returns to customer
+                        $alloc->delete();
+                    }
+                } else {
+                    $alloc->delete();
+                }
+            }
+
+            // Clean up any remaining instant checkout payments with remarks referencing this sale
+            $autoPayments = Payment::where(function ($q) use ($sale) {
+                $q->where('remarks', 'like', '%Sale ' . $sale->invoice . '%')
+                  ->orWhere('remarks', 'like', '%Instance Checkout for -> Sale ' . $sale->invoice . '%');
+            })
+            ->whereNotIn('id', $processedPaymentIds)
+            ->get();
+
+            foreach ($autoPayments as $autoPayment) {
+                if (!empty($autoPayment->cheque_id)) {
+                    \App\Models\Chequebook::where('id', $autoPayment->cheque_id)->update(['status' => 'unused']);
+                }
+
+                $surplusAllocs = PaymentAllocation::where('payment_id', $autoPayment->id)->get();
+                foreach ($surplusAllocs as $sAlloc) {
+                    if ($sAlloc->bill_type === 'App\Models\Sales' || $sAlloc->bill_type === Sales::class) {
+                        $olderBill = Sales::find($sAlloc->bill_id);
+                        if ($olderBill && $olderBill->id !== $sale->id) {
+                            $olderBill->paid_amount = max(0, round((float)$olderBill->paid_amount - (float)$sAlloc->amount, 2));
+                            $netPayable = max(0, (float)$olderBill->net_total - (float)($olderBill->extra_discount ?? 0));
+                            $olderBill->remaining_amount = max(0, round($netPayable - $olderBill->paid_amount, 2));
+                            $olderBill->save();
+                        }
+                    }
+                    $sAlloc->delete();
+                }
+
+                $autoPayment->delete();
+            }
+
+            // 5. Unlink Online Order if applicable
+            $onlineOrder = \App\Models\OnlineOrder::where('sale_id', $sale->id)->first();
+            if ($onlineOrder) {
+                $onlineOrder->sale_id = null;
+                $onlineOrder->status = 'under_review';
+                $onlineOrder->save();
+            }
+
+            // 6. Delete Sale items & Sale
             // Deleting sale items automatically restores available ledger stock.
             // Opening stock (items.stock_1/stock_2) remains immutable.
             SalesItem::where('sale_id', $id)->delete();
             $sale->delete();
 
             DB::commit();
-            return redirect()->back()->with('success', 'Sale deleted successfully!');
+            return redirect()->back()->with('success', "Sale invoice {$sale->invoice} and its checkout payment were deleted successfully, and stock/ledger balances have been restored.");
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error deleting sale: ' . $e->getMessage());
