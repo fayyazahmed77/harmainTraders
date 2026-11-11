@@ -502,14 +502,56 @@ export default function DataTable({ data }: DataTableProps) {
 
             {/* Deletion Confirmation Dialog */}
             <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete bill <span className="font-bold text-foreground">{purchaseToDelete?.invoice}</span>?
-                            This action will revert technical stock levels and cannot be undone.
+                        <DialogTitle className="text-destructive flex items-center gap-2">
+                            <Trash2 className="size-5 text-rose-600" />
+                            Confirm Permanent Deletion
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground pt-1">
+                            Are you sure you want to permanently delete purchase bill <span className="font-bold text-foreground">{purchaseToDelete?.invoice}</span>?
                         </DialogDescription>
                     </DialogHeader>
+
+                    {purchaseToDelete && (
+                        <div className="rounded-lg border border-border/70 bg-muted/40 p-3 space-y-2.5 text-xs">
+                            <div className="space-y-1 pb-2 border-b border-border/50">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Supplier:</span>
+                                    <span className="font-semibold text-foreground">{purchaseToDelete.supplier?.title || "N/A"}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Bill Net Total:</span>
+                                    <span className="font-semibold text-foreground">Rs. {Number(purchaseToDelete.net_total || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">Paid Amount:</span>
+                                    <span className={`font-semibold ${Number(purchaseToDelete.paid_amount || 0) > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-muted-foreground"}`}>
+                                        Rs. {Number(purchaseToDelete.paid_amount || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5 text-[11px]">
+                                <div className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                    <AlertCircle className="size-3.5 shrink-0" />
+                                    <span>What will happen upon deletion:</span>
+                                </div>
+                                <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-1">
+                                    <li>Inward inventory ({purchaseToDelete.no_of_items} item lines) will be automatically removed from warehouse stock.</li>
+                                    {Number(purchaseToDelete.paid_amount || 0) > 0 ? (
+                                        <li className="text-rose-600 dark:text-rose-400 font-medium">
+                                            Instant checkout payment voucher (Rs. {Number(purchaseToDelete.paid_amount || 0).toLocaleString()}) will be safely deleted, restoring supplier and bank/cash ledger balances.
+                                        </li>
+                                    ) : (
+                                        <li>No checkout payment was recorded on this bill; supplier credit payable will simply be removed.</li>
+                                    )}
+                                    <li>Any company bank cheques issued will be restored to unused in chequebook.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="outline" disabled={isDeleting} onClick={() => setIsDeleteDialogOpen(false)}>
                             Cancel

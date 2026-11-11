@@ -1127,72 +1127,128 @@ class PurchaseController extends Controller implements HasMiddleware
             $purchase = Purchase::with('items')->findOrFail($id);
 
             // 1. Guard against deleting a purchase if purchase return(s) exist against it
-            if (\App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)->exists()) {
+            $hasReturns = \App\Models\PurchaseReturn::where('original_invoice', $purchase->invoice)->exists();
+            if ($hasReturns) {
                 return redirect()->back()->with('error', "Cannot delete purchase {$purchase->invoice} because purchase return(s) have already been processed for this bill.");
             }
 
-            // 2. Revert Stock (Decrease stock by total_pcs)
-            foreach ($purchase->items as $pi) {
-                $item = Items::find($pi->item_id);
-                if ($item) {
-                    // Inward stock automatically removed when purchase items are deleted
-                }
-            }
-
-            // 3. Handle Payment Allocations and Auto-generated Payments
+            // 2. Handle Payment Allocations and Auto-generated Instant Checkout Payments
             $allocations = PaymentAllocation::where('bill_id', $purchase->id)
-                ->where('bill_type', 'App\Models\Purchase')
+                ->where(function ($q) {
+                    $q->where('bill_type', 'App\Models\Purchase')
+                      ->orWhere('bill_type', Purchase::class)
+                      ->orWhere('bill_type', 'Purchase');
+                })
                 ->get();
+
+            $processedPaymentIds = [];
 
             foreach ($allocations as $alloc) {
                 $payment = Payment::find($alloc->payment_id);
-                if ($payment && str_starts_with($payment->remarks ?? '', 'Auto-generated from Purchase ' . $purchase->invoice)) {
-                    // Bank cheque restoration
-                    if (!empty($payment->cheque_id)) {
-                        Chequebook::where('id', $payment->cheque_id)->update(['status' => 'unused']);
+                if ($payment) {
+                    $isAutoCheckoutPayment = (
+                        str_contains($payment->remarks ?? '', $purchase->invoice) ||
+                        str_contains($payment->remarks ?? '', 'Instance Checkout') ||
+                        str_contains($payment->remarks ?? '', 'Instant Checkout') ||
+                        str_contains($payment->remarks ?? '', 'Auto-generated from Purchase')
+                    );
+
+                    if ($isAutoCheckoutPayment) {
+                        $processedPaymentIds[] = $payment->id;
+
+                        // Bank cheque restoration (company chequebook)
+                        if (!empty($payment->cheque_id)) {
+                            Chequebook::where('id', $payment->cheque_id)->update(['status' => 'unused']);
+                        }
+
+                        // Distributed customer third-party cheque restoration
+                        if (!empty($payment->source_payment_id)) {
+                            Payment::where('id', $payment->source_payment_id)->update(['cheque_status' => 'In Hand']);
+                        } elseif ($payment->payment_method === 'Cheque' && !empty($payment->cheque_no)) {
+                            Payment::where('type', 'RECEIPT')
+                                ->where('cheque_no', $payment->cheque_no)
+                                ->where('cheque_status', 'Distributed')
+                                ->update(['cheque_status' => 'In Hand']);
+                        }
+
+                        // If surplus was applied to older bills (FIFO), revert older bills
+                        $surplusAllocs = PaymentAllocation::where('payment_id', $payment->id)
+                            ->where('id', '!=', $alloc->id)
+                            ->get();
+
+                        foreach ($surplusAllocs as $sAlloc) {
+                            if ($sAlloc->bill_type === 'App\Models\Purchase' || $sAlloc->bill_type === Purchase::class) {
+                                $olderBill = Purchase::find($sAlloc->bill_id);
+                                if ($olderBill && $olderBill->id !== $purchase->id) {
+                                    $olderBill->paid_amount = max(0, round((float)$olderBill->paid_amount - (float)$sAlloc->amount, 2));
+                                    $netPayable = max(0, (float)$olderBill->net_total - (float)($olderBill->extra_discount ?? 0));
+                                    $olderBill->remaining_amount = max(0, round($netPayable - $olderBill->paid_amount, 2));
+                                    $olderBill->status = ($olderBill->remaining_amount <= 0.005) ? 'Paid' : (($olderBill->paid_amount > 0) ? 'Partial' : 'Completed');
+                                    $olderBill->save();
+                                }
+                            }
+                            $sAlloc->delete();
+                        }
+
+                        $alloc->delete();
+                        $payment->delete();
+                    } else {
+                        // Advance payment or manual payment allocation — remove allocation to free advance back to supplier
+                        $alloc->delete();
                     }
-                    // Customer cheque restoration
-                    if (!empty($payment->customer_cheque_id)) {
-                        Payment::where('id', $payment->customer_cheque_id)->update(['cheque_status' => 'Pending']);
-                    }
-                    PaymentAllocation::where('payment_id', $payment->id)->delete();
-                    $payment->delete();
                 } else {
-                    // Advance payment or manual payment allocation — remove allocation to free advance back to supplier
                     $alloc->delete();
                 }
             }
 
             // Clean up any remaining auto-generated payments with remarks referencing this purchase
-            $autoPayments = Payment::where('remarks', 'like', 'Auto-generated from Purchase ' . $purchase->invoice . '%')->get();
+            $autoPayments = Payment::where(function ($q) use ($purchase) {
+                $q->where('remarks', 'like', '%Purchase ' . $purchase->invoice . '%')
+                  ->orWhere('remarks', 'like', '%Instance Checkout for -> Purchase ' . $purchase->invoice . '%')
+                  ->orWhere('remarks', 'like', 'Auto-generated from Purchase ' . $purchase->invoice . '%');
+            })
+            ->whereNotIn('id', $processedPaymentIds)
+            ->get();
+
             foreach ($autoPayments as $autoPayment) {
                 if (!empty($autoPayment->cheque_id)) {
                     Chequebook::where('id', $autoPayment->cheque_id)->update(['status' => 'unused']);
                 }
-                // If surplus was applied to older bills, revert older bills paid/remaining balances
-                $surplusAllocs = PaymentAllocation::where('payment_id', $autoPayment->id)
-                    ->where('bill_id', '!=', $purchase->id)
-                    ->where('bill_type', 'App\Models\Purchase')
-                    ->get();
+
+                if (!empty($autoPayment->source_payment_id)) {
+                    Payment::where('id', $autoPayment->source_payment_id)->update(['cheque_status' => 'In Hand']);
+                } elseif ($autoPayment->payment_method === 'Cheque' && !empty($autoPayment->cheque_no)) {
+                    Payment::where('type', 'RECEIPT')
+                        ->where('cheque_no', $autoPayment->cheque_no)
+                        ->where('cheque_status', 'Distributed')
+                        ->update(['cheque_status' => 'In Hand']);
+                }
+
+                $surplusAllocs = PaymentAllocation::where('payment_id', $autoPayment->id)->get();
                 foreach ($surplusAllocs as $sAlloc) {
-                    $olderBill = Purchase::find($sAlloc->bill_id);
-                    if ($olderBill) {
-                        $olderBill->paid_amount = max(0, $olderBill->paid_amount - $sAlloc->amount);
-                        $olderBill->remaining_amount += $sAlloc->amount;
-                        $olderBill->save();
+                    if ($sAlloc->bill_type === 'App\Models\Purchase' || $sAlloc->bill_type === Purchase::class) {
+                        $olderBill = Purchase::find($sAlloc->bill_id);
+                        if ($olderBill && $olderBill->id !== $purchase->id) {
+                            $olderBill->paid_amount = max(0, round((float)$olderBill->paid_amount - (float)$sAlloc->amount, 2));
+                            $netPayable = max(0, (float)$olderBill->net_total - (float)($olderBill->extra_discount ?? 0));
+                            $olderBill->remaining_amount = max(0, round($netPayable - $olderBill->paid_amount, 2));
+                            $olderBill->status = ($olderBill->remaining_amount <= 0.005) ? 'Paid' : (($olderBill->paid_amount > 0) ? 'Partial' : 'Completed');
+                            $olderBill->save();
+                        }
                     }
                     $sAlloc->delete();
                 }
-                PaymentAllocation::where('payment_id', $autoPayment->id)->delete();
+
                 $autoPayment->delete();
             }
 
-            // 4. Delete Purchase items & Purchase
+            // 3. Delete Purchase items & Purchase
+            // Deleting purchase items automatically removes inward inventory
             PurchaseItem::where('purchase_id', $id)->delete();
             $purchase->delete();
 
             DB::commit();
-            return redirect()->back()->with('success', "Purchase invoice {$purchase->invoice} deleted and stock/accounting reverted successfully!");
+            return redirect()->back()->with('success', "Purchase invoice {$purchase->invoice} and its checkout payment were deleted successfully, and stock/accounting balances have been restored.");
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Error deleting purchase: ' . $e->getMessage());
