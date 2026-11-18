@@ -36,6 +36,7 @@ class StorePaymentRequest extends FormRequest
             'allocations.*.amount' => 'required_with:allocations|numeric|gt:0',
             'is_multi' => 'nullable|boolean',
             'splits' => 'nullable|array',
+            'idempotency_key' => 'nullable|string|max:64',
         ];
     }
 

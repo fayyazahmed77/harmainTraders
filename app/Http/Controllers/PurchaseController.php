@@ -78,7 +78,26 @@ class PurchaseController extends Controller implements HasMiddleware
             });
         }
 
+        // Filter by Amount — matches net_total, gross_total, or remaining_amount
+        if ($request->filled('amount')) {
+            $rawAmt = str_replace([',', ' '], '', trim((string) $request->amount));
+            if (is_numeric($rawAmt)) {
+                $amtFloat = (float) $rawAmt;
+                $query->where(function ($q) use ($amtFloat, $rawAmt) {
+                    $q->whereBetween('net_total', [$amtFloat - 0.99, $amtFloat + 0.99])
+                      ->orWhereBetween('gross_total', [$amtFloat - 0.99, $amtFloat + 0.99])
+                      ->orWhereBetween('remaining_amount', [$amtFloat - 0.99, $amtFloat + 0.99])
+                      ->orWhere('net_total', 'like', "%{$rawAmt}%");
+                });
+            }
+        }
+
         $purchases = $query->latest()->get();
+        $purchases->each(function ($p) {
+            if ($p->relationLoaded('supplier') && $p->supplier) {
+                $p->supplier->setHidden(['current_balance', 'guest_link', 'image_url']);
+            }
+        });
 
         // Summary Calculations
         // Note: Filters affect summary. 
@@ -110,13 +129,15 @@ class PurchaseController extends Controller implements HasMiddleware
 
         // Suppliers for Filter
         $suppliers = Account::eligibleForPurchase()
-            ->select('id', 'title')
-            ->get();
+            ->select('id', 'title', 'code')
+            ->orderBy('title')
+            ->get()
+            ->each(fn($acc) => $acc->setHidden(['current_balance', 'guest_link', 'image_url']));
 
         return Inertia::render("daily/purchase/index", [
             'purchases' => $purchases,
             'summary' => $summary,
-            'filters' => $request->all(['start_date', 'end_date', 'supplier_id', 'status', 'search']),
+            'filters' => $request->all(['start_date', 'end_date', 'supplier_id', 'status', 'search', 'amount']),
             'suppliers' => $suppliers,
         ]);
     }
@@ -270,11 +291,18 @@ class PurchaseController extends Controller implements HasMiddleware
             'message_line_id'         => 'nullable|integer',
             'firm_id'                 => 'nullable|integer',
             'update_prices'           => 'nullable|boolean',
+            'idempotency_key'          => 'nullable|string|max:64',
         ]);
 
-        DB::beginTransaction();
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
 
         try {
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'purchase.store',
+                payload: $request->except(['_token']),
+                userId: \Illuminate\Support\Facades\Auth::id(),
+                callback: function () use ($request) {
             // --- Multi-Method Split Payments & Allocation Logic ---
             $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
@@ -538,8 +566,6 @@ class PurchaseController extends Controller implements HasMiddleware
                 }
             }
 
-            DB::commit();
-
             $purchase->load(['supplier', 'items']);
             $successDialogData = [
                 'supplierName' => $purchase->supplier->title ?? 'N/A',
@@ -554,22 +580,43 @@ class PurchaseController extends Controller implements HasMiddleware
                 'mode'         => 'create',
             ];
 
+            $cacheData = [
+                'redirect_route' => 'purchase.index',
+                'id'             => $purchase->id,
+                'flash'          => [
+                    'success' => 'Purchase saved successfully!',
+                    'id'      => $purchase->id,
+                ],
+                'success_dialog' => $successDialogData,
+            ];
+
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                return redirect()->route('purchase.index')
+                $pdfUrl = route('purchase.pdf', ['id' => $purchase->id, 'format' => $request->print_format]);
+                $cacheData['pdf_url'] = $pdfUrl;
+                $cacheData['flash']['pdf_url'] = $pdfUrl;
+                $finalResponse = redirect()->route('purchase.index')
                     ->with('success', 'Purchase saved successfully!')
                     ->with('id', $purchase->id)
-                    ->with('pdf_url', route('purchase.pdf', ['id' => $purchase->id, 'format' => $request->print_format]))
+                    ->with('pdf_url', $pdfUrl)
+                    ->with('success_dialog', $successDialogData);
+            } else {
+                $finalResponse = redirect()->route('purchase.index')
+                    ->with('success', 'Purchase saved successfully!')
+                    ->with('id', $purchase->id)
                     ->with('success_dialog', $successDialogData);
             }
 
-            return redirect()->route('purchase.index')
-                ->with('success', 'Purchase saved successfully!')
-                ->with('id', $purchase->id)
-                ->with('success_dialog', $successDialogData);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+            return [
+                'model'    => $purchase,
+                'response' => $finalResponse,
+                'cache'    => $cacheData,
+            ];
         }
+    );
+} catch (\Throwable $e) {
+    \Illuminate\Support\Facades\Log::error('PurchaseController@store error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+    return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+}
     }
     //edit
     public function edit($id)

@@ -62,10 +62,12 @@ export interface Offer {
     date: string;
     offertype: string;
     is_live?: boolean;
+    items_count?: number;
     account: {
         id: number;
         title: string;
-    };
+        code?: string;
+    } | null;
     firm: {
         id: number;
         name: string;
@@ -73,7 +75,11 @@ export interface Offer {
     user: {
         id: number;
         name: string;
-    };
+    } | null;
+    message_line?: {
+        id: number;
+        messageline: string;
+    } | null;
 }
 
 interface DataTableProps {
@@ -111,6 +117,31 @@ export default function DataTable({ data }: DataTableProps) {
 
     const columns: ColumnDef<Offer>[] = [
         {
+            accessorKey: "id",
+            header: () => (
+                <div className="flex items-center gap-1.5">
+                    <Tag className="h-3 w-3 text-orange-500" />
+                    <span>Offer #</span>
+                </div>
+            ),
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <button
+                        type="button"
+                        onClick={() => router.visit(`/offer-list/${row.original.id}/view`)}
+                        className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100 hover:text-orange-600 dark:hover:text-orange-400 text-left transition-colors"
+                    >
+                        #OFR-{row.original.id.toString().padStart(4, "0")}
+                    </button>
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">
+                        {row.original.items_count !== undefined
+                            ? `${row.original.items_count} Products`
+                            : "Offer Manifest"}
+                    </span>
+                </div>
+            ),
+        },
+        {
             accessorKey: "date",
             header: () => (
                 <div className="flex items-center gap-2">
@@ -127,7 +158,7 @@ export default function DataTable({ data }: DataTableProps) {
                             {date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                         </span>
                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter tabular-nums">
-                            Saved Date
+                            Effective Date
                         </span>
                     </div>
                 );
@@ -147,7 +178,7 @@ export default function DataTable({ data }: DataTableProps) {
                         {row.original.firm?.name || "Default (Haramain)"}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter">
-                        Firm Info
+                        Billing Entity
                     </span>
                 </div>
             )
@@ -157,16 +188,22 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <User className="h-3 w-3 text-orange-500" />
-                    <span>Offer Type</span>
+                    <span>Audience / Target</span>
                 </div>  
             ),
             cell: ({ row }) => (
                 <div className="flex flex-col max-w-[250px]">
                     <span className="font-black text-zinc-900 dark:text-zinc-100 text-xs truncate">
-                        {row.original.offertype === "1" ? "General Offer" : row.original.offertype === "2" ? "Market Offer" : row.original.offertype || "General Offer"}
+                        {row.original.account?.title
+                            ? row.original.account.title
+                            : row.original.offertype === "1"
+                            ? "Customer Group Offer"
+                            : row.original.offertype === "2"
+                            ? "Public Market Offer"
+                            : "General Offer"}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
-                        Offer Type
+                        {row.original.account?.code ? `Code: ${row.original.account.code}` : "All Eligible Customers"}
                     </span>
                 </div>
             )
@@ -176,7 +213,7 @@ export default function DataTable({ data }: DataTableProps) {
             header: () => (
                 <div className="flex items-center gap-2">
                     <Tag className="h-3 w-3 text-orange-500" />
-                    <span>Price Type</span>
+                    <span>Price Tier & Live Status</span>
                 </div>
             ),
             cell: ({ row }) => {
@@ -185,20 +222,35 @@ export default function DataTable({ data }: DataTableProps) {
                 const isType2 = type === '2';
                 
                 return (
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         <div className={cn(
                             "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest w-fit",
-                            isType1 ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" :
-                                isType2 ? "text-blue-500 bg-blue-500/10 border-blue-500/20" :
-                                    "text-orange-500 bg-orange-500/10 border-orange-500/20"
+                            isType1 ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" :
+                                isType2 ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20" :
+                                    "text-orange-600 dark:text-orange-400 bg-orange-500/10 border-orange-500/20"
                         )}>
                             <Sparkles className="h-3 w-3" />
                             {isType1 ? "Customer Group" : isType2 ? "Market Offer" : type}
                         </div>
-                        {row.original.is_live && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-600 text-white text-[8px] font-black uppercase tracking-[0.2em] w-fit animate-pulse">
+                        {row.original.is_live ? (
+                            <button
+                                type="button"
+                                onClick={() => router.post(`/offer-list/${row.original.id}/toggle-live`, {}, { preserveScroll: true })}
+                                title="Click to unpublish from Live Portal"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-[8px] font-black uppercase tracking-[0.2em] w-fit shadow-xs transition-all cursor-pointer"
+                            >
+                                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
                                 Live Now
-                            </div>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => router.post(`/offer-list/${row.original.id}/toggle-live`, {}, { preserveScroll: true })}
+                                title="Click to publish as Live Offer"
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-100 hover:bg-orange-50 dark:bg-zinc-800 dark:hover:bg-orange-950/40 text-zinc-500 hover:text-orange-600 border border-zinc-200 dark:border-zinc-700 text-[8px] font-bold uppercase tracking-wider w-fit transition-all cursor-pointer"
+                            >
+                                Draft / Offline
+                            </button>
                         )}
                     </div>
                 );
@@ -214,10 +266,10 @@ export default function DataTable({ data }: DataTableProps) {
             ),
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[10px] font-black text-zinc-500 uppercase">
-                        {row.original.user?.name.charAt(0)}
+                    <div className="h-6 w-6 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase">
+                        {row.original.user?.name ? row.original.user.name.charAt(0) : "S"}
                     </div>
-                    <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
+                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
                         {row.original.user?.name || "System"}
                     </span>
                 </div>

@@ -90,12 +90,27 @@ interface Item {
     trade_price: number;
     retail: number;
     packing_qty: number;
+    reorder_level?: number;
     category: string;
     gst_percent: number;
     retail_tp_diff: number;
     discount: number;
     stock_1?: number;
     stock_2?: number;
+    opening_stock_1?: number;
+    opening_stock_2?: number;
+    opening_total_pcs?: number;
+    available_stock?: number;
+    available_full?: number;
+    available_pcs?: number;
+    total_stock_pcs?: number;
+    stock_breakdown?: string;
+    is_negative_stock?: boolean;
+    purchase_pcs?: number;
+    sale_pcs?: number;
+    sale_return_pcs?: number;
+    purchase_return_pcs?: number;
+    net_movement_pcs?: number;
     pt2?: number;
     pt3?: number;
     pt4?: number;
@@ -193,6 +208,45 @@ export default function OfferListing({
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>("all");
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
+    const [selectedStockFilter, setSelectedStockFilter] = useState<"in_stock" | "all" | "low_stock" | "out_of_stock">("in_stock");
+
+    // Helper: Get real-time ledger stock details (matches /items and /sales/create StockService)
+    const getLiveStockMeta = (it: Item) => {
+        const packing = Math.max(1, Number(it.packing_qty) || 1);
+        const totalPcs =
+            it.available_stock !== undefined
+                ? Number(it.available_stock)
+                : it.total_stock_pcs !== undefined
+                ? Number(it.total_stock_pcs)
+                : (Number(it.stock_1) || 0) * packing + (Number(it.stock_2) || 0);
+
+        const isNeg = totalPcs < 0;
+        const absPcs = Math.abs(totalPcs);
+        const full =
+            it.available_full !== undefined
+                ? Number(it.available_full)
+                : (isNeg ? -1 : 1) * Math.floor(absPcs / packing);
+        const pcs =
+            it.available_pcs !== undefined
+                ? Number(it.available_pcs)
+                : (isNeg ? -1 : 1) * (absPcs % packing);
+
+        const reorder = Number(it.reorder_level) || 0;
+        let status: "OK" | "Low Stock" | "Out of Stock" | "Deficit" = "OK";
+        if (totalPcs < 0) status = "Deficit";
+        else if (totalPcs === 0) status = "Out of Stock";
+        else if (reorder > 0 && totalPcs <= reorder) status = "Low Stock";
+
+        return {
+            totalPcs,
+            full,
+            pcs,
+            packing,
+            isNeg,
+            status,
+            formatted: packing > 1 ? `${full}F / ${pcs}P` : `${totalPcs} Units`,
+        };
+    };
 
     // Helper: Category and Company name lookups
     const getCategoryName = (catVal: string | number | undefined | null) => {
@@ -408,9 +462,15 @@ export default function OfferListing({
     const filteredRegistryItems = useMemo(() => {
         const q = searchQuery.toLowerCase().trim();
         return items.filter(it => {
-            const availableStock = ((Number(it.stock_1) || 0) * (Number(it.packing_qty) || 1)) + (Number(it.stock_2) || 0);
-            const hasStock = (it.stock_1 !== undefined || it.stock_2 !== undefined) ? availableStock > 0 : true;
-            if (!hasStock) return false;
+            const stockMeta = getLiveStockMeta(it);
+
+            // Live Stock Filter
+            if (selectedStockFilter === "in_stock" && stockMeta.totalPcs <= 0) return false;
+            if (selectedStockFilter === "out_of_stock" && stockMeta.totalPcs > 0) return false;
+            if (selectedStockFilter === "low_stock") {
+                const reorder = Number(it.reorder_level) || 0;
+                if (!(stockMeta.totalPcs > 0 && stockMeta.totalPcs <= reorder)) return false;
+            }
 
             // Company filter
             if (selectedCompanyFilter && selectedCompanyFilter !== "all") {
@@ -438,7 +498,7 @@ export default function OfferListing({
                 String(it.id).includes(q)
             );
         }).sort((a,b) => a.title.localeCompare(b.title));
-    }, [searchQuery, items, selectedCompanyFilter, selectedCategoryFilter, companies, categories]);
+    }, [searchQuery, items, selectedCompanyFilter, selectedCategoryFilter, selectedStockFilter, companies, categories]);
 
     const handleSelectFromRegistry = (item: Item) => {
         const isSelected = rows.some(r => r.item_id === item.id);
@@ -657,100 +717,101 @@ export default function OfferListing({
             <SidebarInset className="bg-zinc-50/50 dark:bg-zinc-950/50">
                 <SiteHeader breadcrumbs={breadcrumbs} />
 
-                <div className="p-3 sm:p-6 lg:p-10 space-y-6 sm:space-y-8 max-w-[1600px] mx-auto w-full min-w-0">
-                    {/* Page Header */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="space-y-2"
-                        >
-                            <div className="flex items-center gap-2 text-orange-500 font-black text-[10px] uppercase tracking-[0.3em]">
-                                <Workflow className="h-3 w-3" />
-                                <span>Offer Details</span>
-                            </div>
-                            <Heading
-                                title="Add Offer"
-                                description="Create new price offers for customers."
-                            />
-                        </motion.div>
+                <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto w-full min-w-0">
+                    {/* ── Hero Header Section ── */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative overflow-hidden bg-white dark:bg-zinc-900 p-5 sm:p-6 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                        <div className="absolute -right-12 -top-12 w-56 h-56 bg-gradient-to-br from-orange-500/10 via-amber-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
 
-                        <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center gap-2 md:gap-3 w-full md:w-auto"
-                        >
+                        <div className="relative z-10 space-y-1">
+                            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/60 border border-orange-200/70 dark:border-orange-800/70 text-orange-600 dark:text-orange-400 font-black text-[10px] uppercase tracking-widest">
+                                <Workflow className="h-3 w-3" />
+                                <span>Offer Provisioning Studio</span>
+                            </div>
+                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
+                                Create Price Offer List
+                            </h1>
+                            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+                                Configure wholesale carton & loose pricing tiers, check real-time warehouse stock, and publish B2B price catalogs.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto relative z-10">
                             <Button
+                                type="button"
                                 variant="outline"
                                 onClick={() => router.visit('/offer-list')}
-                                className="flex-1 md:flex-none rounded-xl border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase tracking-widest h-12 px-4 md:px-6 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+                                className="flex-1 md:flex-none rounded-xl border-zinc-200 dark:border-zinc-800 text-xs font-bold h-11 px-5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
                             >
                                 <History className="mr-2 h-4 w-4" />
-                                Cancel
+                                Back to List
                             </Button>
                             <Button
+                                type="button"
                                 onClick={storeOffer}
-                                className="flex-1 md:flex-none bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-400 text-white transition-all duration-300 rounded-xl px-4 md:px-8 h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-orange-500/30"
+                                className="flex-1 md:flex-none bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white transition-all rounded-xl px-6 h-11 font-black text-xs uppercase tracking-wider shadow-md shadow-orange-500/20"
                             >
                                 <Save className="mr-2 h-4 w-4" />
-                                Save Offer
+                                Save Offer ({rows.filter(r => r.item_id).length})
                             </Button>
-                        </motion.div>
-                    </div>
+                        </div>
+                    </motion.div>
 
-                    {/* Control Surface */}
+                    {/* ── Configuration Control Bar ── */}
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
+                        transition={{ delay: 0.06 }}
                     >
-                        <Card className="p-4 md:p-8 border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity hidden md:block">
-                                <Sparkles className="h-24 w-24 text-orange-500" />
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start relative z-10">
-                                <div className="col-span-1 md:col-span-12 lg:col-span-2 space-y-2">
-                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                        <Layers className="h-3 w-3" />
+                        <Card className="p-4 sm:p-6 border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm bg-white dark:bg-zinc-900 relative overflow-hidden">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end relative z-10">
+                                {/* 1. Offer Type */}
+                                <div className="lg:col-span-2 space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                        <Layers className="h-3 w-3 text-orange-500" />
                                         Offer Type
-                                    </div>
+                                    </label>
                                     <Select value={offerType} onValueChange={(val: "1" | "2") => setOfferType(val)}>
-                                        <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                        <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                        <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
                                             <SelectItem value="1" className="text-xs font-bold">1: Customer Group</SelectItem>
                                             <SelectItem value="2" className="text-xs font-bold">2: Market Offer</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                <div className="col-span-1 md:col-span-12 lg:col-span-2 space-y-2">
-                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                        <CalendarClock className="h-3 w-3" />
-                                        Date
-                                    </div>
+                                {/* 2. Date */}
+                                <div className="lg:col-span-2 space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                        <CalendarClock className="h-3 w-3 text-orange-500" />
+                                        Offer Date
+                                    </label>
                                     <Input
                                         value={date}
                                         readOnly
-                                        className="bg-zinc-100/50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 h-11 rounded-sm font-bold tabular-nums text-zinc-500"
+                                        className="bg-zinc-100/70 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-800 h-10 rounded-xl font-mono font-bold text-xs text-zinc-600 dark:text-zinc-300"
                                     />
                                 </div>
 
+                                {/* 3. Price Tiers */}
                                 {offerType === "1" ? (
                                     <>
-                                        <div className="col-span-1 md:col-span-4 lg:col-span-2 space-y-2">
-                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                                <PercentCircle className="h-3 w-3" />
+                                        <div className="lg:col-span-2 space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                                <PercentCircle className="h-3 w-3 text-emerald-500" />
                                                 Carton Tier
-                                            </div>
+                                            </label>
                                             <Select value={cartonPriceTier} onValueChange={setCartonPriceTier}>
-                                                <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                                <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
                                                     <SelectValue placeholder="Select Tier" />
                                                 </SelectTrigger>
-                                                <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                                <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
+                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price (Base)</SelectItem>
                                                     <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
                                                     <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
                                                     <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
@@ -760,17 +821,17 @@ export default function OfferListing({
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="col-span-1 md:col-span-4 lg:col-span-2 space-y-2">
-                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                                <PercentCircle className="h-3 w-3" />
+                                        <div className="lg:col-span-2 space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                                <PercentCircle className="h-3 w-3 text-blue-500" />
                                                 Loose Ctn Tier
-                                            </div>
+                                            </label>
                                             <Select value={loosePriceTier} onValueChange={setLoosePriceTier}>
-                                                <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                                <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
                                                     <SelectValue placeholder="Select Tier" />
                                                 </SelectTrigger>
-                                                <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                                <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
+                                                    <SelectItem value="1" className="text-xs font-bold">Trade Price (Base)</SelectItem>
                                                     <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
                                                     <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
                                                     <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
@@ -782,17 +843,17 @@ export default function OfferListing({
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="col-span-1 md:col-span-6 lg:col-span-2 space-y-2">
-                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                            <PercentCircle className="h-3 w-3" />
-                                            Market Tier
-                                        </div>
+                                    <div className="lg:col-span-4 space-y-1.5">
+                                        <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                            <PercentCircle className="h-3 w-3 text-orange-500" />
+                                            Market Price Tier
+                                        </label>
                                         <Select value={marketPriceTier} onValueChange={setMarketPriceTier}>
-                                            <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
+                                            <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
                                                 <SelectValue placeholder="Select Tier" />
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
-                                                <SelectItem value="1" className="text-xs font-bold">Trade Price</SelectItem>
+                                            <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
+                                                <SelectItem value="1" className="text-xs font-bold">Trade Price (Base)</SelectItem>
                                                 <SelectItem value="2" className="text-xs font-bold">T.P 2</SelectItem>
                                                 <SelectItem value="3" className="text-xs font-bold">T.P 3</SelectItem>
                                                 <SelectItem value="4" className="text-xs font-bold">T.P 4</SelectItem>
@@ -804,16 +865,17 @@ export default function OfferListing({
                                     </div>
                                 )}
 
-                                <div className="col-span-1 md:col-span-12 lg:col-span-4 space-y-2">
-                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-zinc-400">
-                                        <Briefcase className="h-3 w-3" />
-                                        Select Firm
-                                    </div>
+                                {/* 4. Select Firm */}
+                                <div className="lg:col-span-2 space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                        <Briefcase className="h-3 w-3 text-orange-500" />
+                                        Billing Firm
+                                    </label>
                                     <Select value={selectedFirm} onValueChange={setSelectedFirm}>
-                                        <SelectTrigger className="w-full h-11 rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 text-xs font-bold transition-all">
-                                            <SelectValue placeholder="General / Haramain" />
+                                        <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
+                                            <SelectValue placeholder="Default (Haramain)" />
                                         </SelectTrigger>
-                                        <SelectContent className="rounded-sm border-zinc-200 dark:border-zinc-800 shadow-2xl">
+                                        <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
                                             <SelectItem value="0" className="text-xs font-bold">Default (Haramain)</SelectItem>
                                             {firms.map((firm) => (
                                                 <SelectItem key={firm.id} value={firm.id.toString()} className="text-xs font-bold">
@@ -823,170 +885,389 @@ export default function OfferListing({
                                         </SelectContent>
                                     </Select>
                                 </div>
+
+                                {/* 5. Select Message Line */}
+                                <div className="lg:col-span-2 space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                                        <Tag className="h-3 w-3 text-orange-500" />
+                                        Footer Message Line
+                                    </label>
+                                    <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                                        <SelectTrigger className="w-full h-10 rounded-xl border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/50 text-xs font-bold">
+                                            <SelectValue placeholder="No Message Line" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl border-zinc-200 dark:border-zinc-800 shadow-xl">
+                                            <SelectItem value="0" className="text-xs font-bold">No Message Line</SelectItem>
+                                            {(messageLines || []).map((msg) => (
+                                                <SelectItem key={msg.id} value={msg.id.toString()} className="text-xs font-bold">
+                                                    {msg.messageline}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </Card>
                     </motion.div>
 
-                    {/* Manifest Surface */}
+                    {/* ── Negotiation Manifest Ledger ── */}
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="space-y-4"
+                        transition={{ delay: 0.12 }}
+                        className="space-y-3"
                     >
-                        <div className="flex flex-col md:flex-row md:items-center justify-between px-2 md:px-4 gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-1.5 w-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Negotiation Manifest Ledger</span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="h-2 w-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                <span className="text-xs font-black uppercase tracking-widest text-zinc-700 dark:text-zinc-300">
+                                    Offer Items Manifest ({rows.filter((r) => r.item_id).length} Selected)
+                                </span>
+                                <span className="text-[11px] font-medium text-zinc-400 hidden sm:inline">
+                                    • Live stock verified from ERP inventory ledger
+                                </span>
                             </div>
-                            <div className="flex items-center gap-2 w-full md:w-auto">
+
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                 <Button
+                                    type="button"
                                     size="sm"
                                     onClick={addMoreItems}
-                                    className="flex-1 md:flex-none h-9 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20"
+                                    className="flex-1 sm:flex-none h-9 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-sm"
                                 >
-                                    <Plus className="mr-1 md:mr-2 h-3.5 w-3.5" />
-                                    Add More
+                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    Browse & Add Items ({items.filter((i) => getLiveStockMeta(i).totalPcs > 0).length} In Stock)
                                 </Button>
                                 <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const inStockItems = items.filter((it) => getLiveStockMeta(it).totalPcs > 0);
+                                        if (inStockItems.length === 0) return;
+                                        const allItemRows: RowData[] = inStockItems.map((item) => {
+                                            const cat = categories.find((c) => String(c.id) === String(item.category));
+                                            const catName = cat ? cat.name : "Uncategorized";
+                                            const baseTP = Number(item.trade_price ?? 0);
+                                            const packingQty = Number(item.packing_qty) || 1;
+                                            let offerPrice = baseTP;
+                                            let packPrice = baseTP;
+                                            let loosePrice = baseTP;
+                                            let tp6Price = baseTP;
+                                            let selectedPercentage = 0;
+
+                                            if (offerType === "1") {
+                                                packPrice = calculatePrice(item, null, Number(cartonPriceTier));
+                                                loosePrice = calculatePrice(item, null, Number(loosePriceTier));
+                                                offerPrice = loosePrice;
+                                                selectedPercentage = Number(item[`pt${loosePriceTier}` as keyof Item] ?? 0);
+                                                tp6Price = calculatePrice(item, null, Number(marketPriceTier));
+                                            } else {
+                                                tp6Price = calculatePrice(item, null, Number(marketPriceTier));
+                                                offerPrice = tp6Price;
+                                                loosePrice = Math.round(tp6Price / packingQty);
+                                                selectedPercentage = Number(item[`pt${marketPriceTier}` as keyof Item] ?? 0);
+                                                packPrice = 0;
+                                            }
+
+                                            return {
+                                                id: Date.now() + item.id + Math.random(),
+                                                item_id: item.id,
+                                                title: item.title,
+                                                pack_ctn: offerType === "1" ? packPrice : 0,
+                                                loos_ctn: offerType === "1" ? loosePrice : 0,
+                                                trade_price: offerPrice,
+                                                retail: item.retail,
+                                                category_name: catName,
+                                                discount: item.discount?.toString() ?? "",
+                                                scheme: (offerType === "2" ? item.scheme2 : item.scheme) ?? "",
+                                                mrp: item.retail,
+                                                tp6: tp6Price,
+                                                pt7: selectedPercentage,
+                                                company: item.company,
+                                            };
+                                        });
+                                        setRows(allItemRows);
+                                    }}
+                                    className="h-9 px-3 rounded-xl border-zinc-200 dark:border-zinc-800 text-xs font-bold hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                                    title="Load all items with positive live stock"
+                                >
+                                    <ListPlus className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+                                    Load All In-Stock
+                                </Button>
+                                <Button
+                                    type="button"
                                     size="sm"
                                     variant="outline"
                                     onClick={resetRows}
-                                    className="h-9 w-9 p-0 rounded-xl border-zinc-200 dark:border-zinc-800 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all group shrink-0"
+                                    title="Clear Manifest"
+                                    className="h-9 px-3 rounded-xl border-zinc-200 dark:border-zinc-800 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-200 shrink-0"
                                 >
-                                    <RotateCcw className="h-4 w-4 transition-transform group-active:rotate-180" />
+                                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                                    Clear
                                 </Button>
                             </div>
                         </div>
 
-                        <Card className="border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md overflow-hidden">
-                            <div className="overflow-x-auto min-h-[400px]">
+                        <Card className="border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm bg-white dark:bg-zinc-900 overflow-hidden py-0">
+                            <div className="overflow-x-auto min-h-[380px]">
                                 <table className="w-full text-left border-collapse">
                                     <thead className="hidden md:table-header-group">
-                                        <tr className="border-b border-zinc-200 dark:border-zinc-800 h-14 bg-zinc-50/50 dark:bg-zinc-950/20">
-                                            <th className="px-6 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                                                <div className="flex items-center gap-2 italic">
-                                                    <PackageSearch className="h-3 w-3 text-orange-500" />
-                                                    Item
+                                        <tr className="border-b border-zinc-200 dark:border-zinc-800 h-12 bg-zinc-50/90 dark:bg-zinc-800/70">
+                                            <th className="px-4 w-12 text-[10px] font-black uppercase tracking-wider text-zinc-400 text-center">
+                                                #
+                                            </th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                                                <div className="flex items-center gap-2">
+                                                    <PackageSearch className="h-3.5 w-3.5 text-orange-500" />
+                                                    Product / Quick Select
                                                 </div>
+                                            </th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 text-center">
+                                                Live Stock (Full | Pcs)
                                             </th>
                                             {offerType === "1" ? (
                                                 <>
-                                                    <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Carton Price</th>
-                                                    <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Loose Ctn Price</th>
+                                                    <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 text-center">
+                                                        Carton Price (Rs)
+                                                    </th>
+                                                    <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 text-center">
+                                                        Loose Ctn Price (Rs)
+                                                    </th>
                                                 </>
                                             ) : (
-                                                <>
-                                                    <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Rate</th>
-                                                </>
+                                                <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 text-center">
+                                                    Market Offer Rate (Rs)
+                                                </th>
                                             )}
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-center">M.R.P</th>
-                                            <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Scheme</th>
-                                            {offerType === "2" && <th className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 text-right">Price</th>}
-                                            <th className="px-6 w-10"></th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500 text-center">
+                                                M.R.P (Retail)
+                                            </th>
+                                            <th className="px-4 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                                                Promotional Scheme
+                                            </th>
+                                            <th className="px-4 w-12 text-center text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                                                Del
+                                            </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="flex flex-col md:table-row-group">
+                                    <tbody className="flex flex-col md:table-row-group divide-y divide-zinc-100 dark:divide-zinc-800/70">
                                         <AnimatePresence mode="popLayout">
                                             {rows.map((row, idx) => (
                                                 <motion.tr
                                                     key={row.id}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 10 }}
-                                                    transition={{ delay: idx * 0.05 }}
-                                                    className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-orange-500/[0.02] dark:hover:bg-orange-500/[0.02] transition-colors md:h-16 flex flex-col md:table-row p-3 md:p-0 relative"
+                                                    initial={{ opacity: 0, y: 6 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -6 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className={cn(
+                                                        "hover:bg-orange-50/30 dark:hover:bg-zinc-800/40 transition-colors flex flex-col md:table-row p-3 md:p-0 relative",
+                                                        selectedItemId === row.item_id && row.item_id !== null
+                                                            ? "bg-orange-50/40 dark:bg-orange-950/20"
+                                                            : ""
+                                                    )}
                                                     onClick={() => row.item_id && setSelectedItemId(row.item_id)}
                                                 >
-                                                    <td className="md:px-6 md:min-w-[300px] pb-2 md:pb-0 block md:table-cell">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{row.title || "No Item Selected"}</span>
-                                                                <span className="text-[10px] text-zinc-400 font-medium">{row.category_name}</span>
-                                                            </div>
+                                                    {/* Row # */}
+                                                    <td className="px-4 py-3 text-center font-mono text-xs font-bold text-zinc-400 hidden md:table-cell">
+                                                        {idx + 1}
+                                                    </td>
+
+                                                    {/* Item Column (Supports Direct Selection or Clicking Browse) */}
+                                                    <td className="md:px-4 md:py-2.5 md:min-w-[320px] pb-2 md:pb-0 block md:table-cell">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            {row.item_id ? (
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 truncate">
+                                                                            {row.title}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-semibold mt-0.5">
+                                                                        <span>{getCompanyName(row.company)}</span>
+                                                                        <span>•</span>
+                                                                        <span>{row.category_name}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setIsRegistryOpen(true)}
+                                                                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-dashed border-orange-300 dark:border-orange-800 bg-orange-50/40 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 hover:bg-orange-50 transition-colors text-xs font-bold"
+                                                                >
+                                                                    <span className="flex items-center gap-2">
+                                                                        <Search className="w-3.5 h-3.5" />
+                                                                        Click to select products from Live Inventory...
+                                                                    </span>
+                                                                    <PlusCircle className="w-4 h-4 shrink-0" />
+                                                                </button>
+                                                            )}
+
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-7 w-7 rounded-lg hover:bg-rose-500/10 text-rose-500 md:hidden shrink-0"
-                                                                onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    removeRow(row.id);
+                                                                }}
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </div>
                                                     </td>
 
+                                                    {/* Live Stock Column in Manifest */}
+                                                    <td className="md:px-4 py-1.5 md:py-2.5 block md:table-cell text-center">
+                                                        {(() => {
+                                                            const matchedItem = row.item_id
+                                                                ? items.find((i) => i.id === row.item_id)
+                                                                : null;
+                                                            if (!matchedItem) {
+                                                                return (
+                                                                    <span className="text-[10px] text-zinc-300 dark:text-zinc-600 font-mono">
+                                                                        —
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            const stockMeta = getLiveStockMeta(matchedItem);
+                                                            return (
+                                                                <div className="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/30">
+                                                                    <div
+                                                                        className={cn(
+                                                                            "font-mono text-xs font-black flex items-center gap-1.5",
+                                                                            stockMeta.totalPcs > 0
+                                                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                                                : stockMeta.totalPcs < 0
+                                                                                ? "text-rose-600 dark:text-rose-400"
+                                                                                : "text-zinc-500 dark:text-zinc-400"
+                                                                        )}
+                                                                    >
+                                                                        <span>{stockMeta.formatted}</span>
+                                                                        {stockMeta.status === "Deficit" && (
+                                                                            <span className="px-1 py-0.2 rounded text-[8px] bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-black uppercase border border-rose-300">
+                                                                                Deficit
+                                                                            </span>
+                                                                        )}
+                                                                        {stockMeta.status === "Out of Stock" && (
+                                                                            <span className="px-1 py-0.2 rounded text-[8px] bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300 font-black uppercase border border-rose-200">
+                                                                                0 Stock
+                                                                            </span>
+                                                                        )}
+                                                                        {stockMeta.status === "Low Stock" && (
+                                                                            <span className="px-1 py-0.2 rounded text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-black uppercase border border-amber-300">
+                                                                                Low
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[9px] font-bold text-zinc-400 font-mono">
+                                                                        Total: {stockMeta.totalPcs} Pcs
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </td>
+
                                                     {offerType === "1" ? (
                                                         <>
-                                                            <td className="md:px-4 py-1 md:py-0 block md:table-cell">
-                                                                <div className="flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 rounded p-1">
-                                                                    <span className="text-[14px] font-black tabular-nums text-zinc-900 dark:text-zinc-100">
-                                                                        {row.pack_ctn?.toLocaleString()}
-                                                                    </span>
-                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Carton Price</span>
-                                                                </div>
+                                                            <td className="md:px-4 py-1 md:py-2.5 block md:table-cell text-center">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={row.pack_ctn || ""}
+                                                                    onChange={(e) =>
+                                                                        setRows((prev) =>
+                                                                            prev.map((r) =>
+                                                                                r.id === row.id
+                                                                                    ? { ...r, pack_ctn: Number(e.target.value) }
+                                                                                    : r
+                                                                            )
+                                                                        )
+                                                                    }
+                                                                    className="h-9 text-xs font-mono font-black text-center rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900 w-full md:w-28 mx-auto"
+                                                                />
                                                             </td>
-                                                            <td className="md:px-4 py-1 md:py-0 block md:table-cell">
-                                                                <div className="flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 rounded p-1">
-                                                                    <span className="text-[14px] font-black tabular-nums text-zinc-900 dark:text-zinc-100">
-                                                                        {row.loos_ctn?.toLocaleString()}
-                                                                    </span>
-                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-400">Loose Ctn Price</span>
-                                                                </div>
+                                                            <td className="md:px-4 py-1 md:py-2.5 block md:table-cell text-center">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={row.loos_ctn || ""}
+                                                                    onChange={(e) => {
+                                                                        const val = Number(e.target.value);
+                                                                        setRows((prev) =>
+                                                                            prev.map((r) =>
+                                                                                r.id === row.id
+                                                                                    ? { ...r, loos_ctn: val, trade_price: val }
+                                                                                    : r
+                                                                            )
+                                                                        );
+                                                                    }}
+                                                                    className="h-9 text-xs font-mono font-black text-center rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900 w-full md:w-28 mx-auto"
+                                                                />
                                                             </td>
                                                         </>
                                                     ) : (
-                                                        <td className="md:px-4 py-1 md:py-0 block md:table-cell">
-                                                            <div className="flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded p-1">
-                                                                <span className="text-[14px] font-black tabular-nums text-orange-600 dark:text-orange-400">
-                                                                    {row.tp6?.toLocaleString()}
-                                                                </span>
-                                                                <span className="text-[8px] font-black uppercase tracking-widest text-orange-400">T.P + {row.pt7}%</span>
-                                                            </div>
+                                                        <td className="md:px-4 py-1 md:py-2.5 block md:table-cell text-center">
+                                                            <Input
+                                                                type="number"
+                                                                value={row.tp6 || ""}
+                                                                onChange={(e) => {
+                                                                    const val = Number(e.target.value);
+                                                                    setRows((prev) =>
+                                                                        prev.map((r) =>
+                                                                            r.id === row.id
+                                                                                ? { ...r, tp6: val, trade_price: val }
+                                                                                : r
+                                                                        )
+                                                                    );
+                                                                }}
+                                                                className="h-9 text-xs font-mono font-black text-center rounded-lg border-orange-200 dark:border-orange-900/50 bg-orange-50/40 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300 w-full md:w-32 mx-auto"
+                                                            />
                                                         </td>
                                                     )}
 
-                                                    <td className="md:px-4 md:text-center py-1 md:py-0 block md:table-cell">
-                                                        <div className="space-y-1 block md:inline-block w-full">
-                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none block md:hidden text-left mb-1">Retail Price</Label>
-                                                            <Input
-                                                                className="h-8 text-[11px] font-black tabular-nums rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30 text-left md:text-center w-full md:w-24"
-                                                                value={row.mrp}
-                                                                onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, mrp: Number(e.target.value) } : r))}
-                                                            />
-                                                        </div>
+                                                    <td className="md:px-4 py-1 md:py-2.5 block md:table-cell text-center">
+                                                        <Input
+                                                            type="number"
+                                                            className="h-9 text-xs font-mono font-bold rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 text-center w-full md:w-24 mx-auto"
+                                                            value={row.mrp || ""}
+                                                            onChange={(e) =>
+                                                                setRows((prev) =>
+                                                                    prev.map((r) =>
+                                                                        r.id === row.id
+                                                                            ? { ...r, mrp: Number(e.target.value) }
+                                                                            : r
+                                                                    )
+                                                                )
+                                                            }
+                                                        />
                                                     </td>
-                                                    <td className="md:px-4 py-1 md:py-0 block md:table-cell">
-                                                        <div className="space-y-1 block md:block">
-                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none block md:hidden mb-1">Scheme</Label>
-                                                            <Input
-                                                                className="h-8 text-[10px] font-bold rounded-sm border-zinc-200 dark:border-zinc-700 bg-white/30 dark:bg-zinc-900/30 w-full"
-                                                                placeholder="e.g. 10+1 Promo..."
-                                                                value={row.scheme}
-                                                                onChange={(e) => setRows(prev => prev.map(r => r.id === row.id ? { ...r, scheme: e.target.value } : r))}
-                                                            />
-                                                        </div>
-                                                    </td>
-                                                    
-                                                    {offerType === "2" && (
-                                                        <td className="md:px-4 py-2 mt-2 md:mt-0 font-bold border-t border-zinc-100 dark:border-zinc-800 border-dashed md:border-none md:py-0 flex flex-row justify-between items-center md:table-cell text-right">
-                                                            <Label className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none md:hidden block">Price</Label>
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="text-[14px] md:text-[12px] font-black tabular-nums text-zinc-900 dark:text-zinc-100">
-                                                                    <span className="text-[10px] text-zinc-400 mr-1 italic">V:</span>
-                                                                    {row.trade_price.toLocaleString()}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                    )}
 
-                                                    <td className="px-6 hidden md:table-cell">
+                                                    <td className="md:px-4 py-1 md:py-2.5 block md:table-cell">
+                                                        <Input
+                                                            className="h-9 text-xs font-semibold rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 w-full"
+                                                            placeholder="e.g. 10+1 Free, Net Rate..."
+                                                            value={row.scheme}
+                                                            onChange={(e) =>
+                                                                setRows((prev) =>
+                                                                    prev.map((r) =>
+                                                                        r.id === row.id ? { ...r, scheme: e.target.value } : r
+                                                                    )
+                                                                )
+                                                            }
+                                                        />
+                                                    </td>
+
+                                                    <td className="px-4 py-2.5 text-center hidden md:table-cell">
                                                         <Button
+                                                            type="button"
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="h-8 w-8 rounded-lg hover:bg-rose-500/10 group overflow-hidden transition-colors"
-                                                            onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}
+                                                            className="h-8 w-8 rounded-lg hover:bg-rose-500/10 group transition-colors"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                removeRow(row.id);
+                                                            }}
                                                         >
-                                                            <Trash2 className="h-4 w-4 text-zinc-300 group-hover:text-rose-500 group-active:scale-90" />
+                                                            <Trash2 className="h-4 w-4 text-zinc-400 group-hover:text-rose-500" />
                                                         </Button>
                                                     </td>
                                                 </motion.tr>
@@ -997,17 +1278,19 @@ export default function OfferListing({
                             </div>
 
                             {/* Summary Footer */}
-                            <div className="bg-zinc-950/20 dark:bg-zinc-950/40 p-3 md:p-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-3">
-                                <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
-                                    <div className="flex flex-col flex-1 md:flex-none text-center md:text-left">
-                                        <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Total Items</span>
-                                        <span className="text-sm font-black text-orange-500 tabular-nums">{rows.filter(r => r.item_id).length} Active</span>
+                            <div className="bg-zinc-50/80 dark:bg-zinc-800/50 px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <div className="flex items-center gap-6">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-zinc-500">Selected Offer Items:</span>
+                                        <span className="text-sm font-black text-orange-600 dark:text-orange-400 font-mono">
+                                            {rows.filter((r) => r.item_id).length}
+                                        </span>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-zinc-400 italic text-[10px] w-full md:w-auto text-center md:text-left justify-center md:justify-start">
-                                    <BadgeInfo className="h-3 w-3 shrink-0" />
-                                    <span>All values are based on current server-side price info.</span>
+                                <div className="flex items-center gap-2 text-zinc-500 text-xs">
+                                    <BadgeInfo className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                                    <span>Click any row to inspect its 7-tier Trade Price matrix below.</span>
                                 </div>
                             </div>
 
@@ -1096,7 +1379,7 @@ export default function OfferListing({
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-md">
                                         {filteredRegistryItems.length} of {items.length} Items
                                     </span>
-                                    {(selectedCompanyFilter !== "all" || selectedCategoryFilter !== "all" || searchQuery) && (
+                                    {(selectedCompanyFilter !== "all" || selectedCategoryFilter !== "all" || selectedStockFilter !== "in_stock" || searchQuery) && (
                                         <Button
                                             type="button"
                                             variant="ghost"
@@ -1104,6 +1387,7 @@ export default function OfferListing({
                                             onClick={() => {
                                                 setSelectedCompanyFilter("all");
                                                 setSelectedCategoryFilter("all");
+                                                setSelectedStockFilter("in_stock");
                                                 setSearchQuery("");
                                             }}
                                             className="h-7 px-2 text-[10px] font-bold text-orange-400 hover:text-white hover:bg-orange-500/20 uppercase tracking-wider"
@@ -1126,8 +1410,8 @@ export default function OfferListing({
                                 />
                             </div>
 
-                            {/* Company & Category Searchable Dropdowns */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-3">
+                            {/* Company, Category & Live Stock Filter Controls */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mt-3">
                                 <div className="space-y-1">
                                     <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                                         <Briefcase className="h-3 w-3 text-orange-500" />
@@ -1161,23 +1445,56 @@ export default function OfferListing({
                                         modal={false}
                                     />
                                 </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                        <Filter className="h-3 w-3 text-orange-500" />
+                                        Live Stock Filter
+                                    </label>
+                                    <Select
+                                        value={selectedStockFilter}
+                                        onValueChange={(val: "in_stock" | "all" | "low_stock" | "out_of_stock") =>
+                                            setSelectedStockFilter(val)
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full h-10 bg-white/10 border-white/15 text-white hover:bg-white/15 rounded-md text-xs font-bold">
+                                            <SelectValue placeholder="In Stock (> 0)" />
+                                        </SelectTrigger>
+                                        <SelectContent className="z-[9999]">
+                                            <SelectItem value="in_stock" className="text-xs font-bold">
+                                                In Stock Only (&gt; 0 Pcs)
+                                            </SelectItem>
+                                            <SelectItem value="all" className="text-xs font-bold">
+                                                All Active Items (Include 0 / Deficit)
+                                            </SelectItem>
+                                            <SelectItem value="low_stock" className="text-xs font-bold">
+                                                Low Stock Only
+                                            </SelectItem>
+                                            <SelectItem value="out_of_stock" className="text-xs font-bold">
+                                                Out of Stock / Deficit (&le; 0)
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-x-auto touch-scroll-x overflow-y-auto custom-scrollbar min-h-0 bg-zinc-50/30 dark:bg-zinc-950/30">
-                            <div className="min-w-[650px]">
-                                <div className="grid grid-cols-12 bg-zinc-100/50 dark:bg-zinc-900/50 px-4 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
+                            <div className="min-w-[760px]">
+                                <div className="grid grid-cols-12 bg-zinc-100/80 dark:bg-zinc-900/80 px-4 sm:px-6 py-2.5 sm:py-3 sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800">
                                     <div className="col-span-4 text-[9px] font-black uppercase text-zinc-400 tracking-widest">Item Description</div>
+                                    <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Live Inventory</div>
                                     <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Carton Price</div>
                                     <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Loose Price</div>
-                                    <div className="col-span-2 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Scheme</div>
-                                    <div className="col-span-2 text-right text-[9px] font-black uppercase text-zinc-400 tracking-widest">MRP (Retail)</div>
+                                    <div className="col-span-1 text-center text-[9px] font-black uppercase text-zinc-400 tracking-widest">Scheme</div>
+                                    <div className="col-span-1 text-right text-[9px] font-black uppercase text-zinc-400 tracking-widest">MRP</div>
                                 </div>
 
                                 <div className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
                                     {filteredRegistryItems.map((item) => {
                                         const isSelected = rows.some(r => r.item_id === item.id);
-                                        
+                                        const stockMeta = getLiveStockMeta(item);
+
                                         const getPrices = () => {
                                              if (offerType === "1") {
                                                  const cartonPrice = calculatePrice(item, null, Number(cartonPriceTier));
@@ -1192,8 +1509,9 @@ export default function OfferListing({
                                          return (
                                              <button
                                                  key={item.id}
+                                                 type="button"
                                                  onClick={() => handleSelectFromRegistry(item)}
-                                                 className={`w-full text-left transition-all p-3 sm:p-4 grid grid-cols-12 items-center gap-2 sm:gap-4 group ${
+                                                 className={`w-full text-left transition-all p-3 sm:p-4 grid grid-cols-12 items-center gap-2 sm:gap-3 group ${
                                                      isSelected 
                                                      ? "bg-orange-500/10 dark:bg-orange-500/5 border-l-4 border-orange-500" 
                                                      : "hover:bg-zinc-100 dark:hover:bg-zinc-900 border-l-4 border-transparent"
@@ -1210,18 +1528,50 @@ export default function OfferListing({
                                                              {item.title}
                                                          </span>
                                                          <span className="text-[10px] font-bold text-zinc-400 truncate">
-                                                             {getCompanyName(item.company)} | {getCategoryName(item.category)}
+                                                             {item.code ? `${item.code} • ` : ""}{getCompanyName(item.company)} | {getCategoryName(item.category)}
                                                          </span>
                                                      </div>
                                                  </div>
+
+                                                 {/* Live Inventory Breakdown (Matches /items & /sales/create) */}
+                                                 <div className="col-span-2 text-center">
+                                                     <div className="flex flex-col items-center justify-center">
+                                                         <div
+                                                             className={cn(
+                                                                 "font-mono text-xs font-black inline-flex items-center gap-1",
+                                                                 stockMeta.totalPcs > 0
+                                                                     ? "text-emerald-600 dark:text-emerald-400"
+                                                                     : stockMeta.totalPcs < 0
+                                                                     ? "text-rose-600 dark:text-rose-400"
+                                                                     : "text-zinc-500 dark:text-zinc-400"
+                                                             )}
+                                                         >
+                                                             <span>{stockMeta.formatted}</span>
+                                                             {stockMeta.status === "Deficit" && (
+                                                                 <span className="px-1 py-0.2 rounded text-[8px] bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 font-black uppercase border border-rose-300">
+                                                                     Deficit
+                                                                 </span>
+                                                             )}
+                                                             {stockMeta.status === "Out of Stock" && (
+                                                                 <span className="px-1 py-0.2 rounded text-[8px] bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300 font-black uppercase border border-rose-200">
+                                                                     0 Stock
+                                                                 </span>
+                                                             )}
+                                                         </div>
+                                                         <span className="text-[9px] font-mono font-bold text-zinc-400">
+                                                             Total: {stockMeta.totalPcs} Pcs
+                                                         </span>
+                                                     </div>
+                                                 </div>
+
                                                  <div className="col-span-2 text-center font-black tabular-nums text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">Rs {prices.pack.toLocaleString()}</div>
                                                  <div className="col-span-2 text-center font-black tabular-nums text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">Rs {prices.loose.toLocaleString()}</div>
-                                                 <div className="col-span-2 text-center">
-                                                     <span className="px-1.5 sm:px-2 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border border-blue-500/20 truncate block">
-                                                         {(offerType === "2" ? item.scheme2 : item.scheme) || 'NO SCHEME'}
+                                                 <div className="col-span-1 text-center">
+                                                     <span className="px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 text-[9px] font-black uppercase tracking-wider border border-blue-500/20 truncate block">
+                                                         {(offerType === "2" ? item.scheme2 : item.scheme) || '—'}
                                                      </span>
                                                  </div>
-                                                 <div className="col-span-2 text-right font-black tabular-nums text-xs sm:text-sm text-orange-600 dark:text-orange-500">Rs {item.retail.toLocaleString()}</div>
+                                                 <div className="col-span-1 text-right font-black tabular-nums text-xs sm:text-sm text-orange-600 dark:text-orange-500">Rs {item.retail.toLocaleString()}</div>
                                              </button>
                                          );
                                      })}

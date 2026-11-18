@@ -96,7 +96,7 @@ class OnlineOrderPlacementService
                 $offer = PriceOfferTo::where('is_live', true)->orderBy('date', 'desc')->first();
             }
 
-            // 3. Server-authoritative item validation and calculation
+            // 3. Server-authoritative item validation and calculation (single batch query to eliminate N+1)
             $orderItems = [];
             $subtotal = 0;
 
@@ -109,16 +109,30 @@ class OnlineOrderPlacementService
                     ->keyBy('item_id');
             }
 
+            $requestedItemIds = collect($itemsInput)
+                ->pluck('item_id')
+                ->filter()
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $productsMap = !empty($requestedItemIds)
+                ? Items::whereIn('id', $requestedItemIds)->where('is_active', 1)->get()->keyBy('id')
+                : collect();
+
+            $nowTimestamp = now();
+
             foreach ($itemsInput as $rawItem) {
-                $itemId = $rawItem['item_id'] ?? null;
+                $itemId = isset($rawItem['item_id']) ? (int) $rawItem['item_id'] : null;
                 $qtyCarton = max(0, (float)($rawItem['qty_carton'] ?? 0));
                 $qtyPcs = max(0, (float)($rawItem['qty_pcs'] ?? 0));
 
-                if ($qtyCarton <= 0 && $qtyPcs <= 0) {
+                if (!$itemId || ($qtyCarton <= 0 && $qtyPcs <= 0)) {
                     continue;
                 }
 
-                $product = Items::where('id', $itemId)->where('is_active', 1)->first();
+                $product = $productsMap->get($itemId);
                 if (!$product) {
                     continue; // Skip invalid or inactive products
                 }
@@ -172,6 +186,8 @@ class OnlineOrderPlacementService
                     'price_carton' => $priceCarton,
                     'price_piece' => $pricePiece,
                     'line_subtotal' => $lineSubtotal,
+                    'created_at' => $nowTimestamp,
+                    'updated_at' => $nowTimestamp,
                 ];
             }
 
@@ -199,16 +215,17 @@ class OnlineOrderPlacementService
                 'final_total' => $subtotal,
                 'currency' => 'PKR',
                 'customer_notes' => $customerNotes ? trim($customerNotes) : null,
-                'submitted_at' => now(),
+                'submitted_at' => $nowTimestamp,
                 'idempotency_key' => $idempotencyKey,
                 'revision_number' => 1,
             ]);
 
-            // 6. Create line items
-            foreach ($orderItems as $itemRow) {
+            // 6. Batch insert line items in a single SQL query
+            foreach ($orderItems as &$itemRow) {
                 $itemRow['online_order_id'] = $onlineOrder->id;
-                OnlineOrderItem::create($itemRow);
             }
+            unset($itemRow);
+            OnlineOrderItem::insert($orderItems);
 
             // 7. Create immutable history record
             OnlineOrderHistory::create([
@@ -225,12 +242,12 @@ class OnlineOrderPlacementService
                     'item_count' => count($orderItems),
                     'approval_status' => $customer->approval_status,
                 ],
-                'created_at' => now(),
+                'created_at' => $nowTimestamp,
             ]);
 
             DB::commit();
 
-            // 8. Dispatch in-system notification and email to internal administrators
+            // 8. Create in-app notifications immediately (fast batch DB insert) & dispatch emails/WebSockets after HTTP response
             try {
                 $existingRoles = \Spatie\Permission\Models\Role::whereIn('name', ['Admin', 'Super Admin', 'admin', 'super-admin'])
                     ->pluck('name')
@@ -241,45 +258,107 @@ class OnlineOrderPlacementService
                     ? User::permission('view online orders')->get()
                     : collect();
 
-                $admins = $roleUsers->merge($permUsers)->unique('id');
+                $admins = $roleUsers->merge($permUsers)->unique('id')->values();
                 if ($admins->isEmpty()) {
                     $admins = User::all();
                 }
 
-                $onlineOrder->load(['items', 'customerUser']);
+                $notifTitle = "New Wholesale Order #{$onlineOrder->order_no}";
+                $customerLabel = $customer->business_name
+                    ? "{$customer->name} ({$customer->business_name})"
+                    : $customer->name;
+                $itemCount = count($orderItems);
+                $notifMessage = "{$customerLabel} placed an order of {$itemCount} " . ($itemCount === 1 ? 'item' : 'items') . " worth Rs. " . number_format((float)$onlineOrder->final_total) . ".";
+                $actionUrl = "/online-orders/{$onlineOrder->id}";
 
+                $notificationRows = [];
+                $broadcastPayloads = [];
                 foreach ($admins as $admin) {
-                    Notification::create([
-                        'id' => (string) Str::uuid(),
+                    $notifId = (string) Str::orderedUuid();
+                    $dataPayload = [
+                        'title' => $notifTitle,
+                        'message' => $notifMessage,
+                        'action_url' => $actionUrl,
+                        'online_order_id' => $onlineOrder->id,
+                        'order_no' => $onlineOrder->order_no,
+                        'customer_name' => $customer->name,
+                        'business_name' => $customer->business_name,
+                        'customer_mobile' => $customer->mobile,
+                        'final_total' => (float) $onlineOrder->final_total,
+                        'item_count' => $itemCount,
+                    ];
+
+                    $notificationRows[] = [
+                        'id' => $notifId,
                         'type' => 'App\Notifications\NewOnlineOrderAdminNotification',
                         'notifiable_type' => User::class,
                         'notifiable_id' => $admin->id,
                         'priority' => 'high',
-                        'category' => 'Online Orders',
-                        'data' => [
-                            'online_order_id' => $onlineOrder->id,
-                            'order_no' => $onlineOrder->order_no,
-                            'customer_name' => $customer->name,
-                            'customer_mobile' => $customer->mobile,
-                            'final_total' => $onlineOrder->final_total,
-                            'message' => "New Online Order #{$onlineOrder->order_no} from {$customer->name} (Rs. " . number_format($onlineOrder->final_total) . ")",
-                            'action_url' => "/online-orders/{$onlineOrder->order_no}",
-                        ],
-                        'created_at' => now(),
-                    ]);
+                        'category' => 'online_orders',
+                        'data' => json_encode($dataPayload),
+                        'created_at' => $nowTimestamp,
+                    ];
 
-                    if (!empty($admin->email) && filter_var($admin->email, FILTER_VALIDATE_EMAIL)) {
+                    $broadcastPayloads[] = [
+                        'recipient_id' => $admin->id,
+                        'payload' => [
+                            'id' => $notifId,
+                            'title' => $notifTitle,
+                            'message' => $notifMessage,
+                            'actionUrl' => $actionUrl,
+                            'category' => 'online_orders',
+                            'priority' => 'high',
+                            'order_no' => $onlineOrder->order_no,
+                            'final_total' => (float) $onlineOrder->final_total,
+                            'customer_name' => $customer->name,
+                            'read' => false,
+                            'createdAt' => 'Just now',
+                        ],
+                    ];
+                }
+
+                if (!empty($notificationRows)) {
+                    Notification::insert($notificationRows);
+                }
+
+                // Collect unique valid email addresses of Admin role users (plus company contact_email if configured)
+                $adminEmails = $admins->pluck('email')
+                    ->filter(fn($email) => !empty($email) && filter_var($email, FILTER_VALIDATE_EMAIL))
+                    ->map(fn($email) => strtolower(trim($email)))
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $siteSetting = \App\Models\SiteSetting::first();
+                if ($siteSetting && !empty($siteSetting->contact_email) && filter_var($siteSetting->contact_email, FILTER_VALIDATE_EMAIL)) {
+                    $contactEmail = strtolower(trim($siteSetting->contact_email));
+                    if (!in_array($contactEmail, $adminEmails, true)) {
+                        $adminEmails[] = $contactEmail;
+                    }
+                }
+
+                // Queue email onto the database queue (NewOnlineOrderAdminMail implements ShouldQueue — takes ~2ms, never blocks HTTP!)
+                if (!empty($adminEmails)) {
+                    $primaryRecipient = $adminEmails[0];
+                    $ccRecipients = array_slice($adminEmails, 1);
+                    $pendingMail = \Illuminate\Support\Facades\Mail::to($primaryRecipient);
+                    if (!empty($ccRecipients)) {
+                        $pendingMail->cc($ccRecipients);
+                    }
+                    $pendingMail->queue(new \App\Mail\NewOnlineOrderAdminMail($onlineOrder));
+                }
+
+                // Queue WebSocket broadcast events (RealtimeNotificationEvent implements ShouldBroadcast — queued in ~1ms, never blocks HTTP!)
+                if (config('queue.default') !== 'sync') {
+                    foreach ($broadcastPayloads as $bp) {
                         try {
-                            \Illuminate\Support\Facades\Mail::to($admin->email)->send(
-                                new \App\Mail\NewOnlineOrderAdminMail($onlineOrder)
-                            );
-                        } catch (\Throwable $mailException) {
-                            \Illuminate\Support\Facades\Log::warning(
-                                "Failed to send order email to admin ({$admin->email}) for order #{$orderNo}: " . $mailException->getMessage()
-                            );
+                            broadcast(new \App\Events\RealtimeNotificationEvent($bp['recipient_id'], $bp['payload']));
+                        } catch (\Throwable $broadcastEx) {
+                            // Ignore if broadcast queueing fails
                         }
                     }
                 }
+
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("Failed to dispatch admin notification for order #{$orderNo}: " . $e->getMessage());
             }

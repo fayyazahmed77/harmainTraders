@@ -22,6 +22,7 @@ interface FilterData {
     supplier_id?: string;
     status?: string;
     search?: string;
+    amount?: string;
 }
 
 interface SummaryData {
@@ -35,6 +36,7 @@ interface SummaryData {
 interface Supplier {
     id: number;
     title: string;
+    code?: string;
 }
 
 interface Purchases {

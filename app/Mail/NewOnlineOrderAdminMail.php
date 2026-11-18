@@ -4,12 +4,16 @@ namespace App\Mail;
 
 use App\Models\OnlineOrder;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class NewOnlineOrderAdminMail extends Mailable
+class NewOnlineOrderAdminMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
+
+    public int $tries = 2;
+    public int $timeout = 15;
 
     public OnlineOrder $order;
 
@@ -33,7 +37,7 @@ class NewOnlineOrderAdminMail extends Mailable
                         'order' => $this->order,
                         'customer' => $this->order->customerUser,
                         'items' => $this->order->items,
-                        'reviewUrl' => url('/online-orders/' . $this->order->order_no),
+                        'reviewUrl' => url('/online-orders/' . $this->order->id),
                     ]);
     }
 }

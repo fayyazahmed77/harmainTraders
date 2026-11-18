@@ -14,6 +14,7 @@ import {
     FileText,
     ExternalLink,
     ShieldCheck,
+    MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -165,6 +166,19 @@ export default function CustomerDashboard({ customer, metrics, recent_orders, re
                                 View My Orders
                             </Button>
                         </Link>
+                        <a
+                            href={`https://wa.me/923318102001?text=${encodeURIComponent(
+                                `Assalam-o-Alaikum Haramain Traders! I have an inquiry regarding my wholesale account (${customer.name}${customer.business_name ? ` - ${customer.business_name}` : ""}, Mobile: ${customer.mobile}).`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto"
+                        >
+                            <Button className="w-full sm:w-auto h-11 px-5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                                <MessageCircle className="w-4 h-4 mr-2" />
+                                WhatsApp Inquiry (0331 8102001)
+                            </Button>
+                        </a>
                     </div>
                 </div>
 

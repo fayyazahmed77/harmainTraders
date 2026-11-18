@@ -224,6 +224,11 @@ class Account extends Model
         return $this->hasMany(Payment::class, 'payment_account_id');
     }
 
+    public function customerUser()
+    {
+        return $this->hasOne(CustomerUser::class, 'account_id');
+    }
+
     public function getCurrentBalanceAttribute()
     {
         if (array_key_exists('current_balance', $this->attributes) && $this->attributes['current_balance'] !== null) {

@@ -16,6 +16,7 @@ import {
     Building2,
     ShieldCheck,
     Clock,
+    MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { KeyRound, Lock } from "lucide-react";
 import { useAppearance } from "@/hooks/use-appearance";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +49,8 @@ interface CustomerUser {
     business_name?: string | null;
     approval_status: string;
     account_id?: number | null;
+    is_active?: boolean;
+    must_change_password?: boolean;
     account?: {
         id: number;
         code: string;
@@ -55,6 +68,59 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
     const customer = propCustomer || (page.props.auth as any)?.customer as CustomerUser;
     const { appearance, updateAppearance } = useAppearance();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+    // Password Update Modal State
+    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [newPasswordConfirmation, setNewPasswordConfirmation] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError("");
+        if (newPassword.length < 6) {
+            setPasswordError("New password must be at least 6 characters long.");
+            return;
+        }
+        if (newPassword !== newPasswordConfirmation) {
+            setPasswordError("New password confirmation does not match.");
+            return;
+        }
+
+        setPasswordSubmitting(true);
+        try {
+            const res = await fetch("/customer/update-password", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": (document.querySelector('meta[name="csrf-token"]') as any)?.content || "",
+                },
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword,
+                    new_password_confirmation: newPasswordConfirmation,
+                }),
+            });
+            const data = await res.json();
+            setPasswordSubmitting(false);
+
+            if (data.success) {
+                alert("Password updated successfully!");
+                setPasswordModalOpen(false);
+                setCurrentPassword("");
+                setNewPassword("");
+                setNewPasswordConfirmation("");
+                router.reload();
+            } else {
+                setPasswordError(data.message || data.errors?.current_password?.[0] || "Failed to update password.");
+            }
+        } catch (err) {
+            setPasswordSubmitting(false);
+            setPasswordError("Network error. Please try again.");
+        }
+    };
 
     const currentUrl = page.url;
 
@@ -77,6 +143,14 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
     };
 
     const isApproved = String(customer?.approval_status || "").toLowerCase() === "approved";
+
+    const whatsappSupportNumber = "923318102001";
+    const whatsappDisplayPhone = "0331 8102001";
+    const whatsappInquiryUrl = `https://wa.me/${whatsappSupportNumber}?text=${encodeURIComponent(
+        customer
+            ? `Assalam-o-Alaikum Haramain Traders! I have an inquiry regarding my wholesale account (${customer.name}${customer.business_name ? ` - ${customer.business_name}` : ""}, Mobile: ${customer.mobile}).`
+            : "Assalam-o-Alaikum Haramain Traders! I have an inquiry regarding wholesale orders and portal access."
+    )}`;
 
     return (
         <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans">
@@ -126,6 +200,18 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
 
                     {/* Right Controls */}
                     <div className="flex items-center gap-2 sm:gap-3">
+                        {/* WhatsApp Direct Inquiry Button */}
+                        <a
+                            href={whatsappInquiryUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`WhatsApp Inquiry: ${whatsappDisplayPhone}`}
+                            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>Inquiry: {whatsappDisplayPhone}</span>
+                        </a>
+
                         {/* Theme Toggle */}
                         <button
                             onClick={() => updateAppearance(appearance === "dark" ? "light" : "dark")}
@@ -203,6 +289,10 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
                                         );
                                     })}
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setPasswordModalOpen(true)} className="font-semibold text-xs py-2 cursor-pointer">
+                                        <KeyRound className="w-4 h-4 mr-2 text-zinc-400" />
+                                        <span>Change Password</span>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={handleLogout} className="text-rose-600 dark:text-rose-400 focus:text-rose-600 font-semibold text-xs py-2 cursor-pointer">
                                         <LogOut className="w-4 h-4 mr-2" />
                                         <span>Sign Out</span>
@@ -254,7 +344,16 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
                                 </Link>
                             );
                         })}
-                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 space-y-1.5">
+                            <a
+                                href={whatsappInquiryUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors"
+                            >
+                                <MessageCircle className="w-4 h-4" />
+                                <span>WhatsApp Inquiry: {whatsappDisplayPhone}</span>
+                            </a>
                             <button
                                 onClick={handleLogout}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
@@ -267,14 +366,132 @@ export default function CustomerPortalLayout({ children, customer: propCustomer 
                 )}
             </header>
 
+            {/* Temporary Password Prompt Banner */}
+            {customer?.must_change_password && (
+                <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-200">
+                    <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>
+                                <strong>Security Notice:</strong> You are using a temporary password. Please set a secure private password to protect your account.
+                            </span>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => setPasswordModalOpen(true)}
+                            className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0 shadow-sm"
+                        >
+                            Set New Password Now
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Main Content */}
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 {children}
             </main>
 
+            {/* Change Password Dialog */}
+            <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                            <Lock className="w-5 h-5 text-amber-600" />
+                            Change Portal Password
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Enter your current password and choose a new private password for online ordering.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handlePasswordSubmit} className="space-y-4 py-2">
+                        {passwordError && (
+                            <div className="p-2.5 text-xs rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-medium">
+                                {passwordError}
+                            </div>
+                        )}
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                                Current Password (or Temporary Password)
+                            </label>
+                            <Input
+                                type="password"
+                                required
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                placeholder="Enter current password..."
+                                className="h-9 text-xs"
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                                New Password (min 6 characters)
+                            </label>
+                            <Input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Choose a secure new password..."
+                                className="h-9 text-xs"
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                                Confirm New Password
+                            </label>
+                            <Input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={newPasswordConfirmation}
+                                onChange={(e) => setNewPasswordConfirmation(e.target.value)}
+                                placeholder="Re-enter new password..."
+                                className="h-9 text-xs"
+                            />
+                        </div>
+
+                        <DialogFooter className="pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setPasswordModalOpen(false)}
+                                disabled={passwordSubmitting}
+                                className="h-8 text-xs"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={passwordSubmitting || !newPassword || !currentPassword}
+                                className="h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white"
+                            >
+                                {passwordSubmitting ? "Updating..." : "Update Password"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
             {/* Footer */}
-            <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 text-center text-xs text-zinc-400">
-                <p>&copy; {new Date().getFullYear()} Haramain Traders Wholesale. All rights reserved.</p>
+            <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 px-4 text-center text-xs text-zinc-400">
+                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <p>&copy; {new Date().getFullYear()} Haramain Traders Wholesale. All rights reserved.</p>
+                    <a
+                        href={whatsappInquiryUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Customer Support & Inquiry (WhatsApp): {whatsappDisplayPhone}</span>
+                    </a>
+                </div>
             </footer>
         </div>
     );

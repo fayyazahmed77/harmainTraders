@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Combobox } from "@/components/ui/combobox";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -284,6 +284,10 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState<boolean>(false);
   const [extraDiscount, setExtraDiscount] = useState<number>(0);
   const [processing, setProcessing] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
+    return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2));
+  });
   const [showStockWarning, setShowStockWarning] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -652,7 +656,9 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       // F9 or Ctrl+Enter (when dialog not open): Finalize Invoice
       if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !checkoutDialogOpen) {
         e.preventDefault();
-        handleSave();
+        if (!isSubmittingRef.current) {
+          handleSave();
+        }
         return;
       }
     };
@@ -666,6 +672,8 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   // Simple renderer / layout
   // ───────────────────────────────────────────
   const handleSave = async () => {
+    if (isSubmittingRef.current) return;
+
     // Validation: Check for stock availability
     const stockErrors = rowsWithComputed.filter(r => r.stockExceeded);
     if (stockErrors.length > 0) {
@@ -676,7 +684,12 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
   };
 
   const saveInvoice = (forceSave = false) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setProcessing(true);
+
     const payload = {
+      idempotency_key: idempotencyKey,
       date: date ? formatLocalDate(date) : formatLocalDate(new Date()), // Format as YYYY-MM-DD
       // invoice is generated server-side; we do NOT send it from the client
       code: code,
@@ -729,13 +742,13 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
       })
         .filter(r => r.item_id !== null)
     };
-    console.log(payload);
-    setProcessing(true);
+
     router.post("/sales", payload, {
       preserveState: true,
       onSuccess: (page) => {
         const flashError = (page.props as any)?.flash?.error;
         if (flashError) {
+          isSubmittingRef.current = false;
           setProcessing(false);
           return;
         }
@@ -752,15 +765,22 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
           invoiceNo: invoiceNo
         });
 
+        // Generate a fresh UUID for the next transaction
+        setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
         clearForm();
 
         setShowSuccessDialog(true);
       },
       onError: (errors) => {
+        isSubmittingRef.current = false;
+        setProcessing(false);
         console.error(errors);
         alert("Failed to save sale. Check console for details.");
       },
-      onFinish: () => setProcessing(false)
+      onFinish: () => {
+        isSubmittingRef.current = false;
+        setProcessing(false);
+      }
     });
   };
 
@@ -1723,6 +1743,7 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
             removeSplitRow={removeSplitRow}
             updateSplitRow={updateSplitRow}
             onCommit={() => {
+              if (isSubmittingRef.current) return;
               setCheckoutDialogOpen(false);
               saveInvoice();
             }}

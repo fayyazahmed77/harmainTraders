@@ -65,6 +65,9 @@ interface RowData {
     discPercent: number;
     taxReadOnly?: boolean;
     discReadOnly?: boolean;
+    orig_subtotal?: number;
+    orig_discount?: number;
+    orig_tax?: number;
     amount: number;
     packing: number;
     // Bonus Fields
@@ -353,6 +356,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
     const [desktopAccOpen, setDesktopAccOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const isSubmittingRef = React.useRef(false);
+    const [idempotencyKey, setIdempotencyKey] = useState<string>(() => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
 
     // ── Mobile specific states ────────────────
     const [showStickyFooter, setShowStickyFooter] = useState(true);
@@ -586,25 +591,38 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                         const s_full = toNum(si.qty_carton);
                         const s_pcs = toNum(si.qty_pcs);
                         const rate = toNum(si.trade_price);
-                        const packing = toNum(si.item?.packing_qty || si.item?.packing_full || 1);
-                        const base = (s_full * packing + s_pcs) * rate;
+                        const packing = Math.max(1, toNum(si.item?.packing_qty || si.item?.packing_full || 1));
+                        const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+                        const origSubtotal = toNum(si.subtotal) > 0 ? toNum(si.subtotal) : calcBase;
+                        const base = origSubtotal;
 
                         const taxAmt = toNum(si.gst_amount || 0);
                         const discAmt = toNum(si.discount || 0);
 
-                        // Derived percentages - strictly from amounts
+                        // Derived percentages - strictly from per-carton base / original subtotal
                         const taxableBase = base - discAmt;
-                        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-                        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+                        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+                        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
+                        const alreadyReturned = toNum(si.already_returned_pcs);
                         const returnablePcs = toNum(si.returnable_pcs ?? si.total_pcs);
+                        const soldNonBonusPcs = (s_full * packing) + s_pcs;
+                        const remNonBonusPcs = alreadyReturned > 0
+                            ? Math.max(0, soldNonBonusPcs - alreadyReturned)
+                            : soldNonBonusPcs;
+                        const initFull = alreadyReturned === 0
+                            ? s_full
+                            : (s_full === 0 ? 0 : Math.floor(remNonBonusPcs / packing));
+                        const initPcs = alreadyReturned === 0
+                            ? s_pcs
+                            : (s_full === 0 ? remNonBonusPcs : (remNonBonusPcs % packing));
 
                         return {
                             id: Math.random(),
                             item_id: si.item_id,
                             item_title: si.item?.title ?? "",
-                            full: Math.min(s_full, Math.floor(returnablePcs / packing)),
-                            pcs: Math.min(s_pcs, returnablePcs % packing),
+                            full: initFull,
+                            pcs: initPcs,
                             sold_full: s_full,
                             sold_pcs: s_pcs,
                             rate: rate,
@@ -612,12 +630,15 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                             discPercent: discVal,
                             taxReadOnly: true,
                             discReadOnly: true,
+                            orig_subtotal: origSubtotal,
+                            orig_discount: discAmt,
+                            orig_tax: taxAmt,
                             amount: 0,
                             packing: packing,
                             bonus_full: 0,
                             bonus_pcs: 0,
                             has_bonus_available: toNum(si.bonus_carton) > 0 || toNum(si.bonus_pcs) > 0,
-                            already_returned_pcs: toNum(si.already_returned_pcs),
+                            already_returned_pcs: alreadyReturned,
                             returnable_pcs: returnablePcs,
                             sales_date: inv.date,
                             sales_invoice: inv.invoice,
@@ -645,15 +666,17 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         const s_full = toNum(found.qty_carton);
         const s_pcs = toNum(found.qty_pcs);
         const rate = toNum(found.last_trade_price ?? 0);
-        const packing = toNum(it?.packing_qty || it?.packing_full || 1);
-        const base = (s_full * packing + s_pcs) * rate;
+        const packing = Math.max(1, toNum(it?.packing_qty || it?.packing_full || 1));
+        const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+        const origSubtotal = toNum(found.subtotal) > 0 ? toNum(found.subtotal) : calcBase;
+        const base = origSubtotal;
 
         const taxAmt = toNum(found.gst_amount || 0);
         const discAmt = toNum(found.discount || 0);
 
         const taxableBase = base - discAmt;
-        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
         setRows(prev => prev.map(r => r.id === rowId ? {
             ...r,
@@ -668,6 +691,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             discPercent: discVal,
             taxReadOnly: true,
             discReadOnly: true,
+            orig_subtotal: origSubtotal,
+            orig_discount: discAmt,
+            orig_tax: taxAmt,
             packing: packing,
             sales_date: found.date,
             sales_invoice: found.invoice_no,
@@ -691,15 +717,17 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             const s_pcs = toNum(ci.qty_pcs);
             const rate = toNum(ci.last_trade_price ?? 0);
             const it = ci.item;
-            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
-            const base = (s_full * packing + s_pcs) * rate;
+            const packing = Math.max(1, toNum(it?.packing_qty || it?.packing_full || 1));
+            const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+            const origSubtotal = toNum(ci.subtotal) > 0 ? toNum(ci.subtotal) : calcBase;
+            const base = origSubtotal;
 
             const taxAmt = toNum(ci.gst_amount || 0);
             const discAmt = toNum(ci.discount || 0);
 
             const taxableBase = base - discAmt;
-            const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-            const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+            const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+            const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
             return {
                 id: Math.random(),
@@ -714,6 +742,9 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                 discPercent: discVal,
                 taxReadOnly: true,
                 discReadOnly: true,
+                orig_subtotal: origSubtotal,
+                orig_discount: discAmt,
+                orig_tax: taxAmt,
                 amount: 0,
                 packing: packing,
                 sales_date: ci.date,
@@ -768,16 +799,32 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
     // ── Calculations ───────────────────────────
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
-            const packing = toNum(r.packing) || 1;
+            const packing = Math.max(1, toNum(r.packing) || 1);
             const units = toNum(r.full) * packing + toNum(r.pcs);
             const rate = toNum(r.rate);
-            const baseAmount = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
+            const isFullLineReturn = r.orig_subtotal !== undefined && r.orig_subtotal > 0
+                && toNum(r.full) === toNum(r.sold_full)
+                && toNum(r.pcs) === toNum(r.sold_pcs);
+
+            // Match Sales row calculation: Sales rounds each row's gross subtotal via Math.round((full * rate) + (pcs * (rate / packing)))
+            const rawBase = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
+            const baseAmount = units === 0
+                ? 0
+                : (isFullLineReturn ? toNum(r.orig_subtotal) : Math.round(rawBase));
+
             const discPercent = toNum(r.discPercent);
             const taxPercent = toNum(r.taxPercent);
-            
-            const discAmount = (discPercent / 100) * baseAmount;
+
+            const discAmount = (r.discReadOnly && r.orig_subtotal && r.orig_subtotal > 0 && r.orig_discount !== undefined)
+                ? (isFullLineReturn ? toNum(r.orig_discount) : (toNum(r.orig_discount) * (baseAmount / r.orig_subtotal)))
+                : ((discPercent / 100) * baseAmount);
+
             const taxableAmount = baseAmount - discAmount;
-            const taxAmount = (taxPercent / 100) * taxableAmount;
+
+            const taxAmount = (r.taxReadOnly && r.orig_subtotal && r.orig_subtotal > 0 && r.orig_tax !== undefined)
+                ? (isFullLineReturn ? toNum(r.orig_tax) : (toNum(r.orig_tax) * (baseAmount / r.orig_subtotal)))
+                : ((taxPercent / 100) * taxableAmount);
+
             const finalAmount = taxableAmount + taxAmount;
 
             return { 
@@ -808,7 +855,7 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
         if (selectedInvoice) {
             const maxReturnable = Number(selectedInvoice.returnable_amount ?? selectedInvoice.net_total ?? 0);
-            if (maxReturnable > 0 && netVal > maxReturnable && (netVal - maxReturnable) <= 2) {
+            if (maxReturnable > 0 && netVal > maxReturnable && (netVal - maxReturnable) <= 50) {
                 netVal = maxReturnable;
             }
         }
@@ -843,6 +890,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
 
     // ── Save ──────────────────────────────────
     const handleSave = () => {
+        if (isSubmittingRef.current) return;
+
         const rowCount = rows.filter(r => r.item_id !== null).length;
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
 
@@ -850,7 +899,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
         if (!originalInvoiceNo) { alert("Please select a source invoice to attach this return."); return; }
         if (rowCount === 0) { alert("Please assign items to the manifest before executing return."); return; }
         if (validRows.length === 0) { alert("Please enter return quantities (Cartons or PCS) for the assigned items."); return; }
+
+        isSubmittingRef.current = true;
+        setIsSaving(true);
+
         const payload = {
+            idempotency_key: idempotencyKey,
             date: date.toISOString().split('T')[0],
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
@@ -869,9 +923,6 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             remaining_amount: totals.net - extraDiscount - refundAmount,
             sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
-                const base = (toNum(r.full) * r.rate) + (toNum(r.pcs) * (r.rate / r.packing));
-                const d = (toNum(r.discPercent) / 100) * base;
-                const t = (toNum(r.taxPercent) / 100) * (base - d);
                 return {
                     item_id: r.item_id,
                     qty_carton: r.full,
@@ -880,8 +931,8 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                     bonus_qty_pcs: r.bonus_pcs,
                     total_pcs: (toNum(r.full) + toNum(r.bonus_full || 0)) * r.packing + toNum(r.pcs) + toNum(r.bonus_pcs || 0),
                     trade_price: r.rate,
-                    discount: +d.toFixed(2),
-                    gst_amount: +t.toFixed(2),
+                    discount: +r.computed_disc.toFixed(2),
+                    gst_amount: +r.computed_tax.toFixed(2),
                     subtotal: r.amount,
                 };
             }),
@@ -900,10 +951,12 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
             setCreditBalance(null);
             setAdvanceBalance(null);
             setSelectedPaymentAccountId("");
+            setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
         };
 
         router.post("/sales-return", payload, {
             onSuccess: (page) => {
+                isSubmittingRef.current = false;
                 setIsSaving(false);
                 const flashError = (page.props as any)?.flash?.error;
                 if (flashError) {
@@ -923,7 +976,14 @@ export default function SalesReturnCreatePage({ accounts, salemans, nextInvoiceN
                 resetForm();
                 setShowSuccessDialog(true);
             },
-            onError: () => setIsSaving(false),
+            onError: () => {
+                isSubmittingRef.current = false;
+                setIsSaving(false);
+            },
+            onFinish: () => {
+                isSubmittingRef.current = false;
+                setIsSaving(false);
+            }
         });
     };
 

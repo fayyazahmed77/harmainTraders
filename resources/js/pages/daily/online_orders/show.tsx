@@ -26,10 +26,14 @@ import {
     Plus,
     Search,
     Loader2,
+    Printer,
+    Download,
+    Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -149,6 +153,7 @@ interface Props {
     order: OnlineOrder;
     whatsappDirectLink?: string | null;
     stockBalances?: Record<number, any>;
+    previousBalance?: number;
 }
 
 interface RevItem {
@@ -164,12 +169,36 @@ interface RevItem {
     available_stock_pcs: number;
 }
 
-export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalances }: Props) {
+export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalances, previousBalance = 0 }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: "Daily", href: "/sales" },
         { title: "Online Orders", href: "/online-orders" },
         { title: `#${order.order_no}`, href: `/online-orders/${order.id}` },
     ];
+
+    const formatRs = (amount: number) => {
+        const num = Number(amount || 0);
+        return `Rs ${num.toLocaleString("en-PK", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
+    };
+
+    const handlePrintOrder = (format: "small" | "big") => {
+        if (order.sale?.id) {
+            window.open(`/sales/${order.sale.id}/pdf?format=${format}`, "_blank");
+        } else {
+            window.open(`/online-orders/${order.id}/invoice-pdf?format=${format}`, "_blank");
+        }
+    };
+
+    const handleDownloadOrderPdf = () => {
+        if (order.sale?.id) {
+            window.location.href = `/sales/${order.sale.id}/download?format=big`;
+        } else {
+            window.location.href = `/online-orders/${order.id}/invoice-pdf?format=big&download=1`;
+        }
+    };
 
     // Modals state
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -480,6 +509,37 @@ export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalanc
 
                         {/* Top Action Buttons */}
                         <div className="flex flex-wrap items-center gap-2">
+                            {/* Print Small, Print Large, Download PDF Buttons */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handlePrintOrder("small")}
+                                className="h-9 px-3.5 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-xs flex items-center gap-1.5"
+                            >
+                                <Printer className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
+                                Print Small
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handlePrintOrder("big")}
+                                className="h-9 px-3.5 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-xs flex items-center gap-1.5"
+                            >
+                                <Printer className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
+                                Print Large
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleDownloadOrderPdf}
+                                className="h-9 px-3.5 text-xs font-bold rounded-xl border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all shadow-xs flex items-center gap-1.5"
+                            >
+                                <Download className="h-3.5 w-3.5 text-zinc-700 dark:text-zinc-300" />
+                                Download PDF
+                            </Button>
+
                             {whatsappDirectLink && (
                                 <a
                                     href={whatsappDirectLink}
@@ -488,7 +548,7 @@ export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalanc
                                 >
                                     <Button
                                         size="sm"
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 shadow-sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 rounded-xl shadow-xs"
                                     >
                                         <MessageCircle className="w-4 h-4 mr-1.5" />
                                         WhatsApp Customer
@@ -500,29 +560,29 @@ export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalanc
                                 <Button
                                     size="sm"
                                     onClick={handleStartReview}
-                                    className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs h-9 shadow-sm"
+                                    className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs h-9 rounded-xl shadow-xs"
                                 >
                                     <RefreshCw className="w-4 h-4 mr-1.5" />
                                     Start Review
                                 </Button>
                             )}
 
-                            {["pending", "under_review"].includes(order.status) && (
+                            {!["confirmed", "canceled"].includes(order.status) && (
                                 <>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={openRevisionModal}
-                                        className="text-orange-700 border-orange-300 hover:bg-orange-50 font-semibold text-xs h-9"
-                                    >
-                                        <Edit3 className="w-4 h-4 mr-1.5" />
-                                        Propose Revision
-                                    </Button>
+                                    <Link href={`/online-orders/${order.id}/edit`}>
+                                        <Button
+                                            size="sm"
+                                            className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs h-9 rounded-xl shadow-xs"
+                                        >
+                                            <Edit3 className="w-4 h-4 mr-1.5" />
+                                            Propose Revision / Edit
+                                        </Button>
+                                    </Link>
 
                                     <Button
                                         size="sm"
                                         onClick={() => setConfirmDialogOpen(true)}
-                                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs h-9 shadow-sm"
+                                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs h-9 rounded-xl shadow-xs"
                                     >
                                         <Check className="w-4 h-4 mr-1.5" />
                                         Confirm into ERP Sale
@@ -530,30 +590,12 @@ export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalanc
                                 </>
                             )}
 
-                            {order.status === "awaiting_customer_acceptance" && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="inline-flex items-center text-xs font-bold text-orange-800 bg-orange-100 border border-orange-300 rounded-lg px-3 py-1.5 shadow-sm">
-                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-orange-600 animate-pulse" />
-                                        Awaiting Customer Acceptance (Revision #{order.revision_number})
-                                    </span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={openRevisionModal}
-                                        className="text-orange-700 border-orange-300 hover:bg-orange-50 font-semibold text-xs h-9"
-                                    >
-                                        <Edit3 className="w-4 h-4 mr-1.5" />
-                                        Update Proposal
-                                    </Button>
-                                </div>
-                            )}
-
                             {!["confirmed", "canceled"].includes(order.status) && (
                                 <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => setCancelDialogOpen(true)}
-                                    className="text-rose-600 border-rose-300 hover:bg-rose-50 font-semibold text-xs h-9"
+                                    className="text-rose-600 border-rose-300 hover:bg-rose-50 font-semibold text-xs h-9 rounded-xl"
                                 >
                                     <X className="w-4 h-4 mr-1.5" />
                                     Cancel Order
@@ -736,226 +778,289 @@ export default function OnlineOrderShow({ order, whatsappDirectLink, stockBalanc
                         </div>
                     )}
 
-                    {/* Staged Items Table */}
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-                        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                                    Order Items ({order.items.length})
-                                </h3>
-                                <p className="text-xs text-zinc-500">
-                                    Real-time warehouse stock checked against live ERP stock balances.
-                                </p>
+                    {/* ══════════════════════════════════════════════════════════════════ */}
+                    {/* ── INVOICE ITEMS MANIFEST (Matching Sales Invoice Manifest Style) ─ */}
+                    {/* ══════════════════════════════════════════════════════════════════ */}
+                    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 py-0 dark:border-zinc-800 shadow-sm rounded-xl overflow-hidden">
+                        <CardHeader className="px-6 py-1 pt-3.5 pb-2.5 bg-zinc-50/50 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <Receipt className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />
+                                    <div>
+                                        <CardTitle className="text-sm font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-200">
+                                            Invoice Items Manifest
+                                        </CardTitle>
+                                        <CardDescription className="text-[10px] text-zinc-500 font-mono">
+                                            Detailed manifest of products and transaction row totals
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                                <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-mono border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-none"
+                                >
+                                    {order.sale?.id ? `SID_${order.sale.id}` : `OID_${order.id}`}
+                                </Badge>
                             </div>
-                        </div>
+                        </CardHeader>
 
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-4 py-3">#</th>
-                                        <th className="px-4 py-3">Product Name</th>
-                                        <th className="px-4 py-3">Live Stock</th>
-                                        <th className="px-4 py-3 text-right">Unit Price</th>
-                                        <th className="px-4 py-3 text-right">Order Qty</th>
-                                        <th className="px-4 py-3 text-right">Subtotal</th>
+                            <table className="w-full text-left border-collapse table-auto">
+                                <thead>
+                                    <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-700 dark:text-zinc-200 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                        <th rowSpan={2} className="px-6 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            #
+                                        </th>
+                                        <th rowSpan={2} className="px-3 py-3 text-left align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            Description of Goods
+                                        </th>
+                                        <th colSpan={2} className="px-3 py-1.5 text-center border-b border-zinc-200 dark:border-zinc-800">
+                                            Quantity
+                                        </th>
+                                        <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            Retail
+                                        </th>
+                                        <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            Rate
+                                        </th>
+                                        <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            Disc %
+                                        </th>
+                                        <th rowSpan={2} className="px-4 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            After Discount
+                                        </th>
+                                        <th rowSpan={2} className="px-6 py-3 text-right align-middle border-b border-zinc-200 dark:border-zinc-800">
+                                            Net Amount
+                                        </th>
+                                    </tr>
+                                    <tr className="bg-zinc-50/50 dark:bg-zinc-950/20 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                                        <th className="px-3 py-1.5 text-center">Box</th>
+                                        <th className="px-3 py-1.5 text-center">Pcs</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                    {order.items.map((item, idx) => {
-                                        const rawStock = (item as any).available_stock_pcs ?? item.stock_balance?.balance_pcs;
-                                        const liveStock = typeof rawStock === 'number' ? rawStock : parseFloat(rawStock || '0');
-                                        const hasEnough = liveStock >= item.quantity;
-                                        const productMeta = item.item || (item as any).product;
+                                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/40">
+                                    {order.items.map((item: any, idx) => {
+                                        const productMeta = item.item || item.product;
+                                        const packing = Math.max(
+                                            1,
+                                            Number(
+                                                item.packing_qty_snapshot ??
+                                                    productMeta?.packing_size ??
+                                                    productMeta?.packing ??
+                                                    productMeta?.packing_qty ??
+                                                    1
+                                            ) || 1
+                                        );
+                                        const totalPcs = Number(item.total_pcs ?? item.quantity ?? 0);
+                                        const boxQty =
+                                            item.qty_carton !== undefined && item.qty_carton !== null
+                                                ? Number(item.qty_carton)
+                                                : Math.floor(totalPcs / packing);
+                                        const pcsQty =
+                                            item.qty_pcs !== undefined && item.qty_pcs !== null
+                                                ? Number(item.qty_pcs)
+                                                : totalPcs % packing;
+
+                                        const rate = Number(item.unit_price ?? item.price_piece ?? 0);
+                                        const retailPrice = Number(
+                                            item.retail_price ?? productMeta?.retail ?? productMeta?.retail_price ?? 0
+                                        );
+                                        const lineNet = Number(item.subtotal ?? item.line_subtotal ?? totalPcs * rate);
+                                        const grossRow = totalPcs * rate;
+                                        const rowDiscAmt = Math.max(0, grossRow - lineNet);
+                                        const discPercent = grossRow > 0 && rowDiscAmt > 0.01 ? (rowDiscAmt / grossRow) * 100 : 0;
+                                        const afterDiscRate = rate * (1 - discPercent / 100);
+
                                         return (
-                                            <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-                                                <td className="px-4 py-3.5 text-zinc-400 text-xs">{idx + 1}</td>
-                                                <td className="px-4 py-3.5">
-                                                    <div className="font-bold text-zinc-900 dark:text-zinc-100">
-                                                        {item.item_name}
+                                            <tr
+                                                key={item.id}
+                                                className="group transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 border-l-2 border-transparent text-xs"
+                                            >
+                                                <td className="px-6 py-3.5 text-zinc-400 font-mono">{idx + 1}</td>
+                                                <td className="px-3 py-3.5">
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[340px]">
+                                                            {item.item_name || item.item_name_snapshot || productMeta?.title}
+                                                        </p>
                                                     </div>
-                                                    {productMeta && (
-                                                        <div className="text-xs text-zinc-400">
-                                                            Code: {productMeta.code} | Packing: {productMeta.packing ?? productMeta.packing_qty ?? 1} pcs
-                                                        </div>
-                                                    )}
                                                 </td>
-                                                <td className="px-4 py-3.5">
-                                                    <Badge
-                                                        className={`text-xs px-2 py-0.5 font-bold ${
-                                                            liveStock < 0
-                                                                ? "bg-rose-100 text-rose-800 border-rose-300"
-                                                                : liveStock === 0
-                                                                ? "bg-rose-100 text-rose-800 border-rose-300"
-                                                                : !hasEnough
-                                                                ? "bg-amber-100 text-amber-800 border-amber-300"
-                                                                : "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                                        }`}
-                                                    >
-                                                        {liveStock < 0
-                                                            ? `${liveStock} pcs (Deficit)`
-                                                            : liveStock === 0
-                                                            ? "0 pcs (Out of Stock)"
-                                                            : `${liveStock} pcs in stock`}
-                                                    </Badge>
+                                                <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {boxQty.toFixed(2)}
                                                 </td>
-                                                <td className="px-4 py-3.5 text-right font-medium text-zinc-700 dark:text-zinc-300">
-                                                    Rs. {Number(item.unit_price).toLocaleString()}
+                                                <td className="px-3 py-3.5 text-center font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {pcsQty.toFixed(2)}
                                                 </td>
-                                                <td className="px-4 py-3.5 text-right font-bold text-zinc-900 dark:text-zinc-100">
-                                                    {item.quantity} pcs
+                                                <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {formatRs(retailPrice)}
                                                 </td>
-                                                <td className="px-4 py-3.5 text-right font-bold text-zinc-900 dark:text-zinc-100">
-                                                    Rs. {Number(item.subtotal).toLocaleString()}
+                                                <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {formatRs(rate)}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {discPercent > 0 ? discPercent.toFixed(2) : "0.00"}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right font-mono text-black dark:text-zinc-100 font-bold">
+                                                    {formatRs(afterDiscRate)}
+                                                </td>
+                                                <td className="px-6 py-3.5 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                                                    {formatRs(lineNet)}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
+                                <tfoot className="bg-zinc-50/50 dark:bg-zinc-950/20 font-black text-xs border-t border-zinc-200 dark:border-zinc-800">
+                                    {(() => {
+                                        const totalBoxes = order.items.reduce((acc, it: any) => {
+                                            const pm = it.item || it.product;
+                                            const pk = Math.max(
+                                                1,
+                                                Number(it.packing_qty_snapshot ?? pm?.packing_size ?? pm?.packing ?? pm?.packing_qty ?? 1) || 1
+                                            );
+                                            const tp = Number(it.total_pcs ?? it.quantity ?? 0);
+                                            const bx =
+                                                it.qty_carton !== undefined && it.qty_carton !== null
+                                                    ? Number(it.qty_carton)
+                                                    : Math.floor(tp / pk);
+                                            return acc + bx;
+                                        }, 0);
+
+                                        const totalLoosePcs = order.items.reduce((acc, it: any) => {
+                                            const pm = it.item || it.product;
+                                            const pk = Math.max(
+                                                1,
+                                                Number(it.packing_qty_snapshot ?? pm?.packing_size ?? pm?.packing ?? pm?.packing_qty ?? 1) || 1
+                                            );
+                                            const tp = Number(it.total_pcs ?? it.quantity ?? 0);
+                                            const pc =
+                                                it.qty_pcs !== undefined && it.qty_pcs !== null
+                                                    ? Number(it.qty_pcs)
+                                                    : tp % pk;
+                                            return acc + pc;
+                                        }, 0);
+
+                                        const totalRowDisc = order.items.reduce((acc, it: any) => {
+                                            const tp = Number(it.total_pcs ?? it.quantity ?? 0);
+                                            const rt = Number(it.unit_price ?? it.price_piece ?? 0);
+                                            const ln = Number(it.subtotal ?? it.line_subtotal ?? tp * rt);
+                                            return acc + Math.max(0, tp * rt - ln);
+                                        }, 0);
+
+                                        const totalNetItems = order.items.reduce(
+                                            (acc, it: any) => acc + Number(it.subtotal ?? it.line_subtotal ?? 0),
+                                            0
+                                        );
+
+                                        return (
+                                            <tr>
+                                                <td colSpan={2} className="px-6 py-3.5 text-zinc-500">
+                                                    Total
+                                                </td>
+                                                <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
+                                                    {totalBoxes}
+                                                </td>
+                                                <td className="px-3 py-3.5 text-center text-zinc-900 dark:text-zinc-100 font-mono">
+                                                    {totalLoosePcs}
+                                                </td>
+                                                <td className="px-4 py-3.5"></td>
+                                                <td className="px-4 py-3.5"></td>
+                                                <td className="px-4 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">
+                                                    -{formatRs(totalRowDisc)}
+                                                </td>
+                                                <td className="px-4 py-3.5"></td>
+                                                <td className="px-6 py-3.5 text-right text-black dark:text-zinc-100 font-mono font-bold">
+                                                    {formatRs(totalNetItems || order.subtotal)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })()}
+                                </tfoot>
                             </table>
                         </div>
 
-                        {/* Financial Totals Breakdown */}
-                        <div className="p-5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                            <div className="text-xs text-zinc-500 space-y-1">
-                                <div>• Pending & Staged orders do not affect warehouse stock.</div>
-                                <div>• Stock deduction occurs atomically when confirmed into an ERP sale.</div>
-                            </div>
+                        {/* Summary Section (Matching Sales Invoice Summary Layout) */}
+                        {(() => {
+                            const courierCharges = Number(order.delivery_charges || 0);
+                            const extraDiscount = Number(order.discount_amount || 0);
+                            const currentInvoiceTotal = Number(order.payable_amount || 0);
+                            const prevBal = Number(previousBalance || 0);
+                            const cashReceived = Number((order.sale as any)?.paid_amount || 0);
+                            const totalBalance = currentInvoiceTotal + prevBal;
+                            const totalReceivable = Math.max(0, totalBalance - cashReceived);
 
-                            <div className="w-full sm:w-72 space-y-2 text-sm">
-                                <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
-                                    <span>Subtotal:</span>
-                                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                        Rs. {Number(order.subtotal).toLocaleString()}
-                                    </span>
-                                </div>
-
-                                {Number(order.discount_amount) > 0 && (
-                                    <div className="flex justify-between text-rose-600">
-                                        <span>
-                                            Discount{" "}
-                                            {order.discount_type === "percentage" ? `(${order.discount_rate}%)` : ""}:
-                                        </span>
-                                        <span className="font-semibold">
-                                            -Rs. {Number(order.discount_amount).toLocaleString()}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {Number(order.delivery_charges) > 0 && (
-                                    <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
-                                        <span>Delivery Charges:</span>
-                                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                            +Rs. {Number(order.delivery_charges).toLocaleString()}
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="pt-2 border-t border-zinc-300 dark:border-zinc-700 flex justify-between font-black text-lg text-emerald-800 dark:text-emerald-300">
-                                    <span>Final Payable:</span>
-                                    <span>Rs. {Number(order.payable_amount).toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Revisions & Audit History */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Revisions List */}
-                        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
-                            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                                Revision History ({order.revisions.length})
-                            </h3>
-
-                            {order.revisions.length === 0 ? (
-                                <p className="text-xs text-zinc-400">No revisions have been proposed for this order.</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {order.revisions.map((rev) => (
-                                        <div
-                                            key={rev.id}
-                                            className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 space-y-2 text-xs"
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                                                    Revision #{rev.revision_number}
+                            return (
+                                <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-950/20">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                                        {/* Left Column */}
+                                        <div className="space-y-12">
+                                            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                                <span>Total # Of Items:</span>
+                                                <span className="font-mono text-zinc-900 dark:text-zinc-100 font-black">
+                                                    {order.items.length}
                                                 </span>
-                                                <Badge
-                                                    className={
-                                                        String(rev.status || "").toLowerCase() === "accepted"
-                                                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                                            : String(rev.status || "").toLowerCase() === "rejected"
-                                                            ? "bg-rose-100 text-rose-800 border-rose-300"
-                                                            : "bg-amber-100 text-amber-800 border-amber-300"
-                                                    }
-                                                >
-                                                    {String(rev.status || "").toLowerCase() === "accepted"
-                                                        ? "Accepted by Customer"
-                                                        : String(rev.status || "").toLowerCase() === "rejected"
-                                                        ? "Rejected by Customer"
-                                                        : "Awaiting Customer Acceptance"}
-                                                </Badge>
                                             </div>
-                                            {rev.notes && (
-                                                <div className="text-zinc-700 dark:text-zinc-300">
-                                                    <span className="font-semibold text-zinc-500">Proposal Notes:</span> {rev.notes}
-                                                </div>
-                                            )}
-                                            {rev.items && rev.items.length > 0 && (
-                                                <div className="bg-white dark:bg-zinc-900/80 rounded-lg p-2.5 border border-zinc-200 dark:border-zinc-700 space-y-1">
-                                                    <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Proposed Item Adjustments:</span>
-                                                    {rev.items.map((it) => (
-                                                        <div key={it.id} className="flex justify-between text-[11px] text-zinc-700 dark:text-zinc-300">
-                                                            <span>{it.quantity}x {it.item_name} @ Rs. {Number(it.unit_price).toLocaleString()}</span>
-                                                            <span className="font-semibold">Rs. {Number(it.subtotal).toLocaleString()}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <div className="flex justify-between items-center pt-1 font-bold text-zinc-900 dark:text-zinc-100">
-                                                <span>Proposed Payable:</span>
-                                                <span className="text-emerald-700 dark:text-emerald-400">Rs. {Number(rev.payable_amount).toLocaleString()}</span>
+
+                                            <div className="pt-6">
+                                                <div className="w-48 border-b border-zinc-300 dark:border-zinc-700"></div>
+                                                <p className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-black mt-2">
+                                                    Check By Name & Time
+                                                </p>
                                             </div>
-                                            {rev.customer_remarks && (
-                                                <div className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[11px]">
-                                                    <strong>Customer Feedback:</strong> {rev.customer_remarks}
-                                                </div>
-                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
 
-                        {/* Audit Log / Timeline */}
-                        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
-                            <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                                Order Activity Timeline
-                            </h3>
-
-                            <div className="space-y-3">
-                                {order.histories.map((hist) => (
-                                    <div key={hist.id} className="flex gap-3 text-xs">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                                        <div className="space-y-0.5">
-                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200">
-                                                {hist.description}
+                                        {/* Right Column */}
+                                        <div className="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-400 font-bold">
+                                            <div className="flex justify-between items-center">
+                                                <span>Courier Charges :-</span>
+                                                <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                                                    {formatRs(courierCharges)}
+                                                </span>
                                             </div>
-                                            <div className="text-zinc-400 text-[11px]">
-                                                {new Date(hist.created_at).toLocaleString("en-PK", {
-                                                    day: "2-digit",
-                                                    month: "short",
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })}{" "}
-                                                by {hist.actor_type}
+                                            <div className="flex justify-between items-center text-black dark:text-zinc-100">
+                                                <span>Extra Discount :-</span>
+                                                <span className="font-mono font-bold">
+                                                    -{formatRs(extraDiscount)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Rs. :-</span>
+                                                <span className="font-mono">
+                                                    {formatRs(currentInvoiceTotal)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span>Previous Balance :-</span>
+                                                <span className="font-mono font-bold text-black dark:text-zinc-100">
+                                                    {prevBal < 0 ? "-" : ""}
+                                                    {formatRs(Math.abs(prevBal))}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Balance :-</span>
+                                                <span className="font-mono text-black dark:text-zinc-100">
+                                                    {formatRs(totalBalance)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-black dark:text-zinc-100 font-bold">
+                                                <span>Cash Received :-</span>
+                                                <span className="font-mono font-black">
+                                                    {formatRs(cashReceived)}
+                                                </span>
+                                            </div>
+                                            <div className="w-full border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+                                            <div className="flex justify-between items-center text-zinc-900 dark:text-zinc-50 font-black text-sm">
+                                                <span>Total Receivable :</span>
+                                                <span className="font-mono font-black text-base text-black dark:text-zinc-100">
+                                                    {formatRs(totalReceivable)}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                                </div>
+                            );
+                        })()}
+                    </Card>
                 </div>
 
                 {/* Cancel Dialog */}

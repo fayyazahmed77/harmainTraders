@@ -196,7 +196,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
 
     const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
     const [checkoutOpen, setCheckoutOpen] = useState(false);
-    const [successData, setSuccessData] = useState<{ invoice: string; customerCode: string; guestToken: string; amount?: number } | null>(null);
+    const [successData, setSuccessData] = useState<{ invoice: string; customerCode: string; guestToken: string; amount?: number; whatsappUrl?: string | null } | null>(null);
 
     // Item Quantity Modal state
     const [selectedOfferItem, setSelectedOfferItem] = useState<OfferItem | null>(null);
@@ -1019,6 +1019,7 @@ export default function LiveOffers({ customerOffer, marketOffer, sharedOfferId, 
                 offerId={activeOffer?.id}
                 formatCurrency={formatCurrency}
                 onSuccess={handleSuccess}
+                initialCustomer={authCustomer}
             />
 
             {/* Offer Success Dialog */}
@@ -2062,9 +2063,20 @@ function SiteFooter() {
         <footer className="bg-surface-1 border-t border-border py-6 px-4 mt-auto">
             <div className="max-w-[1800px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-3 text-[10px] sm:text-xs font-mono-jet text-text-muted text-center sm:text-left">
                 <p>© 2026 HARAMAIN TRADERS · WHOLESALE & SUPPLY CHAIN</p>
-                <div className="flex items-center gap-1.5">
-                    <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-                    <span>Powered by Aishtycoons</span>
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <a
+                        href="https://wa.me/923318102001?text=Assalam-o-Alaikum%20Haramain%20Traders!%20I%20have%20an%20inquiry%20regarding%20wholesale%20live%20offers."
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>WhatsApp Inquiry: 0331 8102001</span>
+                    </a>
+                    <div className="flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                        <span>Powered by Aishtycoons</span>
+                    </div>
                 </div>
             </div>
         </footer>

@@ -22,6 +22,9 @@ class CustomerUser extends Authenticatable
         'mobile',
         'email',
         'password',
+        'is_active',
+        'must_change_password',
+        'registered_via',
         'approval_status',
         'rejection_reason',
         'email_verified_at',
@@ -41,6 +44,8 @@ class CustomerUser extends Authenticatable
 
     protected $casts = [
         'password' => 'hashed',
+        'is_active' => 'boolean',
+        'must_change_password' => 'boolean',
         'email_verified_at' => 'datetime',
         'mobile_verified_at' => 'datetime',
         'approved_at' => 'datetime',
@@ -95,6 +100,16 @@ class CustomerUser extends Authenticatable
     public function isRejected(): bool
     {
         return $this->approval_status === 'rejected';
+    }
+
+    public function isActive(): bool
+    {
+        return (bool)($this->is_active ?? true);
+    }
+
+    public function mustChangePassword(): bool
+    {
+        return (bool)($this->must_change_password ?? false);
     }
 }
 

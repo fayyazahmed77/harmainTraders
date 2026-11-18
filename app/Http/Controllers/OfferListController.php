@@ -10,6 +10,7 @@ use App\Models\PriceOfferTo;
 use App\Models\OfferList;
 use App\Models\Firm;
 use App\Services\OfferListSyncService;
+use App\Services\StockService;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -31,22 +32,51 @@ class OfferListController extends Controller implements HasMiddleware
     //index
     public function index()
     {
-        $offers = PriceOfferTo::with(['account', 'firm', 'user', 'messageLine'])->orderBy('id', 'desc')->get();
+        $offers = PriceOfferTo::with(['account:id,title,code', 'firm:id,name', 'user:id,name', 'messageLine:id,messageline'])
+            ->withCount('items')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->each(function ($offer) {
+                if ($offer->relationLoaded('account') && $offer->account) {
+                    $offer->account->setHidden(['current_balance', 'guest_link', 'image_url']);
+                }
+            });
+
+        $firms = Firm::where('status', 1)->select('id', 'name')->get();
+
         return inertia('daily/offerlist/index', [
-            'offers' => $offers
+            'offers' => $offers,
+            'firms'  => $firms,
         ]);
     }
     //create
     public function create()
     {
-        $items = Items::with(['companyAccount:id,title'])
-            ->whereRaw('(COALESCE(stock_1, 0) * COALESCE(packing_qty, 1)) + COALESCE(stock_2, 0) > 0')
+        // Load all active items with lightweight column selection
+        $items = Items::where('is_active', 1)
+            ->with(['companyAccount:id,title'])
+            ->select(
+                'id', 'date', 'code', 'title', 'short_name', 'company',
+                'trade_price', 'retail', 'retail_tp_diff', 'reorder_level',
+                'packing_qty', 'packing_size', 'pcs', 'type', 'category',
+                'gst_percent', 'gst_amount', 'discount', 'stock_1', 'stock_2',
+                'is_active', 'pt2', 'pt3', 'pt4', 'pt5', 'pt6', 'pt7',
+                'scheme', 'scheme2'
+            )
+            ->orderBy('title')
             ->get();
+
+        // Attach true real-time ledger balances (Opening + Purchases + Sales Returns - Sales - Purchase Returns)
+        StockService::attachRealtimeBalances($items);
+
         $categories = ItemCategory::where('status', 'active')->get();
         $accounts = Account::select('id', 'title', 'item_category')->whereHas('accountType', function ($q) {
             $q->where('name', 'Customers');
         })
-            ->get();
+            ->get()
+            ->each(function ($acc) {
+                $acc->setHidden(['current_balance', 'guest_link', 'image_url']);
+            });
 
         $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Offer List')
             ->where('status', 'active')
@@ -58,7 +88,10 @@ class OfferListController extends Controller implements HasMiddleware
             $q->where('name', 'Company');
         })
             ->orderBy('title')
-            ->get();
+            ->get()
+            ->each(function ($comp) {
+                $comp->setHidden(['current_balance', 'guest_link', 'image_url']);
+            });
 
         return Inertia::render("daily/offerlist/create", [
             'items' => $items,

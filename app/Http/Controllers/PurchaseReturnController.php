@@ -176,6 +176,7 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             'items.*.trade_price'     => 'required|numeric',
             'items.*.discount'        => 'required|numeric',
             'items.*.subtotal'        => 'required|numeric',
+            'idempotency_key'         => 'nullable|string|max:64',
         ]);
 
         $purchase = \App\Models\Purchase::where('invoice', $request->original_invoice)
@@ -226,105 +227,142 @@ class PurchaseReturnController extends Controller implements HasMiddleware
             }
         }
 
-        DB::beginTransaction();
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
 
         try {
-            $supplier = Account::findOrFail($request->supplier_id);
-            $previousBalance = (float)$supplier->current_balance;
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'purchase_return.store',
+                payload: $request->except(['_token']),
+                userId: \Illuminate\Support\Facades\Auth::id(),
+                callback: function () use ($request, $purchase) {
+                    $supplier = Account::findOrFail($request->supplier_id);
+                    $previousBalance = (float)$supplier->current_balance;
 
-            $extraDiscount = (float)($request->extra_discount ?? 0);
-            if ($extraDiscount > $request->net_total) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'extra_discount' => 'Extra discount cannot exceed return total.'
-                ]);
-            }
+                    $extraDiscount = (float)($request->extra_discount ?? 0);
+                    if ($extraDiscount > $request->net_total) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'extra_discount' => 'Extra discount cannot exceed return total.'
+                        ]);
+                    }
 
-            $return = PurchaseReturn::create([
-                'date'            => $request->date,
-                'invoice'         => $request->invoice ?? 'PRET-' . time(),
-                'original_invoice' => $request->original_invoice,
-                'supplier_id'     => $request->supplier_id,
-                'previous_balance' => $previousBalance,
-                'salesman_id'     => $request->salesman_id ?: null,
-                'firm_id'         => $request->firm_id ?? null,
-                'no_of_items'     => $request->no_of_items,
-                'gross_total'     => $request->gross_total,
-                'discount_total'  => $request->discount_total,
-                'tax_total'       => 0,
-                'net_total'       => $request->net_total,
-                'extra_discount'  => $extraDiscount,
-                'paid_amount'     => $request->paid_amount,
-                'remaining_amount' => $request->remaining_amount,
-                'remarks'         => $request->remarks,
-            ]);
-            foreach ($request->items as $it) {
-                PurchaseReturnItem::create([
-                    'purchase_return_id' => $return->id,
-                    'item_id'     => $it['item_id'],
-                    'qty_carton'  => $it['qty_carton'],
-                    'qty_pcs'     => $it['qty_pcs'],
-                    'total_pcs'   => $it['total_pcs'],
-                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
-                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
-                    'trade_price' => $it['trade_price'],
-                    'discount'    => $it['discount'] ?? 0,
-                    'gst_amount'  => 0,
-                    'subtotal'    => $it['subtotal'],
-                ]);
+                    // Sequential safe invoice derivation
+                    $latestPR = PurchaseReturn::where('invoice', 'LIKE', 'PRET-%')->orderByDesc('id')->lockForUpdate()->first();
+                    $nextNum = 1;
+                    if ($latestPR && preg_match('/PRET-(\d+)/', $latestPR->invoice, $m)) {
+                        $nextNum = (int)$m[1] + 1;
+                    }
+                    $candidateInvoice = 'PRET-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                    while (PurchaseReturn::where('invoice', $candidateInvoice)->exists()) {
+                        $nextNum++;
+                        $candidateInvoice = 'PRET-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                    }
+                    $finalInvoice = $request->invoice ?: $candidateInvoice;
 
-                // DECREASE Stock for Purchase Returns (We are giving items back, total_pcs already includes bonus units)
-                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
-                if ($item) {
-                    $totalReturnPcs = (float)($it['total_pcs']);
-                    // Outward stock recorded transactionally in purchase_return_items
+                    $return = PurchaseReturn::create([
+                        'date'            => $request->date,
+                        'invoice'         => $finalInvoice,
+                        'original_invoice' => $request->original_invoice,
+                        'supplier_id'     => $request->supplier_id,
+                        'previous_balance' => $previousBalance,
+                        'salesman_id'     => $request->salesman_id ?: null,
+                        'firm_id'         => $request->firm_id ?? null,
+                        'no_of_items'     => $request->no_of_items,
+                        'gross_total'     => $request->gross_total,
+                        'discount_total'  => $request->discount_total,
+                        'tax_total'       => 0,
+                        'net_total'       => $request->net_total,
+                        'extra_discount'  => $extraDiscount,
+                        'paid_amount'     => $request->paid_amount,
+                        'remaining_amount' => $request->remaining_amount,
+                        'remarks'         => $request->remarks,
+                    ]);
+                    foreach ($request->items as $it) {
+                        PurchaseReturnItem::create([
+                            'purchase_return_id' => $return->id,
+                            'item_id'     => $it['item_id'],
+                            'qty_carton'  => $it['qty_carton'],
+                            'qty_pcs'     => $it['qty_pcs'],
+                            'total_pcs'   => $it['total_pcs'],
+                            'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                            'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
+                            'trade_price' => $it['trade_price'],
+                            'discount'    => $it['discount'] ?? 0,
+                            'gst_amount'  => 0,
+                            'subtotal'    => $it['subtotal'],
+                        ]);
+
+                        // DECREASE Stock for Purchase Returns (We are giving items back, total_pcs already includes bonus units)
+                        $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
+                        if ($item) {
+                            $totalReturnPcs = (float)($it['total_pcs']);
+                            // Outward stock recorded transactionally in purchase_return_items
+                        }
+                    }
+
+                    $allocationService = new \App\Services\FIFOAllocationService();
+                    $allocationService->allocatePurchaseReturn($return, (float)($return->net_total - $return->extra_discount) - (float)$return->paid_amount);
+
+                    if ($request->paid_amount > 0) {
+                        $lastVoucher = Payment::where('type', 'RECEIPT')->where('voucher_no', 'LIKE', 'CRV-%')->orderByDesc('id')->lockForUpdate()->first();
+                        $nextVNum = 1;
+                        if ($lastVoucher && preg_match('/CRV-(\d+)/', $lastVoucher->voucher_no, $vm)) {
+                            $nextVNum = (int)$vm[1] + 1;
+                        }
+                        $voucherNo = 'CRV-' . str_pad($nextVNum, 4, '0', STR_PAD_LEFT);
+
+                        Payment::create([
+                            'date' => $request->date,
+                            'voucher_no' => $voucherNo,
+                            'account_id' => $request->supplier_id,
+                            'payment_account_id' => null,
+                            'amount' => $request->paid_amount,
+                            'net_amount' => $request->paid_amount,
+                            'type' => 'RECEIPT',
+                            'remarks' => 'Refund for Purchase Return Invoice: ' . ($return->invoice ?? 'N/A'),
+                            'payment_method' => 'Cash',
+                            'cheque_status' => 'Refund',
+                        ]);
+                    }
+
+                    // Log activity
+                    \App\Services\ActivityLogger::log('created', 'Purchase Return', "Created purchase return {$return->invoice} for supplier ID {$request->supplier_id}");
+
+                    $return->load(['supplier', 'items']);
+                    $successDialogData = [
+                        'customerName'  => $return->supplier->title ?? 'Supplier',
+                        'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                        'countItems'    => $return->items->count(),
+                        'countFull'     => (int) $return->items->sum('qty_carton'),
+                        'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                        'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                        'saleId'        => $return->id,
+                        'invoiceNo'     => $return->invoice,
+                        'type'          => 'create',
+                    ];
+
+                    $finalResponse = redirect()->route('purchase_return.index')
+                        ->with('success', 'Purchase Return saved successfully!')
+                        ->with('id', $return->id)
+                        ->with('success_dialog', $successDialogData);
+
+                    return [
+                        'model'    => $return,
+                        'response' => $finalResponse,
+                        'cache'    => [
+                            'redirect_route' => 'purchase_return.index',
+                            'id'             => $return->id,
+                            'flash'          => [
+                                'success' => 'Purchase Return saved successfully!',
+                                'id'      => $return->id,
+                            ],
+                            'success_dialog' => $successDialogData,
+                        ],
+                    ];
                 }
-            }
-
-            $allocationService = new \App\Services\FIFOAllocationService();
-            $allocationService->allocatePurchaseReturn($return, (float)($return->net_total - $return->extra_discount) - (float)$return->paid_amount);
-
-            if ($request->paid_amount > 0) {
-                $count = Payment::where('type', 'RECEIPT')->count() + 1;
-                $voucherNo = 'CRV-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-
-                Payment::create([
-                    'date' => $request->date,
-                    'voucher_no' => $voucherNo,
-                    'account_id' => $request->supplier_id,
-                    'payment_account_id' => null,
-                    'amount' => $request->paid_amount,
-                    'net_amount' => $request->paid_amount,
-                    'type' => 'RECEIPT',
-                    'remarks' => 'Refund for Purchase Return Invoice: ' . ($request->invoice ?? 'N/A'),
-                    'payment_method' => 'Cash',
-                    'cheque_status' => 'Refund',
-                ]);
-            }
-
-            // Log activity
-            \App\Services\ActivityLogger::log('created', 'Purchase Return', "Created purchase return {$return->invoice} for supplier ID {$request->supplier_id}");
-
-            DB::commit();
-
-            $return->load(['supplier', 'items']);
-            $successDialogData = [
-                'customerName'  => $return->supplier->title ?? 'Supplier',
-                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
-                'countItems'    => $return->items->count(),
-                'countFull'     => (int) $return->items->sum('qty_carton'),
-                'countPcs'      => (int) $return->items->sum('qty_pcs'),
-                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
-                'saleId'        => $return->id,
-                'invoiceNo'     => $return->invoice,
-                'type'          => 'create',
-            ];
-
-            return redirect()->route('purchase_return.index')
-                ->with('success', 'Purchase Return saved successfully!')
-                ->with('id', $return->id)
-                ->with('success_dialog', $successDialogData);
-        } catch (\Exception $e) {
-            DB::rollBack();
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('PurchaseReturnController@store error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }

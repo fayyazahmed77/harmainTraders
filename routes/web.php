@@ -351,6 +351,10 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/online-orders')->group(function () {
         Route::get('/search-items', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'searchRevisionItems'])->name('online-orders.search-items');
         Route::get('/', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'index'])->name('online-orders.index');
+        Route::get('/{id}/edit', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'edit'])->name('online-orders.edit');
+        Route::post('/{id}/update', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'update'])->name('online-orders.update');
+        Route::put('/{id}', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'update'])->name('online-orders.update-put');
+        Route::get('/{id}/invoice-pdf', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'downloadInvoicePdf'])->name('online-orders.invoice-pdf');
         Route::get('/{id}', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'show'])->name('online-orders.show');
         Route::post('/{id}/start-review', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'startReview'])->name('online-orders.start-review');
         Route::post('/{id}/revision', [\App\Http\Controllers\Admin\OnlineOrderAdminController::class, 'createRevision'])->name('online-orders.revision');
@@ -363,6 +367,11 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/customers/approvals')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'index'])->name('customer-approvals.index');
         Route::get('/search-accounts', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'searchAccounts'])->name('customer-approvals.search-accounts');
+        Route::get('/search-erp-customers', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'searchErpCustomers'])->name('customer-approvals.search-erp');
+        Route::post('/provision-erp/{id}', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'provisionErp'])->name('customer-approvals.provision-erp');
+        Route::post('/provision-erp-bulk', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'provisionErpBulk'])->name('customer-approvals.provision-erp-bulk');
+        Route::post('/{id}/toggle-access', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'toggleAccess'])->name('customer-approvals.toggle-access');
+        Route::post('/{id}/reset-password', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'resetPassword'])->name('customer-approvals.reset-password');
         Route::post('/{id}/approve', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'approve'])->name('customer-approvals.approve');
         Route::post('/{id}/reject', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'reject'])->name('customer-approvals.reject');
         Route::post('/{id}/link-account', [\App\Http\Controllers\Admin\CustomerApprovalAdminController::class, 'linkAccount'])->name('customer-approvals.link-account');
@@ -717,6 +726,7 @@ Route::prefix('/customer')->group(function () {
 
     // Customer Portal (Requires Customer Authentication)
     Route::middleware(['auth:customer'])->group(function () {
+        Route::post('/update-password', [App\Http\Controllers\Customer\CustomerAuthController::class, 'updatePassword'])->name('customer.update-password');
         Route::get('/dashboard', [App\Http\Controllers\Customer\CustomerPortalController::class, 'dashboard'])->name('customer.dashboard');
         Route::get('/orders', [App\Http\Controllers\Customer\CustomerPortalController::class, 'orders'])->name('customer.orders');
         Route::get('/orders/{orderNo}', [App\Http\Controllers\Customer\CustomerPortalController::class, 'showOrder'])->name('customer.orders.show');

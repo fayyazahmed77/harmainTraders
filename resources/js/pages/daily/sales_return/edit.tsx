@@ -63,6 +63,9 @@ interface RowData {
     discPercent: number;
     taxReadOnly?: boolean;
     discReadOnly?: boolean;
+    orig_subtotal?: number;
+    orig_discount?: number;
+    orig_tax?: number;
     amount: number;
     packing: number;
     bonus_full: number;
@@ -450,33 +453,38 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     useEffect(() => {
         if (returnData.items) {
             const initialRows = returnData.items.map(it => {
-                const packing = toNum(it.item?.packing_qty || it.item?.packing_full || 1);
+                const packing = Math.max(1, toNum(it.item?.packing_qty || it.item?.packing_full || 1));
+                const s_full = toNum(it.qty_carton);
+                const s_pcs = toNum(it.qty_pcs);
+                const rate = toNum(it.trade_price);
 
-                // Calculate percentages back from amounts for display if possible,
-                // otherwise use the strict logic. For Edit, we should probably 
-                // trust the stored amounts but percentages are better for the UI.
-                const base = (toNum(it.qty_carton) * packing + toNum(it.qty_pcs)) * toNum(it.trade_price);
+                // Calculate percentages back from per-carton base (not multiplied by packing)
+                const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+                const base = calcBase > 0 ? calcBase : toNum(it.subtotal);
                 const discAmt = toNum(it.discount);
                 const taxAmt = toNum(it.gst_amount);
 
                 const taxableBase = base - discAmt;
-                const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-                const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+                const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+                const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
-                const origReturnPcs = (toNum(it.qty_carton) * packing + toNum(it.qty_pcs)) + (toNum(it.bonus_qty_carton || 0) * packing + toNum(it.bonus_qty_pcs || 0));
+                const origReturnPcs = (s_full * packing + s_pcs) + (toNum(it.bonus_qty_carton || 0) * packing + toNum(it.bonus_qty_pcs || 0));
                 return {
                     id: it.id,
                     item_id: it.item_id,
                     item_title: it.item?.title ?? "Unknown Item",
-                    full: toNum(it.qty_carton),
-                    pcs: toNum(it.qty_pcs),
-                    sold_full: toNum(it.qty_carton),
-                    sold_pcs: toNum(it.qty_pcs),
-                    rate: toNum(it.trade_price),
+                    full: s_full,
+                    pcs: s_pcs,
+                    sold_full: s_full,
+                    sold_pcs: s_pcs,
+                    rate: rate,
                     taxPercent: taxVal,
                     discPercent: discVal,
                     taxReadOnly: true,
                     discReadOnly: true,
+                    orig_subtotal: base,
+                    orig_discount: discAmt,
+                    orig_tax: taxAmt,
                     amount: toNum(it.subtotal),
                     packing: packing,
                     bonus_full: toNum(it.bonus_qty_carton),
@@ -573,14 +581,16 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                         const s_full = toNum(si.qty_carton);
                         const s_pcs = toNum(si.qty_pcs);
                         const rate = toNum(si.trade_price);
-                        const packing = toNum(si.item?.packing_qty || si.item?.packing_full || 1);
-                        const base = (s_full * packing + s_pcs) * rate;
+                        const packing = Math.max(1, toNum(si.item?.packing_qty || si.item?.packing_full || 1));
+                        const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+                        const origSubtotal = toNum(si.subtotal) > 0 ? toNum(si.subtotal) : calcBase;
+                        const base = origSubtotal;
                         const taxAmt = toNum(si.gst_amount || 0);
                         const discAmt = toNum(si.discount || 0);
 
                         const taxableBase = base - discAmt;
-                        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-                        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+                        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+                        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
                         return {
                             id: Math.random(),
@@ -595,8 +605,13 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                             discPercent: discVal,
                             taxReadOnly: true,
                             discReadOnly: true,
+                            orig_subtotal: origSubtotal,
+                            orig_discount: discAmt,
+                            orig_tax: taxAmt,
                             amount: 0,
                             packing: packing,
+                            bonus_full: 0,
+                            bonus_pcs: 0,
                         };
                     });
                     setRows(loadedRows.length > 0 ? loadedRows : [getEmptyRow()]);
@@ -616,14 +631,16 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         const s_full = toNum(found.qty_carton);
         const s_pcs = toNum(found.qty_pcs);
         const rate = toNum(found.last_trade_price ?? 0);
-        const packing = toNum(it?.packing_full ?? 1);
-        const base = (s_full * packing + s_pcs) * rate;
+        const packing = Math.max(1, toNum(it?.packing_qty || it?.packing_full || 1));
+        const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+        const origSubtotal = toNum(found.subtotal) > 0 ? toNum(found.subtotal) : calcBase;
+        const base = origSubtotal;
         const taxAmt = toNum(found.gst_amount || 0);
         const discAmt = toNum(found.discount || 0);
 
         const taxableBase = base - discAmt;
-        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+        const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+        const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
         setRows(prev => prev.map(r => r.id === rowId ? {
             ...r,
@@ -638,6 +655,9 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             discPercent: discVal,
             taxReadOnly: true,
             discReadOnly: true,
+            orig_subtotal: origSubtotal,
+            orig_discount: discAmt,
+            orig_tax: taxAmt,
             packing: packing,
             bonus_full: 0,
             bonus_pcs: 0,
@@ -652,14 +672,16 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             const s_pcs = toNum(ci.qty_pcs);
             const rate = toNum(ci.last_trade_price ?? 0);
             const it = ci.item;
-            const packing = toNum(it?.packing_qty || it?.packing_full || 1);
-            const base = (s_full * packing + s_pcs) * rate;
+            const packing = Math.max(1, toNum(it?.packing_qty || it?.packing_full || 1));
+            const calcBase = Math.round((s_full * rate) + (s_pcs * (rate / packing)));
+            const origSubtotal = toNum(ci.subtotal) > 0 ? toNum(ci.subtotal) : calcBase;
+            const base = origSubtotal;
             const taxAmt = toNum(ci.gst_amount || 0);
             const discAmt = toNum(ci.discount || 0);
 
             const taxableBase = base - discAmt;
-            const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(2) : 0;
-            const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(2) : 0;
+            const taxVal = (taxAmt > 0 && taxableBase > 0) ? +((taxAmt / taxableBase) * 100).toFixed(4) : 0;
+            const discVal = (discAmt > 0 && base > 0) ? +((discAmt / base) * 100).toFixed(4) : 0;
 
             return {
                 id: Math.random(),
@@ -674,6 +696,9 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                 discPercent: discVal,
                 taxReadOnly: true,
                 discReadOnly: true,
+                orig_subtotal: origSubtotal,
+                orig_discount: discAmt,
+                orig_tax: taxAmt,
                 amount: 0,
                 packing: packing,
                 bonus_full: 0,
@@ -694,15 +719,28 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
     // ── Calculations ───────────────────────────
     const rowsWithAmount = useMemo(() => {
         return rows.map(r => {
-            const packing = toNum(r.packing) || 1;
+            const packing = Math.max(1, toNum(r.packing) || 1);
             const units = toNum(r.full) * packing + toNum(r.pcs);
             const rate = toNum(r.rate);
-            
-            const baseAmount = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
-            const discAmount = (toNum(r.discPercent) / 100) * baseAmount;
+            const isFullLineReturn = r.orig_subtotal !== undefined && r.orig_subtotal > 0
+                && toNum(r.full) === toNum(r.sold_full)
+                && toNum(r.pcs) === toNum(r.sold_pcs);
+
+            const rawBase = (toNum(r.full) * rate) + (toNum(r.pcs) * (rate / packing));
+            const baseAmount = units === 0
+                ? 0
+                : (isFullLineReturn ? toNum(r.orig_subtotal) : Math.round(rawBase));
+
+            const discAmount = (r.discReadOnly && r.orig_subtotal && r.orig_subtotal > 0 && r.orig_discount !== undefined)
+                ? (isFullLineReturn ? toNum(r.orig_discount) : (toNum(r.orig_discount) * (baseAmount / r.orig_subtotal)))
+                : ((toNum(r.discPercent) / 100) * baseAmount);
+
             const taxableAmount = baseAmount - discAmount;
-            const taxAmount = (toNum(r.taxPercent) / 100) * taxableAmount;
-            
+
+            const taxAmount = (r.taxReadOnly && r.orig_subtotal && r.orig_subtotal > 0 && r.orig_tax !== undefined)
+                ? (isFullLineReturn ? toNum(r.orig_tax) : (toNum(r.orig_tax) * (baseAmount / r.orig_subtotal)))
+                : ((toNum(r.taxPercent) / 100) * taxableAmount);
+
             const finalAmount = taxableAmount + taxAmount;
 
             return { 
@@ -731,7 +769,7 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
 
         if (selectedInvoice) {
             const maxReturnable = Number(selectedInvoice.returnable_amount ?? selectedInvoice.net_total ?? 0);
-            if (maxReturnable > 0 && netVal > maxReturnable && (netVal - maxReturnable) <= 2) {
+            if (maxReturnable > 0 && netVal > maxReturnable && (netVal - maxReturnable) <= 50) {
                 netVal = maxReturnable;
             }
         }
@@ -793,9 +831,6 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
             payment_account_id: selectedPaymentAccountId,
             sale_id: selectedInvoice ? selectedInvoice.id : null,
             items: validRows.map(r => {
-                const base = (toNum(r.full) * r.rate) + (toNum(r.pcs) * (r.rate / r.packing));
-                const d = (toNum(r.discPercent) / 100) * base;
-                const t = (toNum(r.taxPercent) / 100) * (base - d);
                 return {
                     item_id: r.item_id,
                     qty_carton: r.full,
@@ -804,8 +839,8 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                     bonus_qty_pcs: r.bonus_pcs,
                     total_pcs: (toNum(r.full) + toNum(r.bonus_full || 0)) * r.packing + toNum(r.pcs) + toNum(r.bonus_pcs || 0),
                     trade_price: r.rate,
-                    discount: +d.toFixed(2),
-                    gst_amount: +t.toFixed(2),
+                    discount: +r.computed_disc.toFixed(2),
+                    gst_amount: +r.computed_tax.toFixed(2),
                     subtotal: r.amount,
                 };
             }),

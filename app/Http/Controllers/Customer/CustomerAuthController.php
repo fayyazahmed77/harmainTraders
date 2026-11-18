@@ -53,6 +53,13 @@ class CustomerAuthController extends Controller
             ]);
         }
 
+        // Enforce account active status
+        if (!$customer->isActive()) {
+            throw ValidationException::withMessages([
+                'login' => ['Your online customer portal access has been disabled by administration. Please contact customer support on WhatsApp at 0331 8102001.'],
+            ]);
+        }
+
         RateLimiter::clear($throttleKey);
 
         Auth::guard('customer')->login($customer, $request->boolean('remember'));
@@ -72,6 +79,8 @@ class CustomerAuthController extends Controller
                     'business_name' => $customer->business_name,
                     'address' => $customer->address,
                     'approval_status' => $customer->approval_status,
+                    'is_active' => $customer->isActive(),
+                    'must_change_password' => $customer->mustChangePassword(),
                 ],
             ]);
         }
@@ -121,28 +130,68 @@ class CustomerAuthController extends Controller
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
 
-        // Dispatch in-system notification to all admins about new customer registration
+        // Dispatch in-system notification to all Admin role users about new customer registration
         try {
-            $admins = User::all();
+            $existingRoles = \Spatie\Permission\Models\Role::whereIn('name', ['Admin', 'Super Admin', 'admin', 'super-admin'])
+                ->pluck('name')
+                ->toArray();
+            $admins = !empty($existingRoles) ? User::role($existingRoles)->get()->unique('id')->values() : collect();
+            if ($admins->isEmpty()) {
+                $admins = User::all();
+            }
+
+            $notifTitle = "New Customer Registration: {$customer->name}";
+            $bizSuffix = $customer->business_name ? " ({$customer->business_name})" : "";
+            $notifMessage = "{$customer->name}{$bizSuffix} [{$customer->mobile}] registered on the wholesale portal and is awaiting approval.";
+            $actionUrl = '/customers/approvals?tab=pending';
+            $nowTimestamp = now();
+            $broadcastPayloads = [];
+
             foreach ($admins as $admin) {
+                $notifId = (string) Str::orderedUuid();
                 Notification::create([
-                    'id' => (string) Str::uuid(),
+                    'id' => $notifId,
                     'type' => 'App\Notifications\NewCustomerRegistrationNotification',
                     'notifiable_type' => User::class,
                     'notifiable_id' => $admin->id,
                     'priority' => 'high',
-                    'category' => 'Customers',
+                    'category' => 'customers',
                     'data' => [
+                        'title' => $notifTitle,
+                        'message' => $notifMessage,
+                        'action_url' => $actionUrl,
                         'customer_user_id' => $customer->id,
                         'name' => $customer->name,
                         'username' => $customer->username,
                         'mobile' => $customer->mobile,
                         'business_name' => $customer->business_name,
-                        'message' => "New customer registration: {$customer->name} ({$customer->mobile}) is awaiting approval.",
-                        'action_url' => '/customers/approvals',
                     ],
-                    'created_at' => now(),
+                    'created_at' => $nowTimestamp,
                 ]);
+
+                $broadcastPayloads[] = [
+                    'recipient_id' => $admin->id,
+                    'payload' => [
+                        'id' => $notifId,
+                        'title' => $notifTitle,
+                        'message' => $notifMessage,
+                        'actionUrl' => $actionUrl,
+                        'category' => 'customers',
+                        'priority' => 'high',
+                        'read' => false,
+                        'createdAt' => 'Just now',
+                    ],
+                ];
+            }
+
+            if (config('queue.default') !== 'sync') {
+                foreach ($broadcastPayloads as $bp) {
+                    try {
+                        broadcast(new \App\Events\RealtimeNotificationEvent($bp['recipient_id'], $bp['payload']));
+                    } catch (\Throwable $e) {
+                        // Ignore if broadcast driver is offline
+                    }
+                }
             }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("Failed to dispatch admin notification for customer registration: " . $e->getMessage());
@@ -220,10 +269,43 @@ class CustomerAuthController extends Controller
                 'address' => $customer->address,
                 'approval_status' => $customer->approval_status,
                 'rejection_reason' => $customer->rejection_reason,
+                'is_active' => $customer->isActive(),
+                'must_change_password' => $customer->mustChangePassword(),
                 'can_place_order' => $canOrder,
                 'eligibility_message' => $eligibilityMessage,
                 'reason_code' => $reasonCode,
             ],
+        ]);
+    }
+
+    /**
+     * Customer Password Update (First login or self-service)
+     */
+    public function updatePassword(Request $request)
+    {
+        $customer = Auth::guard('customer')->user();
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $request->validate([
+            'current_password' => 'required|string',
+            'new_password'     => 'required|string|min:6|confirmed',
+        ]);
+
+        if (!Hash::check($request->current_password, $customer->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Your current temporary password does not match.'],
+            ]);
+        }
+
+        $customer->password = $request->new_password;
+        $customer->must_change_password = false;
+        $customer->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password updated successfully! You can now use all online ordering features.',
         ]);
     }
 }

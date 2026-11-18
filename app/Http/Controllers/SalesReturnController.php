@@ -183,6 +183,7 @@ class SalesReturnController extends Controller implements HasMiddleware
                 'items.*.discount'        => 'required|numeric',
                 'items.*.gst_amount'      => 'required|numeric',
                 'items.*.subtotal'        => 'required|numeric',
+                'idempotency_key'         => 'nullable|string|max:64',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Illuminate\Support\Facades\Log::error('SalesReturn validation failed', [
@@ -221,12 +222,72 @@ class SalesReturnController extends Controller implements HasMiddleware
             ]);
         }
 
+        // Validate item quantities first (grouped across any duplicate rows of the same item)
+        $requestedPcsByItem = [];
+        foreach ($request->items as $it) {
+            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantities cannot be negative.'
+                ]);
+            }
+
+            $itemId = (int) $it['item_id'];
+            $item = Items::find($itemId);
+            if (!$item) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Selected item does not exist.'
+                ]);
+            }
+            $packing = $item->packing_qty ?: 1;
+            // Note: frontend total_pcs already includes bonus_qty_carton and bonus_qty_pcs; calculate authoritatively here without double-counting
+            $rowTotalPcs = (((float) ($it['qty_carton'] ?? 0) + (float) ($it['bonus_qty_carton'] ?? 0)) * $packing)
+                + (float) ($it['qty_pcs'] ?? 0)
+                + (float) ($it['bonus_qty_pcs'] ?? 0);
+
+            $requestedPcsByItem[$itemId] = ($requestedPcsByItem[$itemId] ?? 0.0) + $rowTotalPcs;
+        }
+
+        foreach ($requestedPcsByItem as $itemId => $totalToReturn) {
+            // Fetch original sales items (summed across any duplicate lines of the same item)
+            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $sale->id)
+                ->where('item_id', $itemId);
+            if (!$saleItemsQuery->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Item was not purchased on the original invoice.'
+                ]);
+            }
+            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
+
+            // Calculate already returned pieces for this item on this sale
+            $alreadyReturnedPcs = (float) \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+                ->where('sales_returns.sale_id', $sale->id)
+                ->where('sales_return_items.item_id', $itemId)
+                ->sum('sales_return_items.total_pcs');
+
+            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
+
+            if ($totalToReturn > $maxReturnableQty + 0.001) {
+                $item = Items::find($itemId);
+                $itemTitle = $item ? $item->title : ('#' . $itemId);
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantity for item ' . $itemTitle . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
+                ]);
+            }
+        }
+
         $liveReturned = (float) SalesReturn::where('sale_id', $sale->id)->sum('net_total');
         $maxReturnable = max(0, (float) $sale->net_total - $liveReturned);
 
-        // Auto-clamp small rounding differences (up to 2.00 Rupees) caused by whole-rupee rounding on sales invoices
+        // Auto-clamp rounding/discount-derivation differences when item quantities are verified within returnable limits
         $diff = round($request->net_total, 2) - round($maxReturnable, 2);
-        if ($diff > 0 && $diff <= 2.00) {
+        $totalSoldOnSale = (float) \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
+        $totalAlreadyReturnedOnSale = (float) \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+            ->where('sales_returns.sale_id', $sale->id)
+            ->sum('sales_return_items.total_pcs');
+        $totalReturningNow = array_sum($requestedPcsByItem);
+        $isFullRemainingReturn = ($totalSoldOnSale > 0) && (($totalAlreadyReturnedOnSale + $totalReturningNow) >= ($totalSoldOnSale - 0.001));
+
+        if ($diff > 0 && ($diff <= 50.00 || $isFullRemainingReturn)) {
             $request->merge([
                 'net_total' => $maxReturnable,
                 'remaining_amount' => max(0, $maxReturnable - (float)($request->extra_discount ?? 0) - (float)($request->paid_amount ?? 0)),
@@ -239,182 +300,245 @@ class SalesReturnController extends Controller implements HasMiddleware
             ]);
         }
 
-        // Validate item quantities and ensure they don't return more than purchased
-        foreach ($request->items as $it) {
-            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Return quantities cannot be negative.'
-                ]);
-            }
-            
-            // Fetch original sales items (summed across any duplicate lines of the same item)
-            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $sale->id)
-                ->where('item_id', $it['item_id']);
-            if (!$saleItemsQuery->exists()) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Item was not purchased on the original invoice.'
-                ]);
-            }
-            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
-
-            // Calculate already returned pieces for this item on this sale
-            $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
-                ->where('sales_returns.sale_id', $sale->id)
-                ->where('sales_return_items.item_id', $it['item_id'])
-                ->sum('sales_return_items.total_pcs');
-            
-            $item = Items::find($it['item_id']);
-            $packing = $item->packing_qty ?: 1;
-            $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-            $totalToReturn = $it['total_pcs'] + $bonusUnits;
-
-            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
-
-            if ($totalToReturn > $maxReturnableQty) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Return quantity for item ' . $item->title . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
-                ]);
-            }
-        }
-
-        DB::beginTransaction();
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
 
         try {
-            // Generate sequential invoice number inside the transaction to prevent duplicates
-            $finalInvoice = $request->invoice ?? $this->generateNextReturnInvoice();
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'sales_return.store',
+                payload: $request->except(['_token']),
+                userId: \Illuminate\Support\Facades\Auth::id(),
+                callback: function () use ($request, $sale) {
+                    // Generate sequential invoice number inside the transaction to prevent duplicates
+                    $finalInvoice = $request->invoice ?? $this->generateNextReturnInvoice();
 
-            $customer = Account::findOrFail($request->customer_id);
-            $previousBalance = (float)$customer->current_balance;
+                    $customer = Account::findOrFail($request->customer_id);
+                    $previousBalance = (float)$customer->current_balance;
 
-            $extraDiscount = (float)($request->extra_discount ?? 0);
-            if ($extraDiscount > $request->net_total) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'extra_discount' => 'Extra discount cannot exceed return total.'
-                ]);
-            }
+                    $extraDiscount = (float)($request->extra_discount ?? 0);
+                    if ($extraDiscount > $request->net_total) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'extra_discount' => 'Extra discount cannot exceed return total.'
+                        ]);
+                    }
 
-            $return = SalesReturn::create([
-                'date'            => $request->date,
-                'invoice'         => $finalInvoice,
-                'original_invoice' => $request->original_invoice,
-                'sale_id'         => $sale->id,
-                'customer_id'     => $request->customer_id,
-                'previous_balance' => $previousBalance,
-                'salesman_id'     => $request->salesman_id ?? 0,
-                'firm_id'         => $request->firm_id ?? null,
-                'no_of_items'     => $request->no_of_items,
-                'gross_total'     => $request->gross_total,
-                'discount_total'  => $request->discount_total,
-                'tax_total'       => $request->tax_total,
-                'net_total'       => $request->net_total,
-                'extra_discount'  => $extraDiscount,
-                'paid_amount'     => $request->paid_amount,
-                'remaining_amount' => $request->remaining_amount,
-                'remarks'         => $request->remarks,
-            ]);
+                    $return = SalesReturn::create([
+                        'date'            => $request->date,
+                        'invoice'         => $finalInvoice,
+                        'original_invoice' => $request->original_invoice,
+                        'sale_id'         => $sale->id,
+                        'customer_id'     => $request->customer_id,
+                        'previous_balance' => $previousBalance,
+                        'salesman_id'     => $request->salesman_id ?? 0,
+                        'firm_id'         => $request->firm_id ?? null,
+                        'no_of_items'     => $request->no_of_items,
+                        'gross_total'     => $request->gross_total,
+                        'discount_total'  => $request->discount_total,
+                        'tax_total'       => $request->tax_total,
+                        'net_total'       => $request->net_total,
+                        'extra_discount'  => $extraDiscount,
+                        'paid_amount'     => $request->paid_amount,
+                        'remaining_amount' => $request->remaining_amount,
+                        'remarks'         => $request->remarks,
+                    ]);
 
-            foreach ($request->items as $it) {
-                SalesReturnItem::create([
-                    'sales_return_id' => $return->id,
-                    'item_id'     => $it['item_id'],
-                    'qty_carton'  => $it['qty_carton'],
-                    'qty_pcs'     => $it['qty_pcs'],
-                    'total_pcs'   => $it['total_pcs'],
-                    'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
-                    'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
-                    'trade_price' => $it['trade_price'],
-                    'discount'    => $it['discount'] ?? 0,
-                    'gst_amount'  => $it['gst_amount'] ?? 0,
-                    'subtotal'    => $it['subtotal'],
-                ]);
+                    foreach ($request->items as $it) {
+                        SalesReturnItem::create([
+                            'sales_return_id' => $return->id,
+                            'item_id'     => $it['item_id'],
+                            'qty_carton'  => $it['qty_carton'],
+                            'qty_pcs'     => $it['qty_pcs'],
+                            'total_pcs'   => $it['total_pcs'],
+                            'bonus_qty_carton' => $it['bonus_qty_carton'] ?? 0,
+                            'bonus_qty_pcs'    => $it['bonus_qty_pcs'] ?? 0,
+                            'trade_price' => $it['trade_price'],
+                            'discount'    => $it['discount'] ?? 0,
+                            'gst_amount'  => $it['gst_amount'] ?? 0,
+                            'subtotal'    => $it['subtotal'],
+                        ]);
 
-                // INCREASE Stock for Returns (total_pcs already includes bonus units)
-                $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
-                if ($item) {
-                    $totalToReturn = (int)$it['total_pcs'];
-                    // Inward stock recorded transactionally in sales_return_items
+                        // INCREASE Stock for Returns (total_pcs already includes bonus units)
+                        $item = Items::where('id', $it['item_id'])->lockForUpdate()->first();
+                        if ($item) {
+                            $totalToReturn = (int)$it['total_pcs'];
+                            // Inward stock recorded transactionally in sales_return_items
+                        }
+                    }
+
+                    // Allocate return value using the FIFO Allocation engine
+                    $allocationService = new \App\Services\FIFOAllocationService();
+                    $allocationService->allocate($return, (float)($return->net_total - $return->extra_discount));
+
+                    // Log activity
+                    \App\Services\ActivityLogger::log('created', 'Sales Return', "Created sales return {$finalInvoice} for customer ID {$request->customer_id}");
+
+                    // Recalculate status and balance of the source invoice
+                    $this->updateSaleStatusAndBalance($sale->invoice, $sale->id);
+
+                    $return->load(['customer', 'items']);
+                    $successDialogData = [
+                        'customerName'  => $return->customer->title ?? 'Customer',
+                        'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
+                        'countItems'    => $return->items->count(),
+                        'countFull'     => (int) $return->items->sum('qty_carton'),
+                        'countPcs'      => (int) $return->items->sum('qty_pcs'),
+                        'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
+                        'saleId'        => $return->id,
+                        'invoiceNo'     => $return->invoice,
+                        'type'          => 'create',
+                    ];
+
+                    $finalResponse = redirect()->route('sales_return.index')
+                        ->with('success', 'Sales Return saved successfully!')
+                        ->with('id', $return->id)
+                        ->with('success_dialog', $successDialogData);
+
+                    return [
+                        'model'    => $return,
+                        'response' => $finalResponse,
+                        'cache'    => [
+                            'redirect_route' => 'sales_return.index',
+                            'id'             => $return->id,
+                            'flash'          => [
+                                'success' => 'Sales Return saved successfully!',
+                                'id'      => $return->id,
+                            ],
+                            'success_dialog' => $successDialogData,
+                        ],
+                    ];
                 }
-            }
-
-            // Allocate return value using the FIFO Allocation engine
-            $allocationService = new \App\Services\FIFOAllocationService();
-            $allocationService->allocate($return, (float)($return->net_total - $return->extra_discount));
-
-            // Log activity
-            \App\Services\ActivityLogger::log('created', 'Sales Return', "Created sales return {$finalInvoice} for customer ID {$request->customer_id}");
-
-            // Recalculate status and balance of the source invoice
-            $this->updateSaleStatusAndBalance($sale->invoice, $sale->id);
-
-            DB::commit();
-
-            $return->load(['customer', 'items']);
-            $successDialogData = [
-                'customerName'  => $return->customer->title ?? 'Customer',
-                'totalAmount'   => (float) max(0, $return->net_total - ($return->extra_discount ?? 0)),
-                'countItems'    => $return->items->count(),
-                'countFull'     => (int) $return->items->sum('qty_carton'),
-                'countPcs'      => (int) $return->items->sum('qty_pcs'),
-                'totalDiscount' => (float) ($return->discount_total + ($return->extra_discount ?? 0)),
-                'saleId'        => $return->id,
-                'invoiceNo'     => $return->invoice,
-                'type'          => 'create',
-            ];
-
-            return redirect()->route('sales_return.index')
-                ->with('success', 'Sales Return saved successfully!')
-                ->with('id', $return->id)
-                ->with('success_dialog', $successDialogData);
-        } catch (\Exception $e) {
-            DB::rollBack();
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SalesReturnController@store error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
         }
     }
 
     // Get customer's sales invoices
-    public function getCustomerInvoices($customerId)
-    {
-        try {
-            $invoices = Sales::where('customer_id', $customerId)
-                ->select('id', 'invoice', 'date', 'net_total', 'remaining_amount', 'status', 'firm_id')
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->unique('invoice')
-                ->values()
-                ->map(function ($sale) {
-                    $totalSoldPcs = (float) \App\Models\SalesItem::where('sale_id', $sale->id)->sum('total_pcs');
-                    $allReturnIds = SalesReturn::where('sale_id', $sale->id)
-                        ->orWhere('original_invoice', $sale->invoice)
-                        ->pluck('id');
-                    $totalReturnedPcs = (float) \App\Models\SalesReturnItem::whereIn('sales_return_id', $allReturnIds)->sum('total_pcs');
+    
+public function getCustomerInvoices($customerId)
+{
+    try {
+        $sales = Sales::where('customer_id', $customerId)
+            ->select(
+                'id',
+                'invoice',
+                'date',
+                'net_total',
+                'remaining_amount',
+                'status',
+                'firm_id'
+            )
+            ->orderByDesc('created_at')
+            ->get()
+            ->unique('invoice')
+            ->values();
 
-                    $isFullyReturned = ($totalSoldPcs > 0 && $totalReturnedPcs >= $totalSoldPcs) || $sale->status === 'Returned';
-                    $isPartialReturn = !$isFullyReturned && ($totalReturnedPcs > 0 || $sale->status === 'Partial Return');
+        $saleIds = $sales->pluck('id');
 
-                    $status = $isFullyReturned ? 'Returned' : ($isPartialReturn ? 'Partial Return' : ($sale->status ?? 'Completed'));
+        $soldQuantities = \App\Models\SalesItem::query()
+            ->whereIn('sale_id', $saleIds)
+            ->selectRaw('sale_id, SUM(total_pcs) as total_pcs')
+            ->groupBy('sale_id')
+            ->pluck('total_pcs', 'sale_id');
 
-                    $saleLiveReturned = (float) SalesReturn::where('sale_id', $sale->id)->sum('net_total');
-                    $saleMaxReturnable = max(0, (float) $sale->net_total - $saleLiveReturned);
+        $returns = SalesReturn::query()
+            ->whereIn('sale_id', $saleIds)
+            ->selectRaw('sale_id, SUM(net_total) as returned_amount')
+            ->selectRaw('COUNT(*) as return_count')
+            ->groupBy('sale_id')
+            ->get()
+            ->keyBy('sale_id');
 
-                    return [
-                        'id'                => $sale->id,
-                        'invoice'           => $sale->invoice,
-                        'date'              => $sale->date,
-                        'net_total'         => $sale->net_total,
-                        'returnable_amount' => $saleMaxReturnable,
-                        'remaining_amount'  => $isFullyReturned ? 0.0 : max(0.0, (float)$sale->remaining_amount),
-                        'status'            => $status,
-                        'firm_id'           => $sale->firm_id,
-                        'is_fully_returned' => $isFullyReturned,
-                        'returnable_pcs'    => max(0, (int)($totalSoldPcs - $totalReturnedPcs)),
-                    ];
-                });
+        $returnIds = SalesReturn::whereIn('sale_id', $saleIds)
+            ->pluck('id');
 
-            return response()->json($invoices);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        $returnedQuantities = \App\Models\SalesReturnItem::query()
+            ->whereIn('sales_return_id', $returnIds)
+            ->join(
+                'sales_returns',
+                'sales_returns.id',
+                '=',
+                'sales_return_items.sales_return_id'
+            )
+            ->selectRaw(
+                'sales_returns.sale_id, SUM(sales_return_items.total_pcs) as total_pcs'
+            )
+            ->groupBy('sales_returns.sale_id')
+            ->pluck('total_pcs', 'sales_returns.sale_id');
+
+        $invoices = $sales->map(function ($sale) use (
+            $soldQuantities,
+            $returnedQuantities,
+            $returns
+        ) {
+            $totalSoldPcs = (float) ($soldQuantities[$sale->id] ?? 0);
+            $totalReturnedPcs = (float) ($returnedQuantities[$sale->id] ?? 0);
+
+            $returnedAmount = (float) (
+                $returns[$sale->id]->returned_amount ?? 0
+            );
+
+            $isFullyReturned =
+                ($totalSoldPcs > 0 && $totalReturnedPcs >= $totalSoldPcs)
+                || $sale->status === 'Returned';
+
+            $isPartialReturn =
+                !$isFullyReturned
+                && (
+                    $totalReturnedPcs > 0
+                    || $sale->status === 'Partial Return'
+                );
+
+            $status = $isFullyReturned
+                ? 'Returned'
+                : ($isPartialReturn
+                    ? 'Partial Return'
+                    : ($sale->status ?? 'Completed'));
+
+            return [
+                'id' => $sale->id,
+                'invoice' => $sale->invoice,
+                'date' => $sale->date,
+                'net_total' => $sale->net_total,
+
+                'returnable_amount' => round(
+                    max(0, (float) $sale->net_total - $returnedAmount),
+                    2
+                ),
+
+                'remaining_amount' => $isFullyReturned
+                    ? 0.0
+                    : max(0.0, (float) $sale->remaining_amount),
+
+                'status' => $status,
+                'firm_id' => $sale->firm_id,
+                'is_fully_returned' => $isFullyReturned,
+
+                'returnable_pcs' => max(
+                    0,
+                    (int) ($totalSoldPcs - $totalReturnedPcs)
+                ),
+            ];
+        });
+
+        return response()->json($invoices);
+
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::error(
+            'Customer invoice retrieval failed',
+            [
+                'customer_id' => $customerId,
+                'error' => $e->getMessage(),
+            ]
+        );
+
+        return response()->json([
+            'error' => 'Unable to retrieve customer invoices.'
+        ], 500);
     }
+}
+
 
     // Get items for a specific invoice
     public function getInvoiceItems($invoiceId)
@@ -430,11 +554,21 @@ class SalesReturnController extends Controller implements HasMiddleware
                 \App\Services\StockService::attachRealtimeBalances($sale->items->pluck('item')->filter());
             }
 
-            $items = $sale->items->map(function ($saleItem) use ($sale) {
-                $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
-                    ->where('sales_returns.sale_id', $sale->id)
-                    ->where('sales_return_items.item_id', $saleItem->item_id)
-                    ->sum('sales_return_items.total_pcs');
+            // Pre-aggregate already returned pieces per item on this invoice so duplicate rows of the same item share the returned pool accurately
+            $returnedPoolByItem = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+                ->where('sales_returns.sale_id', $sale->id)
+                ->selectRaw('sales_return_items.item_id, SUM(sales_return_items.total_pcs) as returned_pcs')
+                ->groupBy('sales_return_items.item_id')
+                ->pluck('returned_pcs', 'item_id')
+                ->map(fn($v) => (float) $v)
+                ->all();
+
+            $items = $sale->items->map(function ($saleItem) use (&$returnedPoolByItem) {
+                $itemId = $saleItem->item_id;
+                $remPool = $returnedPoolByItem[$itemId] ?? 0.0;
+                $lineSoldPcs = (float) $saleItem->total_pcs;
+                $allocatedReturned = min($lineSoldPcs, $remPool);
+                $returnedPoolByItem[$itemId] = max(0.0, $remPool - $allocatedReturned);
 
                 return [
                     'item_id'              => $saleItem->item_id,
@@ -442,8 +576,8 @@ class SalesReturnController extends Controller implements HasMiddleware
                     'qty_carton'           => $saleItem->qty_carton,
                     'qty_pcs'              => $saleItem->qty_pcs,
                     'total_pcs'            => $saleItem->total_pcs,
-                    'already_returned_pcs' => (int) $alreadyReturnedPcs,
-                    'returnable_pcs'       => max(0, $saleItem->total_pcs - (int) $alreadyReturnedPcs),
+                    'already_returned_pcs' => (int) round($allocatedReturned),
+                    'returnable_pcs'       => max(0, (int) round($lineSoldPcs - $allocatedReturned)),
                     'trade_price'          => $saleItem->trade_price, // exact price from sale
                     'discount'             => $saleItem->discount,
                     'gst_amount'           => $saleItem->gst_amount,
@@ -484,11 +618,21 @@ class SalesReturnController extends Controller implements HasMiddleware
 
             \App\Services\StockService::attachRealtimeBalances($rawPurchasedItems->pluck('item')->filter());
 
-            $purchasedItems = $rawPurchasedItems->map(function ($si) {
-                    $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
-                        ->where('sales_returns.sale_id', $si->sale_id)
-                        ->where('sales_return_items.item_id', $si->item_id)
-                        ->sum('sales_return_items.total_pcs');
+            // Pre-aggregate returned pieces per (sale_id, item_id) so duplicate lines on the same invoice distribute returned quantities accurately
+            $returnedBySaleAndItem = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+                ->whereIn('sales_returns.sale_id', $sales)
+                ->selectRaw('sales_returns.sale_id, sales_return_items.item_id, SUM(sales_return_items.total_pcs) as returned_pcs')
+                ->groupBy('sales_returns.sale_id', 'sales_return_items.item_id')
+                ->get()
+                ->mapWithKeys(fn($r) => [($r->sale_id . '_' . $r->item_id) => (float) $r->returned_pcs])
+                ->all();
+
+            $purchasedItems = $rawPurchasedItems->map(function ($si) use (&$returnedBySaleAndItem) {
+                    $poolKey = $si->sale_id . '_' . $si->item_id;
+                    $remPool = $returnedBySaleAndItem[$poolKey] ?? 0.0;
+                    $lineSoldPcs = (float) $si->total_pcs;
+                    $allocatedReturned = min($lineSoldPcs, $remPool);
+                    $returnedBySaleAndItem[$poolKey] = max(0.0, $remPool - $allocatedReturned);
 
                     return [
                         'id'               => $si->id,
@@ -500,11 +644,12 @@ class SalesReturnController extends Controller implements HasMiddleware
                         'qty_carton'       => $si->qty_carton,
                         'qty_pcs'          => $si->qty_pcs,
                         'total_pcs'        => $si->total_pcs,
-                        'already_returned_pcs' => (int) $alreadyReturnedPcs,
-                        'returnable_pcs'       => max(0, $si->total_pcs - (int) $alreadyReturnedPcs),
+                        'already_returned_pcs' => (int) round($allocatedReturned),
+                        'returnable_pcs'       => max(0, (int) round($lineSoldPcs - $allocatedReturned)),
                         'last_trade_price' => $si->trade_price,
                         'gst_amount'       => $si->gst_amount,
                         'discount'         => $si->discount,
+                        'subtotal'         => $si->subtotal,
                         'bonus_carton'     => $si->bonus_qty_carton,
                         'bonus_pcs'        => $si->bonus_qty_pcs,
                     ];
@@ -626,12 +771,73 @@ class SalesReturnController extends Controller implements HasMiddleware
             ]);
         }
 
+        // Validate item quantities first (grouped across any duplicate rows of the same item)
+        $requestedPcsByItem = [];
+        foreach ($request->items as $it) {
+            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantities cannot be negative.'
+                ]);
+            }
+
+            $itemId = (int) $it['item_id'];
+            $item = Items::find($itemId);
+            if (!$item) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Selected item does not exist.'
+                ]);
+            }
+            $packing = $item->packing_qty ?: 1;
+            $rowTotalPcs = (((float) ($it['qty_carton'] ?? 0) + (float) ($it['bonus_qty_carton'] ?? 0)) * $packing)
+                + (float) ($it['qty_pcs'] ?? 0)
+                + (float) ($it['bonus_qty_pcs'] ?? 0);
+
+            $requestedPcsByItem[$itemId] = ($requestedPcsByItem[$itemId] ?? 0.0) + $rowTotalPcs;
+        }
+
+        foreach ($requestedPcsByItem as $itemId => $totalToReturn) {
+            // Fetch original sales items (summed across any duplicate lines of the same item)
+            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $newSale->id)
+                ->where('item_id', $itemId);
+            if (!$saleItemsQuery->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Item was not purchased on the original invoice.'
+                ]);
+            }
+            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
+
+            // Calculate already returned pieces for this item on this sale (excluding current return)
+            $alreadyReturnedPcs = (float) \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+                ->where('sales_returns.sale_id', $newSale->id)
+                ->where('sales_return_items.sales_return_id', '!=', $id)
+                ->where('sales_return_items.item_id', $itemId)
+                ->sum('sales_return_items.total_pcs');
+
+            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
+
+            if ($totalToReturn > $maxReturnableQty + 0.001) {
+                $item = Items::find($itemId);
+                $itemTitle = $item ? $item->title : ('#' . $itemId);
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => 'Return quantity for item ' . $itemTitle . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
+                ]);
+            }
+        }
+
         $liveReturned = (float) SalesReturn::where('sale_id', $newSale->id)->where('id', '!=', $id)->sum('net_total');
         $maxReturnable = max(0, (float) $newSale->net_total - $liveReturned);
 
-        // Auto-clamp small rounding differences (up to 2.00 Rupees) caused by whole-rupee rounding on sales invoices
+        // Auto-clamp rounding/discount-derivation differences when item quantities are verified within returnable limits
         $diff = round($request->net_total, 2) - round($maxReturnable, 2);
-        if ($diff > 0 && $diff <= 2.00) {
+        $totalSoldOnSale = (float) \App\Models\SalesItem::where('sale_id', $newSale->id)->sum('total_pcs');
+        $totalAlreadyReturnedOnSale = (float) \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
+            ->where('sales_returns.sale_id', $newSale->id)
+            ->where('sales_return_items.sales_return_id', '!=', $id)
+            ->sum('sales_return_items.total_pcs');
+        $totalReturningNow = array_sum($requestedPcsByItem);
+        $isFullRemainingReturn = ($totalSoldOnSale > 0) && (($totalAlreadyReturnedOnSale + $totalReturningNow) >= ($totalSoldOnSale - 0.001));
+
+        if ($diff > 0 && ($diff <= 50.00 || $isFullRemainingReturn)) {
             $request->merge([
                 'net_total' => $maxReturnable,
                 'remaining_amount' => max(0, $maxReturnable - (float)($request->extra_discount ?? 0) - (float)($request->paid_amount ?? 0)),
@@ -642,45 +848,6 @@ class SalesReturnController extends Controller implements HasMiddleware
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'net_total' => 'Return amount (' . number_format($request->net_total, 2) . ') cannot exceed returnable balance (' . number_format($maxReturnable, 2) . ').'
             ]);
-        }
-
-        // Validate item quantities and ensure they don't return more than purchased
-        foreach ($request->items as $it) {
-            if ($it['qty_carton'] < 0 || $it['qty_pcs'] < 0 || $it['total_pcs'] < 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Return quantities cannot be negative.'
-                ]);
-            }
-            
-            // Fetch original sales items (summed across any duplicate lines of the same item)
-            $saleItemsQuery = \App\Models\SalesItem::where('sale_id', $newSale->id)
-                ->where('item_id', $it['item_id']);
-            if (!$saleItemsQuery->exists()) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Item was not purchased on the original invoice.'
-                ]);
-            }
-            $originalSoldTotalPcs = (float) $saleItemsQuery->sum('total_pcs');
-
-            // Calculate already returned pieces for this item on this sale (excluding current return)
-            $alreadyReturnedPcs = \App\Models\SalesReturnItem::join('sales_returns', 'sales_return_items.sales_return_id', '=', 'sales_returns.id')
-                ->where('sales_returns.sale_id', $newSale->id)
-                ->where('sales_return_items.sales_return_id', '!=', $id)
-                ->where('sales_return_items.item_id', $it['item_id'])
-                ->sum('sales_return_items.total_pcs');
-            
-            $item = Items::find($it['item_id']);
-            $packing = $item->packing_qty ?: 1;
-            $bonusUnits = (($it['bonus_qty_carton'] ?? 0) * $packing) + ($it['bonus_qty_pcs'] ?? 0);
-            $totalToReturn = $it['total_pcs'] + $bonusUnits;
-
-            $maxReturnableQty = $originalSoldTotalPcs - $alreadyReturnedPcs;
-
-            if ($totalToReturn > $maxReturnableQty) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'items' => 'Return quantity for item ' . $item->title . ' (' . $totalToReturn . ' Pcs) exceeds returnable limit (' . $maxReturnableQty . ' Pcs).'
-                ]);
-            }
         }
 
         DB::beginTransaction();

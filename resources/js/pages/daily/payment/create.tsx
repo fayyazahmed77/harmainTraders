@@ -998,15 +998,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
   }, [amount, discount, totalAllocated]);
 
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef<boolean>(false);
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
 
   // Handle Save
   const handleSave = () => {
-    if (loading) return;
+    if (isSubmittingRef.current || loading) return;
 
     if (!selectedAccountId) {
       toast.error("Please select a Ledger Party.");
       return;
     }
+
+    isSubmittingRef.current = true;
+    setLoading(true);
 
     // Process Allocations
     const allocationPayload = unpaidBills
@@ -1060,11 +1065,16 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
         return { ...p, payment_method: method };
       });
 
-      if (!isValid) return;
+      if (!isValid) {
+        isSubmittingRef.current = false;
+        setLoading(false);
+        return;
+      }
 
       const splitsTotal = cleanedSplits.reduce((s, p) => s + Number(p.amount), 0);
 
       finalPayload = {
+        idempotency_key: idempotencyKey,
         is_multi: true,
         date,
         account_id: selectedAccountId,
@@ -1081,10 +1091,14 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       // Single Payment Validation
       if (amount <= 0) {
         toast.error("Please enter a Payment Amount greater than 0.");
+        isSubmittingRef.current = false;
+        setLoading(false);
         return;
       }
       if (!paymentAccountId) {
         toast.error("Please select a Payout Source (Cash/Bank) before confirming.");
+        isSubmittingRef.current = false;
+        setLoading(false);
         return;
       }
 
@@ -1096,15 +1110,20 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
       } else {
         if (!finalMethod || finalMethod === 'Cash') {
           toast.error("Please select a Bank Method (e.g. Cheque, Online Transfer).");
+          isSubmittingRef.current = false;
+          setLoading(false);
           return;
         }
         if (finalMethod === 'Cheque' && !chequeNo && paymentType === 'PAYMENT') {
           toast.error("Please select a Cheque Number before saving.");
+          isSubmittingRef.current = false;
+          setLoading(false);
           return;
         }
       }
 
       finalPayload = {
+        idempotency_key: idempotencyKey,
         is_multi: false,
         date,
         account_id: selectedAccountId,
@@ -1142,16 +1161,23 @@ export default function PaymentVoucher({ accounts, paymentAccounts, messageLines
     ]);
   };
 
-  setLoading(true);
   router.post('/payment/store', finalPayload, {
     onSuccess: () => {
+      isSubmittingRef.current = false;
+      setLoading(false);
+      setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
       resetForm();
     },
     onError: (errors) => {
+      isSubmittingRef.current = false;
+      setLoading(false);
       console.error("Payment store error:", errors);
       toast.error("Failed to save payment. Please check error messages.");
     },
-    onFinish: () => setLoading(false)
+    onFinish: () => {
+      isSubmittingRef.current = false;
+      setLoading(false);
+    }
   });
 };
 

@@ -246,13 +246,21 @@ class SalesController extends Controller implements HasMiddleware
             'message_line_id'          => 'nullable|integer|exists:message_lines,id',
             'print_format'             => 'nullable|in:big,small',
             'allow_negative_stock'     => 'nullable|boolean', // Added flag
+            'idempotency_key'          => 'nullable|string|max:64',
         ]);
 
-        DB::beginTransaction();
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
 
         try {
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'sales.store',
+                payload: $request->except(['_token']),
+                userId: \Illuminate\Support\Facades\Auth::id(),
+                callback: function () use ($request) {
+                    $afterCommitEvents = [];
 
-            // B9 Fix: Server-side financial verification — never trust frontend totals.
+                    // B9 Fix: Server-side financial verification — never trust frontend totals.
             $calcGross = collect($request->items)->sum(fn($i) => (float)($i['subtotal'] ?? 0));
             $calcNet   = $calcGross
                 - (float)($request->discount_total ?? 0)
@@ -469,7 +477,7 @@ class SalesController extends Controller implements HasMiddleware
                     $payment->update(['group_id' => $groupId]);
                     $createdPayments[] = $payment;
 
-                    event(new \App\Events\PaymentConfirmed($payment));
+                    $afterCommitEvents[] = new \App\Events\PaymentConfirmed($payment);
                 }
 
                 // Distribution Logic
@@ -566,12 +574,10 @@ class SalesController extends Controller implements HasMiddleware
                 if (env('ENABLE_LOW_STOCK_ALERTS', false) && ($item->reorder_level ?? 0) > 0) {
                     $itemBal = \App\Services\StockService::getItemBalance($item->id);
                     if ($itemBal && (float)$itemBal->balance_pcs < $item->reorder_level) {
-                        event(new \App\Events\LowStockAlert($item));
+                        $afterCommitEvents[] = new \App\Events\LowStockAlert($item);
                     }
                 }
             }
-
-            DB::commit();
 
             $sale->load(['customer', 'items']);
             $successDialogData = [
@@ -586,22 +592,48 @@ class SalesController extends Controller implements HasMiddleware
                 'type'          => 'create',
             ];
 
+            $cacheData = [
+                'redirect_route' => 'sale.index',
+                'id'             => $sale->id,
+                'flash'          => [
+                    'success' => 'Sale saved successfully!',
+                    'id'      => $sale->id,
+                ],
+                'success_dialog' => $successDialogData,
+            ];
+
             if ($request->has('print_format') && in_array($request->print_format, ['big', 'small'])) {
-                return redirect()->route('sale.index')
+                $pdfUrl = route('sale.pdf', ['sale' => $sale->id, 'format' => $request->print_format]);
+                $cacheData['pdf_url'] = $pdfUrl;
+                $cacheData['flash']['pdf_url'] = $pdfUrl;
+                $finalResponse = redirect()->route('sale.index')
                     ->with('success', 'Sale saved successfully!')
                     ->with('id', $sale->id)
-                    ->with('pdf_url', route('sale.pdf', ['sale' => $sale->id, 'format' => $request->print_format]))
+                    ->with('pdf_url', $pdfUrl)
+                    ->with('success_dialog', $successDialogData);
+            } else {
+                $finalResponse = redirect()->route('sale.index')
+                    ->with('success', 'Sale saved successfully!')
+                    ->with('id', $sale->id)
                     ->with('success_dialog', $successDialogData);
             }
 
-            return redirect()->route('sale.index')
-                ->with('success', 'Sale saved successfully!')
-                ->with('id', $sale->id)
-                ->with('success_dialog', $successDialogData);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+            return [
+                'model'        => $sale,
+                'response'     => $finalResponse,
+                'cache'        => $cacheData,
+                'after_commit' => function () use ($afterCommitEvents) {
+                    foreach ($afterCommitEvents as $evt) {
+                        event($evt);
+                    }
+                },
+            ];
         }
+    );
+} catch (\Throwable $e) {
+    \Illuminate\Support\Facades\Log::error('SalesController@store error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+    return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+}
     }
 
     //edit

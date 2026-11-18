@@ -1406,59 +1406,42 @@ class PaymentController extends Controller implements HasMiddleware
 
     public function store(StorePaymentRequest $request)
     {
-        $userId = $request->user()?->id ?? 'guest';
-        $lock = Cache::lock('payment_store_' . $request->account_id . '_' . $userId, 5);
-
-        if (!$lock->get()) {
-            return back()->withErrors(['error' => 'A payment submission is already being processed. Please wait a moment.']);
-        }
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
 
         try {
-            $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = $isMulti ? $request->input('splits', []) : [[
-                'payment_account_id' => $request->payment_account_id,
-                'amount' => $request->amount,
-                'discount' => $request->discount ?? 0,
-                'payment_method' => $request->payment_method,
-                'cheque_no' => $request->cheque_no,
-                'cheque_date' => $request->cheque_date,
-                'clear_date' => $request->clear_date,
-                'original_cheque_id' => $request->original_cheque_id,
-            ]];
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'payments.store',
+                payload: $request->except(['_token']),
+                userId: $request->user()?->id,
+                callback: function () use ($request) {
+                    $isMulti = (bool) $request->input('is_multi', false);
+                    $splitsData = $isMulti ? $request->input('splits', []) : [[
+                        'payment_account_id' => $request->payment_account_id,
+                        'amount' => $request->amount,
+                        'discount' => $request->discount ?? 0,
+                        'payment_method' => $request->payment_method,
+                        'cheque_no' => $request->cheque_no,
+                        'cheque_date' => $request->cheque_date,
+                        'clear_date' => $request->clear_date,
+                        'original_cheque_id' => $request->original_cheque_id,
+                    ]];
 
-            DB::beginTransaction();
+                    // Safety checks (Total aggregate)
+                    $totalAmount = collect($splitsData)->sum('amount'); // Cash/Bank disbursement total
+                    if ($totalAmount <= 0) {
+                        throw new \Exception('Payment amount must be greater than 0.');
+                    }
+                    $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
+                    $totalGrossSettlement = $totalAmount + $totalDiscount; // Total settlement value (Cash + Discount)
 
-            // Safety checks (Total aggregate)
-            $totalAmount = collect($splitsData)->sum('amount'); // Cash/Bank disbursement total
-            if ($totalAmount <= 0) {
-                DB::rollBack();
-                optional($lock)->release();
-                return back()->withErrors(['error' => 'Payment amount must be greater than 0.']);
-            }
-                $totalDiscount = $isMulti ? ($request->discount ?? 0) : collect($splitsData)->sum('discount');
-                $totalGrossSettlement = $totalAmount + $totalDiscount; // Total settlement value (Cash + Discount)
+                    $account = Account::findOrFail($request->account_id);
 
-                $account = Account::findOrFail($request->account_id);
-
-                // Prevent duplicate rapid voucher submissions (identical account, type, amount within 3 seconds)
-                $recentDuplicate = Payment::where('account_id', $request->account_id)
-                    ->where('type', $request->type)
-                    ->where('amount', max(0, (float)($splitsData[0]['amount'] ?? 0)))
-                    ->where('created_at', '>=', now()->subSeconds(3))
-                    ->first();
-
-                if ($recentDuplicate) {
-                    DB::rollBack();
-                    $lock->release();
-                    return back()->withErrors(['error' => 'Duplicate payment submission detected. Transaction blocked.']);
-                }
-
-            // Simplified sum logic for performance or use existing if reliable
-            $totalAllocated = collect($request->allocations)->sum('amount');
-            if ($totalAllocated > ($totalGrossSettlement + 0.01)) {
-                DB::rollBack();
-                return back()->withErrors(['error' => 'Allocation total exceeds gross payment.']);
-            }
+                    // Simplified sum logic for performance or use existing if reliable
+                    $totalAllocated = collect($request->allocations)->sum('amount');
+                    if ($totalAllocated > ($totalGrossSettlement + 0.01)) {
+                        throw new \Exception('Allocation total exceeds gross payment.');
+                    }
 
             // Generate Base Voucher No - Robust logic
             $prefix = $request->type === 'RECEIPT' ? 'CRV-' : 'CPV-';
@@ -1649,10 +1632,7 @@ class PaymentController extends Controller implements HasMiddleware
                 'timestamp' => now()->toIso8601String(),
             ]);
 
-            DB::commit();
-            optional($lock)->release();
-
-            return redirect()->route('payments.index')
+            $finalRedirect = redirect()->route('payments.index')
                 ->with('success', 'Payment saved successfully.')
                 ->with('print_id', $groupId)
                 ->with('saved_payments', $savedPaymentsDetails)
@@ -1662,14 +1642,32 @@ class PaymentController extends Controller implements HasMiddleware
                 ->with('invoices_count', count($request->allocations ?? []))
                 ->with('method', $isMulti ? 'Multi' : ($request->payment_method ?? 'Cash'))
                 ->with('payment_type', $request->type);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            optional($lock)->release();
-            \Illuminate\Support\Facades\Log::error('Payment Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return back()->withErrors(['error' => 'Failed to save payment: ' . $e->getMessage()]);
-        } finally {
-            optional($lock)->release();
+
+            return [
+                'model'    => $createdPayments[0] ?? null,
+                'response' => $finalRedirect,
+                'cache'    => [
+                    'redirect_route' => 'payments.index',
+                    'id'             => $groupId,
+                    'flash'          => [
+                        'success'          => 'Payment saved successfully.',
+                        'print_id'         => $groupId,
+                        'saved_payments'   => $savedPaymentsDetails,
+                        'party_name'       => $account->title ?? 'General Party',
+                        'amount'           => $totalAmount,
+                        'discount'         => $totalDiscount,
+                        'invoices_count'   => count($request->allocations ?? []),
+                        'method'           => $isMulti ? 'Multi' : ($request->payment_method ?? 'Cash'),
+                        'payment_type'     => $request->type,
+                    ],
+                ],
+            ];
         }
+    );
+} catch (\Throwable $e) {
+    \Illuminate\Support\Facades\Log::error('Payment Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+    return back()->withErrors(['error' => 'Failed to save payment: ' . $e->getMessage()]);
+}
     }
     
     public function getAvailableCredits(int|string $customerId)

@@ -1,16 +1,8 @@
-import React, { useState } from "react";
-import { Head, Link, router } from "@inertiajs/react";
+import React from "react";
+import { Head, Link } from "@inertiajs/react";
 import CustomerPortalLayout from "@/layouts/CustomerPortalLayout";
 import {
-    ShoppingCart,
-    Clock,
-    CheckCircle2,
-    XCircle,
-    AlertCircle,
-    RefreshCw,
     ArrowLeft,
-    Check,
-    X,
     FileText,
     MessageCircle,
     Download,
@@ -23,20 +15,20 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 
 interface CustomerUser {
     id: number;
     name: string;
     username: string;
     mobile: string;
+    business_name?: string | null;
+    approval_status: string;
+    account_id?: number | null;
+    account?: {
+        id: number;
+        code: string;
+        title: string;
+    } | null;
 }
 
 interface OrderItem {
@@ -82,6 +74,7 @@ interface HistoryEntry {
 interface OnlineOrder {
     id: number;
     order_no: string;
+    revision_number?: number;
     status: "pending" | "under_review" | "awaiting_customer_acceptance" | "confirmed" | "canceled" | string;
     subtotal: number;
     discount_type?: string;
@@ -112,47 +105,7 @@ interface Props {
 }
 
 export default function CustomerOrderDetail({ customer, order }: Props) {
-    const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-    const [rejectReason, setRejectReason] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleAcceptRevision = () => {
-        if (confirm("Are you sure you want to accept the proposed order adjustments?")) {
-            setIsSubmitting(true);
-            router.post(
-                `/customer/orders/${order.id}/accept-revision`,
-                {},
-                {
-                    onFinish: () => setIsSubmitting(false),
-                }
-            );
-        }
-    };
-
-    const handleRejectRevision = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        router.post(
-            `/customer/orders/${order.id}/reject-revision`,
-            { reason: rejectReason },
-            {
-                onFinish: () => {
-                    setIsSubmitting(false);
-                    setRejectDialogOpen(false);
-                },
-            }
-        );
-    };
-
-    const pendingRevision =
-        order.active_revision ||
-        order.revisions?.find(
-            (r) =>
-                r.status === "Pending" ||
-                String((r as any).revision_status || "").toLowerCase() === "awaiting_customer_acceptance"
-        );
-
-    const whatsappAdminNumber = "923120000000"; // Haramain WhatsApp Support
+    const whatsappAdminNumber = "923318102001"; // Haramain WhatsApp Support (0331 8102001)
     const whatsappHelpUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
         `Assalam-o-Alaikum, I have an inquiry regarding my Online Order #${order.order_no} (Customer: ${customer.name}, Mobile: ${customer.mobile}).`
     )}`;
@@ -182,13 +135,18 @@ export default function CustomerOrderDetail({ customer, order }: Props) {
                                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 capitalize text-[11px]"
                                             : order.status === "canceled"
                                             ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300 capitalize text-[11px]"
-                                            : order.status === "awaiting_customer_acceptance"
-                                            ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border-orange-300 capitalize text-[11px]"
+                                            : order.status === "under_review"
+                                            ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300 capitalize text-[11px]"
                                             : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 capitalize text-[11px]"
                                     }
                                 >
                                     {order.status.replace(/_/g, " ")}
                                 </Badge>
+                                {(order.revision_number ?? 0) > 0 && (
+                                    <Badge variant="outline" className="text-[10px] text-zinc-500 border-zinc-300">
+                                        Updated by Admin
+                                    </Badge>
+                                )}
                             </div>
                             <div className="text-xs text-zinc-400 mt-0.5">
                                 Submitted on{" "}
@@ -201,105 +159,25 @@ export default function CustomerOrderDetail({ customer, order }: Props) {
                         </div>
                     </div>
 
-                    <a href={whatsappHelpUrl} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 px-4 rounded-xl font-bold shadow-sm">
-                            <MessageCircle className="w-4 h-4 mr-1.5" />
-                            WhatsApp Support
-                        </Button>
-                    </a>
-                </div>
-                {/* Active Revision Banner */}
-                {order.status === "awaiting_customer_acceptance" && pendingRevision && (
-                    <div className="p-5 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border-2 border-orange-300 dark:border-orange-700 shadow-md space-y-4">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="w-6 h-6 text-orange-600 shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                                <h3 className="font-black text-base text-orange-950 dark:text-orange-100">
-                                    Action Required: Order Revision Proposed
-                                </h3>
-                                <p className="text-xs sm:text-sm text-orange-900 dark:text-orange-200">
-                                    Our team has reviewed your order and proposed updates to quantities, discounts, or delivery.
-                                </p>
-                            </div>
-                        </div>
-
-                        {pendingRevision.notes && (
-                            <div className="p-3 bg-white/80 dark:bg-zinc-900/80 rounded-xl text-xs text-zinc-700 dark:text-zinc-300 border border-orange-200">
-                                <span className="font-bold text-orange-800 dark:text-orange-300">Note from sales team: </span>
-                                {pendingRevision.notes}
-                            </div>
-                        )}
-
-                        {/* Revised Items List & Financials */}
-                        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-orange-200 p-4 space-y-3 text-xs">
-                            <span className="font-bold uppercase tracking-wider text-zinc-500">Proposed Item Adjustments:</span>
-                            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                {pendingRevision.items?.map((revIt) => (
-                                    <div key={revIt.id} className="py-2 flex justify-between items-center">
-                                        <div>
-                                            <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                                {revIt.item_name || (revIt as any).item_name_snapshot}
-                                            </span>
-                                            <div className="text-[11px] text-zinc-400">
-                                                {(revIt as any).qty_carton !== undefined && Number((revIt as any).qty_carton) > 0
-                                                    ? `${(revIt as any).qty_carton} ctn + ${Number((revIt as any).qty_pcs || 0)} pcs (${revIt.quantity || (revIt as any).total_pcs} pcs)`
-                                                    : `${revIt.quantity || (revIt as any).total_pcs} pcs`}
-                                                {" "}@ Rs. {Number(revIt.unit_price || (revIt as any).price_piece).toLocaleString()}
-                                            </div>
-                                        </div>
-                                        <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                                            Rs. {Number(revIt.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 space-y-1.5 text-zinc-600 dark:text-zinc-400">
-                                <div className="flex justify-between">
-                                    <span>Proposed Subtotal:</span>
-                                    <span className="font-semibold">Rs. {Number(pendingRevision.subtotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                {Number(pendingRevision.discount_amount) > 0 && (
-                                    <div className="flex justify-between text-rose-600 font-semibold">
-                                        <span>Special Discount Applied:</span>
-                                        <span>-Rs. {Number(pendingRevision.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                )}
-                                {Number(pendingRevision.delivery_charges) > 0 && (
-                                    <div className="flex justify-between">
-                                        <span>Delivery Charges:</span>
-                                        <span>+Rs. {Number(pendingRevision.delivery_charges).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                )}
-                                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-between font-black text-sm text-emerald-700 dark:text-emerald-400">
-                                    <span>Revised Total Payable:</span>
-                                    <span>Rs. {Number(pendingRevision.payable_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Decision Buttons */}
-                        <div className="flex flex-wrap items-center gap-3 pt-2">
-                            <Button
-                                onClick={handleAcceptRevision}
-                                disabled={isSubmitting}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 shadow-sm"
-                            >
-                                <Check className="w-4 h-4 mr-1.5" />
-                                Accept Revised Order
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={`/customer/orders/${order.order_no}/invoice-pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button size="sm" variant="outline" className="text-xs h-9 font-semibold border-zinc-300">
+                                <FileText className="w-4 h-4 mr-1.5 text-orange-600" />
+                                Order PDF
                             </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => setRejectDialogOpen(true)}
-                                disabled={isSubmitting}
-                                className="text-rose-600 border-rose-300 hover:bg-rose-50 text-xs h-9"
-                            >
-                                <X className="w-4 h-4 mr-1.5" />
-                                Decline Revision
+                        </a>
+                        <a href={whatsappHelpUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 px-4 rounded-xl font-bold shadow-sm">
+                                <MessageCircle className="w-4 h-4 mr-1.5" />
+                                WhatsApp Support (0331 8102001)
                             </Button>
-                        </div>
+                        </a>
                     </div>
-                )}
+                </div>
 
                 {/* Confirmed Invoice Notification & Actions */}
                 {order.sale ? (
@@ -346,14 +224,24 @@ export default function CustomerOrderDetail({ customer, order }: Props) {
                         </div>
                     </div>
                 ) : (
-                    <div className="p-4 rounded-xl bg-zinc-100/70 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+                    <div className="p-4 rounded-xl bg-zinc-100/70 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-600 dark:text-zinc-400">
                         <div className="flex items-center gap-2.5">
-                            <Info className="w-4 h-4 text-zinc-400 shrink-0" />
+                            <Info className="w-4 h-4 text-orange-600 shrink-0" />
                             <span>
-                                <strong>ERP Invoice Status:</strong> Order is currently{" "}
-                                <span className="capitalize font-semibold text-zinc-800 dark:text-zinc-200">{order.status.replace(/_/g, " ")}</span>. The official sales invoice and download option will appear here once approved by our team.
+                                <strong>Order Status:</strong> Currently{" "}
+                                <span className="capitalize font-semibold text-zinc-800 dark:text-zinc-200">{order.status.replace(/_/g, " ")}</span>. You can view or download your provisional order bill at any time.
                             </span>
                         </div>
+                        <a
+                            href={`/customer/orders/${order.order_no}/invoice-pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button size="sm" variant="outline" className="text-xs h-8 border-zinc-300">
+                                <Download className="w-3.5 h-3.5 mr-1.5 text-zinc-500" />
+                                Download Order PDF
+                            </Button>
+                        </a>
                     </div>
                 )}
 
@@ -473,44 +361,6 @@ export default function CustomerOrderDetail({ customer, order }: Props) {
                     </div>
                 </div>
             </div>
-
-            {/* Decline Dialog */}
-            <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Decline Proposed Revision</DialogTitle>
-                        <DialogDescription>
-                            Please let us know why you are declining the revised order (optional). Our team will review again.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleRejectRevision} className="space-y-4 py-2">
-                        <textarea
-                            rows={3}
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            placeholder="e.g. Price is higher than expected, needed full quantity..."
-                            className="w-full text-sm p-2 rounded-md border border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800"
-                        />
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setRejectDialogOpen(false)}
-                                disabled={isSubmitting}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                className="bg-rose-600 hover:bg-rose-700 text-white"
-                                disabled={isSubmitting}
-                            >
-                                {isSubmitting ? "Submitting..." : "Confirm Decline"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </CustomerPortalLayout>
     );
 }

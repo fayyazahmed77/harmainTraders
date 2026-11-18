@@ -377,6 +377,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     const [mobileAccOpen, setMobileAccOpen] = useState(false);
     const [desktopAccOpen, setDesktopAccOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const isSubmittingRef = React.useRef(false);
+    const [idempotencyKey, setIdempotencyKey] = useState<string>(() => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
 
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -851,6 +853,8 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
     // ── Save ──────────────────────────────────
     const handleSave = () => {
+        if (isSubmittingRef.current) return;
+
         const rowCount = rows.filter(r => r.item_id !== null).length;
         const validRows = rowsWithAmount.filter(r => r.item_id !== null && (r.full > 0 || r.pcs > 0));
 
@@ -858,8 +862,11 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         if (rowCount === 0) { alert("Please assign items to the manifest before executing return."); return; }
         if (validRows.length === 0) { alert("Please enter return quantities for the assigned items."); return; }
 
+        isSubmittingRef.current = true;
         setIsSaving(true);
+
         const payload = {
+            idempotency_key: idempotencyKey,
             date: date.toISOString().split('T')[0],
             invoice: invoiceNo,
             original_invoice: originalInvoiceNo,
@@ -907,10 +914,12 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             setCreditBalance(null);
             setAdvanceBalance(null);
             setRemarks("");
+            setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
         };
 
         router.post("/purchase-return", payload, {
             onSuccess: (page) => {
+                isSubmittingRef.current = false;
                 setIsSaving(false);
                 const flashError = (page.props as any)?.flash?.error;
                 if (flashError) {
@@ -930,7 +939,14 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 resetForm();
                 setShowSuccessDialog(true);
             },
-            onError: () => setIsSaving(false),
+            onError: () => {
+                isSubmittingRef.current = false;
+                setIsSaving(false);
+            },
+            onFinish: () => {
+                isSubmittingRef.current = false;
+                setIsSaving(false);
+            }
         });
     };
 

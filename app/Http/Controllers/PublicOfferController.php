@@ -66,6 +66,23 @@ class PublicOfferController extends Controller
 
         $categories = ItemCategory::where('status', 'active')->orderBy('name')->get();
 
+        // Prevent N+1 ledger queries from Account::$appends (current_balance, guest_link) on companyAccount relations
+        foreach ([$customerOffer, $marketOffer] as $offerModel) {
+            if ($offerModel && $offerModel->relationLoaded('items')) {
+                if ($offerModel->relationLoaded('firm') && $offerModel->firm) {
+                    // firm is lightweight
+                }
+                foreach ($offerModel->items as $offerLine) {
+                    if ($offerLine->relationLoaded('items') && $offerLine->items) {
+                        $product = $offerLine->items;
+                        if ($product->relationLoaded('companyAccount') && $product->companyAccount) {
+                            $product->companyAccount->setHidden(['current_balance', 'guest_link']);
+                        }
+                    }
+                }
+            }
+        }
+
         return Inertia::render('public/LiveOffers', [
             'customerOffer' => $customerOffer,
             'marketOffer' => $marketOffer,
@@ -177,7 +194,7 @@ class PublicOfferController extends Controller
             'customer_notes' => 'nullable|string|max:1000',
             'idempotency_key' => 'nullable|string|max:64',
             'items' => 'required|array|min:1',
-            'items.*.item_id' => 'required|exists:items,id',
+            'items.*.item_id' => 'required|integer',
             'items.*.qty_carton' => 'required|numeric|min:0',
             'items.*.qty_pcs' => 'required|numeric|min:0',
         ]);

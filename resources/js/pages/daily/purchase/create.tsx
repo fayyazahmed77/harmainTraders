@@ -244,6 +244,9 @@ export default function Purchase({
     const [updatePricesAfterPayment, setUpdatePricesAfterPayment] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
+    const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
+        return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2));
+    });
 
     const handlePostPriceUpdate = (update: boolean) => {
         setUpdatePricesAfterPayment(update);
@@ -657,6 +660,7 @@ export default function Purchase({
         setIsSubmitting(true);
 
         const payload = {
+            idempotency_key: idempotencyKey,
             date: date ? date.toISOString().slice(0, 10) : null,
             invoice: invoiceNo,
 
@@ -746,6 +750,7 @@ export default function Purchase({
     };
 
     const clearForm = (nextInvoiceNo?: string) => {
+        setIdempotencyKey(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('key_' + Date.now() + '_' + Math.random().toString(36).substring(2)));
         resetRows();
         if (nextInvoiceNo) {
             setInvoiceNo(nextInvoiceNo);
@@ -1730,9 +1735,14 @@ console.log(lastPurchaseInfo);
                                         <div className="pt-2">
                                             <Button
                                                 onClick={handleSave}
-                                                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-sm gap-2"
+                                                disabled={isSubmitting}
+                                                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 active:scale-95 transition-all rounded-sm gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <Save size={18} className="stroke-[2.5]" />
+                                                {isSubmitting ? (
+                                                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                                ) : (
+                                                    <Save size={18} className="stroke-[2.5]" />
+                                                )}
                                                 Confirm & Save
                                             </Button>
                                         </div>

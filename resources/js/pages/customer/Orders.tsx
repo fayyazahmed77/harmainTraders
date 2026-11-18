@@ -205,21 +205,6 @@ export default function CustomerOrders({ customer, orders }: Props) {
                                     )}
                                 </div>
 
-                                {/* Action Required Banner */}
-                                {order.status === "awaiting_customer_acceptance" && (
-                                    <div className="p-3 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded-xl flex items-center justify-between text-xs text-orange-900 dark:text-orange-200">
-                                        <div className="flex items-center gap-2">
-                                            <AlertCircle className="w-4 h-4 text-orange-600 shrink-0" />
-                                            <span>The team has proposed adjustments to quantities or prices.</span>
-                                        </div>
-                                        <Link href={`/customer/orders/${order.order_no}`}>
-                                            <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white h-7 text-xs">
-                                                Review Changes
-                                            </Button>
-                                        </Link>
-                                    </div>
-                                )}
-
                                 {/* Card Footer */}
                                 <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                                     <div>

@@ -47,6 +47,7 @@ interface OfferCheckoutDialogProps {
     offerId?: number | string | null;
     formatCurrency: (amount: number) => string;
     onSuccess: (invoice: string, customerCode: string, token: string, extra?: any) => void;
+    initialCustomer?: any | null;
 }
 
 export const OfferCheckoutDialog: React.FC<OfferCheckoutDialogProps> = ({
@@ -57,10 +58,13 @@ export const OfferCheckoutDialog: React.FC<OfferCheckoutDialogProps> = ({
     offerId,
     formatCurrency,
     onSuccess,
+    initialCustomer = null,
 }) => {
     // Auth mode: 'authenticated' | 'login' | 'register'
     const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-    const [customerUser, setCustomerUser] = useState<any | null>(null);
+    const [customerUser, setCustomerUser] = useState<any | null>(() =>
+        initialCustomer ? { can_place_order: true, ...initialCustomer } : null
+    );
     const [loadingAuth, setLoadingAuth] = useState(false);
 
     // Login Form State
@@ -105,9 +109,11 @@ export const OfferCheckoutDialog: React.FC<OfferCheckoutDialogProps> = ({
         return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     };
 
-    // Check if customer is already authenticated
-    const checkCustomerAuth = async () => {
-        setLoadingAuth(true);
+    // Check if customer is already authenticated (silent background refresh if initialCustomer is already present)
+    const checkCustomerAuth = async (silent = false) => {
+        if (!silent) {
+            setLoadingAuth(true);
+        }
         try {
             const res = await fetch('/customer/me');
             const data = await res.json();
@@ -120,15 +126,27 @@ export const OfferCheckoutDialog: React.FC<OfferCheckoutDialogProps> = ({
                 setCustomerUser(null);
             }
         } catch {
-            setCustomerUser(null);
+            if (!silent) {
+                setCustomerUser(null);
+            }
         } finally {
             setLoadingAuth(false);
         }
     };
 
     useEffect(() => {
+        if (initialCustomer && !customerUser) {
+            setCustomerUser({ can_place_order: true, ...initialCustomer });
+        }
+    }, [initialCustomer]);
+
+    useEffect(() => {
         if (open) {
-            checkCustomerAuth();
+            const hasPreloadedCustomer = Boolean(customerUser || initialCustomer);
+            if (!customerUser && initialCustomer) {
+                setCustomerUser({ can_place_order: true, ...initialCustomer });
+            }
+            checkCustomerAuth(hasPreloadedCustomer);
             setOrderError(null);
             setLoginError(null);
             setRegError(null);

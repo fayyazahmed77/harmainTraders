@@ -179,14 +179,23 @@ class JournalVoucherController extends Controller implements HasMiddleware
             'remarks' => 'nullable|string',
             'source_allocations' => 'nullable|array',
             'destination_allocations' => 'nullable|array',
+            'idempotency_key' => 'nullable|string|max:64',
         ]);
 
-        DB::beginTransaction();
+        $idempotencyService = app(\App\Services\IdempotencyService::class);
+
         try {
-            // Generate Base Voucher No - Safer approach
-            $lastPayment = Payment::where('voucher_no', 'LIKE', 'JV-%')
-                ->orderByRaw('CAST(SUBSTRING(voucher_no, 4) AS UNSIGNED) DESC')
-                ->first();
+            return $idempotencyService->execute(
+                idempotencyKey: $request->input('idempotency_key'),
+                routeName: 'journal-vouchers.store',
+                payload: $request->except(['_token']),
+                userId: \Illuminate\Support\Facades\Auth::id(),
+                callback: function () use ($request) {
+                    // Generate Base Voucher No with lockForUpdate to prevent race conditions
+                    $lastPayment = Payment::where('voucher_no', 'LIKE', 'JV-%')
+                        ->lockForUpdate()
+                        ->orderByRaw('CAST(SUBSTRING(voucher_no, 4) AS UNSIGNED) DESC')
+                        ->first();
             
             $nextNum = 1;
             if ($lastPayment) {
@@ -286,12 +295,21 @@ class JournalVoucherController extends Controller implements HasMiddleware
                 }
             }
 
-            DB::commit();
-
-            return redirect()->route('journal-vouchers.index')->with('success', 'Journal Voucher created successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Illuminate\Support\Facades\Log::error('JV Store Error: ' . $e->getMessage());
+                    return [
+                        'model'    => $receipt,
+                        'response' => redirect()->route('journal-vouchers.index')->with('success', 'Journal Voucher created successfully.'),
+                        'cache'    => [
+                            'redirect_route' => 'journal-vouchers.index',
+                            'id'             => $groupId,
+                            'flash'          => [
+                                'success' => 'Journal Voucher created successfully.',
+                            ],
+                        ],
+                    ];
+                }
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('JV Store Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return back()->withErrors(['error' => 'Failed to save: ' . $e->getMessage()]);
         }
     }

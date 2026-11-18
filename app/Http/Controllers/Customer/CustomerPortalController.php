@@ -139,7 +139,7 @@ class CustomerPortalController extends Controller
     }
 
     /**
-     * Download or view sales invoice PDF for customer's confirmed order.
+     * Download or view sales invoice PDF for customer's confirmed or pending order.
      */
     public function downloadInvoicePdf($orderNo)
     {
@@ -152,25 +152,31 @@ class CustomerPortalController extends Controller
                 }
             })
             ->where('customer_user_id', $customerUser->id)
+            ->with(['items.item', 'customerUser'])
             ->firstOrFail();
 
-        if (!$order->sale_id) {
-            abort(404, 'No confirmed sales invoice is linked to this order yet.');
+        // If order has already been confirmed as an ERP Sale, show official sales invoice
+        if ($order->sale_id) {
+            $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->findOrFail($order->sale_id);
+            $firm = Firm::find($sale->firm_id);
+
+            $returns = \App\Models\SalesReturn::with(['items.item'])
+                ->where('original_invoice', $sale->invoice)
+                ->get();
+
+            $sale->returns = $returns;
+
+            $pdf = Pdf::loadView('pdf.sale', compact('sale', 'firm'));
+            $pdf->setPaper('A4', 'portrait');
+
+            return $pdf->stream("Invoice-{$sale->invoice}.pdf");
         }
 
-        $sale = Sales::with('customer', 'salesman', 'items.item', 'messageLine')->findOrFail($order->sale_id);
-        $firm = Firm::find($sale->firm_id);
-
-        $returns = \App\Models\SalesReturn::with(['items.item'])
-            ->where('original_invoice', $sale->invoice)
-            ->get();
-
-        $sale->returns = $returns;
-
-        $pdf = Pdf::loadView('pdf.sale', compact('sale', 'firm'));
+        // Otherwise stream the Provisional Online Order Invoice
+        $pdf = Pdf::loadView('pdf.online-order', compact('order'));
         $pdf->setPaper('A4', 'portrait');
 
-        return $pdf->stream("Invoice-{$sale->invoice}.pdf");
+        return $pdf->stream("Order-Invoice-{$order->order_no}.pdf");
     }
 
     /**
@@ -424,6 +430,14 @@ class CustomerPortalController extends Controller
             ]);
         });
 
+        $this->notifyAdminsOfRevisionDecision(
+            $order,
+            $customerUser->name,
+            true,
+            $activeRevision->revision_number,
+            null
+        );
+
         return redirect()->back()->with('success', "You have accepted the revised order! Our team will now confirm and process your shipment.");
     }
 
@@ -477,6 +491,96 @@ class CustomerPortalController extends Controller
             ]);
         });
 
+        $this->notifyAdminsOfRevisionDecision(
+            $order,
+            $customerUser->name,
+            false,
+            $activeRevision->revision_number,
+            $request->reason
+        );
+
         return redirect()->back()->with('success', "You have declined the proposed revision. An admin will review your order again.");
+    }
+
+    /**
+     * Notify Admin role users when a customer accepts or rejects a proposed order revision.
+     */
+    protected function notifyAdminsOfRevisionDecision(
+        OnlineOrder $order,
+        string $customerName,
+        bool $accepted,
+        int $revisionNumber,
+        ?string $reason = null
+    ): void {
+        try {
+            $existingRoles = \Spatie\Permission\Models\Role::whereIn('name', ['Admin', 'Super Admin', 'admin', 'super-admin'])
+                ->pluck('name')
+                ->toArray();
+            $admins = !empty($existingRoles) ? \App\Models\User::role($existingRoles)->get()->unique('id')->values() : collect();
+            if ($admins->isEmpty()) {
+                $admins = \App\Models\User::all();
+            }
+
+            $notifTitle = $accepted
+                ? "Revision Accepted: Order #{$order->order_no}"
+                : "Revision Declined: Order #{$order->order_no}";
+            $notifMessage = $accepted
+                ? "{$customerName} accepted Revision #{$revisionNumber} (Rs. " . number_format((float)$order->final_total) . "). Ready for ERP confirmation."
+                : "{$customerName} declined Revision #{$revisionNumber}" . ($reason ? " — \"{$reason}\"" : ".");
+            $actionUrl = "/online-orders/{$order->id}";
+            $nowTimestamp = now();
+            $broadcastPayloads = [];
+
+            foreach ($admins as $admin) {
+                $notifId = (string) \Illuminate\Support\Str::orderedUuid();
+                \App\Models\Notification::create([
+                    'id' => $notifId,
+                    'type' => 'App\Notifications\OnlineOrderRevisionDecisionNotification',
+                    'notifiable_type' => \App\Models\User::class,
+                    'notifiable_id' => $admin->id,
+                    'priority' => 'high',
+                    'category' => 'online_orders',
+                    'data' => [
+                        'title' => $notifTitle,
+                        'message' => $notifMessage,
+                        'action_url' => $actionUrl,
+                        'online_order_id' => $order->id,
+                        'order_no' => $order->order_no,
+                        'customer_name' => $customerName,
+                        'final_total' => (float) $order->final_total,
+                    ],
+                    'created_at' => $nowTimestamp,
+                ]);
+
+                $broadcastPayloads[] = [
+                    'recipient_id' => $admin->id,
+                    'payload' => [
+                        'id' => $notifId,
+                        'title' => $notifTitle,
+                        'message' => $notifMessage,
+                        'actionUrl' => $actionUrl,
+                        'category' => 'online_orders',
+                        'priority' => 'high',
+                        'order_no' => $order->order_no,
+                        'final_total' => (float) $order->final_total,
+                        'customer_name' => $customerName,
+                        'read' => false,
+                        'createdAt' => 'Just now',
+                    ],
+                ];
+            }
+
+            if (config('queue.default') !== 'sync') {
+                foreach ($broadcastPayloads as $bp) {
+                    try {
+                        broadcast(new \App\Events\RealtimeNotificationEvent($bp['recipient_id'], $bp['payload']));
+                    } catch (\Throwable $e) {
+                        // Ignore if broadcast driver is offline
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to dispatch revision decision notification for order #{$order->order_no}: " . $e->getMessage());
+        }
     }
 }
