@@ -1,7 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useMemo, Suspense, lazy } from "react";
 import { DollarSign, Calendar, TrendingUp, RefreshCcw, ArrowUpRight, CheckCircle, Activity } from "lucide-react";
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, subDays, isSameDay } from 'date-fns';
+
+const SalesWeeklyChart = lazy(() => import('./components/SalesWeeklyChart'));
 
 interface Sale {
     id: number;
@@ -223,47 +224,9 @@ export default function SalesSummary({ summary, sales }: SummaryProps) {
                     </div>
 
                     <div className="flex-1 min-h-[130px] relative z-10">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={weeklyData}>
-                                <defs>
-                                    <linearGradient id="salesBar" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={1} />
-                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.1} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                                <XAxis
-                                    dataKey="date"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 7, fontWeight: 700, fill: 'var(--muted-foreground)' }}
-                                    dy={6}
-                                />
-                                <YAxis hide />
-                                <Tooltip
-                                    cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-                                    contentStyle={{
-                                        backgroundColor: 'var(--card)',
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid var(--border)',
-                                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                        fontSize: '9px'
-                                    }}
-                                    itemStyle={{ fontWeight: 900, fontSize: '10px', color: 'var(--foreground)' }}
-                                    labelStyle={{ fontWeight: 900, color: 'var(--primary)', marginBottom: '2px' }}
-                                    formatter={(value: any) => [formatCurrency(value as number), '']}
-                                />
-                                <Bar dataKey="sales" fill="url(#salesBar)" radius={[3, 3, 0, 0]} barSize={10} />
-                                <Line
-                                    type="monotone"
-                                    dataKey="collection"
-                                    stroke="var(--chart-1)"
-                                    strokeWidth={2}
-                                    dot={{ r: 2, fill: 'var(--chart-1)', strokeWidth: 1, stroke: 'var(--card)' }}
-                                    activeDot={{ r: 4, strokeWidth: 0 }}
-                                />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                        <Suspense fallback={<div className="h-full w-full min-h-[130px] animate-pulse bg-muted/30 rounded flex items-center justify-center text-[8px] text-muted-foreground font-mono">Loading matrix...</div>}>
+                            <SalesWeeklyChart weeklyData={weeklyData} formatCurrency={formatCurrency} />
+                        </Suspense>
                     </div>
                 </div>
 

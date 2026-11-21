@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { type BreadcrumbItem } from '@/types';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import * as Icons from 'lucide-react';
+import { resolveIcon } from '@/lib/icon-resolver';
 import { LucideIcon, Pencil, Trash2, Plus, Hash, Shield, LayoutGrid } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -169,7 +169,7 @@ export default function Index() {
                                         <AnimatePresence mode="popLayout">
                                             {permissions.length > 0 ? (
                                                 permissions.map((permission, index) => {
-                                                    const IconComponent = Icons[permission.icon as keyof typeof Icons] as LucideIcon;
+                                                    const IconComponent = resolveIcon(permission.icon, Shield);
                                                     return (
                                                         <motion.tr
                                                             key={permission.id}

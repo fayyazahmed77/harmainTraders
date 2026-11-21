@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { purchaseReports } from '../constants/purchaseReports';
 import { cn } from '@/lib/utils';
-import * as LucideIcons from 'lucide-react';
+import { resolveIcon } from '@/lib/icon-resolver';
 
 interface PurchaseReportSectionDialogProps {
     open: boolean;
@@ -33,7 +33,7 @@ export function PurchaseReportSectionDialog({
                 </DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-surface-0/50">
                     {purchaseReports.map((report) => {
-                        const Icon = (LucideIcons as any)[report.icon] || LucideIcons.FileText;
+                        const Icon = resolveIcon(report.icon);
                         const isActive = currentReportId === report.id;
 
                         return (

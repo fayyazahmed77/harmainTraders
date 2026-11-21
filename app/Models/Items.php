@@ -152,13 +152,11 @@ class Items extends Model
 
     public function getPrimaryImageUrlAttribute()
     {
-        $primary = null;
         if ($this->relationLoaded('images')) {
             $primary = $this->images->firstWhere('is_primary', true) ?? $this->images->first();
-        } else {
-            $primary = $this->images()->where('is_primary', true)->first() ?? $this->images()->first();
+            return $primary ? ($primary->url ?? asset($primary->image_path)) : null;
         }
 
-        return $primary ? ($primary->url ?? asset($primary->image_path)) : null;
+        return null;
     }
 }

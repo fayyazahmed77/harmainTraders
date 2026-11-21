@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { stockReports } from '../constants/stockReports';
 import { cn } from '@/lib/utils';
-import * as LucideIcons from 'lucide-react';
+import { resolveIcon } from '@/lib/icon-resolver';
 
 interface StockReportSectionDialogProps {
     open: boolean;
@@ -37,7 +37,7 @@ export function StockReportSectionDialog({
                 </DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-6 bg-surface-0/50 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {stockReports.map((report) => {
-                        const Icon = (LucideIcons as any)[report.icon] || LucideIcons.FileText;
+                        const Icon = resolveIcon(report.icon);
                         const isActive = currentReportId === report.id;
 
                         return (

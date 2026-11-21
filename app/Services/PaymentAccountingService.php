@@ -17,7 +17,10 @@ class PaymentAccountingService
      */
     public static function getRecognizedDiscount(Payment $payment): float
     {
-        $allocatedSettlement = (float)$payment->allocations()->sum('amount');
+        $allocatedSettlement = $payment->relationLoaded('allocations')
+            ? (float)$payment->allocations->sum('amount')
+            : (float)$payment->allocations()->sum('amount');
+
         if ($allocatedSettlement > 0) {
             $cashAllocated = min((float)$payment->amount, $allocatedSettlement);
             return max(0.0, $allocatedSettlement - $cashAllocated);
@@ -41,7 +44,9 @@ class PaymentAccountingService
      */
     public static function getUnallocatedCash(Payment $payment): float
     {
-        $allocatedSettlement = (float)$payment->allocations()->sum('amount');
+        $allocatedSettlement = $payment->relationLoaded('allocations')
+            ? (float)$payment->allocations->sum('amount')
+            : (float)$payment->allocations()->sum('amount');
         $cashAllocated = min((float)$payment->amount, $allocatedSettlement);
         return max(0.0, (float)$payment->amount - $cashAllocated);
     }

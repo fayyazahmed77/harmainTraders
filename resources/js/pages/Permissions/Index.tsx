@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { toast } from "sonner";
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import * as Icons from 'lucide-react';
+import { resolveIcon } from '@/lib/icon-resolver';
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from "@/components/ui/select";
 import { LucideIcon, Pencil, Trash2, Plus, Check, ChevronDown, ChevronRight, Search, Hash, Shield, User as UserIcon } from 'lucide-react';
@@ -209,7 +209,7 @@ export default function Index() {
                                 <AnimatePresence mode="popLayout">
                                     {Object.entries(filteredGroups).length > 0 ? (
                                         Object.entries(filteredGroups).map(([key, group], index) => {
-                                            const IconComponent = Icons[group.categoryIcon as keyof typeof Icons] as LucideIcon;
+                                            const IconComponent = resolveIcon(group.categoryIcon, Shield);
                                             return (
                                                 <motion.div
                                                     key={key}
@@ -341,7 +341,7 @@ export default function Index() {
                                             <SelectContent className="dark:bg-zinc-900 border-zinc-800">
                                                 <SelectGroup>
                                                     {categories.map((category) => {
-                                                        const IconComp = Icons[category.icon as keyof typeof Icons] as LucideIcon;
+                                                        const IconComp = resolveIcon(category.icon, Shield);
                                                         return (
                                                             <SelectItem key={category.id} value={category.id.toString()} className="font-bold text-xs uppercase cursor-pointer">
                                                                 <div className="flex items-center gap-2">
@@ -395,7 +395,7 @@ export default function Index() {
                                             <SelectContent className="dark:bg-zinc-900 border-zinc-800">
                                                 <SelectGroup>
                                                     {categories.map((category) => {
-                                                        const IconComp = Icons[category.icon as keyof typeof Icons] as LucideIcon;
+                                                        const IconComp = resolveIcon(category.icon, Shield);
                                                         return (
                                                             <SelectItem key={category.id} value={category.id.toString()} className="font-bold text-xs uppercase cursor-pointer">
                                                                 <div className="flex items-center gap-2">

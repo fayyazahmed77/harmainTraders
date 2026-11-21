@@ -34,7 +34,7 @@ class SalesReturnController extends Controller implements HasMiddleware
     //index
     public function index(Request $request)
     {
-        $query = SalesReturn::with(['customer', 'salesman']);
+        $query = SalesReturn::with(['customer:id,title,code', 'salesman:id,name']);
 
         // Search by Return Invoice, Original Invoice, Remarks, or Customer Title/Code
         if ($request->filled('search')) {

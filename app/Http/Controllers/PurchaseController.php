@@ -92,17 +92,17 @@ class PurchaseController extends Controller implements HasMiddleware
             }
         }
 
-        $purchases = $query->latest()->get();
-        $purchases->each(function ($p) {
-            if ($p->relationLoaded('supplier') && $p->supplier) {
-                $p->supplier->setHidden(['current_balance', 'guest_link', 'image_url']);
-            }
-        });
+        // Summary Calculations via SQL across full filtered dataset
+        $summaryQuery = clone $query;
+        $summaryQuery->getQuery()->columns = null;
+        $agg = $summaryQuery->selectRaw('
+            COUNT(*) as count,
+            COALESCE(SUM(net_total - COALESCE(extra_discount, 0)), 0) as total_purchase,
+            COALESCE(SUM(paid_amount), 0) as total_paid,
+            COALESCE(SUM(remaining_amount), 0) as total_unpaid
+        ')->first();
 
-        // Summary Calculations
-        // Note: Filters affect summary. 
-        // For Returns, we must also apply similar filters (date, supplier) to PurchaseReturn model to match context.
-
+        // For Returns, apply matching filters to PurchaseReturn model
         $returnQuery = \App\Models\PurchaseReturn::query();
         if (!empty($request->start_date) && !empty($request->end_date)) {
             $returnQuery->whereBetween('date', [
@@ -113,32 +113,45 @@ class PurchaseController extends Controller implements HasMiddleware
         if (!empty($request->supplier_id) && $request->supplier_id !== 'all') {
             $returnQuery->where('supplier_id', $request->supplier_id);
         }
-
-        $totalPurchase = $purchases->sum(fn($p) => $p->net_total - ($p->extra_discount ?? 0));
-        $totalPaid = $purchases->sum('paid_amount');
-        $totalUnpaid = $purchases->sum('remaining_amount'); // or net_total - paid_amount
-        $totalReturns = $returnQuery->sum('net_total');
+        $totalReturns = (float)$returnQuery->sum('net_total');
 
         $summary = [
-            'total_purchase' => $totalPurchase,
-            'total_paid' => $totalPaid,
-            'total_unpaid' => $totalUnpaid,
+            'total_purchase' => (float)($agg->total_purchase ?? 0),
+            'total_paid' => (float)($agg->total_paid ?? 0),
+            'total_unpaid' => (float)($agg->total_unpaid ?? 0),
             'total_returns' => $totalReturns,
-            'count' => $purchases->count(),
+            'count' => (int)($agg->count ?? 0),
         ];
+
+        // Optimized payload: When no filters or search are active, stream the latest 100 purchases.
+        // When any filter is selected (supplier, dates, status, search, amount), load all matching results.
+        $hasFilters = $request->filled('start_date') || $request->filled('end_date') || ($request->filled('supplier_id') && $request->supplier_id !== 'all') || ($request->filled('status') && $request->status !== 'all') || $request->filled('search') || $request->filled('amount');
+
+        $purchasesQuery = $query->latest();
+        if (!$hasFilters && !$request->boolean('all')) {
+            $purchases = $purchasesQuery->take(100)->get();
+        } else {
+            $purchases = $purchasesQuery->get();
+        }
+
+        $purchases->each(function ($p) {
+            if ($p->relationLoaded('supplier') && $p->supplier) {
+                $p->supplier->setHidden(['current_balance', 'guest_link', 'image_url']);
+            }
+        });
 
         // Suppliers for Filter
         $suppliers = Account::eligibleForPurchase()
             ->select('id', 'title', 'code')
             ->orderBy('title')
-            ->get()
-            ->each(fn($acc) => $acc->setHidden(['current_balance', 'guest_link', 'image_url']));
+            ->get();
 
         return Inertia::render("daily/purchase/index", [
             'purchases' => $purchases,
             'summary' => $summary,
-            'filters' => $request->all(['start_date', 'end_date', 'supplier_id', 'status', 'search', 'amount']),
+            'filters' => $request->all(['start_date', 'end_date', 'supplier_id', 'status', 'search', 'amount', 'all']),
             'suppliers' => $suppliers,
+            'isLimited' => !$hasFilters && !$request->boolean('all'),
         ]);
     }
     //create
@@ -180,6 +193,7 @@ class PurchaseController extends Controller implements HasMiddleware
                     $item->last_purchase_qty_pcs = (float) $lastP->qty_pcs;
                     $item->last_purchase_total = (float) $lastP->subtotal;
                 }
+                $item->unsetRelation('lastPurchaseItem');
 
                 $pStat = $purchaseStats->get($item->id);
                 $sStat = $saleStats->get($item->id);
@@ -225,6 +239,8 @@ class PurchaseController extends Controller implements HasMiddleware
             ->select('id', 'title', 'type', 'code')
             ->with('accountType:id,name')
             ->get();
+
+        \App\Services\PaymentAccountingService::attachBulkBalances($paymentAccounts);
 
         $customerCheques = Payment::where('type', 'RECEIPT')
             ->where('payment_method', 'Cheque')

@@ -77,11 +77,17 @@ class SalesController extends Controller implements HasMiddleware
             });
         }
 
-        $sales = $query->orderBy('date', 'desc')->orderBy('id', 'desc')->get();
+        // Summary Calculations via SQL across full filtered dataset
+        $summaryQuery = clone $query;
+        $summaryQuery->getQuery()->columns = null;
+        $aggregates = $summaryQuery->selectRaw('
+            COALESCE(SUM(net_total), 0) as total_sales,
+            COALESCE(SUM(CASE WHEN status = "Partial Return" THEN net_total ELSE 0 END), 0) as partial_return,
+            COALESCE(SUM(paid_amount), 0) as total_paid,
+            COALESCE(SUM(remaining_amount), 0) as total_unpaid
+        ')->first();
 
-        // Calculate Summary
-        // For returns, we need a separate query that matches the same filters (Date, Customer) if possible.
-        // Assuming SalesReturn has similar fields: date, customer_id.
+        // Calculate Returns matching filters
         $returnQuery = \App\Models\SalesReturn::query();
         if ($request->has('start_date') && $request->has('end_date') && $request->start_date && $request->end_date) {
             $returnQuery->whereBetween('date', [$request->start_date, $request->end_date]);
@@ -89,25 +95,36 @@ class SalesController extends Controller implements HasMiddleware
         if ($request->has('customer_id') && $request->customer_id) {
             $returnQuery->where('customer_id', $request->customer_id);
         }
-        $totalReturns = $returnQuery->sum('net_total');
-
+        $totalReturns = (float)$returnQuery->sum('net_total');
 
         $summary = [
-            'total_sales' => $sales->sum('net_total'),
+            'total_sales' => (float)($aggregates->total_sales ?? 0),
             'total_sales_return' => $totalReturns,
-            'partial_return' => $sales->where('status', 'Partial Return')->sum('net_total'),
-            'total_paid' => $sales->sum('paid_amount'),
-            'total_unpaid' => $sales->sum('remaining_amount'),
+            'partial_return' => (float)($aggregates->partial_return ?? 0),
+            'total_paid' => (float)($aggregates->total_paid ?? 0),
+            'total_unpaid' => (float)($aggregates->total_unpaid ?? 0),
         ];
 
-        // Get Customers for Filter
-        $customers = Account::eligibleForSale()->select('id', 'title')->get();
+        // Optimized payload: When no filters or search are active, stream the latest 100 invoices.
+        // When any filter is selected (date range, customer, status, search), load all matching results.
+        $hasFilters = $request->filled('start_date') || $request->filled('end_date') || ($request->filled('customer_id') && $request->customer_id !== 'all') || ($request->filled('status') && $request->status !== 'all') || $request->filled('search') || $request->filled('is_online');
+        
+        $salesQuery = $query->orderBy('date', 'desc')->orderBy('id', 'desc');
+        if (!$hasFilters && !$request->boolean('all')) {
+            $sales = $salesQuery->take(100)->get();
+        } else {
+            $sales = $salesQuery->get();
+        }
+
+        // Get Customers for Filter (lightweight projection)
+        $customers = Account::eligibleForSale()->select('id', 'title')->orderBy('title')->get();
 
         return Inertia::render("daily/sales/index", [
             'sales' => $sales,
             'summary' => $summary,
-            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'search', 'is_online']),
+            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'search', 'is_online', 'all']),
             'customers' => $customers,
+            'isLimited' => !$hasFilters && !$request->boolean('all'),
         ]);
     }
     //create
@@ -154,6 +171,7 @@ class SalesController extends Controller implements HasMiddleware
                     $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
                     $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
                 }
+                $item->unsetRelation('lastPurchaseItem');
 
                 $pStat = $purchaseStats->get($item->id);
                 $sStat = $saleStats->get($item->id);
@@ -185,6 +203,8 @@ class SalesController extends Controller implements HasMiddleware
             ->whereHas('accountType', function ($q) {
                 $q->whereIn('name', ['Cash', 'Bank', 'Cheque in hand']);
             })->get();
+
+        \App\Services\PaymentAccountingService::attachBulkBalances($paymentAccounts);
 
         $firms = Firm::select('id', 'name', 'defult')->get();
 
@@ -712,6 +732,7 @@ class SalesController extends Controller implements HasMiddleware
                     $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
                     $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
                 }
+                $item->unsetRelation('lastPurchaseItem');
 
                 $pStat = $purchaseStats->get($item->id);
                 $sStat = $saleStats->get($item->id);

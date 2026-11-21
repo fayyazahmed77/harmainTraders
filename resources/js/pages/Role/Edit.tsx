@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type BreadcrumbItem } from '@/types';
 import React, { useState } from 'react';
-import * as Icons from 'lucide-react';
-import { LucideIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, LucideIcon } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 
 interface PermissionAction {
@@ -90,7 +89,7 @@ export default function Edit() {
                                         href="/roles/permissions/list"
                                         className="group p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-primary hover:text-primary-foreground transition-all active:scale-90"
                                     >
-                                        <Icons.ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
+                                        <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
                                     </Link>
                                     <div className="space-y-1">
                                         <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Edit Role</h2>
@@ -201,7 +200,7 @@ export default function Edit() {
                                         disabled={processing}
                                         className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors active:scale-95 disabled:opacity-50 flex items-center gap-2"
                                     >
-                                        {processing && <Icons.Loader2 size={16} className="animate-spin" />}
+                                        {processing && <Loader2 size={16} className="animate-spin" />}
                                         Save Changes
                                     </Button>
                                 </div>

@@ -49,8 +49,11 @@ export default defineConfig({
                         if (id.includes('framer-motion')) {
                             return 'vendor-motion';
                         }
-                        if (id.includes('lucide-react') || id.includes('@tabler/icons-react')) {
+                        if (id.includes('lucide-react')) {
                             return 'vendor-icons';
+                        }
+                        if (id.includes('@tabler/icons-react')) {
+                            return 'vendor-tabler';
                         }
                     }
                 },

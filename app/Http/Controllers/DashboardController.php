@@ -38,14 +38,30 @@ class DashboardController extends Controller
 
         $now = Carbon::now();
         $today = Carbon::today();
+        $todayStr = $today->toDateString();
         $thisMonth = $now->month;
         $thisYear = $now->year;
-        $last7Days = $now->copy()->subDays(6);
+        $startOfYear = $now->copy()->startOfYear()->toDateString();
+        $endOfYear = $now->copy()->endOfYear()->toDateString();
+        $startOfMonth = $now->copy()->startOfMonth()->toDateString();
+        $last7Days = $now->copy()->subDays(6)->toDateString();
 
-        // Daily Summary Stats
-        $dailySales      = Sales::whereDate('date', $today)->count();
-        $dailyPurchases  = Purchase::whereDate('date', $today)->count();
-        $dailyExpenses   = Payment::whereDate('date', $today)->whereHas('account', function($q) {
+        // Daily Summary Stats (Indexed lookups + consolidated aggregations)
+        $todaySales = DB::table('sales')
+            ->where('date', $todayStr)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(net_total), 0) as revenue')
+            ->first();
+        $dailySales = (int)($todaySales->count ?? 0);
+        $dailySalesRevenue = (float)($todaySales->revenue ?? 0);
+
+        $todayPurchases = DB::table('purchases')
+            ->where('date', $todayStr)
+            ->selectRaw('COUNT(*) as count, COALESCE(SUM(net_total), 0) as cost')
+            ->first();
+        $dailyPurchases = (int)($todayPurchases->count ?? 0);
+        $dailyPurchaseCost = (float)($todayPurchases->cost ?? 0);
+
+        $dailyExpenses = Payment::whereDate('date', $today)->whereHas('account', function($q) {
             $q->where('type', 4); // Expense account type
         })->where(function($q) {
             $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
@@ -55,8 +71,6 @@ class DashboardController extends Controller
                 $q->whereNotIn('cheque_status', ['Canceled', 'Cancelled'])->orWhereNull('cheque_status');
             })->sum('amount');
         
-        $dailySalesRevenue = (float)Sales::whereDate('date', $today)->sum('net_total');
-        $dailyPurchaseCost = (float)Purchase::whereDate('date', $today)->sum('net_total');
         $dailyProfit = $dailySalesRevenue - $dailyPurchaseCost - (float)$dailyExpenses;
 
         $dailySummary = [
@@ -67,15 +81,33 @@ class DashboardController extends Controller
             'dailyProfit' => (float)$dailyProfit,
         ];
 
-        // 1. Stat Cards
-        $totalSalesYear = (float)Sales::whereYear('date', $thisYear)->sum('net_total');
-        $totalOrdersYear = Sales::whereYear('date', $thisYear)->count();
-        $cancelledOrdersYear = SalesReturn::whereYear('date', $thisYear)->count();
-        $totalCustomers = Account::where('sale', 1)->count();
+        // 1. Stat Cards (Consolidated indexed range aggregations)
+        $salesAgg = DB::table('sales')
+            ->whereBetween('date', [$startOfYear, $endOfYear])
+            ->selectRaw("
+                COUNT(*) as year_orders,
+                COALESCE(SUM(net_total), 0) as year_sales,
+                COUNT(CASE WHEN date >= ? THEN 1 END) as month_orders,
+                COALESCE(SUM(CASE WHEN date >= ? THEN net_total ELSE 0 END), 0) as month_sales
+            ", [$startOfMonth, $startOfMonth])
+            ->first();
 
-        $totalSalesMonth = (float)Sales::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->sum('net_total');
-        $totalOrdersMonth = Sales::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->count();
-        $cancelledOrdersMonth = SalesReturn::whereMonth('date', $thisMonth)->whereYear('date', $thisYear)->count();
+        $totalSalesYear = (float)($salesAgg->year_sales ?? 0);
+        $totalOrdersYear = (int)($salesAgg->year_orders ?? 0);
+        $totalSalesMonth = (float)($salesAgg->month_sales ?? 0);
+        $totalOrdersMonth = (int)($salesAgg->month_orders ?? 0);
+
+        $returnsAgg = DB::table('sales_returns')
+            ->whereBetween('date', [$startOfYear, $endOfYear])
+            ->selectRaw("
+                COUNT(*) as year_returns,
+                COUNT(CASE WHEN date >= ? THEN 1 END) as month_returns
+            ", [$startOfMonth])
+            ->first();
+
+        $cancelledOrdersYear = (int)($returnsAgg->year_returns ?? 0);
+        $cancelledOrdersMonth = (int)($returnsAgg->month_returns ?? 0);
+        $totalCustomers = Account::where('sale', 1)->count();
         $currentMonthName = $now->format('F');
 
         // Weekly Order Chart (Last 7 Days)

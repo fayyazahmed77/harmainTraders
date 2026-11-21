@@ -69,9 +69,10 @@ interface Props {
     summary: SummaryData;
     filters: FilterData;
     suppliers: Supplier[];
+    isLimited?: boolean;
 }
 
-export default function Index({ purchases, summary, filters, suppliers }: Props) {
+export default function Index({ purchases, summary, filters, suppliers, isLimited }: Props) {
     const { props } = usePage();
     const { flash } = props as any;
     const lastOpenedRef = React.useRef<string | null>(null);
@@ -114,6 +115,23 @@ export default function Index({ purchases, summary, filters, suppliers }: Props)
                     <PurchaseSummary summary={summary} purchases={purchases} />
 
                     <PurchaseFilters filters={filters} suppliers={suppliers} />
+
+                    {isLimited && (
+                        <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+                            <span className="flex items-center gap-2">
+                                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z" /></svg>
+                                Showing latest 100 bills for fast loading. Apply date range or filters to search all bills.
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-3 text-xs font-bold border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0"
+                                onClick={() => router.get("/purchase", { all: "true" }, { preserveState: true, preserveScroll: true })}
+                            >
+                                Load All
+                            </Button>
+                        </div>
+                    )}
 
                     <DataTable data={purchases} />
                 </div>

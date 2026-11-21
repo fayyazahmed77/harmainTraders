@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type BreadcrumbItem } from '@/types';
 import React, { useState } from 'react';
-import * as Icons from 'lucide-react';
-import { LucideIcon } from 'lucide-react';
+import { Loader2, LucideIcon } from 'lucide-react';
 
 interface Permission {
     id: number;
@@ -184,7 +183,7 @@ export default function Roles() {
                                         disabled={processing}
                                         className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors active:scale-95 disabled:opacity-50 flex items-center gap-2"
                                     >
-                                        {processing && <Icons.Loader2 size={16} className="animate-spin" />}
+                                        {processing && <Loader2 size={16} className="animate-spin" />}
                                         Save
                                     </Button>
                                 </div>

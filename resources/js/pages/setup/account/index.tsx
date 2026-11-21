@@ -7,7 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Plus, FileSpreadsheet, Download } from "lucide-react";
 import { DataTable } from "@/components/setup/account/DataTable";
-import { usePage, Link } from "@inertiajs/react";
+import { usePage, Link, router } from "@inertiajs/react";
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: "Account", href: "#" },
@@ -59,13 +59,14 @@ interface Props {
   filters: FilterData;
   cities: City[];
   accountTypes: AccountType[];
+  isLimited?: boolean;
 }
 
 import AccountSummary from "./AccountSummary";
 import AccountFilters from "./AccountFilters";
 import { BreadcrumbItem } from "@/types";
 
-export default function AccountsPage({ accounts, summary, filters, cities, accountTypes }: Props) {
+export default function AccountsPage({ accounts, summary, filters, cities, accountTypes, isLimited }: Props) {
   function route(_name: string): string {
     if (_name === "account.create") return "/account/create";
     if (_name === "account.bulk-upload") return "/account/bulk-upload";
@@ -119,6 +120,23 @@ export default function AccountsPage({ accounts, summary, filters, cities, accou
           <AccountSummary summary={summary} />
 
           <AccountFilters filters={filters} cities={cities} accountTypes={accountTypes} />
+
+          {isLimited && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+              <span className="flex items-center gap-2">
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 110 20A10 10 0 0112 2z" /></svg>
+                Showing latest 100 accounts for fast loading. Apply search or category filter to search all accounts.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-3 text-xs font-bold border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0"
+                onClick={() => router.get("/account", { all: "true" }, { preserveState: true, preserveScroll: true })}
+              >
+                Load All
+              </Button>
+            </div>
+          )}
 
           {accounts && accounts.length > 0 ? (
             <DataTable data={accounts} />

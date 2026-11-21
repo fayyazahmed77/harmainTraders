@@ -54,7 +54,7 @@ class Account extends Model
         'guest_token',
     ];
 
-    protected $appends = ['current_balance', 'guest_link', 'image_url'];
+    protected $appends = ['guest_link', 'image_url'];
 
     protected $casts = [
         'purchase'             => 'boolean',
@@ -237,6 +237,12 @@ class Account extends Model
 
         if (isset($this->memoizedCurrentBalance)) {
             return $this->memoizedCurrentBalance;
+        }
+
+        // If a lightweight partial projection was selected (e.g. id, title for display/relation)
+        // and core ledger attributes were omitted, do not trigger multi-query ledger calculations.
+        if (!array_key_exists('type', $this->attributes) && !array_key_exists('opening_balance', $this->attributes)) {
+            return 0.0;
         }
 
         $type = strtolower($this->accountType->name ?? '');

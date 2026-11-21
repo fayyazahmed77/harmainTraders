@@ -27,6 +27,12 @@ class ItemsController extends Controller implements HasMiddleware
     }
     public function index(Request $request)
     {
+        $hasFilters = ($request->has('category_id') && $request->category_id && $request->category_id !== 'all') ||
+            ($request->has('company_id') && $request->company_id && $request->company_id !== 'all') ||
+            ($request->has('status') && $request->status && $request->status !== 'all') ||
+            ($request->has('stock_status') && $request->stock_status && $request->stock_status !== 'all') ||
+            ($request->has('search') && $request->search);
+
         $query = Items::with([
             'category:id,name',
             'companyAccount:id,title',
@@ -52,8 +58,6 @@ class ItemsController extends Controller implements HasMiddleware
             }
         }
 
-
-
         // Filter by Search (Code, Title, Company Category)
         if ($request->has('search') && $request->search) {
             $search = $request->search;
@@ -75,7 +79,7 @@ class ItemsController extends Controller implements HasMiddleware
             $query->orderBy('title', 'asc');
         }
 
-        $items = $query->get([
+        $colsToSelect = [
             'id',
             'code',
             'title',
@@ -91,9 +95,15 @@ class ItemsController extends Controller implements HasMiddleware
             'is_import',
             'is_active',
             'created_at',
-        ]);
+        ];
 
-        // Attach real-time ledger balance and carton breakdown
+        if (!$hasFilters && !$request->boolean('all')) {
+            $items = (clone $query)->take(100)->get($colsToSelect);
+        } else {
+            $items = (clone $query)->get($colsToSelect);
+        }
+
+        // Attach real-time ledger balance and carton breakdown to displayed items
         \App\Services\StockService::attachRealtimeBalances($items);
 
         // Filter by Stock Status (evaluated dynamically from real-time available stock)
@@ -113,14 +123,23 @@ class ItemsController extends Controller implements HasMiddleware
             })->values();
         }
 
-        // Calculate Summary based on real-time available stock
-        $totalItems = $items->count();
-        $activeItems = $items->where('is_active', true)->count();
+        // Calculate Summary across all items (or filtered items when filters active)
+        if ($hasFilters || $request->boolean('all')) {
+            $summaryItems = $items;
+        } else {
+            $summaryItems = Items::select([
+                'id', 'trade_price', 'reorder_level', 'packing_qty', 'is_active', 'stock_1', 'stock_2'
+            ])->get();
+            \App\Services\StockService::attachRealtimeBalances($summaryItems);
+        }
+
+        $totalItems = $summaryItems->count();
+        $activeItems = $summaryItems->where('is_active', true)->count();
         $outOfStock = 0;
         $lowStock = 0;
         $stockValue = 0.0;
 
-        foreach ($items as $item) {
+        foreach ($summaryItems as $item) {
             $avail = (float)($item->available_stock ?? 0);
             $reorder = (float)($item->reorder_level ?? 0);
             $packing = max(1, (int)($item->packing_qty ?: 1));
@@ -145,7 +164,7 @@ class ItemsController extends Controller implements HasMiddleware
             'low_stock' => $lowStock,
         ];
 
-        $categories = ItemCategory::all();
+        $categories = ItemCategory::select('id', 'name')->get();
         $companies = Account::whereHas('accountType', function ($q) {
             $q->whereIn('name', ['Company']);
         })->orderBy('title')->get(['id', 'title']);
@@ -154,8 +173,9 @@ class ItemsController extends Controller implements HasMiddleware
             'items' => $items,
             'categories' => $categories,
             'companies' => $companies,
-            'filters' => $request->all(['category_id', 'company_id', 'status', 'stock_status', 'search']),
+            'filters' => $request->all(['category_id', 'company_id', 'status', 'stock_status', 'search', 'all']),
             'summary' => $summary,
+            'isLimited' => !$hasFilters && !$request->boolean('all'),
         ]);
     }
     public function create()

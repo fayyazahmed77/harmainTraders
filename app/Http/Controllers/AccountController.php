@@ -39,7 +39,17 @@ class AccountController extends Controller implements HasMiddleware
     }
     public function index(Request $request)
     {
-        $query = Account::with(['accountType', 'city', 'area', 'saleman', 'creator']);
+        $hasFilters = $request->filled('search') ||
+            ($request->filled('type') && $request->type !== 'all') ||
+            ($request->filled('city_id') && $request->city_id !== 'all') ||
+            ($request->filled('status') && $request->status !== 'all');
+
+        $query = Account::with([
+            'accountType:id,name',
+            'city:id,name',
+            'area:id,name',
+            'saleman:id,name',
+        ]);
 
         // Filter by Search (Code, Title)
         if ($request->has('search') && $request->search) {
@@ -68,18 +78,40 @@ class AccountController extends Controller implements HasMiddleware
             }
         }
 
-        $accounts = $query->latest()->get();
+        $colsToSelect = [
+            'id', 'code', 'title', 'type', 'purchase', 'sale', 'cashbank',
+            'opening_balance', 'opening_balance_type', 'credit_limit', 'status',
+            'created_at', 'city_id', 'area_id', 'saleman_id', 'image', 'guest_token'
+        ];
 
-        // Bulk calculate & attach live current_balance to all accounts in single-pass
+        $accountsQuery = (clone $query)->select($colsToSelect)->latest();
+
+        if (!$hasFilters && !$request->boolean('all')) {
+            $accounts = $accountsQuery->take(100)->get();
+        } else {
+            $accounts = $accountsQuery->get();
+        }
+
+        // Bulk calculate & attach live current_balance to the displayed accounts
         \App\Services\PaymentAccountingService::attachBulkBalances($accounts);
 
-        // Calculate Summary
+        // Calculate Summary across all accounts (or filtered accounts when filters active)
+        if ($hasFilters || $request->boolean('all')) {
+            $summaryAccounts = $accounts;
+        } else {
+            $summaryAccounts = Account::with('accountType:id,name')
+                ->whereHas('accountType', fn($q) => $q->whereIn('name', ['Customers', 'Supplier']))
+                ->select(['id', 'type', 'purchase', 'sale', 'opening_balance', 'opening_balance_type'])
+                ->get();
+            \App\Services\PaymentAccountingService::attachBulkBalances($summaryAccounts);
+        }
+
         // Filter collection by relationship name since 'type' column holds ID
-        $customers = $accounts->filter(function ($account) {
+        $customers = $summaryAccounts->filter(function ($account) {
             return $account->accountType && $account->accountType->name === 'Customers';
         });
 
-        $suppliers = $accounts->filter(function ($account) {
+        $suppliers = $summaryAccounts->filter(function ($account) {
             return $account->accountType && $account->accountType->name === 'Supplier';
         });
 
@@ -96,7 +128,7 @@ class AccountController extends Controller implements HasMiddleware
         }
 
         $summary = [
-            'total_accounts' => $accounts->count(),
+            'total_accounts' => $summaryAccounts->count(),
             'customers_count' => $customers->count(),
             'suppliers_count' => $suppliers->count(),
             'total_receivables' => $receivables,
@@ -105,31 +137,15 @@ class AccountController extends Controller implements HasMiddleware
 
         // Datasets for Filters
         $cities = City::select('id', 'name')->get();
-        // Assuming 'type' is a string field in Account based on store validation "type => required|string".
-        // If it refers to AccountType model, we'd fetch that. validation says string in store, but index previously mapped usage of accountType relation.
-        // Let's check store() again: 'type' => 'required|string'.
-        // But index() used $account->accountType?->name. 
-        // It seems 'type' column might store the string name or there is an inconsistency.
-        // Looking at 'store': 'type' => 'required|string'.
-        // Looking at 'index' map: 'type' => ucfirst($account->accountType?->name ?? 'Unknown').
-        // This suggests the DB might have `type` column storing 'Customer'/'Supplier' OR it relies on `account_type_id`.
-        // Let's look at `create()` method... $accountTypes = AccountType::all();
-        // The store validation has 'type', but not 'account_type_id'.
-        // Wait, `Account` model likely has `type` (string) as per validation.
-        // But `index` map was using relationship. Maybe `type` input fills `account_type_id`?
-        // Let's blindly trust the `type` column for now as a string filter, or `account_type_id` if available.
-        // Actually, previous index map: 'type' => ucfirst($account->accountType?->name ?? 'Unknown')
-        // This implies the model has `accountType` relationship.
-        // Let's pass AccountTypes for filter.
-        $accountTypes = AccountType::all();
-
+        $accountTypes = AccountType::select('id', 'name')->get();
 
         return Inertia::render("setup/account/index", [
             'accounts' => $accounts,
             'cities' => $cities,
             'accountTypes' => $accountTypes,
             'summary' => $summary,
-            'filters' => $request->all(['search', 'type', 'city_id', 'status']),
+            'filters' => $request->all(['search', 'type', 'city_id', 'status', 'all']),
+            'isLimited' => !$hasFilters && !$request->boolean('all'),
         ]);
     }
     public function create()

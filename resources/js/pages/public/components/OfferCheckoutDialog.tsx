@@ -142,15 +142,22 @@ export const OfferCheckoutDialog: React.FC<OfferCheckoutDialogProps> = ({
 
     useEffect(() => {
         if (open) {
-            const hasPreloadedCustomer = Boolean(customerUser || initialCustomer);
-            if (!customerUser && initialCustomer) {
-                setCustomerUser({ can_place_order: true, ...initialCustomer });
-            }
-            checkCustomerAuth(hasPreloadedCustomer);
             setOrderError(null);
             setLoginError(null);
             setRegError(null);
             setIdempotencyKey('idemp_' + Math.random().toString(36).substring(2) + Date.now());
+
+            // If customer is already preloaded from server props, skip the network round-trip.
+            // Only hit /customer/me when no customer is known yet (unauthenticated session).
+            if (customerUser || initialCustomer) {
+                if (!customerUser && initialCustomer) {
+                    setCustomerUser({ can_place_order: true, ...initialCustomer });
+                }
+                // Silent background refresh to keep session in sync (non-blocking)
+                checkCustomerAuth(true);
+            } else {
+                checkCustomerAuth(false);
+            }
         }
     }, [open]);
 

@@ -36,13 +36,16 @@
     <link rel="icon" href="/storage/img/favicon.png" type="image/png">
     <link rel="apple-touch-icon" href="/storage/img/favicon.png">
 
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 
     {{-- Dynamic broadcast config --}}
     @php
         try {
-            $settings = \App\Models\SiteSetting::first();
+            $settings = \Illuminate\Support\Facades\Cache::remember('site_setting_singleton', 3600, function () {
+                return \App\Models\SiteSetting::first();
+            });
             $broadcastConfig = [
                 'driver' => $settings->broadcast_driver ?? 'reverb',
                 'pusher' => [
@@ -73,7 +76,15 @@
     </script>
 
     @routes
-    @viteReactRefresh
+    @php
+        $useProdBuild = env('FORCE_VITE_BUILD', false) || request()->has('prod');
+        if ($useProdBuild) {
+            app(\Illuminate\Foundation\Vite::class)->useHotFile(storage_path('non-existent-hot-file'));
+        }
+    @endphp
+    @unless($useProdBuild)
+        @viteReactRefresh
+    @endunless
     @vite(['resources/js/app.tsx'])
     @inertiaHead
 </head>
