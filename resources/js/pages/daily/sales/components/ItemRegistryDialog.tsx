@@ -66,6 +66,7 @@ interface ItemRegistryDialogProps {
     items: Item[];
     customerCategory: string | null;
     currentRows: any[];
+    originalUsageByItem?: Record<number, number>;
     onAddUpdate: (
         item: Item,
         data: { full: number; pcs: number; bonus_full: number; bonus_pcs: number; rate: number; discPercent: number },
@@ -93,6 +94,7 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
     items,
     customerCategory,
     currentRows,
+    originalUsageByItem,
     onAddUpdate,
 }) => {
     const [itemSearch, setItemSearch] = useState("");
@@ -597,6 +599,15 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                     const matchingLines = getMatchingLinesForItem(item);
                                     const isSelected = matchingLines.length > 0;
                                     const isFocused = idx === selectedIndex;
+                                    const totalAddedUsage = matchingLines.reduce(
+                                        (acc, m) => acc + ((m.full + m.bonus_full) * packing) + m.pcs + m.bonus_pcs,
+                                        0
+                                    );
+                                    const hasNegEnteredQty = matchingLines.some(
+                                        (m) => m.full < 0 || m.pcs < 0 || m.bonus_full < 0 || m.bonus_pcs < 0
+                                    );
+                                    const effectiveStock = stock + (originalUsageByItem?.[Number(item.id)] ?? 0);
+                                    const isSelectedRedAlert = isSelected && (effectiveStock < 0 || totalAddedUsage > effectiveStock || hasNegEnteredQty);
 
                                     let tpVal = toNumber(item.trade_price);
                                     if (customerCategory && customerCategory !== "1") {
@@ -611,30 +622,40 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                 onClick={() => handleItemClick(item)}
                                                 onMouseEnter={() => setSelectedIndex(idx)}
                                                 className={`w-full text-left transition-all px-4 py-2.5 group border-l-4 ${
-                                                    isSelected
-                                                        ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
-                                                        : isFocused
-                                                            ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
-                                                            : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
+                                                    isSelectedRedAlert
+                                                        ? "bg-rose-50/90 dark:bg-rose-950/40 border-rose-500 dark:border-rose-500"
+                                                        : isSelected
+                                                            ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-500"
+                                                            : isFocused
+                                                                ? "bg-orange-100/80 dark:bg-orange-950/40 border-orange-400 ring-1 ring-orange-400/50"
+                                                                : "bg-transparent hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 border-transparent hover:border-orange-300"
                                                 }`}
                                             >
                                                 <div className="hidden md:grid grid-cols-12 items-center py-0.5">
                                                     <div className="col-span-1 pl-1">
-                                                        <span className={`font-mono font-black text-xs ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
+                                                        <span className={`font-mono font-black text-xs ${isSelectedRedAlert ? 'text-rose-700 dark:text-rose-400' : isSelected ? 'text-emerald-700 dark:text-emerald-400' : isFocused ? 'text-orange-600' : 'text-zinc-700'}`}>
                                                             #{String(item.id).padStart(4, '0')}
                                                         </span>
                                                     </div>
                                                     <div className="col-span-4 flex items-center gap-2 pr-2">
                                                         <div className="flex flex-col min-w-0">
                                                             <span className={`font-black uppercase tracking-tight truncate text-xs ${
-                                                                isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
+                                                                isSelectedRedAlert ? 'text-rose-700 dark:text-rose-400' : isSelected ? 'text-emerald-800 dark:text-emerald-300' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'
                                                             }`}>
                                                                 {item.title}
                                                             </span>
                                                         </div>
                                                         {isSelected && (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[8px] font-black uppercase tracking-wider shrink-0">
-                                                                <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                                                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 border ${
+                                                                isSelectedRedAlert
+                                                                    ? "bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700"
+                                                                    : "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                                                            }`}>
+                                                                {isSelectedRedAlert ? (
+                                                                    <AlertTriangle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400 stroke-[3]" />
+                                                                ) : (
+                                                                    <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
+                                                                )}
                                                                 {matchingLines.length > 1 ? `Added (${matchingLines.length})` : "Added"}
                                                             </span>
                                                         )}
@@ -676,10 +697,10 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                 <div className="md:hidden flex justify-between items-center">
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`font-black uppercase tracking-tight text-sm ${isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
+                                                            <span className={`font-black uppercase tracking-tight text-sm ${isSelectedRedAlert ? 'text-rose-700 dark:text-rose-400' : isSelected ? 'text-emerald-700' : isFocused ? 'text-orange-600' : 'text-zinc-800 dark:text-zinc-100'}`}>{item.title}</span>
                                                             {isSelected && (
-                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">
-                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" /> {matchingLines.length > 1 ? `Added (${matchingLines.length})` : "Added"}
+                                                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${isSelectedRedAlert ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                                    {isSelectedRedAlert ? <AlertTriangle className="w-2.5 h-2.5 stroke-[3]" /> : <Check className="w-2.5 h-2.5 stroke-[3]" />} {matchingLines.length > 1 ? `Added (${matchingLines.length})` : "Added"}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -690,8 +711,8 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                             <span>Stock: <span className={stock > 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : stock < 0 ? "font-bold text-rose-600 dark:text-rose-400" : "font-bold text-zinc-500"}>{packing > 1 ? `${full}F / ${pcs}P` : `${stock} Units`} {stock < 0 ? '(Deficit)' : ''}</span></span>
                                                         </div>
                                                     </div>
-                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
-                                                        {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${isSelectedRedAlert ? 'bg-rose-600 border-rose-600 text-white' : isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-200 text-zinc-300'}`}>
+                                                        {isSelectedRedAlert ? <AlertTriangle size={13} /> : isSelected ? <Check size={14} /> : <Plus size={14} />}
                                                     </div>
                                                 </div>
                                             </button>
@@ -722,16 +743,28 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
 
                             {/* Bottom Sync Configuration Tray (Scoped strictly to the Left Column) */}
                             <AnimatePresence>
-                                {selectedItemForQty && (
+                                {selectedItemForQty && (() => {
+                                    const dialogPurchasePrice =
+                                        toNumber(selectedItemForQty.last_purchase_rate) > 0
+                                            ? toNumber(selectedItemForQty.last_purchase_rate)
+                                            : toNumber(selectedItemForQty.trade_price);
+                                    const effectiveDialogRate = toNumber(dialogRate) * (1 - toNumber(dialogDiscount) / 100);
+                                    const isDialogLoss = dialogPurchasePrice > 0 && effectiveDialogRate <= dialogPurchasePrice + 0.0001;
+                                    const isDialogNegQty =
+                                        dialogFull < 0 || dialogPcs < 0 || dialogBonusFull < 0 || dialogBonusPcs < 0;
+
+                                    return (
                                     <motion.div
                                         initial={{ y: "100%", opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
                                         exit={{ y: "100%", opacity: 0 }}
-                                        className="absolute inset-x-0 bottom-0 p-3 sm:py-3.5 sm:px-6 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 border-orange-500 shadow-[0_-20px_50px_rgba(0,0,0,0.25)] flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4 z-[100]"
+                                        className={`absolute inset-x-0 bottom-0 p-3 sm:py-3.5 sm:px-6 bg-white/98 dark:bg-zinc-950/98 backdrop-blur-xl border-t-2 ${
+                                            isDialogLoss || isDialogNegQty ? 'border-rose-500' : 'border-orange-500'
+                                        } shadow-[0_-20px_50px_rgba(0,0,0,0.25)] flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4 z-[100]`}
                                     >
                                         <div className="flex items-center justify-between w-full md:w-auto min-w-0 md:max-w-[280px]">
                                             <div className="flex flex-col min-w-0">
-                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                                                     {editorMode === 'edit' ? (
                                                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-800 text-[9px] font-black uppercase tracking-wider shrink-0">
                                                             <Pencil size={9} />
@@ -747,12 +780,22 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                             New Line
                                                         </span>
                                                     )}
+                                                    {isDialogLoss && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-[9px] font-black uppercase tracking-wider shrink-0">
+                                                            <AlertTriangle size={9} />
+                                                            At Loss (Cost Rs {dialogPurchasePrice.toFixed(2)})
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <h3 className="text-sm sm:text-lg font-black text-zinc-900 dark:text-white truncate leading-tight uppercase tracking-tight italic">
+                                                <h3 className={`text-sm sm:text-lg font-black truncate leading-tight uppercase tracking-tight italic ${
+                                                    isDialogNegQty || toNumber(selectedItemForQty.total_stock_pcs) < 0
+                                                        ? 'text-rose-600 dark:text-rose-400'
+                                                        : 'text-zinc-900 dark:text-white'
+                                                }`}>
                                                     {selectedItemForQty.title}
                                                 </h3>
                                                 <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono sm:hidden truncate">
-                                                    TP: Rs {toNumber(selectedItemForQty.trade_price).toFixed(2)} | Rate: Rs {dialogRate}
+                                                    Cost: Rs {dialogPurchasePrice.toFixed(2)} | Rate: Rs {dialogRate}
                                                 </div>
                                             </div>
                                             <button
@@ -780,7 +823,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         value={dialogFull || ""}
                                                         onChange={e => setDialogFull(toNumber(e.target.value))}
                                                         onKeyDown={handleFullKeyDown}
-                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
+                                                        className={`w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg focus:ring-2 transition-all font-mono px-1 ${
+                                                            dialogFull < 0
+                                                                ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-600 focus:ring-rose-500'
+                                                                : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500'
+                                                        }`}
                                                     />
                                                 </div>
 
@@ -793,7 +840,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                             value={dialogPcs || ""}
                                                             onChange={e => setDialogPcs(toNumber(e.target.value))}
                                                             onKeyDown={handlePcsKeyDown}
-                                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500 focus:ring-2 transition-all font-mono px-1"
+                                                            className={`w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg focus:ring-2 transition-all font-mono px-1 ${
+                                                                dialogPcs < 0
+                                                                    ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-600 focus:ring-rose-500'
+                                                                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 focus:ring-orange-500'
+                                                            }`}
                                                         />
                                                     </div>
                                                 )}
@@ -806,7 +857,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         value={dialogBonusFull || ""}
                                                         onChange={e => setDialogBonusFull(toNumber(e.target.value))}
                                                         onKeyDown={handleBFullKeyDown}
-                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
+                                                        className={`w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg transition-all font-mono px-1 ${
+                                                            dialogBonusFull < 0
+                                                                ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-600 focus:ring-rose-500'
+                                                                : 'border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500'
+                                                        }`}
                                                     />
                                                 </div>
 
@@ -819,13 +874,21 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                             value={dialogBonusPcs || ""}
                                                             onChange={e => setDialogBonusPcs(toNumber(e.target.value))}
                                                             onKeyDown={handleBPcsKeyDown}
-                                                            className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500 transition-all font-mono px-1"
+                                                            className={`w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg transition-all font-mono px-1 ${
+                                                                dialogBonusPcs < 0
+                                                                    ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-600 focus:ring-rose-500'
+                                                                    : 'border-zinc-200 dark:border-zinc-800 bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 focus:ring-amber-500'
+                                                            }`}
                                                         />
                                                     </div>
                                                 )}
 
                                                 <div className="flex flex-col gap-1 items-center flex-1 min-w-[58px] sm:flex-initial">
-                                                    <span className="text-[8px] font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-wider truncate w-full text-center">Rate (Rs)</span>
+                                                    <span className={`text-[8px] font-black uppercase tracking-wider truncate w-full text-center ${
+                                                        isDialogLoss ? 'text-rose-600 dark:text-rose-400' : 'text-zinc-700 dark:text-zinc-300'
+                                                    }`}>
+                                                        {isDialogLoss ? 'Rate (Loss!)' : 'Rate (Rs)'}
+                                                    </span>
                                                     <Input
                                                         ref={rateInputRef}
                                                         type="number"
@@ -833,7 +896,11 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                                         value={dialogRate || ""}
                                                         onChange={e => setDialogRate(toNumber(e.target.value))}
                                                         onKeyDown={handleRateKeyDown}
-                                                        className="w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500 transition-all font-mono px-1"
+                                                        className={`w-full sm:w-24 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-lg transition-all font-mono px-1 ${
+                                                            isDialogLoss
+                                                                ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 focus:ring-rose-500'
+                                                                : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-orange-600 focus:ring-orange-500'
+                                                        }`}
                                                     />
                                                 </div>
 
@@ -871,7 +938,8 @@ export const ItemRegistryDialog: React.FC<ItemRegistryDialogProps> = ({
                                             </Button>
                                         </div>
                                     </motion.div>
-                                )}
+                                    );
+                                })()}
                             </AnimatePresence>
                         </div>
 

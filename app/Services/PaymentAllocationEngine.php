@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\OpeningBalanceAllocation;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Sales;
@@ -384,25 +385,27 @@ class PaymentAllocationEngine
                 $allocations = PaymentAllocation::where('payment_id', $payment->id)->get();
 
                 foreach ($allocations as $allocation) {
-                    if ($allocation->bill_type === Sales::class) {
-                        $sale = Sales::lockForUpdate()->find($allocation->bill_id);
+                    $billType = $allocation->bill_type;
+                    $billId = $allocation->bill_id;
+
+                    // Delete the allocation row first so DB recalculations reflect the post-reversal state
+                    $allocation->delete();
+
+                    if ($billType === Sales::class) {
+                        $sale = Sales::lockForUpdate()->find($billId);
                         if ($sale) {
-                            $sale->paid_amount = max(0.0, round((float)$sale->paid_amount - (float)$allocation->amount, 2));
-                            $netPayable = max(0.0, (float)$sale->net_total - (float)($sale->extra_discount ?? 0));
-                            $returns = $this->getTotalReturns($sale, Sales::class);
-                            $sale->remaining_amount = max(0.0, round($netPayable - $sale->paid_amount - $returns, 2));
+                            AdvanceAllocationService::recalculateSaleSettlement($sale);
                             $sale->status = ($sale->remaining_amount <= 0.005) ? 'Paid' : (($sale->paid_amount > 0) ? 'Partial' : 'Unpaid');
                             $sale->save();
                         }
-                    } elseif ($allocation->bill_type === Purchase::class) {
-                        $purchase = Purchase::lockForUpdate()->find($allocation->bill_id);
+                    } elseif ($billType === Purchase::class) {
+                        $purchase = Purchase::lockForUpdate()->find($billId);
                         if ($purchase) {
-                            $purchase->paid_amount = max(0.0, round((float)$purchase->paid_amount - (float)$allocation->amount, 2));
+                            AdvanceAllocationService::recalculatePurchaseSettlement($purchase);
                             $netPayable = max(0.0, (float)$purchase->net_total - (float)($purchase->extra_discount ?? 0));
                             $returns = $this->getTotalReturns($purchase, Purchase::class);
-                            $purchase->remaining_amount = max(0.0, round($netPayable - $purchase->paid_amount - $returns, 2));
 
-                            if ($returns >= $netPayable) {
+                            if ($returns >= $netPayable && $netPayable > 0) {
                                 $purchase->status = 'Returned';
                             } elseif ($returns > 0) {
                                 $purchase->status = 'Partial Return';
@@ -413,7 +416,6 @@ class PaymentAllocationEngine
                         }
                     }
                     // For Account::class, deleting the allocation row automatically restores the opening balance.
-                    $allocation->delete();
                 }
             }
         });

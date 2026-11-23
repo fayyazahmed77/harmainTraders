@@ -426,7 +426,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
             @endif
         </div>
         <div class="header-contact" style="width: 40%;">
-            <div class="contact-item">Sales Teams : {{ $firm->phone }}</div>
+            <div class="contact-item">Sales Team : {{ $firm->phone }}</div>
             <div class="contact-item">Complain No : {{ $firm->fax }}</div>
         </div>
     </div>

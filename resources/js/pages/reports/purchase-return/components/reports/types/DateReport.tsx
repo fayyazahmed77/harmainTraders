@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell, TableFooter } from '@/components/ui/table';
-import { formatSafeDate } from '@/lib/utils';
+import { formatSafeDate } from '@/lib/format-utils';
 
 export const DateReport = ({ data, formatCurrency }: { data: any[], formatCurrency: (v: number) => string }) => {
     const totals = data.reduce((acc, row) => ({

@@ -15,6 +15,7 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\SalesReturnAllocation;
 use App\Models\CustomerCredit;
+use App\Services\AdvanceAllocationService;
 use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -77,6 +78,21 @@ class SalesController extends Controller implements HasMiddleware
             });
         }
 
+        // Filter by Amount (Net Total: exact numeric or partial match)
+        if ($request->filled('amount')) {
+            $rawAmount = preg_replace('/[^0-9.\-]/', '', (string) $request->amount);
+            if ($rawAmount !== '') {
+                $query->where(function ($q) use ($rawAmount) {
+                    if (is_numeric($rawAmount)) {
+                        $q->where('net_total', '=', (float) $rawAmount)
+                            ->orWhereRaw('CAST(net_total AS CHAR) LIKE ?', ['%' . $rawAmount . '%']);
+                    } else {
+                        $q->whereRaw('CAST(net_total AS CHAR) LIKE ?', ['%' . $rawAmount . '%']);
+                    }
+                });
+            }
+        }
+
         // Summary Calculations via SQL across full filtered dataset
         $summaryQuery = clone $query;
         $summaryQuery->getQuery()->columns = null;
@@ -106,8 +122,8 @@ class SalesController extends Controller implements HasMiddleware
         ];
 
         // Optimized payload: When no filters or search are active, stream the latest 100 invoices.
-        // When any filter is selected (date range, customer, status, search), load all matching results.
-        $hasFilters = $request->filled('start_date') || $request->filled('end_date') || ($request->filled('customer_id') && $request->customer_id !== 'all') || ($request->filled('status') && $request->status !== 'all') || $request->filled('search') || $request->filled('is_online');
+        // When any filter is selected (date range, customer, status, amount, search), load all matching results.
+        $hasFilters = $request->filled('start_date') || $request->filled('end_date') || ($request->filled('customer_id') && $request->customer_id !== 'all') || ($request->filled('status') && $request->status !== 'all') || $request->filled('amount') || $request->filled('search') || $request->filled('is_online');
         
         $salesQuery = $query->orderBy('date', 'desc')->orderBy('id', 'desc');
         if (!$hasFilters && !$request->boolean('all')) {
@@ -122,7 +138,7 @@ class SalesController extends Controller implements HasMiddleware
         return Inertia::render("daily/sales/index", [
             'sales' => $sales,
             'summary' => $summary,
-            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'search', 'is_online', 'all']),
+            'filters' => $request->all(['start_date', 'end_date', 'customer_id', 'status', 'amount', 'search', 'is_online', 'all']),
             'customers' => $customers,
             'isLimited' => !$hasFilters && !$request->boolean('all'),
         ]);
@@ -130,10 +146,8 @@ class SalesController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        $accounts = Account::eligibleForSale()
-            ->select('id', 'code', 'title', 'type', 'city_id', 'area_id', 'saleman_id', 'item_category')
-            ->with('accountType:id,name')
-            ->get();
+        // Accounts are loaded on-demand via /account/picker (server-side paginated search)
+        $accounts = [];
 
         $salemans = Saleman::select('id', 'name', 'code', 'commission_percentage')->get();
 
@@ -337,9 +351,6 @@ class SalesController extends Controller implements HasMiddleware
             }
 
             $netPayable = max(0, (float)$request->net_total - (float)($request->extra_discount ?? 0));
-            $actualPaidOnThisBill = min($totalPaidAmount, $netPayable);
-            $surplusAmount        = max(0, $totalPaidAmount - $netPayable);
-            $remainingAmount      = max(0, $netPayable - $actualPaidOnThisBill);
 
             // --- INVOICE NUMBER: ID-based generation (guaranteed unique, zero race conditions) ---
             // Insert with a unique placeholder to get the auto-increment ID, then
@@ -362,8 +373,8 @@ class SalesController extends Controller implements HasMiddleware
                 'net_total'       => $request->net_total,
                 'extra_discount'  => $request->extra_discount ?? 0,
                 'total_receivable' => $request->total_receivable ?? ($request->net_total + ($request->previous_balance ?? 0)),
-                'paid_amount'     => $actualPaidOnThisBill,
-                'remaining_amount' => $remainingAmount,
+                'paid_amount'     => 0,
+                'remaining_amount' => $netPayable,
             ]);
 
             // Auto-increment ID is now known — set final unique invoice number.
@@ -392,78 +403,14 @@ class SalesController extends Controller implements HasMiddleware
                 }
             }
 
-            // --- Auto-Allocate Existing Advances (Unallocated Receipts & CustomerCredit) ---
-            $useAdvanceOnCreate = (bool) $request->input('use_advance', false);
+            // --- Step 1: Apply Existing Advance FIRST (matching UI calculation) ---
+            // Covers: Unallocated Cash Receipts (cash-only, never discount) + CustomerCredit + Opening Balance CR (CRV-OB-xxxx)
+            $useAdvanceOnCreate = $request->boolean('use_advance', false);
             if ($useAdvanceOnCreate) {
-                $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
-                    ->where('type', 'RECEIPT')
-                    ->where(function($q) {
-                        $q->whereNull('cheque_status')
-                          ->orWhere('cheque_status', '!=', 'Canceled');
-                    })
-                    ->get()
-                    ->filter(function($p) {
-                        $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                        return $p->net_amount > $allocated;
-                    })
-                    ->sortBy('date');
-
-                foreach ($unallocatedPayments as $p) {
-                    if ($sale->remaining_amount <= 0) break;
-                    
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    $avail = $p->net_amount - $allocated;
-                    $allocationAmount = min($sale->remaining_amount, $avail);
-                    
-                    if ($allocationAmount > 0) {
-                        PaymentAllocation::create([
-                            'payment_id' => $p->id,
-                            'bill_id' => $sale->id,
-                            'bill_type' => 'App\Models\Sales',
-                            'amount' => $allocationAmount,
-                        ]);
-                        
-                        $sale->paid_amount += $allocationAmount;
-                        $sale->remaining_amount -= $allocationAmount;
-                    }
-                }
-
-                // --- Auto-Allocate CustomerCredit (from Sales Returns) ---
-                $availableCredits = CustomerCredit::where('customer_id', $sale->customer_id)
-                    ->where('status', '!=', 'Refunded')
-                    ->where('available_balance', '>', 0)
-                    ->orderBy('created_at', 'asc')
-                    ->get();
-
-                foreach ($availableCredits as $credit) {
-                    if ($sale->remaining_amount <= 0) break;
-
-                    $creditAmount = min($sale->remaining_amount, $credit->available_balance);
-
-                    if ($creditAmount > 0.005) {
-                        SalesReturnAllocation::create([
-                            'sales_return_id' => $credit->sales_return_id,
-                            'sale_id'         => $sale->id,
-                            'amount'          => $creditAmount,
-                        ]);
-
-                        $credit->available_balance -= $creditAmount;
-                        if (round($credit->available_balance, 2) <= 0.005) {
-                            $credit->status = 'Used';
-                            $credit->available_balance = 0;
-                        } else {
-                            $credit->status = 'Partial';
-                        }
-                        $credit->save();
-
-                        $sale->paid_amount    += $creditAmount;
-                        $sale->remaining_amount -= $creditAmount;
-                    }
-                }
+                AdvanceAllocationService::applyAdvanceToSale($sale);
             }
-            $sale->save();
 
-            // --- Process Payments & Allocations ---
+            // --- Step 2: Process Instant Checkout Cash/Bank/Cheque Splits ---
             if (count($splitsData) > 0) {
                 $prefix = 'CRV-';
                 // B4 Fix: Use lockForUpdate() inside the current DB transaction to prevent
@@ -476,7 +423,7 @@ class SalesController extends Controller implements HasMiddleware
                     if (($split['amount'] ?? 0) <= 0) continue;
 
                     $voucherNo = $baseVoucherNo;
-                    
+
                     $payment = Payment::create([
                         'date' => $request->date,
                         'voucher_no' => $voucherNo,
@@ -500,30 +447,33 @@ class SalesController extends Controller implements HasMiddleware
                     $afterCommitEvents[] = new \App\Events\PaymentConfirmed($payment);
                 }
 
-                // Distribution Logic
+                // Distribution Logic: settle remaining balance on THIS bill first, then FIFO to older bills
                 $remainingToAllocate = $totalPaidAmount;
 
                 if ($remainingToAllocate > 0) {
-                    // 1. Current Bill Allocation (Respecting existing advance allocations)
-                    $toThisBill = min($remainingToAllocate, $sale->remaining_amount + $actualPaidOnThisBill);
-                    if ($toThisBill > 0) {
+                    // 1. Current Bill Allocation (strictly bounded by remaining_amount after advance)
+                    $toThisBill = min($remainingToAllocate, (float) $sale->remaining_amount);
+                    if ($toThisBill > 0.005) {
                         $tempThis = $toThisBill;
                         foreach ($createdPayments as $p) {
-                            if ($tempThis <= 0) break;
-                            $canTake = min($tempThis, $p->net_amount);
-                            PaymentAllocation::create([
-                                'payment_id' => $p->id,
-                                'bill_id' => $sale->id,
-                                'bill_type' => 'App\Models\Sales',
-                                'amount' => $canTake,
-                            ]);
-                            $tempThis -= $canTake;
+                            if ($tempThis <= 0.005) break;
+                            $canTake = round(min($tempThis, (float) $p->amount), 2);
+                            if ($canTake > 0.005) {
+                                PaymentAllocation::create([
+                                    'payment_id' => $p->id,
+                                    'bill_id' => $sale->id,
+                                    'bill_type' => Sales::class,
+                                    'amount' => $canTake,
+                                    'is_advance' => false,
+                                ]);
+                                $tempThis = round($tempThis - $canTake, 2);
+                            }
                         }
-                        $remainingToAllocate -= $toThisBill;
+                        $remainingToAllocate = round($remainingToAllocate - $toThisBill, 2);
                     }
 
                     // 2. Surplus -> Older Bills (FIFO)
-                    if ($remainingToAllocate > 0 && $request->customer_id) {
+                    if ($remainingToAllocate > 0.005 && $request->customer_id) {
                         $olderBills = Sales::where('customer_id', $request->customer_id)
                             ->where('id', '!=', $sale->id)
                             ->where('remaining_amount', '>', 0)
@@ -532,35 +482,37 @@ class SalesController extends Controller implements HasMiddleware
                             ->get();
 
                         foreach ($olderBills as $oldBill) {
-                            if ($remainingToAllocate <= 0) break;
-                            $allocation = min($remainingToAllocate, $oldBill->remaining_amount);
+                            if ($remainingToAllocate <= 0.005) break;
+                            $allocation = round(min($remainingToAllocate, (float) $oldBill->remaining_amount), 2);
                             $tempOld = $allocation;
 
                             foreach ($createdPayments as $p) {
-                                if ($tempOld <= 0) break;
-                                $alreadyAlloc = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                                $avail = $p->net_amount - $alreadyAlloc;
+                                if ($tempOld <= 0.005) break;
+                                $alreadyAlloc = (float) PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                                $avail = round((float) $p->amount - $alreadyAlloc, 2);
 
-                                if ($avail > 0) {
-                                    $step = min($tempOld, $avail);
+                                if ($avail > 0.005) {
+                                    $step = round(min($tempOld, $avail), 2);
                                     PaymentAllocation::create([
                                         'payment_id' => $p->id,
                                         'bill_id' => $oldBill->id,
-                                        'bill_type' => 'App\Models\Sales',
+                                        'bill_type' => Sales::class,
                                         'amount' => $step,
+                                        'is_advance' => false,
                                     ]);
-                                    $tempOld -= $step;
+                                    $tempOld = round($tempOld - $step, 2);
                                 }
                             }
-                            
-                            $oldBill->paid_amount += $allocation;
-                            $oldBill->remaining_amount -= $allocation;
-                            $oldBill->save();
-                            $remainingToAllocate -= $allocation;
+
+                            AdvanceAllocationService::recalculateSaleSettlement($oldBill);
+                            $remainingToAllocate = round($remainingToAllocate - $allocation, 2);
                         }
                     }
                 }
             }
+
+            // Final authoritative recalculation from DB allocations
+            AdvanceAllocationService::recalculateSaleSettlement($sale);
 
             \Illuminate\Support\Facades\Log::info("SalesController@store: Processing stock for sale " . $sale->id);
             // Insert items and update stock
@@ -665,36 +617,20 @@ class SalesController extends Controller implements HasMiddleware
             return redirect()->route('sales.index')->with('error', 'Online wholesale orders cannot be edited from manual sales.');
         }
 
-        // Fetch associated payments (splits) linked to this sale via allocations
-        // with the allocated amount for this bill rather than the global payment voucher amount
-        $sale->splits = PaymentAllocation::where('bill_id', $id)
-            ->where('bill_type', 'App\Models\Sales')
-            ->with('payment')
-            ->get()
-            ->map(function ($alloc) {
-                $p = $alloc->payment;
-                return [
-                    'id'                 => $alloc->id,
-                    'allocation_id'      => $alloc->id,
-                    'payment_id'         => $alloc->payment_id,
-                    'voucher_no'         => $p->voucher_no ?? null,
-                    'payment_account_id' => $p && $p->payment_account_id ? (string) $p->payment_account_id : '',
-                    'amount'             => (float) $alloc->amount,
-                    'payment_method'     => $p->payment_method ?? 'Cash',
-                    'cheque_no'          => $p->cheque_no ?? '',
-                    'cheque_date'        => $p->cheque_date ?? '',
-                    'clear_date'         => $p->clear_date ?? '',
-                ];
-            })
-            ->values();
+        // Load ONLY Instant Checkout splits belonging to this specific sale (never independent advance vouchers!)
+        $sale->splits = AdvanceAllocationService::getCheckoutSplitsForBill(Sales::class, $sale->id, (string) $sale->invoice);
 
-        // Flag: does this sale already have a CustomerCredit allocation applied?
-        $sale->has_advance_allocated = SalesReturnAllocation::where('sale_id', $id)->exists();
+        $nonAdv = AdvanceAllocationService::getNonAdvancePaidForBill(Sales::class, $sale->id, (string) $sale->invoice);
+        $advSummary = AdvanceAllocationService::getAppliedAdvanceSummaryForBill(Sales::class, $sale->id, (string) $sale->invoice);
 
-        $accounts = Account::eligibleForSale()
-            ->with('accountType')
-            ->get();
-        $salemans = Saleman::get();
+        $sale->checkout_paid_amount = $nonAdv['checkout_paid'];
+        $sale->manual_payment_paid_amount = $nonAdv['manual_payment_paid'];
+        $sale->applied_advance_amount = $advSummary['total_applied_advance'];
+        $sale->has_advance_allocated = $advSummary['has_advance_allocated'];
+
+        // Load ONLY the currently assigned customer (others fetched on-demand via /account/picker)
+        $accounts = AccountController::loadSingleForPicker($sale->customer_id ? (int) $sale->customer_id : null, 'sale');
+        $salemans = Saleman::select('id', 'name', 'code', 'commission_percentage')->get();
         // Historical average stats for items
         $purchaseStats = DB::table('purchase_items')
             ->select('item_id',
@@ -828,36 +764,41 @@ class SalesController extends Controller implements HasMiddleware
             $netTotal = (float) $request->net_total;
             $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netPayable = max(0, $netTotal - $extraDiscount);
-            $useAdvance = (bool) $request->input('use_advance', false);
+            $useAdvance = $request->boolean('use_advance', false);
 
-            // --- Rollback any previous SalesReturnAllocation for this sale ---
-            // This allows a clean re-application on each save
-            $existingReturnAllocations = SalesReturnAllocation::where('sale_id', $sale->id)->get();
-            foreach ($existingReturnAllocations as $retAlloc) {
-                // Restore the CustomerCredit balance
-                $credit = CustomerCredit::where('sales_return_id', $retAlloc->sales_return_id)->first();
-                if ($credit) {
-                    $credit->available_balance += $retAlloc->amount;
-                    if (round($credit->available_balance, 2) >= round($credit->amount, 2)) {
-                        $credit->status = 'Available';
-                        $credit->available_balance = $credit->amount;
-                    } else {
-                        $credit->status = 'Partial';
-                    }
-                    $credit->save();
-                }
-                $retAlloc->delete();
-            }
+            // Step A: Safely release ONLY previous advance allocations (is_advance=true PaymentAllocations,
+            // CustomerCredit allocations, OpeningBalanceAllocations). Independent Payment vouchers & manual
+            // /payment allocations are NEVER mutated or deleted.
+            AdvanceAllocationService::releaseAdvanceFromSale($sale);
 
-            // --- Multi-Method Split Payments & Allocation Sync ---
+            // Step B: Update sale totals & metadata first so remaining calculations use the new bill total
+            $sale->update([
+                'date'             => $request->date,
+                'invoice'          => $request->invoice ?: $sale->invoice,
+                'code'             => $request->code,
+                'type'             => $request->type ?? $sale->type,
+                'customer_id'      => $request->customer_id ?? $sale->customer_id,
+                'salesman_id'      => $request->salesman_id ?? $sale->salesman_id,
+                'firm_id'          => $request->firm_id ?? $sale->firm_id,
+                'message_line_id'  => $request->message_line_id ?? $sale->message_line_id,
+                'no_of_items'      => $request->no_of_items,
+                'gross_total'      => $request->gross_total,
+                'discount_total'   => $request->discount_total,
+                'tax_total'        => $request->tax_total,
+                'courier_charges'  => $request->courier_charges ?? 0,
+                'net_total'        => $request->net_total,
+                'extra_discount'   => $request->extra_discount ?? 0,
+                'total_receivable' => $request->total_receivable ?? $sale->total_receivable,
+            ]);
+
+            // Step C: Multi-Method Split Payments Sync — STRICTLY scoped to Instant Checkout payments for THIS sale!
             $isPayNow = (bool) $request->input('is_pay_now', false);
             $isMulti = (bool) $request->input('is_multi', false);
 
             if ($isPayNow) {
-                // Raw splits submitted from Instant Checkout dialog
                 if ($isMulti) {
                     $rawSplits = $request->input('splits', []);
-                } else if ((float)$request->paid_amount > 0 && $request->payment_account_id) {
+                } elseif ((float)$request->paid_amount > 0 && $request->payment_account_id) {
                     $rawSplits = [[
                         'payment_account_id' => $request->payment_account_id,
                         'amount'             => (float) $request->paid_amount,
@@ -870,10 +811,12 @@ class SalesController extends Controller implements HasMiddleware
                     $rawSplits = [];
                 }
 
-                $existingAllocations = PaymentAllocation::where('bill_id', $sale->id)
-                    ->where('bill_type', 'App\Models\Sales')
+                // Only fetch allocations belonging to THIS sale's Instant Checkout payments!
+                $existingCheckoutAllocations = PaymentAllocation::where('bill_id', $sale->id)
+                    ->where('bill_type', Sales::class)
                     ->with('payment')
-                    ->get();
+                    ->get()
+                    ->filter(fn ($a) => AdvanceAllocationService::isCheckoutPaymentForBill($a->payment, (string) $sale->invoice));
 
                 $matchedAllocIds = [];
                 $newSplitsToCreate = [];
@@ -891,24 +834,24 @@ class SalesController extends Controller implements HasMiddleware
 
                     $matchedAlloc = null;
                     if ($allocId) {
-                        $matchedAlloc = $existingAllocations->firstWhere('id', $allocId);
+                        $matchedAlloc = $existingCheckoutAllocations->firstWhere('id', $allocId);
                     }
                     if (!$matchedAlloc && $paymentId) {
-                        $matchedAlloc = $existingAllocations->firstWhere('payment_id', $paymentId);
+                        $matchedAlloc = $existingCheckoutAllocations->firstWhere('payment_id', $paymentId);
                     }
                     if (!$matchedAlloc && $voucherNo) {
-                        $matchedAlloc = $existingAllocations->first(function ($a) use ($voucherNo) {
+                        $matchedAlloc = $existingCheckoutAllocations->first(function ($a) use ($voucherNo) {
                             return $a->payment && $a->payment->voucher_no === $voucherNo;
                         });
                     }
 
                     if ($matchedAlloc) {
-                        // Existing allocation: update in place
+                        // Existing checkout allocation: update in place (guaranteed checkout payment for THIS sale)
                         $matchedAllocIds[] = $matchedAlloc->id;
                         $matchedAlloc->update(['amount' => $amt]);
 
                         $parentPayment = $matchedAlloc->payment;
-                        if ($parentPayment) {
+                        if ($parentPayment && AdvanceAllocationService::isCheckoutPaymentForBill($parentPayment, (string) $sale->invoice)) {
                             $parentPayment->payment_account_id = $accId;
                             $parentPayment->account_id = $request->customer_id ?? $sale->customer_id;
                             $parentPayment->payment_method = $split['payment_method'] ?? $parentPayment->payment_method ?? 'Cash';
@@ -919,7 +862,6 @@ class SalesController extends Controller implements HasMiddleware
                                 $parentPayment->cheque_status = $parentPayment->cheque_status ?: 'In Hand';
                             }
 
-                            // Payment total: this allocation + any other allocations on other bills
                             $otherAllocsSum = (float) PaymentAllocation::where('payment_id', $parentPayment->id)
                                 ->where('id', '!=', $matchedAlloc->id)
                                 ->sum('amount');
@@ -933,15 +875,15 @@ class SalesController extends Controller implements HasMiddleware
                     }
                 }
 
-                // Delete allocations that the user removed from the dialog
-                foreach ($existingAllocations as $oldAlloc) {
+                // Delete ONLY checkout allocations that the user removed from the dialog
+                foreach ($existingCheckoutAllocations as $oldAlloc) {
                     if (!in_array($oldAlloc->id, $matchedAllocIds)) {
                         $parentPayment = $oldAlloc->payment;
                         $oldAlloc->delete();
 
-                        if ($parentPayment) {
+                        if ($parentPayment && AdvanceAllocationService::isCheckoutPaymentForBill($parentPayment, (string) $sale->invoice)) {
                             $remainingAllocsCount = PaymentAllocation::where('payment_id', $parentPayment->id)->count();
-                            if ($remainingAllocsCount === 0 && str_contains($parentPayment->remarks ?? '', 'Sale')) {
+                            if ($remainingAllocsCount === 0) {
                                 $parentPayment->delete();
                             } else {
                                 $remSum = (float) PaymentAllocation::where('payment_id', $parentPayment->id)->sum('amount');
@@ -985,8 +927,9 @@ class SalesController extends Controller implements HasMiddleware
                         PaymentAllocation::create([
                             'payment_id' => $newPayment->id,
                             'bill_id'    => $sale->id,
-                            'bill_type'  => 'App\Models\Sales',
+                            'bill_type'  => Sales::class,
                             'amount'     => $nAmt,
+                            'is_advance' => false,
                         ]);
 
                         event(new \App\Events\PaymentConfirmed($newPayment));
@@ -994,104 +937,16 @@ class SalesController extends Controller implements HasMiddleware
                 }
             }
 
-            // Accurate total paid on this bill from allocations
-            $actualPaidOnThisBill = (float) PaymentAllocation::where('bill_id', $sale->id)
-                ->where('bill_type', 'App\Models\Sales')
-                ->sum('amount');
+            // Step D: If bill total was reduced below existing allocations, trim excess so no advance is trapped
+            AdvanceAllocationService::trimExcessPaymentAllocations(Sales::class, $sale->id, $netPayable);
+            AdvanceAllocationService::recalculateSaleSettlement($sale);
 
-            $actualPaidOnThisBill = min($actualPaidOnThisBill, $netPayable);
-            $remainingAmount = max(0, $netPayable - $actualPaidOnThisBill);
-
-            $sale->update([
-                'date'             => $request->date,
-                'invoice'          => $request->invoice,
-                'code'             => $request->code,
-                'type'             => $request->type ?? $sale->type,
-                'customer_id'      => $request->customer_id ?? $sale->customer_id,
-                'salesman_id'      => $request->salesman_id ?? $sale->salesman_id,
-                'firm_id'          => $request->firm_id ?? $sale->firm_id,
-                'message_line_id'  => $request->message_line_id ?? $sale->message_line_id,
-                'no_of_items'      => $request->no_of_items,
-                'gross_total'      => $request->gross_total,
-                'discount_total'   => $request->discount_total,
-                'tax_total'        => $request->tax_total,
-                'courier_charges'  => $request->courier_charges ?? 0,
-                'net_total'        => $request->net_total,
-                'extra_discount'   => $request->extra_discount ?? 0,
-                'total_receivable' => $request->total_receivable ?? $sale->total_receivable,
-                'paid_amount'      => $actualPaidOnThisBill,
-                'remaining_amount' => $remainingAmount,
-            ]);
-
-            // --- Auto-Allocate Existing Advances (Unallocated Receipts) ---
-            if ($useAdvance && $sale->remaining_amount > 0) {
-                $unallocatedPayments = Payment::where('account_id', $sale->customer_id)
-                    ->where('type', 'RECEIPT')
-                    ->where(function($q) {
-                        $q->whereNull('cheque_status')
-                          ->orWhere('cheque_status', '!=', 'Canceled');
-                    })
-                    ->get()
-                    ->filter(function($p) {
-                        $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                        return $p->net_amount > $allocated;
-                    })
-                    ->sortBy('date');
-
-                foreach ($unallocatedPayments as $p) {
-                    if ($sale->remaining_amount <= 0) break;
-                    
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    $avail = $p->net_amount - $allocated;
-                    $allocationAmount = min($sale->remaining_amount, $avail);
-                    
-                    if ($allocationAmount > 0) {
-                        PaymentAllocation::create([
-                            'payment_id' => $p->id,
-                            'bill_id'    => $sale->id,
-                            'bill_type'  => 'App\Models\Sales',
-                            'amount'     => $allocationAmount,
-                        ]);
-                        
-                        $sale->paid_amount += $allocationAmount;
-                        $sale->remaining_amount -= $allocationAmount;
-                    }
-                }
-
-                // --- Auto-Allocate CustomerCredit (from Sales Returns) ---
-                $availableCredits = CustomerCredit::where('customer_id', $sale->customer_id)
-                    ->where('status', '!=', 'Refunded')
-                    ->where('available_balance', '>', 0)
-                    ->orderBy('created_at', 'asc')
-                    ->get();
-
-                foreach ($availableCredits as $credit) {
-                    if ($sale->remaining_amount <= 0) break;
-
-                    $creditAmount = min($sale->remaining_amount, $credit->available_balance);
-
-                    if ($creditAmount > 0.005) {
-                        SalesReturnAllocation::create([
-                            'sales_return_id' => $credit->sales_return_id,
-                            'sale_id'         => $sale->id,
-                            'amount'          => $creditAmount,
-                        ]);
-
-                        $credit->available_balance -= $creditAmount;
-                        if (round($credit->available_balance, 2) <= 0.005) {
-                            $credit->status = 'Used';
-                            $credit->available_balance = 0;
-                        } else {
-                            $credit->status = 'Partial';
-                        }
-                        $credit->save();
-
-                        $sale->paid_amount    += $creditAmount;
-                        $sale->remaining_amount -= $creditAmount;
-                    }
-                }
+            // Step E: Re-apply Advance cleanly if checked (respecting remaining_amount & true net credit)
+            if ($useAdvance && $sale->remaining_amount > 0.005) {
+                AdvanceAllocationService::applyAdvanceToSale($sale);
             }
-            $sale->save();
+
+            AdvanceAllocationService::recalculateSaleSettlement($sale);
 
             // Delete old items (transactional replacement updates ledger automatically)
             SalesItem::where('sale_id', $id)->delete();
@@ -1257,15 +1112,12 @@ class SalesController extends Controller implements HasMiddleware
                 return redirect()->back()->with('error', "Cannot delete sale {$sale->invoice} because sales return(s) have already been processed for this bill.");
             }
 
-            // 2. Restore any Sales Return credits (CustomerCredit) used on this bill
+            // 2. Release advance allocations (CustomerCredit, OpeningBalanceAllocation, is_advance PaymentAllocations)
+            AdvanceAllocationService::releaseAdvanceFromSale($sale);
+
+            // Also clean up any remaining direct SalesReturnAllocation rows
             $returnAllocs = SalesReturnAllocation::where('sale_id', $sale->id)->get();
             foreach ($returnAllocs as $rAlloc) {
-                $credit = CustomerCredit::where('sales_return_id', $rAlloc->sales_return_id)->first();
-                if ($credit) {
-                    $credit->available_balance += (float)$rAlloc->amount;
-                    $credit->status = 'Available';
-                    $credit->save();
-                }
                 $rAlloc->delete();
             }
 
@@ -1296,11 +1148,7 @@ class SalesController extends Controller implements HasMiddleware
             foreach ($allocations as $alloc) {
                 $payment = Payment::find($alloc->payment_id);
                 if ($payment) {
-                    $isAutoCheckoutPayment = (
-                        str_contains($payment->remarks ?? '', $sale->invoice) ||
-                        str_contains($payment->remarks ?? '', 'Instance Checkout') ||
-                        str_contains($payment->remarks ?? '', 'Instant Checkout')
-                    );
+                    $isAutoCheckoutPayment = AdvanceAllocationService::isCheckoutPaymentForBill($payment, (string) $sale->invoice);
 
                     if ($isAutoCheckoutPayment) {
                         $processedPaymentIds[] = $payment->id;

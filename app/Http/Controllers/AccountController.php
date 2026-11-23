@@ -34,6 +34,7 @@ class AccountController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('permission:view accounts', only: ['index', 'show', 'getBalance', 'getNextCode', 'searchSuggestions', 'downloadSample']),
+            new Middleware('permission:view accounts|create sales|edit sales|create purchase|edit purchase|create returns|edit returns|create purchase returns|edit purchase returns', only: ['picker']),
             new Middleware('permission:manage accounts', only: ['create', 'store', 'edit', 'update', 'destroy', 'toggleStatus', 'resetGuestToken', 'bulkUpload', 'previewBulkUpload', 'processBulkImport']),
         ];
     }
@@ -672,10 +673,34 @@ class AccountController extends Controller implements HasMiddleware
         return redirect()->route('account.index')
             ->with('success', 'Account deleted successfully!');
     }
-    public function getBalance($id)
+    public function getBalance(Request $request, $id)
     {
-        $account = Account::findOrFail($id);
-        return response()->json(['balance' => (float)$account->current_balance]);
+        $account = Account::with('accountType')->findOrFail($id);
+        $role = $request->query('role');
+        $excludeBillId = $request->query('exclude_bill_id') ? (int) $request->query('exclude_bill_id') : null;
+
+        $response = [
+            'balance' => (float) $account->current_balance,
+        ];
+
+        if (in_array($role, ['sale', 'purchase'], true)) {
+            $excludeBillType = null;
+            if ($excludeBillId) {
+                $excludeBillType = $role === 'sale' ? \App\Models\Sales::class : \App\Models\Purchase::class;
+            }
+
+            $breakdown = \App\Services\AdvanceAllocationService::getAvailableAdvanceBreakdown(
+                $account,
+                $role,
+                $excludeBillType,
+                $excludeBillId
+            );
+
+            $response['effective_previous_balance'] = $breakdown['effective_previous_balance'];
+            $response['advance_breakdown'] = $breakdown;
+        }
+
+        return response()->json($response);
     }
 
     public function getDetailedBalances($id)
@@ -800,6 +825,242 @@ class AccountController extends Controller implements HasMiddleware
         });
 
         return response()->json($results);
+    }
+
+    /**
+     * Format a lightweight account DTO for the Smart Account Selection Dialog and Edit page initial props.
+     */
+    public static function formatAccountForPicker(Account $a, string $context = 'sale'): array
+    {
+        $isPurchaseContext = in_array($context, ['purchase', 'purchase_return'], true);
+        $accountTypeName = strtolower($a->accountType->name ?? '');
+        $isCrNormal = $accountTypeName === 'supplier' || in_array((int) $a->type, [6, 9, 17, 18], true);
+
+        $balance = round((float) ($a->memoizedCurrentBalance ?? $a->getAttributes()['current_balance'] ?? 0), 2);
+        $balanceSide = abs($balance) < 0.005
+            ? 'ZERO'
+            : ($isCrNormal ? ($balance > 0 ? 'CR' : 'DR') : ($balance > 0 ? 'DR' : 'CR'));
+
+        $phone = trim((string) ($a->mobile ?: ($a->telephone1 ?: ($a->telephone2 ?: ''))));
+
+        $tpLabel = 'Retail';
+        if ($isPurchaseContext) {
+            if ($a->accountCategory) {
+                $pct = (float) ($a->accountCategory->percentage ?? 0);
+                $tpLabel = $a->accountCategory->name . ($pct > 0 ? ' (' . rtrim(rtrim(number_format($pct, 2), '0'), '.') . '%)' : '');
+            } else {
+                $tpLabel = '0% Markup';
+            }
+        } else {
+            $ic = $a->item_category !== null && $a->item_category !== '' ? (string) $a->item_category : null;
+            if ($ic !== null && in_array($ic, ['1', '2', '3', '4', '5', '6', '7'], true)) {
+                $tpLabel = 'TP ' . $ic;
+            }
+        }
+
+        return [
+            'id' => (int) $a->id,
+            'code' => $a->code ?? '',
+            'title' => $a->title ?? '',
+            'type' => $a->type,
+            'phone' => $phone,
+            'mobile' => $a->mobile,
+            'telephone1' => $a->telephone1,
+            'telephone2' => $a->telephone2,
+            'aging_days' => (int) ($a->aging_days ?? 0),
+            'credit_limit' => $a->credit_limit !== null ? (float) $a->credit_limit : null,
+            'saleman_id' => $a->saleman_id ? (int) $a->saleman_id : null,
+            'saleman_name' => $a->relationLoaded('saleman') ? $a->saleman?->name : null,
+            'city_id' => $a->city_id ? (int) $a->city_id : null,
+            'city_name' => $a->relationLoaded('city') ? $a->city?->name : null,
+            'area_id' => $a->area_id ? (int) $a->area_id : null,
+            'area_name' => $a->relationLoaded('area') ? $a->area?->name : null,
+            'item_category' => $a->item_category !== null && $a->item_category !== '' ? (string) $a->item_category : null,
+            'tp_label' => $tpLabel,
+            'account_type' => $a->accountType ? [
+                'id' => (int) $a->accountType->id,
+                'name' => $a->accountType->name,
+            ] : null,
+            'account_category' => $a->accountCategory ? [
+                'id' => (int) $a->accountCategory->id,
+                'name' => $a->accountCategory->name,
+                'percentage' => (float) ($a->accountCategory->percentage ?? 0),
+            ] : null,
+            'current_balance' => $balance,
+            'balance_side' => $balanceSide,
+        ];
+    }
+
+    /**
+     * Load a single account formatted for edit screen initialization (1 row instead of full table).
+     */
+    public static function loadSingleForPicker(?int $accountId, string $context = 'sale'): array
+    {
+        if (!$accountId) {
+            return [];
+        }
+
+        $account = Account::select(
+            'id', 'code', 'title', 'type', 'category', 'item_category',
+            'mobile', 'telephone1', 'telephone2',
+            'city_id', 'area_id', 'saleman_id',
+            'aging_days', 'credit_limit',
+            'opening_balance', 'opening_balance_type', 'purchase', 'sale'
+        )
+            ->with([
+                'accountType:id,name',
+                'accountCategory:id,name,percentage',
+            ])
+            ->find($accountId);
+
+        if (!$account) {
+            return [];
+        }
+
+        return [self::formatAccountForPicker($account, $context)];
+    }
+
+    /**
+     * Server-side paginated, filterable, searchable account picker for Sales, Purchase, and Return screens.
+     * Bulk-calculates real-time balances ONLY for the current page (max 50 rows) — zero N+1 queries.
+     */
+    public function picker(Request $request)
+    {
+        $context = strtolower((string) $request->query('context', 'sale'));
+        if (!in_array($context, ['sale', 'purchase', 'sales_return', 'purchase_return'], true)) {
+            $context = 'sale';
+        }
+
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(10, min(50, $perPage));
+
+        $query = Account::select(
+            'id', 'code', 'title', 'type', 'category', 'item_category',
+            'mobile', 'telephone1', 'telephone2',
+            'city_id', 'area_id', 'saleman_id',
+            'aging_days', 'credit_limit',
+            'opening_balance', 'opening_balance_type', 'purchase', 'sale'
+        )->with([
+            'accountType:id,name',
+            'accountCategory:id,name,percentage',
+            'city:id,name',
+            'area:id,name',
+            'saleman:id,name',
+        ]);
+
+        // Preserve exact module eligibility rules
+        if ($context === 'sale') {
+            $query->eligibleForSale();
+        } elseif ($context === 'purchase') {
+            $query->eligibleForPurchase();
+        } elseif ($context === 'sales_return') {
+            $query->active()->whereHas('sales');
+        } elseif ($context === 'purchase_return') {
+            $query->active()->where(function ($q) {
+                $q->where('purchase', true)
+                    ->orWhereHas('accountType', function ($typeQ) {
+                        $typeQ->whereIn('name', ['Supplier', 'Suppliers']);
+                    });
+            });
+        }
+
+        // Server-side search: title, code, phone numbers, city, area
+        $search = trim((string) $request->query('search', ''));
+        if ($search !== '') {
+            $digitsOnly = preg_replace('/[^0-9]/', '', $search);
+            $query->where(function ($q) use ($search, $digitsOnly) {
+                $q->where('title', 'like', '%' . $search . '%')
+                    ->orWhere('code', 'like', '%' . $search . '%')
+                    ->orWhere('mobile', 'like', '%' . $search . '%')
+                    ->orWhere('telephone1', 'like', '%' . $search . '%')
+                    ->orWhere('telephone2', 'like', '%' . $search . '%')
+                    ->orWhereHas('city', fn ($cq) => $cq->where('name', 'like', '%' . $search . '%'))
+                    ->orWhereHas('area', fn ($aq) => $aq->where('name', 'like', '%' . $search . '%'));
+
+                if (strlen($digitsOnly) >= 3) {
+                    $q->orWhereRaw("REPLACE(REPLACE(COALESCE(mobile, ''), ' ', ''), '-', '') LIKE ?", ['%' . $digitsOnly . '%'])
+                        ->orWhereRaw("REPLACE(REPLACE(COALESCE(telephone1, ''), ' ', ''), '-', '') LIKE ?", ['%' . $digitsOnly . '%'])
+                        ->orWhereRaw("REPLACE(REPLACE(COALESCE(telephone2, ''), ' ', ''), '-', '') LIKE ?", ['%' . $digitsOnly . '%']);
+                }
+            });
+        }
+
+        // Structured filters
+        $cityId = $request->query('city_id');
+        if ($cityId && $cityId !== 'all') {
+            $query->where('city_id', (int) $cityId);
+        }
+
+        $areaId = $request->query('area_id');
+        if ($areaId && $areaId !== 'all') {
+            $query->where('area_id', (int) $areaId);
+        }
+
+        $salemanId = $request->query('saleman_id');
+        if ($salemanId && $salemanId !== 'all') {
+            $query->where('saleman_id', (int) $salemanId);
+        }
+
+        $tp = $request->query('tp');
+        if ($tp && $tp !== 'all') {
+            if (in_array($context, ['purchase', 'purchase_return'], true)) {
+                if ($tp === 'none') {
+                    $query->where(function ($q) {
+                        $q->whereNull('category')->orWhere('category', '')->orWhere('category', '0');
+                    });
+                } else {
+                    $query->where('category', $tp);
+                }
+            } else {
+                if ($tp === 'retail') {
+                    $query->where(function ($q) {
+                        $q->whereNull('item_category')->orWhere('item_category', '')->orWhere('item_category', 0);
+                    });
+                } else {
+                    $query->where('item_category', (int) $tp);
+                }
+            }
+        }
+
+        // Rank prefix matches first when searching, then alphabetical
+        if ($search !== '') {
+            $query->orderByRaw('CASE WHEN title LIKE ? THEN 0 WHEN code LIKE ? THEN 1 ELSE 2 END', [$search . '%', $search . '%']);
+        }
+        $query->orderBy('title', 'asc')->orderBy('id', 'asc');
+
+        $paginator = $query->paginate($perPage);
+        $collection = $paginator->getCollection();
+
+        // Bulk-calculate real-time balances ONLY for this page's <= 50 accounts
+        \App\Services\PaymentAccountingService::attachBulkBalances($collection);
+
+        $data = $collection->map(fn (Account $a) => self::formatAccountForPicker($a, $context))->values();
+
+        $payload = [
+            'data' => $data,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+        ];
+
+        // Return filter dropdown lists only when explicitly requested (first open, cached client-side)
+        if ($request->boolean('include_filters')) {
+            $payload['filter_options'] = [
+                'cities' => City::select('id', 'name')->orderBy('name')->get(),
+                'areas' => Areas::select('id', 'name', 'city_id')->orderBy('name')->get(),
+                'salemans' => Saleman::select('id', 'name')->orderBy('name')->get(),
+                'categories' => in_array($context, ['purchase', 'purchase_return'], true)
+                    ? AccountCategory::select('id', 'name', 'percentage')->orderBy('name')->get()
+                    : [],
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     public function bulkUpload()

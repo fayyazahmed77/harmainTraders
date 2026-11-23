@@ -3,6 +3,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, X, Check } from "lucide-react";
@@ -43,7 +44,7 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
                         <AlertTriangle size={32} className="text-white" />
                     </div>
                     <DialogTitle className="text-xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight uppercase">Update Item Trade Prices?</DialogTitle>
-                    <p className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</p>
+                    <DialogDescription className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</DialogDescription>
                 </div>
 
                 <div className="p-0 max-h-[400px] overflow-auto">

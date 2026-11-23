@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatSafeDate } from '@/lib/utils';
+import { formatSafeDate } from '@/lib/format-utils';
 
 const DateReport = ({ data, formatCurrency }: any) => {
     const total = data.reduce((acc: number, row: any) => acc + (Number(row.total_amount) || 0), 0);

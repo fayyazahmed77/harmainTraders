@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Combobox } from "@/components/ui/combobox";
+import {
+    SmartAccountDialog,
+    SmartAccountTrigger,
+    SmartAccount,
+} from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 import ReactSelect from "react-select";
 import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
@@ -243,9 +248,20 @@ export default function PurchaseEdit({
     const [activeRowId, setActiveRowId] = useState<number | null>(null);
 
     // Pay Now / Settlement States
-    const [isPayNow, setIsPayNow] = useState(false);
+    const [isPayNow, setIsPayNow] = useState<boolean>(() => Boolean(purchase?.splits && purchase.splits.length > 0));
     const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-    const [paymentSplits, setPaymentSplits] = useState<SplitPayment[]>([]);
+    const [paymentSplits, setPaymentSplits] = useState<SplitPayment[]>(() => {
+        if (purchase?.splits && purchase.splits.length > 0) {
+            return purchase.splits.map((s: any) => ({
+                ...s,
+                id: s.id || Date.now() + Math.random(),
+                payment_account_id: s.payment_account_id ? String(s.payment_account_id) : "",
+                amount: toNumber(s.amount),
+                payment_method: s.payment_method || "Cash",
+            }));
+        }
+        return [];
+    });
     const [updatePricesAfterPayment, setUpdatePricesAfterPayment] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isSubmittingRef = React.useRef(false);
@@ -331,6 +347,68 @@ export default function PurchaseEdit({
         }
         return null;
     });
+    const [selectedAccountInfo, setSelectedAccountInfo] = useState<{ id: number; title: string; code?: string | null } | null>(() => {
+        if (purchase?.supplier_id && accounts) {
+            const acc = accounts.find(a => Number(a.id) === Number(purchase.supplier_id));
+            if (acc) return { id: acc.id, title: acc.title, code: acc.code ?? null };
+        }
+        if (purchase?.supplier) {
+            return { id: purchase.supplier.id, title: purchase.supplier.title, code: purchase.supplier.code ?? null };
+        }
+        return null;
+    });
+    const [accountDialogOpen, setAccountDialogOpen] = useState<boolean>(false);
+
+    const handleSelectSupplier = (selectedAccount: SmartAccount | null) => {
+        if (selectedAccount) {
+            const id = selectedAccount.id;
+            const label = `${selectedAccount.title}${selectedAccount.code ? ` (${selectedAccount.code})` : ""}`;
+            setAccountType({ value: String(id), label });
+            setSelectedAccountInfo({ id, title: selectedAccount.title, code: selectedAccount.code ?? null });
+            setCreditDays(selectedAccount.aging_days ?? 0);
+            setCreditLimit(
+                typeof selectedAccount.credit_limit === "number"
+                    ? selectedAccount.credit_limit
+                    : selectedAccount.credit_limit
+                    ? Number(selectedAccount.credit_limit)
+                    : ""
+            );
+            setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
+            setSalesman(selectedAccount.saleman_id ?? null);
+
+            // Fetch Supplier Balance On-Demand
+            axios.get(`/account/${id}/balance?role=purchase&exclude_bill_id=${purchase.id}`).then((res) => {
+                const effBal = res.data.effective_previous_balance !== undefined
+                    ? toNumber(res.data.effective_previous_balance)
+                    : getEffectivePreviousBalance(res.data.balance, id);
+                const avail = res.data.advance_breakdown
+                    ? toNumber(res.data.advance_breakdown.applicable_advance)
+                    : Math.max(0, -effBal);
+                setSupplierBalance(effBal);
+                setAdvanceAvailable(effBal);
+                setApplicableAdvance(avail);
+                const isOriginal = Number(id) === Number(purchase?.supplier_id);
+                setUseAdvance(isOriginal ? Boolean((purchase as any)?.has_advance_allocated) : avail > 0);
+            }).catch((err) => {
+                console.error("Failed to fetch balance", err);
+                setSupplierBalance(0);
+                setAdvanceAvailable(0);
+                setApplicableAdvance(0);
+                setUseAdvance(false);
+            });
+        } else {
+            setAccountType(null);
+            setSelectedAccountInfo(null);
+            setCreditDays(0);
+            setCreditLimit("");
+            setMarkupPercentage(0);
+            setSalesman(null);
+            setSupplierBalance(0);
+            setAdvanceAvailable(0);
+            setApplicableAdvance(0);
+            setUseAdvance(false);
+        }
+    };
     const [courier, setCourier] = useState<number>(toNumber(purchase?.courier_charges));
     const [extraDiscount, setExtraDiscount] = useState<number>(toNumber(purchase?.extra_discount));
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
@@ -341,29 +419,39 @@ export default function PurchaseEdit({
         return defaultFirm ? defaultFirm.id.toString() : "";
     });
 
-    const [advanceAvailable, setAdvanceAvailable] = useState<number>(() => {
-        if (purchase?.supplier_id && accounts) {
-            const acc = accounts.find(a => Number(a.id) === Number(purchase.supplier_id));
-            if (acc && acc.current_balance !== undefined) return toNumber(acc.current_balance);
-        }
-        return 0;
-    });
-    const [useAdvance, setUseAdvance] = useState<boolean>(true);
+    const [advanceAvailable, setAdvanceAvailable] = useState<number>(0);
+    const [applicableAdvance, setApplicableAdvance] = useState<number>(toNumber((purchase as any)?.applied_advance_amount));
+    const [useAdvance, setUseAdvance] = useState<boolean>(Boolean((purchase as any)?.has_advance_allocated));
     const [supplierBalance, setSupplierBalance] = useState<number>(0);
+
+    const getEffectivePreviousBalance = (fetchedBalance: number, supId?: number | string | null) => {
+        const isOriginalSupplier = Number(supId) === Number(purchase?.supplier_id);
+        if (!isOriginalSupplier) {
+            return Number(fetchedBalance) || 0;
+        }
+        const origNet = Math.max(0, toNumber(purchase?.net_total) - toNumber(purchase?.extra_discount));
+        const nonAdvPaid = toNumber((purchase as any)?.checkout_paid_amount) + toNumber((purchase as any)?.manual_payment_paid_amount);
+        return Math.round((Number(fetchedBalance) || 0) - (origNet - nonAdvPaid));
+    };
 
     useEffect(() => {
         const supId = purchase?.supplier_id;
         if (supId) {
-            axios.get(`/account/${supId}/balance`).then(res => {
-                const bal = toNumber(res.data.balance);
-                setSupplierBalance(bal);
-                setAdvanceAvailable(bal);
-                setUseAdvance(bal < 0);
+            axios.get(`/account/${supId}/balance?role=purchase&exclude_bill_id=${purchase.id}`).then(res => {
+                const effBal = res.data.effective_previous_balance !== undefined
+                    ? toNumber(res.data.effective_previous_balance)
+                    : getEffectivePreviousBalance(res.data.balance, supId);
+                const avail = res.data.advance_breakdown
+                    ? toNumber(res.data.advance_breakdown.applicable_advance)
+                    : Math.max(0, -effBal);
+                setSupplierBalance(effBal);
+                setAdvanceAvailable(effBal);
+                setApplicableAdvance(avail);
             }).catch(err => {
                 console.error("Failed to fetch balance", err);
             });
         }
-    }, [purchase?.supplier_id]);
+    }, [purchase?.supplier_id, purchase?.id]);
 
     const accountTypeOptions: Option[] = useMemo(() => {
         return accounts.map((a) => ({
@@ -604,6 +692,25 @@ export default function PurchaseEdit({
         });
     }, [rows, items]);
 
+    const {
+        selectedRowId,
+        setRowRef,
+        setCellRef,
+        selectRow,
+        handleCellKeyDown,
+    } = useInvoiceRowNavigation({
+        rows: rowsWithComputed,
+        isModalOpen:
+            itemDialogOpen ||
+            accountDialogOpen ||
+            showPaymentDialog ||
+            showPriceDialog ||
+            showSuccessDialog,
+        onRowFocus: (row) => {
+            if (row.item_id) handleProductFocus(row.item_id);
+        },
+    });
+
     // ───────────────────────────────────────────
     // Totals & Invoice summary
     // ───────────────────────────────────────────
@@ -637,10 +744,11 @@ export default function PurchaseEdit({
         const billNet = Math.max(0, roundedGross - roundedDisc);
         const netPayable = Math.max(0, billNet + courier - extraDiscount);
 
-        const absAdvance = Math.max(0, -advanceAvailable);
+        const absAdvance = applicableAdvance > 0 ? applicableAdvance : Math.max(0, -advanceAvailable);
         const appliedAdvance = useAdvance ? Math.min(netPayable, absAdvance) : 0;
-        const alreadyPaid = toNumber(purchase?.paid_amount ?? 0);
-        const netSettlement = Math.max(0, netPayable - appliedAdvance - alreadyPaid);
+        const remainingAdvance = Math.max(0, absAdvance - appliedAdvance);
+        const nonAdvanceAlreadyPaid = toNumber((purchase as any)?.checkout_paid_amount) + toNumber((purchase as any)?.manual_payment_paid_amount);
+        const netSettlement = Math.max(0, netPayable - appliedAdvance - nonAdvanceAlreadyPaid);
 
         const finalNetPayable = prevBal + netSettlement;
 
@@ -653,6 +761,7 @@ export default function PurchaseEdit({
             netPayable: netPayable,
             net: billNet + courier,
             appliedAdvance,
+            remainingAdvance,
             netSettlement,
             previousBalance: prevBal,
             finalNetPayable: finalNetPayable,
@@ -662,7 +771,7 @@ export default function PurchaseEdit({
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier, extraDiscount, advanceAvailable, useAdvance]);
+    }, [rowsWithComputed, items, courier, extraDiscount, advanceAvailable, applicableAdvance, useAdvance, purchase]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -671,6 +780,7 @@ export default function PurchaseEdit({
     }, [creditLimit, totals]);
 
     // Global Keyboard Shortcuts (F4 / Alt+C -> Payment Settlement Dialog, F9 / Ctrl+Enter -> Update Purchase)
+    const handleSaveRef = React.useRef<() => void>(() => {});
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // F4 or Alt+C: Toggle / Open Payment Settlement Dialog
@@ -685,11 +795,18 @@ export default function PurchaseEdit({
                 return;
             }
 
-            // F9 or Ctrl+Enter (when dialog not open): Update Purchase
-            if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !showPaymentDialog) {
+            // F9 or Ctrl+Enter (when no modal is open): Update Purchase using latest state via ref
+            if (
+                (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) &&
+                !showPaymentDialog &&
+                !showPriceDialog &&
+                !showSuccessDialog &&
+                !itemDialogOpen &&
+                !accountDialogOpen
+            ) {
                 e.preventDefault();
                 if (!isSubmittingRef.current) {
-                    handleSave();
+                    handleSaveRef.current();
                 }
                 return;
             }
@@ -697,7 +814,7 @@ export default function PurchaseEdit({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isPayNow, paymentSplits.length, showPaymentDialog]);
+    }, [isPayNow, paymentSplits.length, showPaymentDialog, showPriceDialog, showSuccessDialog, itemDialogOpen, accountDialogOpen]);
 
     // ───────────────────────────────────────────
     // Simple renderer / layout
@@ -722,8 +839,9 @@ export default function PurchaseEdit({
             courier_charges: totals.courier,
             net_total: totals.net,
             paid_amount: (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
-            remaining_amount: totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
-            applied_advance: totals.appliedAdvance,
+            remaining_amount: Math.max(0, totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0)),
+            use_advance: useAdvance,
+            applied_advance: useAdvance ? totals.appliedAdvance : 0,
             update_prices: updatePrices,
             print_format: printOption,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
@@ -760,7 +878,7 @@ export default function PurchaseEdit({
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
-                    supplierName: accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A",
+                    supplierName: selectedAccountInfo?.title || accountType?.label || "N/A",
                     totalItems: totals.totalItems,
                     totalFull: totals.totalFull,
                     totalPcs: totals.totalPcs,
@@ -777,7 +895,8 @@ export default function PurchaseEdit({
                 isSubmittingRef.current = false;
                 setIsSubmitting(false);
                 console.error(errors);
-                alert("Failed to save purchase. Check console for details.");
+                const msgs = Object.values(errors || {}).flat().filter(Boolean);
+                alert(msgs.length > 0 ? `Failed to save purchase:\n${msgs.join("\n")}` : "Failed to save purchase. Check console for details.");
             },
             onFinish: () => {
                 isSubmittingRef.current = false;
@@ -831,6 +950,7 @@ export default function PurchaseEdit({
             }
         }
     };
+    handleSaveRef.current = handleSave;
 
     return (
         <SidebarProvider
@@ -871,53 +991,13 @@ export default function PurchaseEdit({
                             {/* Essential Main Info (Always visible on mobile) */}
                             <div className="mt-3">
                                 <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Supplier Party</label>
-                                <Select
-                                    value={accountType?.value?.toString() ?? ""}
-                                    onValueChange={(value) => {
-                                        const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
-                                        setAccountType(selectedOption);
-
-                                        if (selectedAccount) {
-                                            setCreditDays(selectedAccount.aging_days ?? 0);
-                                            setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                                            const salemanId = selectedAccount.saleman_id ?? null;
-                                            setSalesman(salemanId);
-
-                                            // Fetch Supplier Balance On-Demand
-                                            axios.get(`/account/${id}/balance`).then((res) => {
-                                                const balance = toNumber(res.data.balance);
-                                                setSupplierBalance(balance);
-                                                setAdvanceAvailable(balance);
-                                                setUseAdvance(balance < 0);
-                                            }).catch((err) => {
-                                                console.error("Failed to fetch balance", err);
-                                                setSupplierBalance(0);
-                                                setAdvanceAvailable(0);
-                                                setUseAdvance(false);
-                                            });
-                                        } else {
-                                            setCreditDays(0);
-                                            setCreditLimit("");
-                                            setSalesman(null);
-                                            setSupplierBalance(0);
-                                            setAdvanceAvailable(0);
-                                            setUseAdvance(false);
-                                        }
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full h-11 border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-black/20 text-md font-bold rounded-xl focus:ring-orange-500">
-                                        <SelectValue placeholder="Tap to Select Supplier" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accountTypeOptions.map((s) => (
-                                            <SelectItem key={s.value} value={s.value.toString()}>
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <SmartAccountTrigger
+                                    value={selectedAccountInfo}
+                                    onClick={() => setAccountDialogOpen(true)}
+                                    onClear={() => handleSelectSupplier(null)}
+                                    placeholder="Tap to Select Supplier"
+                                    className="w-full h-11 border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-black/20 text-sm font-bold rounded-xl"
+                                />
                             </div>
                         </div>
 
@@ -989,47 +1069,11 @@ export default function PurchaseEdit({
 
                             {/* Account Select */}
                             <FieldWrapper label="Select Supplier" className="flex-1 min-w-[160px]">
-                                <Combobox
-                                    options={accountTypeOptions}
-                                    value={accountType?.value || ""}
-                                    onChange={(value) => {
-                                        const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
-
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
-                                        setAccountType(selectedOption);
-
-                                        if (selectedAccount) {
-                                            setCreditDays(selectedAccount.aging_days ?? 0);
-                                            setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                                            setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
-                                            const salemanId = selectedAccount.saleman_id ?? null;
-                                            setSalesman(salemanId);
-                                            
-                                            // Fetch Supplier Balance On-Demand
-                                            axios.get(`/account/${id}/balance`).then((res) => {
-                                                const balance = toNumber(res.data.balance);
-                                                setSupplierBalance(balance);
-                                                setAdvanceAvailable(balance);
-                                                setUseAdvance(balance < 0);
-                                            }).catch((err) => {
-                                                console.error("Failed to fetch balance", err);
-                                                setSupplierBalance(0);
-                                                setAdvanceAvailable(0);
-                                                setUseAdvance(false);
-                                            });
-                                        } else {
-                                            setCreditDays(0);
-                                            setCreditLimit("");
-                                            setMarkupPercentage(0);
-                                            setSalesman(null);
-                                            setSupplierBalance(0);
-                                            setAdvanceAvailable(0);
-                                            setUseAdvance(false);
-                                        }
-                                    }}
-                                    placeholder="Supplier"
-                                    searchPlaceholder="Search by name or code..."
+                                <SmartAccountTrigger
+                                    value={selectedAccountInfo}
+                                    onClick={() => setAccountDialogOpen(true)}
+                                    onClear={() => handleSelectSupplier(null)}
+                                    placeholder="Select Supplier..."
                                     className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-white dark:bg-zinc-900"
                                 />
                             </FieldWrapper>
@@ -1192,7 +1236,7 @@ export default function PurchaseEdit({
 
                                         {/* Rows (scrollable) */}
                                         <div className="max-h-none md:min-h-[calc(100vh-290px)] md:max-h-[calc(100vh-290px)] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm flex-1">
-                                            {rowsWithComputed.map((row) => (
+                                            {rowsWithComputed.map((row, rowIndex) => (
                                                 <React.Fragment key={row.id}>
                                                     {(() => {
                                                         const rowItem = items.find(it => Number(it.id) === Number(row.item_id));
@@ -1334,7 +1378,15 @@ export default function PurchaseEdit({
                                                                 </div>
 
                                                                 {/* Desktop Row View (Hidden on mobile) */}
-                                                                <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
+                                                                <div
+                                                                    ref={setRowRef(row.id)}
+                                                                    onClick={() => selectRow(row)}
+                                                                    className={`hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm transition-colors ${
+                                                                        selectedRowId === row.id
+                                                                            ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                                                            : "hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
+                                                                    }`}
+                                                                >
                                                                     <div className="col-span-3 h-8 flex items-center">
                                                                         {row.item_id ? (
                                                                             <button
@@ -1363,30 +1415,39 @@ export default function PurchaseEdit({
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "full")}
                                                                             className="h-8 px-1 text-center"
                                                                             value={row.full}
                                                                             onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "full")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                     </div>
 
                                                                     <div className="col-span-1">
                                                                         {showLoose && (
                                                                             <Input
+                                                                                ref={setCellRef(row.id, "pcs")}
                                                                                 className="h-8 px-1 text-center"
                                                                                 value={row.pcs}
                                                                                 onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
-                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                onFocus={() => selectRow(row)}
+                                                                                onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "pcs")}
+                                                                                onClick={() => selectRow(row)}
                                                                             />
                                                                         )}
                                                                     </div>
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "bonus_full")}
                                                                             className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
                                                                             value={row.bonus_full}
                                                                             onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_full")}
+                                                                            onClick={() => selectRow(row)}
                                                                             placeholder="B.Full"
                                                                         />
                                                                     </div>
@@ -1394,16 +1455,20 @@ export default function PurchaseEdit({
                                                                     <div className="col-span-1">
                                                                         {showLoose && (
                                                                             <Input
+                                                                                ref={setCellRef(row.id, "bonus_pcs")}
                                                                                 className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
                                                                                 value={row.bonus_pcs}
                                                                                 onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })}
-                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                onFocus={() => selectRow(row)}
+                                                                                onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_pcs")}
+                                                                                onClick={() => selectRow(row)}
                                                                                 placeholder="B.Pcs"
                                                                             />
                                                                         )}
                                                                     </div>
                                                                     <div className="col-span-1 relative">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "rate")}
                                                                             type="text"
                                                                             inputMode="decimal"
                                                                             className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
@@ -1417,7 +1482,9 @@ export default function PurchaseEdit({
                                                                             onBlur={() => {
                                                                                 updateRow(row.id, { rate: toNumber(row.rate) });
                                                                             }}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "rate")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                         {(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) && (
                                                                             <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
@@ -1429,6 +1496,7 @@ export default function PurchaseEdit({
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "disc")}
                                                                             type="text"
                                                                             inputMode="decimal"
                                                                             className="h-8 px-1 text-center"
@@ -1442,7 +1510,9 @@ export default function PurchaseEdit({
                                                                             onBlur={() => {
                                                                                 updateRow(row.id, { discPercent: toNumber(row.discPercent) });
                                                                             }}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "disc")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                     </div>
 
@@ -1609,6 +1679,42 @@ export default function PurchaseEdit({
                                         </div>
 
                                         <div className="h-px bg-zinc-200 dark:bg-zinc-800 border-dashed border-t border-zinc-300 dark:border-zinc-700" />
+
+                                        {/* Advance Information */}
+                                        {advanceAvailable < 0 && (
+                                            <div className="space-y-2.5 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
+                                                        <TrendingDown size={12} /> Available Advance
+                                                    </span>
+                                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        Rs {(applicableAdvance > 0 ? applicableAdvance : Math.abs(advanceAvailable)).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id="use-advance-desktop"
+                                                            checked={useAdvance}
+                                                            onCheckedChange={(v) => setUseAdvance(!!v)}
+                                                            className="w-4 h-4 border-emerald-500/50 data-[state=checked]:bg-emerald-600"
+                                                        />
+                                                        <label htmlFor="use-advance-desktop" className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                                                            Apply to this bill
+                                                        </label>
+                                                    </div>
+                                                    <span className="text-xs font-black text-emerald-600 font-mono">
+                                                        -Rs {totals.appliedAdvance.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-1 border-t border-emerald-500/10 text-[10px]">
+                                                    <span className="font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Remaining Advance</span>
+                                                    <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        Rs {totals.remainingAdvance.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Net Total - Big & Bold */}
                                         <div className="flex flex-col bg-orange-600 dark:bg-orange-700 text-white p-3 rounded-sm shadow-[0_8px_20px_rgba(234,88,12,0.3)]">
@@ -1914,6 +2020,16 @@ export default function PurchaseEdit({
                     isSubmitting={isSubmitting}
                 />
 
+                {/* Smart Supplier Selection Dialog (F1) */}
+                <SmartAccountDialog
+                    open={accountDialogOpen}
+                    onOpenChange={setAccountDialogOpen}
+                    context="purchase"
+                    selectedAccountId={accountType?.value || null}
+                    onSelect={(acc) => handleSelectSupplier(acc)}
+                    f1Disabled={itemDialogOpen || showPaymentDialog || showPriceDialog || showSuccessDialog}
+                />
+
                 {/* Purchase Payment Dialog */}
                 <PurchasePaymentDialog
                     open={showPaymentDialog}
@@ -1929,7 +2045,7 @@ export default function PurchaseEdit({
                         submitPurchase(updatePricesAfterPayment);
                     }}
                     invoiceNo={invoiceNo}
-                    supplierName={accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A"}
+                    supplierName={selectedAccountInfo?.title || accountType?.label || "N/A"}
                     previousBalance={supplierBalance}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}

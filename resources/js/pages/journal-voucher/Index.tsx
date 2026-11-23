@@ -19,7 +19,8 @@ import {
 import { router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn, formatSafeDate } from '@/lib/utils';
+import { cn } from '@/lib/utils'
+import { formatSafeDate } from '@/lib/format-utils';
 import {
     Select,
     SelectContent,

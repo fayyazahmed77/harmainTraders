@@ -67,6 +67,14 @@ class PaymentController extends Controller implements HasMiddleware
             $query->where('amount', $request->amount);
         }
 
+        // Filter by Voucher No (partial match, e.g. CRV-0010, CPV, 0010)
+        if ($request->filled('voucher_no')) {
+            $voucherNo = trim((string) $request->voucher_no);
+            if ($voucherNo !== '') {
+                $query->where('voucher_no', 'like', '%' . $voucherNo . '%');
+            }
+        }
+
         $allPayments = $query->orderBy('date', 'desc')
             ->orderBy('id', 'desc')
             ->get();
@@ -130,6 +138,12 @@ class PaymentController extends Controller implements HasMiddleware
         }
         if ($request->filled('amount')) {
             $summaryQueryBase->where('amount', $request->amount);
+        }
+        if ($request->filled('voucher_no')) {
+            $voucherNo = trim((string) $request->voucher_no);
+            if ($voucherNo !== '') {
+                $summaryQueryBase->where('voucher_no', 'like', '%' . $voucherNo . '%');
+            }
         }
 
         $summaryRow = (clone $summaryQueryBase)
@@ -240,7 +254,7 @@ class PaymentController extends Controller implements HasMiddleware
             'sales_summary' => $salesSummary,
             'purchase_summary' => $purchaseSummary,
             'analytics' => $analytics,
-            'filters' => $request->only(['start_date', 'end_date', 'account_id', 'type', 'payment_method', 'amount']),
+            'filters' => $request->only(['start_date', 'end_date', 'account_id', 'type', 'payment_method', 'amount', 'voucher_no']),
             'accounts' => fn () => Account::select('id', 'title', 'type')->orderBy('title')->get(),
         ]);
     }

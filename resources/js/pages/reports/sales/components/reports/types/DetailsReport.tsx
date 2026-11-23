@@ -1,6 +1,7 @@
 import React from 'react';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { cn, formatSafeDate } from '@/lib/utils';
+import { cn } from '@/lib/utils'
+import { formatSafeDate } from '@/lib/format-utils';
 
 interface Props {
     data: any[];

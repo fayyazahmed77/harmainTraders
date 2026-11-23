@@ -136,10 +136,30 @@
         $criteriaList[] = 'Sort By: ' . strtoupper($sortBy);
     }
 
-    // 15. Ledger Logic (Only if specified and cleardate)
+    // 15. Ledger Logic (Only if specified and not default invdate)
     $dateType = $filterParams['dateType'] ?? null;
     if (!empty($dateType) && $dateType === 'cleardate') {
         $criteriaList[] = 'Logic: BY CLEARING';
+    } elseif (!empty($dateType) && $dateType === 'returndate') {
+        $criteriaList[] = 'Logic: BY RETURN CHEQUE DATE';
+    }
+
+    // 16. Bank Ledger Payment Filter
+    $bankFilter = strtolower((string) ($filterParams['bankFilter'] ?? $filterParams['bank_filter'] ?? ''));
+    $bankFilterLabels = [
+        'online' => 'ONLINE',
+        'cheque' => 'CHEQUE',
+        'receipt' => 'RECEIPT (IN)',
+        'payment' => 'PAYMENT (OUT)',
+    ];
+    if (isset($bankFilterLabels[$bankFilter])) {
+        $criteriaList[] = 'Payment Filter: ' . $bankFilterLabels[$bankFilter];
+    }
+
+    // 17. Bank Status Filter
+    $bankStatus = strtolower((string) ($filterParams['status'] ?? ''));
+    if (in_array($bankStatus, ['cleared', 'pending'], true)) {
+        $criteriaList[] = 'Status: ' . strtoupper($bankStatus);
     }
 @endphp
 

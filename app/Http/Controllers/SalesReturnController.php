@@ -124,10 +124,8 @@ class SalesReturnController extends Controller implements HasMiddleware
     //create
     public function create(Request $request)
     {
-        // Only accounts that have at least one sale
-        $accounts = Account::active()->with('accountType')
-            ->whereHas('sales')
-            ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
+        // Accounts are loaded on-demand via /account/picker?context=sales_return
+        $accounts = [];
 
         $salemans = Saleman::get();
         $messageLines = MessageLine::get(['id', 'messageline']);
@@ -677,18 +675,8 @@ public function getCustomerInvoices($customerId)
             \App\Services\StockService::attachRealtimeBalances($return->items->pluck('item')->filter());
         }
 
-        $accounts = Account::with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Customers', 'Customer', 'Client']);
-            })
-            ->get(['id', 'title', 'aging_days', 'credit_limit', 'saleman_id']);
-
-        if ($return->customer_id && !$accounts->contains('id', $return->customer_id)) {
-            $cust = Account::find($return->customer_id);
-            if ($cust) {
-                $accounts->push($cust);
-            }
-        }
+        // Load ONLY the currently assigned customer (others fetched on-demand via /account/picker?context=sales_return)
+        $accounts = AccountController::loadSingleForPicker($return->customer_id ? (int) $return->customer_id : null, 'sales_return');
 
         $salemans = Saleman::get();
         $messageLines = MessageLine::get(['id', 'messageline']);

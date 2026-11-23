@@ -26,6 +26,7 @@ interface FilterProps {
         end_date?: string;
         customer_id?: string;
         status?: string;
+        amount?: string;
         search?: string;
         is_online?: string;
     };
@@ -53,6 +54,7 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
     });
     const [customerId, setCustomerId] = useState(filters.customer_id || "all");
     const [status, setStatus] = useState(filters.status || "all");
+    const [amount, setAmount] = useState(filters.amount || "");
     const [search, setSearch] = useState(filters.search || "");
     const [isOnline, setIsOnline] = useState(filters.is_online === 'true');
 
@@ -62,6 +64,7 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
             end_date: date?.to ? format(date.to, "yyyy-MM-dd") : "",
             customer_id: customerId === "all" ? "" : customerId,
             status: status === "all" ? "" : status,
+            amount: amount,
             search: search,
             is_online: isOnline ? 'true' : '',
             ...overrides
@@ -77,12 +80,13 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
         setDate(undefined);
         setCustomerId("all");
         setStatus("all");
+        setAmount("");
         setSearch("");
         setIsOnline(false);
         router.get("/sales");
     };
 
-    // Auto-apply filters when state changes (except search which needs debounce)
+    // Auto-apply filters when state changes (except search & amount which need debounce)
     React.useEffect(() => {
         if (customerId !== (filters.customer_id || "all")) {
             applyFilters({ customer_id: customerId === "all" ? "" : customerId });
@@ -100,6 +104,15 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
             applyFilters({ is_online: isOnline ? 'true' : '' });
         }
     }, [isOnline]);
+
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            if (amount !== (filters.amount || "")) {
+                applyFilters({ amount });
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [amount]);
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
@@ -130,13 +143,14 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
         date?.from ||
         (customerId && customerId !== "all") ||
         (status && status !== "all") ||
+        amount ||
         search ||
         isOnline
     );
 
     return (
         <div className="p-4 rounded-xl bg-card border border-border shadow-sm mb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
                 {/* Date Range Picker */}
                 <FieldWrapper label="Date Range" className="w-full min-w-0">
                     <Popover>
@@ -240,7 +254,7 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
                 {/* Status Filter */}
                 <FieldWrapper label="Status" className="w-full min-w-0">
                     <Select value={status} onValueChange={(val) => setStatus(val)}>
-                        <SelectTrigger className="h-10 text-xs font-semibold bg-background border-border">
+                        <SelectTrigger className="w-full h-10 text-xs font-semibold bg-background border-border">
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
@@ -252,6 +266,33 @@ export default function SalesFilters({ filters, customers }: FilterProps) {
                             <SelectItem value="Canceled">Canceled</SelectItem>
                         </SelectContent>
                     </Select>
+                </FieldWrapper>
+
+                {/* Amount Filter */}
+                <FieldWrapper label="Amount" className="w-full min-w-0">
+                    <div className="relative">
+                        <span className="absolute left-2.5 top-2.5 text-[11px] font-bold text-muted-foreground select-none z-10">
+                            Rs
+                        </span>
+                        <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="Net total..."
+                            className="pl-8 pr-7 h-10 border-border bg-background focus:border-primary transition-colors font-semibold text-xs font-mono"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                        />
+                        {amount && (
+                            <button
+                                type="button"
+                                onClick={() => setAmount("")}
+                                className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                                title="Clear amount filter"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
                 </FieldWrapper>
 
                 {/* Search Invoice & Online & Reset */}

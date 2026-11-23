@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head } from '@inertiajs/react';
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -109,6 +109,7 @@ export default function AccountReports({
             remarks: '',
             printOn: 'screen',
             dateType: 'invdate',
+            bankFilter: 'ALL',
             ledgerDesc: 'contraa/c',
             balanceCriteria: 'all',
             identityType: 'code',
@@ -137,34 +138,76 @@ export default function AccountReports({
     const [closingBalance, setClosingBalance] = useState(0);
     const [loading, setLoading] = useState(false);
     const [pageCount, setPageCount] = useState(0);
+    const [totalRecords, setTotalRecords] = useState(0);
     const [balanceType, setBalanceType] = useState<'dr' | 'cr'>('dr');
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
         pageSize: 50,
     });
     const [hasSearched, setHasSearched] = useState(false);
+    const [executedReportId, setExecutedReportId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [bankFilterMode, setBankFilterMode] = useState<'all' | 'cleared' | 'pending'>('all');
+    const [bankSearchTerm, setBankSearchTerm] = useState('');
+    const [debouncedBankSearch, setDebouncedBankSearch] = useState('');
 
-    const fetchData = async () => {
+    const requestIdRef = useRef(0);
+    const prevBankFilterRef = useRef(params.bankFilter);
+    const prevDateTypeRef = useRef(params.dateType);
+    const bankSearchMountedRef = useRef(false);
+
+    const fetchData = async (overrides?: {
+        pageIndex?: number;
+        pageSize?: number;
+        bankFilter?: string;
+        bankFilterMode?: 'all' | 'cleared' | 'pending';
+        bankSearch?: string;
+        dateType?: string;
+    }) => {
+        const reqId = ++requestIdRef.current;
+        const targetPageIndex = overrides?.pageIndex ?? pagination.pageIndex;
+        const targetPageSize = overrides?.pageSize ?? pagination.pageSize;
+        const effectiveBankFilter = overrides?.bankFilter ?? params.bankFilter;
+        const effectiveDateType = overrides?.dateType ?? params.dateType;
+        const effectiveBankStatus = overrides?.bankFilterMode ?? bankFilterMode;
+        const effectiveBankSearch = overrides?.bankSearch ?? debouncedBankSearch;
+
         setHasSearched(true);
         setLoading(true);
         try {
             // This is a generic fetcher that handles multiple report types
             const reportId = params.reportId.toLowerCase();
             const endpoint = route('reports.accounts.ledger');
-            
+
+            const queryParams: Record<string, any> = {
+                ...params,
+                dateType: effectiveDateType,
+                bankFilter: effectiveBankFilter,
+                reportId: reportId,
+                account_id: params.accountId,
+                from: format(params.fromDate, 'yyyy-MM-dd'),
+                to: format(params.toDate, 'yyyy-MM-dd'),
+                page: targetPageIndex + 1,
+                per_page: targetPageSize,
+            };
+
+            if (reportId === 'bank_ledger') {
+                if (effectiveDateType !== 'returndate' && effectiveBankStatus !== 'all') {
+                    queryParams.status = effectiveBankStatus;
+                }
+                if (effectiveBankSearch.trim() !== '') {
+                    queryParams.search = effectiveBankSearch.trim();
+                }
+            }
+
             const response = await axios.get(endpoint, {
-                params: {
-                    ...params,
-                    reportId: reportId,
-                    account_id: params.accountId,
-                    from: format(params.fromDate, 'yyyy-MM-dd'),
-                    to: format(params.toDate, 'yyyy-MM-dd'),
-                    page: pagination.pageIndex + 1,
-                    per_page: pagination.pageSize,
-                },
+                params: queryParams,
                 headers: { 'Accept': 'application/json' }
             });
+
+            if (reqId !== requestIdRef.current) return;
+
+            setExecutedReportId(reportId);
 
             if (reportId === 'accounts_aging') {
                 setAgingData(response.data?.data || []);
@@ -181,6 +224,7 @@ export default function AccountReports({
             } else if (reportId === 'bank_ledger') {
                 setLedgerData(response.data?.data?.data || []);
                 setPageCount(response.data?.data?.last_page || 0);
+                setTotalRecords(response.data?.data?.total || 0);
                 setOpeningBalance(response.data.opening_balance || 0);
                 setPageStartBalance(response.data.page_start_balance || 0);
                 setTotalDebit(response.data.total_cleared_deposits ?? response.data.total_debit ?? 0);
@@ -191,6 +235,7 @@ export default function AccountReports({
             } else if (params.reportId === 'detail_ledger' || params.reportId === 'general_ledger') {
                 setLedgerData(response.data?.data?.data || []);
                 setPageCount(response.data?.data?.last_page || 0);
+                setTotalRecords(response.data?.data?.total || 0);
                 setOpeningBalance(response.data.opening_balance);
                 setPageStartBalance(response.data.page_start_balance);
                 setTotalDebit(response.data.total_debit);
@@ -217,28 +262,92 @@ export default function AccountReports({
                 setTrialBalance6ColData(response.data?.data || []);
             }
         } catch (error: any) {
+            if (reqId !== requestIdRef.current) return;
             console.error("Failed to fetch report", error);
             const message = error.response?.data?.message || "Failed to load report data";
             const details = error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(", ") : "";
             toast.error(`${message} ${details}`);
         } finally {
-            setLoading(false);
+            if (reqId === requestIdRef.current) {
+                setLoading(false);
+            }
         }
     };
+
+    const handleExecute = () => {
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+        fetchData({ pageIndex: 0 });
+    };
+
+    const handlePaginationChange = (updater: PaginationState | ((prev: PaginationState) => PaginationState)) => {
+        const next = typeof updater === 'function' ? updater(pagination) : updater;
+        setPagination(next);
+        if (hasSearched) {
+            fetchData({ pageIndex: next.pageIndex, pageSize: next.pageSize });
+        }
+    };
+
+    const handleBankFilterModeChange = (mode: 'all' | 'cleared' | 'pending') => {
+        setBankFilterMode(mode);
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+        if (hasSearched && params.reportId.toLowerCase() === 'bank_ledger') {
+            fetchData({ pageIndex: 0, bankFilterMode: mode });
+        }
+    };
+
+    // Debounce Bank Ledger table search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedBankSearch(bankSearchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [bankSearchTerm]);
+
+    // Refetch from page 1 when debounced Bank Ledger search changes
+    useEffect(() => {
+        if (!bankSearchMountedRef.current) {
+            bankSearchMountedRef.current = true;
+            return;
+        }
+        if (hasSearched && params.reportId.toLowerCase() === 'bank_ledger') {
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            fetchData({ pageIndex: 0, bankSearch: debouncedBankSearch });
+        }
+    }, [debouncedBankSearch]);
+
+    // Refetch from page 1 when Bank Ledger Payment Filter or Ledger Logic changes after initial execute
+    useEffect(() => {
+        const bankFilterChanged = prevBankFilterRef.current !== params.bankFilter;
+        const dateTypeChanged = prevDateTypeRef.current !== params.dateType;
+        prevBankFilterRef.current = params.bankFilter;
+        prevDateTypeRef.current = params.dateType;
+
+        if (!bankFilterChanged && !dateTypeChanged) return;
+
+        let nextStatus = bankFilterMode;
+        if (dateTypeChanged && params.dateType === 'returndate' && bankFilterMode !== 'all') {
+            nextStatus = 'all';
+            setBankFilterMode('all');
+        }
+
+        if (hasSearched && params.reportId.toLowerCase() === 'bank_ledger') {
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            fetchData({
+                pageIndex: 0,
+                bankFilter: params.bankFilter,
+                dateType: params.dateType,
+                bankFilterMode: nextStatus,
+            });
+        }
+    }, [params.bankFilter, params.dateType]);
 
     // Auto-fetch if navigated with a specific report query
     useEffect(() => {
         const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         if (urlParams?.get('report') || urlParams?.get('reportId')) {
-            fetchData();
+            fetchData({ pageIndex: 0 });
         }
     }, []);
-
-    useEffect(() => {
-        if (hasSearched) {
-            fetchData();
-        }
-    }, [pagination.pageIndex, pagination.pageSize]);
 
     const filteredLedgerData = useMemo(() => {
         let balance = Number(pageStartBalance);
@@ -286,6 +395,11 @@ export default function AccountReports({
         if (params.remarks) queryParams.remarks = params.remarks;
         if (params.sortBy && params.sortBy !== 'INV_DATE') queryParams.sortBy = params.sortBy;
         if (params.dateType && params.dateType !== 'invdate') queryParams.dateType = params.dateType;
+        if (reportId === 'bank_ledger') {
+            if (params.bankFilter && params.bankFilter !== 'ALL') queryParams.bankFilter = params.bankFilter;
+            if (params.dateType !== 'returndate' && bankFilterMode !== 'all') queryParams.status = bankFilterMode;
+            if (bankSearchTerm.trim() !== '') queryParams.search = bankSearchTerm.trim();
+        }
 
         return queryParams;
     };
@@ -399,7 +513,7 @@ export default function AccountReports({
                                 <ReportParameterForm 
                                     data={params} 
                                     setData={setParams} 
-                                    onExecute={fetchData}
+                                    onExecute={handleExecute}
                                     onPrint={handlePrint}
                                     onExportPdf={handleExportPdf}
                                     bootstrap={{
@@ -427,7 +541,7 @@ export default function AccountReports({
                                         <h3 className="text-xl font-bold text-text-primary uppercase tracking-tight">Ready to Generate Report</h3>
                                         <p className="text-sm text-text-muted mt-1 max-w-sm text-center">Configure your account, date range, and filters in the form above and click "Execute" to view your report.</p>
                                     </motion.div>
-                                ) : loading ? (
+                                ) : loading && executedReportId !== params.reportId.toLowerCase() ? (
                                     <motion.div 
                                         key="loading"
                                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -437,7 +551,7 @@ export default function AccountReports({
                                         <p className="text-sm font-bold text-text-muted uppercase tracking-widest">Generating {params.reportId.replace('_', ' ')} Report...</p>
                                     </motion.div>
                                 ) : (params.reportId === 'detail_ledger') ? (
-                                    <motion.div key="detail-ledger" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+                                    <motion.div key="detail-ledger" initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className={cn("space-y-6 transition-opacity", loading && "opacity-60 pointer-events-none")}>
                                         <DetailLedgerReportView 
                                             data={filteredLedgerData}
                                             criteria={getCriteriaString()}
@@ -446,8 +560,9 @@ export default function AccountReports({
                                             totalCredit={totalCredit}
                                             closingBalance={closingBalance}
                                             pageCount={pageCount}
+                                            totalRecords={totalRecords}
                                             pagination={pagination}
-                                            setPagination={setPagination}
+                                            setPagination={handlePaginationChange}
                                             balanceType={balanceType}
                                         />
                                     </motion.div>
@@ -462,13 +577,21 @@ export default function AccountReports({
                                             totalUnclearedFloat={totalUnclearedFloat}
                                             closingBalance={closingBalance}
                                             pageCount={pageCount}
+                                            totalRecords={totalRecords}
                                             pagination={pagination}
-                                            setPagination={setPagination}
+                                            setPagination={handlePaginationChange}
+                                            dateType={params.dateType}
+                                            bankFilter={params.bankFilter}
+                                            filterMode={bankFilterMode}
+                                            setFilterMode={handleBankFilterModeChange}
+                                            searchTerm={bankSearchTerm}
+                                            setSearchTerm={setBankSearchTerm}
+                                            isLoading={loading}
                                             accountInfo={accounts.find(a => a.id.toString() === params.accountId)}
                                         />
                                     </motion.div>
                                 ) : (params.reportId === 'general_ledger') ? (
-                                    <motion.div key="ledger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                                    <motion.div key="ledger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={cn("space-y-6 transition-opacity", loading && "opacity-60 pointer-events-none")}>
                                         <GeneralLedgerReportView 
                                             data={filteredLedgerData}
                                             criteria={getCriteriaString()}
@@ -477,8 +600,9 @@ export default function AccountReports({
                                             totalCredit={totalCredit}
                                             closingBalance={closingBalance}
                                             pageCount={pageCount}
+                                            totalRecords={totalRecords}
                                             pagination={pagination}
-                                            setPagination={setPagination}
+                                            setPagination={handlePaginationChange}
                                             balanceType={balanceType}
                                         />
                                     </motion.div>

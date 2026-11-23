@@ -122,11 +122,6 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     //create
     public function create(Request $request)
     {
-        $accounts = Account::active()->with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Supplier']);
-            })
-            ->get();
         $salemans = Saleman::get();
         $items = Items::get();
         \App\Services\StockService::attachRealtimeBalances($items);
@@ -138,6 +133,11 @@ class PurchaseReturnController extends Controller implements HasMiddleware
                 \App\Services\StockService::attachRealtimeBalances($purchase->items->pluck('item')->filter());
             }
         }
+
+        // Load ONLY the pre-selected supplier if ?purchase_id= is provided; otherwise loaded via /account/picker
+        $accounts = $purchase && $purchase->supplier_id
+            ? AccountController::loadSingleForPicker((int) $purchase->supplier_id, 'purchase_return')
+            : [];
 
         $firms = \App\Models\Firm::select('id', 'name', 'defult')->get();
 
@@ -567,18 +567,8 @@ class PurchaseReturnController extends Controller implements HasMiddleware
     public function edit($id)
     {
         $return = PurchaseReturn::with(['supplier', 'salesman', 'items.item', 'firm'])->findOrFail($id);
-        $accounts = Account::with('accountType')
-            ->whereHas('accountType', function ($q) {
-                $q->whereIn('name', ['Supplier', 'Suppliers']);
-            })
-            ->get();
-
-        if ($return->supplier_id && !$accounts->contains('id', $return->supplier_id)) {
-            $supp = Account::find($return->supplier_id);
-            if ($supp) {
-                $accounts->push($supp);
-            }
-        }
+        // Load ONLY the currently assigned supplier (others fetched on-demand via /account/picker?context=purchase_return)
+        $accounts = AccountController::loadSingleForPicker($return->supplier_id ? (int) $return->supplier_id : null, 'purchase_return');
         $salemans = Saleman::get();
         $items = Items::get();
         \App\Services\StockService::attachRealtimeBalances($items);

@@ -27,6 +27,11 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    SmartAccountDialog,
+    SmartAccountTrigger,
+    SmartAccount,
+} from "@/components/SmartAccountSelect";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -485,8 +490,16 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
     }, []);
 
     // ── Supplier selection ──────────────────────
-    const handleAccountSelect = (accId: number) => {
-        const acc = accounts.find(a => a.id === accId) ?? null;
+    const handleAccountSelect = (picked: SmartAccount | null) => {
+        const acc: Account | null = picked
+            ? {
+                id: picked.id,
+                title: picked.title,
+                aging_days: picked.aging_days,
+                credit_limit: picked.credit_limit ?? undefined,
+                saleman_id: picked.saleman_id ?? undefined,
+            }
+            : null;
         setSelectedAccount(acc);
         setSelectedInvoice(null);
         setOriginalInvoiceNo("");
@@ -502,7 +515,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
             setSalesman(acc.saleman_id ?? null);
 
             // Fetch Detailed Balances
-            fetch(`/account/${accId}/detailed-balances`)
+            fetch(`/account/${acc.id}/detailed-balances`)
                 .then(r => r.json())
                 .then(data => {
                     setSupplierBalance(toNum(data.previous_balance));
@@ -512,7 +525,7 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                 })
                 .catch(console.error);
 
-            fetch(`/purchase-return/supplier/${accId}/purchased-items`)
+            fetch(`/purchase-return/supplier/${acc.id}/purchased-items`)
                 .then(r => r.json())
                 .then(data => { if (Array.isArray(data)) setSupplierItems(data); })
                 .catch(console.error);
@@ -980,31 +993,16 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                 <TechLabel label="Supplier Designation" icon={UserIcon}>
                                     <div className="relative">
-                                        <Popover open={mobileAccOpen} onOpenChange={setMobileAccOpen}>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500 shadow-sm`}>
-                                                    <span className="truncate">{selectedAccount ? selectedAccount.title : "Identify Supplier..."}</span>
-                                                    <Search size={13} className="text-zinc-400 flex-shrink-0 ml-2" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[calc(100vw-48px)] p-0 shadow-2xl border-zinc-300 dark:border-zinc-700" align="center" sideOffset={8}>
-                                                <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                                                </div>
-                                                <div className="max-h-[60vh] overflow-auto py-1">
-                                                    {filteredAccounts.map(acc => (
-                                                        <button key={acc.id} className="w-full text-left px-3 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2.5 group border-l-2 border-transparent hover:border-orange-500"
-                                                            onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500 flex-shrink-0" />
-                                                            <span className="truncate">{acc.title}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
+                                        <SmartAccountTrigger
+                                            value={selectedAccount ? { id: selectedAccount.id, title: selectedAccount.title } : null}
+                                            onClick={() => setDesktopAccOpen(true)}
+                                            onClear={() => handleAccountSelect(null)}
+                                            placeholder="Identify Supplier..."
+                                            className={`w-full h-9 ${PREMIUM_ROUNDING_MD} font-black text-xs uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-orange-500 shadow-sm`}
+                                        />
                                         {supplierBalance !== null && (
-                                            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 mr-5 pointer-events-none">
-                                                <span className={`text-[9px] font-black ${toNum(supplierBalance) <= 0 ? "text-sky-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
+                                            <div className="mt-1 flex items-center justify-end">
+                                                <span className={`text-[9px] font-black ${toNum(supplierBalance) <= 0 ? "text-sky-500" : "text-rose-500"} bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800`}>
                                                     {toNum(supplierBalance) < 0 ? `Advance Rs ${Math.abs(toNum(supplierBalance)).toLocaleString()}` : fmtBalance(supplierBalance, true)}
                                                 </span>
                                             </div>
@@ -1046,29 +1044,13 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
 
                                 <div className="col-span-3">
                                     <TechLabel label="Supplier Designation" icon={UserIcon}>
-                                        <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
-                                                    {selectedAccount ? selectedAccount.title : "Identify Supplier..."}
-                                                    <Search size={12} className="text-zinc-400" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                                <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                    <Input placeholder="SEARCH SUPPLIER..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                                                </div>
-                                                <div className="max-h-64 overflow-auto py-1">
-                                                    {filteredAccounts.map(acc => (
-                                                        <button key={acc.id} className="w-full text-left px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
-                                                            onClick={() => { handleAccountSelect(acc.id); setAccountSearch(""); }}>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
-                                                            {acc.title}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
-
+                                        <SmartAccountTrigger
+                                            value={selectedAccount ? { id: selectedAccount.id, title: selectedAccount.title } : null}
+                                            onClick={() => setDesktopAccOpen(true)}
+                                            onClear={() => handleAccountSelect(null)}
+                                            placeholder="Identify Supplier..."
+                                            className={`w-full h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-orange-500`}
+                                        />
                                     </TechLabel>
                                 </div>
 
@@ -1773,6 +1755,16 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                         animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                     }
                 `}</style>
+                {/* Smart Supplier Selection Dialog (F1) */}
+                <SmartAccountDialog
+                    open={desktopAccOpen}
+                    onOpenChange={setDesktopAccOpen}
+                    context="purchase_return"
+                    selectedAccountId={selectedAccount?.id ?? null}
+                    onSelect={(acc) => handleAccountSelect(acc)}
+                    f1Disabled={invoiceDialogOpen || assignItemDialogOpen || showSuccessDialog}
+                />
+
                 {successData && (
                     <SuccessDialog
                         open={showSuccessDialog}

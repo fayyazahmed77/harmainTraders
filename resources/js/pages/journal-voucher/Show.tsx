@@ -19,7 +19,7 @@ import {
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatSafeDate } from '@/lib/utils';
+import { formatSafeDate } from '@/lib/format-utils';
 
 interface Props {
     receipt: any;

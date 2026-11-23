@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { cn, formatSafeDate } from '@/lib/utils';
+import { cn } from '@/lib/utils'
+import { formatSafeDate } from '@/lib/format-utils';
 import { PaginationState } from '@tanstack/react-table';
 
 export function GeneralLedgerReportView({ 
@@ -196,13 +197,19 @@ export function GeneralLedgerReportView({
                     </table>
                 </div>
 
-                <div className="p-4 border-t border-border flex justify-between items-center bg-surface-1/50">
-                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: p.pageIndex - 1 }))} disabled={pagination.pageIndex === 0} className="h-8 shadow-sm">
-                            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                <div className="p-4 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-2 bg-surface-1/50">
+                     <div className="flex items-center gap-1.5">
+                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="h-8 shadow-sm text-xs px-2.5">
+                            <ChevronsLeft className="h-3.5 w-3.5 mr-1" /> First
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: p.pageIndex + 1 }))} disabled={pagination.pageIndex >= (pageCount - 1)} className="h-8 shadow-sm">
-                            Next <ChevronRight className="h-4 w-4 ml-1" />
+                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="h-8 shadow-sm text-xs px-2.5">
+                            <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Previous
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: Math.min(Math.max(0, (pageCount || 1) - 1), p.pageIndex + 1) }))} disabled={pagination.pageIndex >= (pageCount - 1)} className="h-8 shadow-sm text-xs px-2.5">
+                            Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setPagination((p: any) => ({ ...p, pageIndex: Math.max(0, (pageCount || 1) - 1) }))} disabled={pagination.pageIndex >= (pageCount - 1)} className="h-8 shadow-sm text-xs px-2.5">
+                            Last <ChevronsRight className="h-3.5 w-3.5 ml-1" />
                         </Button>
                     </div>
                     <span className="text-[11px] font-black text-text-secondary uppercase tracking-wider bg-background border border-border px-3 py-1.5 rounded-full">

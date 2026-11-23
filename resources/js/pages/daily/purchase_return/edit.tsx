@@ -27,6 +27,11 @@ import {
     DialogDescription,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    SmartAccountDialog,
+    SmartAccountTrigger,
+    SmartAccount,
+} from "@/components/SmartAccountSelect";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -450,8 +455,14 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
     }, [selectedAccount]);
 
     // ── Handlers ──────────────────────────────
-    const handleAccountSelect = (accId: number) => {
-        const acc = accounts.find(a => a.id === accId) ?? null;
+    const handleAccountSelect = (picked: SmartAccount | null) => {
+        const acc: Account | null = picked
+            ? {
+                id: picked.id,
+                title: picked.title,
+                saleman_id: picked.saleman_id ?? undefined,
+            }
+            : null;
         setSelectedAccount(acc);
         setSelectedInvoice(null);
         setOriginalInvoiceNo("");
@@ -732,28 +743,13 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
 
                             <div className="col-span-5">
                                 <TechLabel label="Supplier Designation" icon={UserIcon}>
-                                    <Popover open={desktopAccOpen} onOpenChange={setDesktopAccOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className={`w-full justify-between h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs text-left truncate uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 transition-all hover:border-orange-500`}>
-                                                {selectedAccount ? selectedAccount.title : "Identify Supplier..."}
-                                                <Search size={12} className="text-zinc-400" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-80 p-0 border-zinc-300 dark:border-zinc-700 shadow-2xl" align="start">
-                                            <div className="p-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                                                <Input placeholder="SEARCH IDENTITY..." value={accountSearch} onChange={e => setAccountSearch(e.target.value)} className={`h-8 text-xs font-mono uppercase border-zinc-200 dark:border-zinc-700 ${PREMIUM_ROUNDING_MD}`} />
-                                            </div>
-                                            <div className="max-h-64 overflow-auto py-1">
-                                                {filteredAccounts.map(acc => (
-                                                    <button key={acc.id} className="w-full text-left px-3 py-1.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors flex items-center gap-2 group border-l-2 border-transparent hover:border-orange-500"
-                                                        onClick={() => handleAccountSelect(acc.id)}>
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 group-hover:bg-orange-500" />
-                                                        {acc.title}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
+                                    <SmartAccountTrigger
+                                        value={selectedAccount ? { id: selectedAccount.id, title: selectedAccount.title } : null}
+                                        onClick={() => setDesktopAccOpen(true)}
+                                        onClear={() => handleAccountSelect(null)}
+                                        placeholder="Identify Supplier..."
+                                        className={`w-full h-8 ${PREMIUM_ROUNDING_MD} font-black text-xs uppercase tracking-tighter bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:border-orange-500`}
+                                    />
                                 </TechLabel>
                             </div>
 
@@ -1032,6 +1028,16 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
                 `}</style>
+                {/* Smart Supplier Selection Dialog (F1) */}
+                <SmartAccountDialog
+                    open={desktopAccOpen}
+                    onOpenChange={setDesktopAccOpen}
+                    context="purchase_return"
+                    selectedAccountId={selectedAccount?.id ?? null}
+                    onSelect={(acc) => handleAccountSelect(acc)}
+                    f1Disabled={invoiceDialogOpen || assignItemDialogOpen || showSuccessDialog}
+                />
+
                 {successData && (
                     <SuccessDialog
                         open={showSuccessDialog}

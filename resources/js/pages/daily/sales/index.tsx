@@ -58,7 +58,9 @@ interface FilterData {
     end_date?: string;
     customer_id?: string;
     status?: string;
+    amount?: string;
     search?: string;
+    is_online?: string;
 }
 
 interface CustomerData {

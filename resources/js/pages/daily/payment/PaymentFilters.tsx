@@ -24,6 +24,7 @@ interface FilterProps {
         type?: string;
         payment_method?: string;
         amount?: string;
+        voucher_no?: string;
     };
     accounts: {
         id: number;
@@ -43,10 +44,12 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
     const [type, setType] = useState(filters.type || "all");
     const [method, setMethod] = useState(filters.payment_method || "all");
     const [amount, setAmount] = useState(filters.amount || "");
+    const [voucherNo, setVoucherNo] = useState(filters.voucher_no || "");
     const [accountSearch, setAccountSearch] = useState("");
     const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
     const dateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const amountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const voucherDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Core navigate helper ──────────────────────────────────────────────────
     const navigate = useCallback(
@@ -59,6 +62,7 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
                 type: type === "all" ? "" : type,
                 payment_method: method === "all" ? "" : method,
                 amount: amount.trim(),
+                voucher_no: voucherNo.trim(),
                 page: "1",
                 ...overrides,
             };
@@ -69,7 +73,7 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
                 only: onlyProps,
             });
         },
-        [date, accountId, type, method, amount]
+        [date, accountId, type, method, amount, voucherNo]
     );
 
     // ── Handlers ─────────────────────────────────────────────────────────────
@@ -123,14 +127,32 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
         }
     };
 
+    const handleVoucherChange = (val: string) => {
+        setVoucherNo(val);
+        if (voucherDebounceRef.current) clearTimeout(voucherDebounceRef.current);
+        voucherDebounceRef.current = setTimeout(() => {
+            navigate({ voucher_no: val.trim() });
+        }, 500);
+    };
+
+    const handleVoucherKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            if (voucherDebounceRef.current) clearTimeout(voucherDebounceRef.current);
+            navigate({ voucher_no: voucherNo.trim() });
+        }
+    };
+
     const clearFilters = () => {
         setDate(undefined);
         setAccountId("all");
         setType("all");
         setMethod("all");
         setAmount("");
+        setVoucherNo("");
         setAccountSearch("");
         if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current);
+        if (voucherDebounceRef.current) clearTimeout(voucherDebounceRef.current);
         router.get(
             "/payments",
             { page: "1" },
@@ -147,6 +169,7 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
     useEffect(() => () => {
         if (dateDebounceRef.current) clearTimeout(dateDebounceRef.current);
         if (amountDebounceRef.current) clearTimeout(amountDebounceRef.current);
+        if (voucherDebounceRef.current) clearTimeout(voucherDebounceRef.current);
     }, []);
 
     // ── Filtered account list ─────────────────────────────────────────────────
@@ -166,10 +189,11 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
         accountId !== "all" ||
         type !== "all" ||
         method !== "all" ||
-        !!amount.trim();
+        !!amount.trim() ||
+        !!voucherNo.trim();
 
     return (
-        <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:items-center lg:gap-4">
+        <div className="p-4 rounded-lg shadow-sm border mb-6 space-y-4 lg:space-y-0 lg:flex lg:flex-wrap xl:flex-nowrap lg:items-center lg:gap-3">
 
             {/* Date Range Picker */}
             <div className="flex-1 min-w-[200px]">
@@ -315,8 +339,36 @@ export default function PaymentFilters({ filters, accounts }: FilterProps) {
                 </Select>
             </div>
 
+            {/* Voucher No Filter */}
+            <div className="w-full lg:w-[155px] min-w-[130px] shrink-0 relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                    id="payment-filter-voucher"
+                    type="text"
+                    placeholder="Voucher no..."
+                    value={voucherNo}
+                    onChange={(e) => handleVoucherChange(e.target.value)}
+                    onKeyDown={handleVoucherKeyDown}
+                    className="w-full h-10 pl-8 pr-7 text-sm font-mono uppercase placeholder:normal-case placeholder:font-sans"
+                />
+                {voucherNo && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setVoucherNo("");
+                            if (voucherDebounceRef.current) clearTimeout(voucherDebounceRef.current);
+                            navigate({ voucher_no: "" });
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        title="Clear voucher"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                )}
+            </div>
+
             {/* Amount Filter */}
-            <div className="w-[130px] min-w-[110px] shrink-0 relative">
+            <div className="w-full lg:w-[130px] min-w-[110px] shrink-0 relative">
                 <Input
                     id="payment-filter-amount"
                     type="number"

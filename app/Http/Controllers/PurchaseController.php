@@ -12,6 +12,7 @@ use App\Models\Firm;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\Chequebook;
+use App\Services\AdvanceAllocationService;
 use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -210,10 +211,8 @@ class PurchaseController extends Controller implements HasMiddleware
         // Attach true real-time ledger balances
         StockService::attachRealtimeBalances($items);
 
-        $accounts = Account::eligibleForPurchase()
-            ->select('id', 'code', 'title', 'type', 'category', 'city_id', 'area_id', 'saleman_id', 'opening_balance', 'opening_balance_type', 'purchase', 'sale')
-            ->with(['accountType:id,name', 'accountCategory:id,name'])
-            ->get();
+        // Accounts are loaded on-demand via /account/picker (server-side paginated search)
+        $accounts = [];
 
         $salemans = Saleman::select('id', 'name', 'code')->get();
 
@@ -351,11 +350,8 @@ class PurchaseController extends Controller implements HasMiddleware
                 }
             }
 
-            // Calculate how much goes to THIS bill vs Surplus (Previous Balance)
+            // Calculate net bill payable
             $netPurchaseTotal = max(0, (float)$request->net_total - (float)($request->extra_discount ?? 0));
-            $actualPaidOnThisBill = min($totalPaidAmount, $netPurchaseTotal);
-            $surplusAmount = max(0, $totalPaidAmount - $netPurchaseTotal);
-            $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
 
             // Create purchase with unique temporary invoice to obtain auto-increment ID atomically
             $purchase = Purchase::create([
@@ -371,8 +367,8 @@ class PurchaseController extends Controller implements HasMiddleware
                 'tax_total'       => 0,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
-                'paid_amount'     => $actualPaidOnThisBill,
-                'remaining_amount' => $remainingAmount,
+                'paid_amount'     => 0,
+                'remaining_amount' => $netPurchaseTotal,
                 'status'          => 'Completed',
                 'message_line_id' => $request->message_line_id,
                 'firm_id'         => $request->firm_id,
@@ -403,42 +399,14 @@ class PurchaseController extends Controller implements HasMiddleware
             $purchase->invoice = $candidateInvoice;
             $purchase->save();
 
-            // --- Auto-Allocate Existing Advances (Unallocated Payments) ---
-            $unallocatedPayments = Payment::where('account_id', $purchase->supplier_id)
-                ->where('type', 'PAYMENT')
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhere('cheque_status', '!=', 'Canceled');
-                })
-                ->get()
-                ->filter(function($p) {
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    return $p->net_amount > $allocated;
-                })
-                ->sortBy('date');
-
-            foreach ($unallocatedPayments as $p) {
-                if ($purchase->remaining_amount <= 0) break;
-                
-                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                $avail = $p->net_amount - $allocated;
-                $allocationAmount = min($purchase->remaining_amount, $avail);
-                
-                if ($allocationAmount > 0) {
-                    PaymentAllocation::create([
-                        'payment_id' => $p->id,
-                        'bill_id' => $purchase->id,
-                        'bill_type' => 'App\Models\Purchase',
-                        'amount' => $allocationAmount,
-                    ]);
-                    
-                    $purchase->paid_amount += $allocationAmount;
-                    $purchase->remaining_amount -= $allocationAmount;
-                }
+            // --- Step 1: Apply Existing Advance FIRST — ONLY when user checked "Apply to this bill" ---
+            // Covers: Unallocated Cash Payments (cash-only, never discount) + SupplierCredit + Opening Balance DR (CPV-OB-xxxx)
+            $useAdvanceOnCreate = $request->boolean('use_advance', false);
+            if ($useAdvanceOnCreate) {
+                AdvanceAllocationService::applyAdvanceToPurchase($purchase);
             }
-            $purchase->save();
 
-            // --- Process Payments & Allocations ---
+            // --- Step 2: Process Instant Checkout Cash/Bank/Cheque Splits ---
             if (count($splitsData) > 0) {
                 $prefix = 'CPV-';
                 $baseVoucherNo = $this->generateNextPurchaseVoucherNo($prefix);
@@ -449,7 +417,7 @@ class PurchaseController extends Controller implements HasMiddleware
                     if (($split['amount'] ?? 0) <= 0) continue;
 
                     $voucherNo = $baseVoucherNo;
-                    
+
                     $payment = Payment::create([
                         'date' => $request->date,
                         'voucher_no' => $voucherNo,
@@ -474,7 +442,7 @@ class PurchaseController extends Controller implements HasMiddleware
 
                     // If it's a customer cheque being reused
                     if (!empty($split['customer_cheque_id'])) {
-                        Payment::where('id', $split['customer_cheque_id'])->update(['cheque_status' => 'Distributed']); 
+                        Payment::where('id', $split['customer_cheque_id'])->update(['cheque_status' => 'Distributed']);
                     }
 
                     if ($index === 0) $groupId = $payment->id;
@@ -482,30 +450,33 @@ class PurchaseController extends Controller implements HasMiddleware
                     $createdPayments[] = $payment;
                 }
 
-                // Distribution Logic
+                // Distribution Logic: settle remaining balance on THIS bill first, then FIFO to older bills
                 $remainingToAllocate = $totalPaidAmount;
 
-                if ($remainingToAllocate > 0) {
-                    // 1. Current Bill Allocation (Respecting existing advance allocations)
-                    $toThisBill = min($remainingToAllocate, $purchase->remaining_amount + $actualPaidOnThisBill);
-                    if ($toThisBill > 0) {
+                if ($remainingToAllocate > 0.005) {
+                    // 1. Current Bill Allocation (strictly bounded by remaining_amount after advance)
+                    $toThisBill = round(min($remainingToAllocate, (float) $purchase->remaining_amount), 2);
+                    if ($toThisBill > 0.005) {
                         $tempThis = $toThisBill;
                         foreach ($createdPayments as $p) {
-                            if ($tempThis <= 0) break;
-                            $canTake = min($tempThis, $p->net_amount);
-                            PaymentAllocation::create([
-                                'payment_id' => $p->id,
-                                'bill_id' => $purchase->id,
-                                'bill_type' => 'App\Models\Purchase',
-                                'amount' => $canTake,
-                            ]);
-                            $tempThis -= $canTake;
+                            if ($tempThis <= 0.005) break;
+                            $canTake = round(min($tempThis, (float) $p->amount), 2);
+                            if ($canTake > 0.005) {
+                                PaymentAllocation::create([
+                                    'payment_id' => $p->id,
+                                    'bill_id' => $purchase->id,
+                                    'bill_type' => Purchase::class,
+                                    'amount' => $canTake,
+                                    'is_advance' => false,
+                                ]);
+                                $tempThis = round($tempThis - $canTake, 2);
+                            }
                         }
-                        $remainingToAllocate -= $toThisBill;
+                        $remainingToAllocate = round($remainingToAllocate - $toThisBill, 2);
                     }
 
                     // 2. Surplus -> Older Bills (FIFO)
-                    if ($remainingToAllocate > 0 && $request->supplier_id) {
+                    if ($remainingToAllocate > 0.005 && $request->supplier_id) {
                         $olderBills = Purchase::where('supplier_id', $request->supplier_id)
                             ->where('id', '!=', $purchase->id)
                             ->where('remaining_amount', '>', 0)
@@ -514,35 +485,37 @@ class PurchaseController extends Controller implements HasMiddleware
                             ->get();
 
                         foreach ($olderBills as $oldBill) {
-                            if ($remainingToAllocate <= 0) break;
-                            $allocation = min($remainingToAllocate, $oldBill->remaining_amount);
+                            if ($remainingToAllocate <= 0.005) break;
+                            $allocation = round(min($remainingToAllocate, (float) $oldBill->remaining_amount), 2);
                             $tempOld = $allocation;
 
                             foreach ($createdPayments as $p) {
-                                if ($tempOld <= 0) break;
-                                $alreadyAlloc = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                                $avail = $p->net_amount - $alreadyAlloc;
+                                if ($tempOld <= 0.005) break;
+                                $alreadyAlloc = (float) PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                                $avail = round((float) $p->amount - $alreadyAlloc, 2);
 
-                                if ($avail > 0) {
-                                    $step = min($tempOld, $avail);
+                                if ($avail > 0.005) {
+                                    $step = round(min($tempOld, $avail), 2);
                                     PaymentAllocation::create([
                                         'payment_id' => $p->id,
                                         'bill_id' => $oldBill->id,
-                                        'bill_type' => 'App\Models\Purchase',
+                                        'bill_type' => Purchase::class,
                                         'amount' => $step,
+                                        'is_advance' => false,
                                     ]);
-                                    $tempOld -= $step;
+                                    $tempOld = round($tempOld - $step, 2);
                                 }
                             }
-                            
-                            $oldBill->paid_amount += $allocation;
-                            $oldBill->remaining_amount -= $allocation;
-                            $oldBill->save();
-                            $remainingToAllocate -= $allocation;
+
+                            AdvanceAllocationService::recalculatePurchaseSettlement($oldBill);
+                            $remainingToAllocate = round($remainingToAllocate - $allocation, 2);
                         }
                     }
                 }
             }
+
+            // Final authoritative recalculation from DB allocations
+            AdvanceAllocationService::recalculatePurchaseSettlement($purchase);
 
             // Fetch supplier category percentage
             $supplier = Account::with('accountCategory')->find($request->supplier_id);
@@ -637,7 +610,18 @@ class PurchaseController extends Controller implements HasMiddleware
     //edit
     public function edit($id)
     {
-        $purchase = Purchase::with('supplier', 'salesman', 'items')->find($id);
+        $purchase = Purchase::with('supplier', 'salesman', 'items')->findOrFail($id);
+
+        // Load ONLY Instant Checkout splits belonging to this specific purchase (never independent advance vouchers!)
+        $purchase->splits = AdvanceAllocationService::getCheckoutSplitsForBill(Purchase::class, $purchase->id, (string) $purchase->invoice);
+
+        $nonAdv = AdvanceAllocationService::getNonAdvancePaidForBill(Purchase::class, $purchase->id, (string) $purchase->invoice);
+        $advSummary = AdvanceAllocationService::getAppliedAdvanceSummaryForBill(Purchase::class, $purchase->id, (string) $purchase->invoice);
+
+        $purchase->checkout_paid_amount = $nonAdv['checkout_paid'];
+        $purchase->manual_payment_paid_amount = $nonAdv['manual_payment_paid'];
+        $purchase->applied_advance_amount = $advSummary['total_applied_advance'];
+        $purchase->has_advance_allocated = $advSummary['has_advance_allocated'];
         // Historical average stats for items
         $purchaseStats = DB::table('purchase_items')
             ->select('item_id',
@@ -695,10 +679,9 @@ class PurchaseController extends Controller implements HasMiddleware
         // Attach true real-time ledger balances
         StockService::attachRealtimeBalances($items);
 
-        $accounts = Account::eligibleForPurchase()
-            ->with(['accountType', 'accountCategory'])
-            ->get();
-        $salemans = Saleman::get();
+        // Load ONLY the currently assigned supplier (others fetched on-demand via /account/picker)
+        $accounts = AccountController::loadSingleForPicker($purchase->supplier_id ? (int) $purchase->supplier_id : null, 'purchase');
+        $salemans = Saleman::select('id', 'name', 'code')->get();
         $messageLines = \App\Models\MessageLine::whereJsonContains('category', 'Purchase')
             ->where('status', 'active')
             ->get();
@@ -779,62 +762,17 @@ class PurchaseController extends Controller implements HasMiddleware
         try {
             $purchase = Purchase::findOrFail($id);
 
-            // --- Multi-Method Split Payments & Allocation Logic ---
-            $isPayNow = (bool) $request->input('is_pay_now', false);
-            $isMulti = (bool) $request->input('is_multi', false);
-            $splitsData = [];
-            $totalNewPaid = 0;
-
-            if ($isPayNow) {
-                // Fetch IDs of payments already allocated to this purchase to strictly avoid duplicating them
-                $existingAllocatedPaymentIds = PaymentAllocation::where('bill_id', $purchase->id)
-                    ->where('bill_type', 'App\Models\Purchase')
-                    ->pluck('payment_id')
-                    ->toArray();
-
-                if ($isMulti) {
-                    $rawSplits = $request->input('splits', []);
-                    foreach ($rawSplits as $split) {
-                        $amt = (float) ($split['amount'] ?? 0);
-                        $hasVoucher = !empty($split['voucher_no']);
-                        $isExistingPayment = !empty($split['id']) && in_array($split['id'], $existingAllocatedPaymentIds);
-
-                        // Only consider truly NEW splits added during this edit session
-                        if ($amt > 0 && !$hasVoucher && !$isExistingPayment && !empty($split['payment_account_id'])) {
-                            $splitsData[] = $split;
-                            $totalNewPaid += $amt;
-                        }
-                    }
-                } else if ((float)$request->paid_amount > 0 && $request->payment_account_id) {
-                    $totalNewPaid = (float)$request->paid_amount;
-                    $splitsData = [[
-                        'payment_account_id' => $request->payment_account_id,
-                        'amount' => $totalNewPaid,
-                        'payment_method' => $request->payment_method ?? 'Cash',
-                        'cheque_no' => $request->cheque_no,
-                        'cheque_date' => $request->cheque_date,
-                        'clear_date' => $request->clear_date,
-                    ]];
-                }
-            }
-
-            // Calculate updated totals
             $extraDiscount = (float) ($request->extra_discount ?? 0);
             $netTotal = (float) $request->net_total;
             $netPurchaseTotal = max(0, $netTotal - $extraDiscount);
+            $useAdvance = $request->boolean('use_advance', false);
 
-            // Re-read existing paid amount from actual PaymentAllocations
-            $existingPaidFromAlloc = (float) PaymentAllocation::where('bill_id', $purchase->id)
-                ->where('bill_type', 'App\Models\Purchase')
-                ->sum('amount');
-            $existingPaid = max((float)$purchase->paid_amount, $existingPaidFromAlloc);
+            // Step A: Safely release ONLY previous advance allocations (is_advance=true PaymentAllocations,
+            // SupplierCredit allocations, OpeningBalanceAllocations). Independent Payment vouchers & manual
+            // /payment allocations are NEVER mutated or deleted.
+            AdvanceAllocationService::releaseAdvanceFromPurchase($purchase);
 
-            // Increment paid amount with NEW payments made during this edit
-            $newTotalPaid = $existingPaid + $totalNewPaid;
-            
-            $actualPaidOnThisBill = min($newTotalPaid, $netPurchaseTotal);
-            $remainingAmount = max(0, $netPurchaseTotal - $actualPaidOnThisBill);
-
+            // Step B: Update purchase totals & metadata first
             $purchase->update([
                 'date'            => $request->date,
                 'invoice'         => $purchase->invoice, // Preserve existing unique invoice number
@@ -848,50 +786,64 @@ class PurchaseController extends Controller implements HasMiddleware
                 'tax_total'       => 0,
                 'courier_charges' => $request->courier_charges ?? 0,
                 'net_total'       => $request->net_total,
-                'paid_amount'     => $actualPaidOnThisBill,
-                'remaining_amount' => $remainingAmount,
                 'status'          => $request->status ?? $purchase->status,
                 'message_line_id' => $request->message_line_id,
                 'firm_id'         => $request->firm_id ?? $purchase->firm_id,
             ]);
 
-            // --- Auto-Allocate Existing Advances (Unallocated Payments) ---
-            $unallocatedPayments = Payment::where('account_id', $purchase->supplier_id)
-                ->where('type', 'PAYMENT')
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhere('cheque_status', '!=', 'Canceled');
-                })
-                ->get()
-                ->filter(function($p) {
-                    $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                    return $p->net_amount > $allocated;
-                })
-                ->sortBy('date');
+            // Step C: Sync Instant Checkout splits (strictly scoped to THIS purchase's checkout payments)
+            $isPayNow = (bool) $request->input('is_pay_now', false);
+            $isMulti = (bool) $request->input('is_multi', false);
+            $splitsData = [];
+            $totalNewPaid = 0;
 
-            foreach ($unallocatedPayments as $p) {
-                if ($purchase->remaining_amount <= 0) break;
-                
-                $allocated = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                $avail = $p->net_amount - $allocated;
-                $allocationAmount = min($purchase->remaining_amount, $avail);
-                
-                if ($allocationAmount > 0) {
-                    PaymentAllocation::create([
-                        'payment_id' => $p->id,
-                        'bill_id' => $purchase->id,
-                        'bill_type' => 'App\Models\Purchase',
-                        'amount' => $allocationAmount,
-                    ]);
-                    
-                    $purchase->paid_amount += $allocationAmount;
-                    $purchase->remaining_amount -= $allocationAmount;
+            if ($isPayNow) {
+                $existingCheckoutAllocations = PaymentAllocation::where('bill_id', $purchase->id)
+                    ->where('bill_type', Purchase::class)
+                    ->with('payment')
+                    ->get()
+                    ->filter(fn ($a) => AdvanceAllocationService::isCheckoutPaymentForBill($a->payment, (string) $purchase->invoice));
+
+                $existingAllocatedPaymentIds = $existingCheckoutAllocations->pluck('payment_id')->toArray();
+
+                if ($isMulti) {
+                    $rawSplits = $request->input('splits', []);
+                    foreach ($rawSplits as $split) {
+                        $amt = (float) ($split['amount'] ?? 0);
+                        $hasVoucher = !empty($split['voucher_no']);
+                        $isExistingPayment = (!empty($split['payment_id']) && in_array((int) $split['payment_id'], $existingAllocatedPaymentIds))
+                            || (!empty($split['id']) && in_array((int) $split['id'], $existingAllocatedPaymentIds));
+
+                        // Only consider truly NEW splits added during this edit session
+                        if ($amt > 0 && !$hasVoucher && !$isExistingPayment && !empty($split['payment_account_id'])) {
+                            $splitsData[] = $split;
+                            $totalNewPaid += $amt;
+                        }
+                    }
+                } elseif ((float)$request->paid_amount > 0 && $request->payment_account_id) {
+                    $totalNewPaid = (float)$request->paid_amount;
+                    $splitsData = [[
+                        'payment_account_id' => $request->payment_account_id,
+                        'amount' => $totalNewPaid,
+                        'payment_method' => $request->payment_method ?? 'Cash',
+                        'cheque_no' => $request->cheque_no,
+                        'cheque_date' => $request->cheque_date,
+                        'clear_date' => $request->clear_date,
+                    ]];
                 }
             }
-            $purchase->save();
 
-            // --- Process New Payments & Allocations ---
-            if (count($splitsData) > 0 && $totalNewPaid > 0) {
+            // Step D: Trim excess allocations if bill net shrank below existing payments
+            AdvanceAllocationService::trimExcessPaymentAllocations(Purchase::class, $purchase->id, $netPurchaseTotal);
+            AdvanceAllocationService::recalculatePurchaseSettlement($purchase);
+
+            // Step E: Apply Advance FIRST if checked (matching UI order)
+            if ($useAdvance && $purchase->remaining_amount > 0.005) {
+                AdvanceAllocationService::applyAdvanceToPurchase($purchase);
+            }
+
+            // Step F: Process NEW Instant Checkout Payments & Allocations
+            if (count($splitsData) > 0 && $totalNewPaid > 0.005) {
                 $prefix = 'CPV-';
                 $baseVoucherNo = $this->generateNextPurchaseVoucherNo($prefix);
                 $groupId = null;
@@ -900,7 +852,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 foreach ($splitsData as $index => $split) {
                     if (($split['amount'] ?? 0) <= 0) continue;
                     $voucherNo = $baseVoucherNo;
-                    
+
                     $payment = Payment::create([
                         'date' => $request->date,
                         'voucher_no' => $voucherNo,
@@ -935,29 +887,31 @@ class PurchaseController extends Controller implements HasMiddleware
 
                 // Distribute NEW payments (surplus allocation)
                 $remainingToAllocate = $totalNewPaid;
-                if ($remainingToAllocate > 0) {
-                    // 1. Current Bill Allocation (Respecting existing advance allocations)
-                    $canTakeToThis = max(0, $purchase->remaining_amount);
-                    $toThisBill = min($remainingToAllocate, $canTakeToThis);
-                    
-                    if ($toThisBill > 0) {
+                if ($remainingToAllocate > 0.005) {
+                    // 1. Current Bill Allocation (strictly bounded by remaining_amount)
+                    $toThisBill = round(min($remainingToAllocate, (float) $purchase->remaining_amount), 2);
+
+                    if ($toThisBill > 0.005) {
                         $tempThis = $toThisBill;
                         foreach ($createdPayments as $p) {
-                            if ($tempThis <= 0) break;
-                            $canTake = min($tempThis, $p->net_amount);
-                            PaymentAllocation::create([
-                                'payment_id' => $p->id,
-                                'bill_id' => $purchase->id,
-                                'bill_type' => 'App\Models\Purchase',
-                                'amount' => $canTake,
-                            ]);
-                            $tempThis -= $canTake;
+                            if ($tempThis <= 0.005) break;
+                            $canTake = round(min($tempThis, (float) $p->amount), 2);
+                            if ($canTake > 0.005) {
+                                PaymentAllocation::create([
+                                    'payment_id' => $p->id,
+                                    'bill_id' => $purchase->id,
+                                    'bill_type' => Purchase::class,
+                                    'amount' => $canTake,
+                                    'is_advance' => false,
+                                ]);
+                                $tempThis = round($tempThis - $canTake, 2);
+                            }
                         }
-                        $remainingToAllocate -= $toThisBill;
+                        $remainingToAllocate = round($remainingToAllocate - $toThisBill, 2);
                     }
 
                     // 2. Surplus -> Older Bills (FIFO)
-                    if ($remainingToAllocate > 0 && $purchase->supplier_id) {
+                    if ($remainingToAllocate > 0.005 && $purchase->supplier_id) {
                         $olderBills = Purchase::where('supplier_id', $purchase->supplier_id)
                             ->where('id', '!=', $purchase->id)
                             ->where('remaining_amount', '>', 0)
@@ -966,37 +920,36 @@ class PurchaseController extends Controller implements HasMiddleware
                             ->get();
 
                         foreach ($olderBills as $oldBill) {
-                            if ($remainingToAllocate <= 0) break;
-                            $allocation = min($remainingToAllocate, $oldBill->remaining_amount);
+                            if ($remainingToAllocate <= 0.005) break;
+                            $allocation = round(min($remainingToAllocate, (float) $oldBill->remaining_amount), 2);
                             $tempOld = $allocation;
 
                             foreach ($createdPayments as $p) {
-                                if ($tempOld <= 0) break;
-                                $alreadyAlloc = PaymentAllocation::where('payment_id', $p->id)->sum('amount');
-                                $avail = $p->net_amount - $alreadyAlloc;
-                                if ($avail > 0) {
-                                    $step = min($tempOld, $avail);
+                                if ($tempOld <= 0.005) break;
+                                $alreadyAlloc = (float) PaymentAllocation::where('payment_id', $p->id)->sum('amount');
+                                $avail = round((float) $p->amount - $alreadyAlloc, 2);
+                                if ($avail > 0.005) {
+                                    $step = round(min($tempOld, $avail), 2);
                                     PaymentAllocation::create([
                                         'payment_id' => $p->id,
                                         'bill_id' => $oldBill->id,
-                                        'bill_type' => 'App\Models\Purchase',
+                                        'bill_type' => Purchase::class,
                                         'amount' => $step,
+                                        'is_advance' => false,
                                     ]);
-                                    $tempOld -= $step;
+                                    $tempOld = round($tempOld - $step, 2);
                                 }
                             }
-                            
-                            $oldBill->paid_amount += $allocation;
-                            $oldBill->remaining_amount -= $allocation;
-                            $oldBill->update([
-                                'paid_amount' => $oldBill->paid_amount,
-                                'remaining_amount' => $oldBill->remaining_amount,
-                            ]);
-                            $remainingToAllocate -= $allocation;
+
+                            AdvanceAllocationService::recalculatePurchaseSettlement($oldBill);
+                            $remainingToAllocate = round($remainingToAllocate - $allocation, 2);
                         }
                     }
                 }
             }
+
+            // Final authoritative recalculation from DB allocations
+            AdvanceAllocationService::recalculatePurchaseSettlement($purchase);
 
             // Calculate net stock delta (new items - old items)
             $stockDeltas = [];
@@ -1195,7 +1148,13 @@ class PurchaseController extends Controller implements HasMiddleware
                 return redirect()->back()->with('error', "Cannot delete purchase {$purchase->invoice} because purchase return(s) have already been processed for this bill.");
             }
 
-            // 2. Handle Payment Allocations and Auto-generated Instant Checkout Payments
+            // 2. Release advance allocations (SupplierCredit, OpeningBalanceAllocation, is_advance PaymentAllocations)
+            AdvanceAllocationService::releaseAdvanceFromPurchase($purchase);
+
+            // Clean up any remaining direct PurchaseReturnAllocation rows
+            \App\Models\PurchaseReturnAllocation::where('purchase_id', $purchase->id)->delete();
+
+            // 3. Handle Payment Allocations and Auto-generated Instant Checkout Payments
             $allocations = PaymentAllocation::where('bill_id', $purchase->id)
                 ->where(function ($q) {
                     $q->where('bill_type', 'App\Models\Purchase')
@@ -1209,12 +1168,7 @@ class PurchaseController extends Controller implements HasMiddleware
             foreach ($allocations as $alloc) {
                 $payment = Payment::find($alloc->payment_id);
                 if ($payment) {
-                    $isAutoCheckoutPayment = (
-                        str_contains($payment->remarks ?? '', $purchase->invoice) ||
-                        str_contains($payment->remarks ?? '', 'Instance Checkout') ||
-                        str_contains($payment->remarks ?? '', 'Instant Checkout') ||
-                        str_contains($payment->remarks ?? '', 'Auto-generated from Purchase')
-                    );
+                    $isAutoCheckoutPayment = AdvanceAllocationService::isCheckoutPaymentForBill($payment, (string) $purchase->invoice);
 
                     if ($isAutoCheckoutPayment) {
                         $processedPaymentIds[] = $payment->id;

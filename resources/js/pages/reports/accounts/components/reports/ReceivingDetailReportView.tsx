@@ -11,7 +11,8 @@ import {
     Scale,
     Layers
 } from 'lucide-react';
-import { cn, formatSafeDate } from '@/lib/utils';
+import { cn } from '@/lib/utils'
+import { formatSafeDate } from '@/lib/format-utils';
 
 interface ReceivingDetail {
     id: number;

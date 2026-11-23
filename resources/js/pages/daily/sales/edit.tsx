@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Combobox } from "@/components/ui/combobox";
+import {
+  SmartAccountDialog,
+  SmartAccountTrigger,
+  SmartAccount,
+} from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { router } from "@inertiajs/react";
@@ -41,6 +46,7 @@ import { ItemRegistryDialog } from "./components/ItemRegistryDialog";
 import { CheckoutDialog } from "./components/CheckoutDialog";
 import { SuccessDialog } from "./components/SuccessDialog";
 import { StockWarningDialog } from "./components/StockWarningDialog";
+import { LossWarningDialog, LossWarningItem } from "./components/LossWarningDialog";
 
 // ───────────────────────────────────────────
 // Breadcrumbs
@@ -283,19 +289,75 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const [customerCategory, setCustomerCategory] = useState<string | null>(sale.customer?.item_category ? String(sale.customer.item_category) : null);
   const [cashCredit, setCashCredit] = useState<string>("CREDIT");
   const [accountType, setAccountType] = useState<Option | null>(sale.customer ? { value: String(sale.customer.id), label: sale.customer.title } : null);
+  const [selectedAccountInfo, setSelectedAccountInfo] = useState<{ id: number; title: string; code?: string | null } | null>(() => {
+    const initial = accounts?.[0];
+    if (initial && Number(initial.id) === Number(sale.customer_id || sale.customer?.id)) {
+      return { id: initial.id, title: initial.title, code: initial.code ?? null };
+    }
+    return sale.customer ? { id: sale.customer.id, title: sale.customer.title, code: sale.customer.code ?? null } : null;
+  });
+  const [accountDialogOpen, setAccountDialogOpen] = useState<boolean>(false);
+
+  const handleSelectAccount = (selectedAccount: SmartAccount | null) => {
+    if (selectedAccount) {
+      const id = selectedAccount.id;
+      const label = `${selectedAccount.title}${selectedAccount.code ? ` (${selectedAccount.code})` : ""}`;
+      setAccountType({ value: String(id), label });
+      setSelectedAccountInfo({ id, title: selectedAccount.title, code: selectedAccount.code ?? null });
+      setCreditDays(selectedAccount.aging_days ?? 0);
+      setCreditLimit(
+        typeof selectedAccount.credit_limit === "number"
+          ? selectedAccount.credit_limit
+          : selectedAccount.credit_limit
+          ? Number(selectedAccount.credit_limit)
+          : ""
+      );
+      setSalesman(selectedAccount.saleman_id ?? null);
+      setCode(selectedAccount.code ?? "");
+      setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
+
+      axios.get(`/account/${id}/balance?role=sale&exclude_bill_id=${sale.id}`).then(res => {
+        const effBal = res.data.effective_previous_balance !== undefined
+          ? toNumber(res.data.effective_previous_balance)
+          : getEffectivePreviousBalance(res.data.balance, id);
+        const avail = res.data.advance_breakdown
+          ? toNumber(res.data.advance_breakdown.applicable_advance)
+          : Math.max(0, -effBal);
+        setPreviousBalance(effBal);
+        setApplicableAdvance(avail);
+        const isOriginal = Number(id) === Number(sale.customer_id || sale.customer?.id);
+        setUseAdvance(isOriginal ? Boolean((sale as any).has_advance_allocated) : avail > 0);
+      }).catch(err => {
+        console.error("Failed to fetch balance", err);
+        setPreviousBalance(0);
+        setApplicableAdvance(0);
+        setUseAdvance(false);
+      });
+    } else {
+      setAccountType(null);
+      setSelectedAccountInfo(null);
+      setCreditDays(0);
+      setCreditLimit("");
+      setSalesman(null);
+      setCode("");
+      setPreviousBalance(0);
+      setApplicableAdvance(0);
+      setUseAdvance(false);
+      setCustomerCategory(null);
+    }
+  };
   const [courier, setCourier] = useState<number>(toNumber(sale.courier_charges));
 
-  // Compute effective previous balance before this bill
+  // Compute effective previous balance before this bill (fallback if backend breakdown unavailable)
   const getEffectivePreviousBalance = (fetchedBalance: number, customerId?: number | string | null) => {
     const isOriginalCustomer = Number(customerId) === Number(sale.customer_id || sale.customer?.id);
     if (!isOriginalCustomer) {
       return Number(fetchedBalance) || 0;
     }
-    // For original customer, this bill's net impact is already inside fetchedBalance in the ledger.
-    // Subtract this bill's original remaining net amount to get true previous balance prior to this bill.
+    // For original customer, subtract ONLY this bill's net ledger impact = originalBillNet - nonAdvanceCashPaid
     const originalBillNet = Math.max(0, toNumber(sale.net_total) - toNumber(sale.extra_discount));
-    const existingPaid = toNumber(sale.paid_amount);
-    const netImpact = Math.max(0, originalBillNet - existingPaid);
+    const nonAdvancePaid = toNumber((sale as any).checkout_paid_amount) + toNumber((sale as any).manual_payment_paid_amount);
+    const netImpact = originalBillNet - nonAdvancePaid;
     return Math.round((Number(fetchedBalance) || 0) - netImpact);
   };
 
@@ -306,7 +368,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   }, [sale]);
 
   const [previousBalance, setPreviousBalance] = useState<number>(initialCalculatedPrevBal);
-  const [useAdvance, setUseAdvance] = useState<boolean>(sale.has_advance_allocated ?? false);
+  const [applicableAdvance, setApplicableAdvance] = useState<number>(toNumber((sale as any).applied_advance_amount));
+  const [useAdvance, setUseAdvance] = useState<boolean>(Boolean((sale as any).has_advance_allocated));
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [printOption, setPrintOption] = useState<"big" | "small">(sale.print_format === "small" ? "small" : "big");
   const [showMobileDetails, setShowMobileDetails] = useState(false);
@@ -320,16 +383,23 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
 
-  // Fetch initial balance
+  // Fetch initial balance with authoritative pre-bill breakdown from backend
   useEffect(() => {
     if (sale.customer?.id) {
-      axios.get(`/account/${sale.customer.id}/balance`).then(res => {
-        setPreviousBalance(getEffectivePreviousBalance(res.data.balance, sale.customer?.id));
+      axios.get(`/account/${sale.customer.id}/balance?role=sale&exclude_bill_id=${sale.id}`).then(res => {
+        const effBal = res.data.effective_previous_balance !== undefined
+          ? toNumber(res.data.effective_previous_balance)
+          : getEffectivePreviousBalance(res.data.balance, sale.customer?.id);
+        const avail = res.data.advance_breakdown
+          ? toNumber(res.data.advance_breakdown.applicable_advance)
+          : Math.max(0, -effBal);
+        setPreviousBalance(effBal);
+        setApplicableAdvance(avail);
       }).catch(err => {
         console.error("Failed to fetch balance", err);
       });
     }
-  }, [sale.customer?.id]);
+  }, [sale.customer?.id, sale.id]);
 
   // Pay Now State
   const [isPayNow, setIsPayNow] = useState<boolean>(() => {
@@ -339,6 +409,8 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   const [extraDiscount, setExtraDiscount] = useState<number>(toNumber(sale.extra_discount));
   const [processing, setProcessing] = useState<boolean>(false);
   const [showStockWarning, setShowStockWarning] = useState(false);
+  const [showLossWarning, setShowLossWarning] = useState(false);
+  const [lossWarningItems, setLossWarningItems] = useState<LossWarningItem[]>([]);
   const [showRightSidebar, setShowRightSidebar] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth >= 1536;
@@ -556,16 +628,33 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     return Math.round(amount);
   };
 
+  const originalUsageByItem = useMemo<Record<number, number>>(() => {
+    const map: Record<number, number> = {};
+    (sale.items ?? []).forEach((si) => {
+      const itemId = Number(si.item_id);
+      if (!itemId) return;
+      const item = items.find((it) => Number(it.id) === itemId);
+      const packing = Math.max(1, toNumber(item?.packing_qty ?? 1));
+      const qty =
+        (toNumber(si.qty_carton) + toNumber(si.bonus_qty_carton)) * packing +
+        toNumber(si.qty_pcs) +
+        toNumber(si.bonus_qty_pcs);
+      map[itemId] = (map[itemId] || 0) + qty;
+    });
+    return map;
+  }, [sale.items, items]);
+
   const rowsWithComputed = useMemo(() => {
     const itemUsage = new Map<number, number>();
     rows.forEach(r => {
       if (r.item_id) {
         const item = items.find(it => Number(it.id) === Number(r.item_id));
         if (item) {
-          const packing = toNumber(item.packing_qty ?? 1);
-          const qty = (r.full * packing) + r.pcs + (r.bonus_full * packing) + r.bonus_pcs;
-          const current = itemUsage.get(r.item_id) || 0;
-          itemUsage.set(r.item_id, current + qty);
+          const itemId = Number(item.id);
+          const packing = Math.max(1, toNumber(item.packing_qty ?? 1));
+          const qty = (toNumber(r.full) * packing) + toNumber(r.pcs) + (toNumber(r.bonus_full) * packing) + toNumber(r.bonus_pcs);
+          const current = itemUsage.get(itemId) || 0;
+          itemUsage.set(itemId, current + qty);
         }
       }
     });
@@ -575,29 +664,79 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       const amount = recalcRowAmount(r, item);
 
       let stockExceeded = false;
+      let hasNegativeStock = false;
       if (item) {
-        const totalUsage = itemUsage.get(item.id) || 0;
-        const availableStock = toNumber(item.total_stock_pcs ?? ((item.stock_1 ?? 0) * (item.packing_qty ?? 1) + (item.stock_2 ?? 0)));
-        if (totalUsage > availableStock) {
+        const itemId = Number(item.id);
+        const totalUsage = itemUsage.get(itemId) || 0;
+        const liveStock = toNumber(item.total_stock_pcs ?? ((item.stock_1 ?? 0) * (item.packing_qty ?? 1) + (item.stock_2 ?? 0)));
+        const availableStock = liveStock + (originalUsageByItem[itemId] ?? 0);
+        hasNegativeStock = availableStock < 0;
+        if (hasNegativeStock || totalUsage > availableStock) {
           stockExceeded = true;
         }
       }
 
+      const hasNegativeQty =
+        toNumber(r.full) < 0 ||
+        toNumber(r.pcs) < 0 ||
+        toNumber(r.bonus_full) < 0 ||
+        toNumber(r.bonus_pcs) < 0;
+      const isQtyRed = stockExceeded || hasNegativeStock || hasNegativeQty;
+
       let isLoss = false;
+      let purchasePrice = 0;
+      let purchasePriceSource: "Last Purchase" | "Trade Price" = "Trade Price";
+      const effectiveRate = toNumber(r.rate) * (1 - toNumber(r.discPercent) / 100);
       if (item) {
-        const allRates = [item.retail, item.pt2, item.pt3, item.pt4, item.pt5, item.pt6, item.pt7];
-        const validRates = allRates.map(r => toNumber(r)).filter(r => r > 0);
-        if (validRates.length > 0) {
-          const minPrice = Math.min(...validRates);
-          if (toNumber(r.rate) < minPrice) {
-            isLoss = true;
-          }
+        const lastPurchaseRate = toNumber(item.last_purchase_rate);
+        const itemTradePrice = toNumber(item.trade_price);
+        if (lastPurchaseRate > 0) {
+          purchasePrice = lastPurchaseRate;
+          purchasePriceSource = "Last Purchase";
+        } else if (itemTradePrice > 0) {
+          purchasePrice = itemTradePrice;
+          purchasePriceSource = "Trade Price";
+        }
+
+        if (purchasePrice > 0 && effectiveRate <= purchasePrice + 0.0001) {
+          isLoss = true;
         }
       }
 
-      return { ...r, amount, stockExceeded, isLoss };
+      return {
+        ...r,
+        amount,
+        stockExceeded,
+        hasNegativeStock,
+        hasNegativeQty,
+        isQtyRed,
+        isLoss,
+        purchasePrice,
+        purchasePriceSource,
+        effectiveRate,
+      };
     });
-  }, [rows, items]);
+  }, [rows, items, originalUsageByItem]);
+
+  const {
+    selectedRowId,
+    setRowRef,
+    setCellRef,
+    selectRow,
+    handleCellKeyDown,
+  } = useInvoiceRowNavigation({
+    rows: rowsWithComputed,
+    isModalOpen:
+      itemDialogOpen ||
+      accountDialogOpen ||
+      checkoutDialogOpen ||
+      showStockWarning ||
+      showLossWarning ||
+      showSuccessDialog,
+    onRowFocus: (row) => {
+      if (row.item_id) setSelectedItemId(row.item_id);
+    },
+  });
 
   const totals = useMemo(() => {
     let gross = 0;
@@ -614,12 +753,14 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
     const netPayable = Math.max(0, net - extraDiscount);
 
     let appliedAdvance = 0;
+    let remainingAdvance = 0;
     let netSettlement = netPayable;
     let receivable = netPayable;
 
     if (previousBalance < 0) {
-      const availableAdvance = Math.abs(previousBalance);
+      const availableAdvance = applicableAdvance > 0 ? applicableAdvance : Math.abs(previousBalance);
       appliedAdvance = useAdvance ? Math.min(netPayable, availableAdvance) : 0;
+      remainingAdvance = Math.max(0, availableAdvance - appliedAdvance);
       netSettlement = Math.max(0, netPayable - appliedAdvance);
       receivable = netSettlement;
     } else {
@@ -637,11 +778,12 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       net,
       netPayable,
       appliedAdvance,
+      remainingAdvance,
       netSettlement,
       receivable,
       finalAmount,
     };
-  }, [rowsWithComputed, items, courier, previousBalance, extraDiscount, useAdvance]);
+  }, [rowsWithComputed, items, courier, previousBalance, applicableAdvance, extraDiscount, useAdvance]);
 
   const isOverLimit = useMemo(() => {
     if (typeof creditLimit !== "number") return false;
@@ -650,6 +792,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
   }, [creditLimit, totals]);
 
   // Global Keyboard Shortcuts (F4 / Alt+C -> Checkout Dialog, F9 / Ctrl+Enter -> Update Invoice)
+  const handleSaveRef = React.useRef<() => void>(() => {});
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // F4 or Alt+C: Toggle Checkout / Open Financial Payment Dialog
@@ -664,26 +807,60 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
         return;
       }
 
-      // F9 or Ctrl+Enter (when dialog not open): Update Invoice
-      if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !checkoutDialogOpen) {
+      // F9 or Ctrl+Enter (when no modal is open): Update Invoice using latest state via ref
+      if (
+        (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) &&
+        !checkoutDialogOpen &&
+        !showStockWarning &&
+        !showLossWarning &&
+        !showSuccessDialog &&
+        !itemDialogOpen &&
+        !accountDialogOpen
+      ) {
         e.preventDefault();
-        handleSave();
+        handleSaveRef.current();
         return;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPayNow, totals.finalAmount, checkoutDialogOpen]);
+  }, [isPayNow, totals.finalAmount, checkoutDialogOpen, showStockWarning, showLossWarning, showSuccessDialog, itemDialogOpen, accountDialogOpen]);
 
-  const handleSave = async () => {
-    const stockErrors = rowsWithComputed.filter(r => r.stockExceeded);
+  const proceedAfterLossCheck = () => {
+    const stockErrors = rowsWithComputed.filter(r => r.item_id !== null && r.stockExceeded);
     if (stockErrors.length > 0) {
       setShowStockWarning(true);
       return;
     }
     saveInvoice();
   };
+
+  const handleSave = async () => {
+    const lossItems: LossWarningItem[] = rowsWithComputed
+      .filter(r => r.item_id !== null && r.isLoss)
+      .map(r => {
+        const item = items.find(it => Number(it.id) === Number(r.item_id));
+        return {
+          item_id: r.item_id as number,
+          title: item?.title || `Item #${r.item_id}`,
+          purchase_price: r.purchasePrice,
+          purchase_source: r.purchasePriceSource,
+          rate: toNumber(r.rate),
+          disc_percent: toNumber(r.discPercent),
+          effective_rate: r.effectiveRate,
+        };
+      });
+
+    if (lossItems.length > 0) {
+      setLossWarningItems(lossItems);
+      setShowLossWarning(true);
+      return;
+    }
+
+    proceedAfterLossCheck();
+  };
+  handleSaveRef.current = handleSave;
 
   const saveInvoice = (forceSave = false) => {
     // Process splits if Instant Checkout is active
@@ -731,9 +908,9 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
       net_total: totals.net,
       total_receivable: totals.finalAmount,
       paid_amount: effectivePaid,
-      remaining_amount: Math.max(0, totals.net - effectivePaid - totals.appliedAdvance),
+      remaining_amount: Math.max(0, totals.netPayable - effectivePaid - totals.appliedAdvance),
       use_advance: useAdvance,
-      applied_advance: totals.appliedAdvance,
+      applied_advance: useAdvance ? totals.appliedAdvance : 0,
 
       items: rowsWithComputed.map((r) => {
         const item = items.find(i => Number(i.id) === Number(r.item_id));
@@ -811,39 +988,12 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                   </div>
 
                   <FieldWrapper label="Select Account" className="w-full">
-                    <Combobox
-                      options={accountTypeOptions}
-                      value={accountType?.value || ""}
-                      onChange={(val) => {
-                        const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
-                        setAccountType(selectedOption);
-                        const id = selectedOption ? Number(selectedOption.value) : null;
-                        const selectedAccount = id ? accounts.find((a) => Number(a.id) === Number(id)) ?? null : null;
-
-                        if (selectedAccount) {
-                          setCreditDays(selectedAccount.aging_days ?? 0);
-                          setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                          const salemanId = selectedAccount.saleman_id ?? null;
-                          setSalesman(salemanId);
-                          setCode(selectedAccount.code ?? "");
-                          axios.get(`/account/${id}/balance`).then(res => {
-                            setPreviousBalance(getEffectivePreviousBalance(res.data.balance, id));
-                          }).catch(err => {
-                            console.error("Failed to fetch balance", err);
-                            setPreviousBalance(0);
-                          });
-                          setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
-                        } else {
-                          setCreditDays(0);
-                          setCreditLimit("");
-                          setSalesman(null);
-                          setPreviousBalance(0);
-                          setCustomerCategory(null);
-                        }
-                      }}
+                    <SmartAccountTrigger
+                      value={selectedAccountInfo}
+                      onClick={() => setAccountDialogOpen(true)}
+                      onClear={() => handleSelectAccount(null)}
                       placeholder="Select Customer..."
-                      searchPlaceholder="Search by name or code..."
-                      className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                      className="w-full h-10 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                     />
                   </FieldWrapper>
 
@@ -957,32 +1107,11 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                   </TechLabel>
 
                   <TechLabel label="Select Account" icon={Search} className="space-y-1.5 flex-1 min-w-[170px] xl:min-w-[200px]">
-                    <Combobox
-                      options={accountTypeOptions}
-                      value={accountType?.value || ""}
-                      onChange={(val) => {
-                        const selectedOption = accountTypeOptions.find((o) => o.value === val) || null;
-                        setAccountType(selectedOption);
-                        const id = selectedOption ? Number(selectedOption.value) : null;
-                        const selectedAccount = id ? accounts.find((a) => Number(a.id) === Number(id)) ?? null : null;
-
-                        if (selectedAccount) {
-                          setCreditDays(selectedAccount.aging_days ?? 0);
-                          setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                          setSalesman(selectedAccount.saleman_id ?? null);
-                          setCode(selectedAccount.code ?? "");
-                          axios.get(`/account/${id}/balance`).then(res => setPreviousBalance(getEffectivePreviousBalance(res.data.balance, id))).catch(() => setPreviousBalance(0));
-                          setCustomerCategory(selectedAccount.item_category ? String(selectedAccount.item_category) : null);
-                        } else {
-                          setCreditDays(0);
-                          setCreditLimit("");
-                          setSalesman(null);
-                          setPreviousBalance(0);
-                          setCustomerCategory(null);
-                        }
-                      }}
+                    <SmartAccountTrigger
+                      value={selectedAccountInfo}
+                      onClick={() => setAccountDialogOpen(true)}
+                      onClear={() => handleSelectAccount(null)}
                       placeholder="Identify Customer..."
-                      searchPlaceholder="Search by name or code..."
                       className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-9 text-xs font-bold uppercase"
                     />
                   </TechLabel>
@@ -1095,20 +1224,32 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
 
                         {/* Rows */}
                         <div className="flex-1 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar space-y-3 md:space-y-0 text-sm">
-                          {rowsWithComputed.map((row) => (
+                          {rowsWithComputed.map((row, rowIndex) => (
                             <React.Fragment key={row.id}>
                               {/* Mobile Card View */}
-                              <div className={`block md:hidden rounded-xl border p-4 bg-white dark:bg-zinc-950 shadow-sm relative overflow-hidden transition-all mb-4 ${row.stockExceeded ? 'border-red-500 ring-1 ring-red-500 bg-red-50' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                              <div className={`block md:hidden rounded-xl border p-4 bg-white dark:bg-zinc-950 shadow-sm relative overflow-hidden transition-all mb-4 ${row.isQtyRed ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50 dark:bg-rose-950/30' : row.isLoss ? 'border-rose-400 bg-rose-50/40 dark:bg-rose-950/20' : 'border-zinc-200 dark:border-zinc-800'}`}>
                                 <div className="flex justify-between items-start mb-3">
                                   <button
                                     onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
                                     className="flex flex-col gap-1 text-left"
                                   >
-                                    <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Item</div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Item</span>
+                                      {row.isQtyRed && (
+                                        <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[8px] font-black uppercase tracking-wider">
+                                          {row.hasNegativeQty ? "Neg Qty" : row.hasNegativeStock ? "Neg Stock" : "Low Stock"}
+                                        </span>
+                                      )}
+                                      {row.isLoss && (
+                                        <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-300 text-[8px] font-black uppercase tracking-wider">
+                                          At Loss (Cost Rs {row.purchasePrice.toFixed(2)})
+                                        </span>
+                                      )}
+                                    </div>
                                     {row.item_id ? (
-                                      <div className="text-sm font-black text-zinc-900 dark:text-white uppercase italic flex items-center gap-1.5">
+                                      <div className={`text-sm font-black uppercase italic flex items-center gap-1.5 ${row.isQtyRed ? 'text-rose-700 dark:text-rose-400' : 'text-zinc-900 dark:text-white'}`}>
                                         {items.find(it => Number(it.id) === Number(row.item_id))?.title}
-                                        <ChevronDown size={14} className="text-zinc-400" />
+                                        <ChevronDown size={14} className={row.isQtyRed ? "text-rose-500" : "text-zinc-400"} />
                                       </div>
                                     ) : (
                                       <div className="text-sm font-bold text-zinc-300 italic uppercase flex items-center gap-1.5">
@@ -1124,18 +1265,18 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
 
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                   <TechLabel label="Full Qty">
-                                    <Input type="number" placeholder="FULL" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
+                                    <Input type="number" placeholder="FULL" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className={`h-10 text-center font-black rounded-lg ${row.full < 0 ? 'border-rose-500 bg-rose-50 text-rose-700' : 'bg-zinc-50/50'}`} />
                                   </TechLabel>
                                   {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 && (
                                     <TechLabel label="Pieces" className="animate-in zoom-in-95 duration-200">
-                                      <Input type="number" placeholder="PIECES" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-10 text-center font-black rounded-lg bg-zinc-50/50" />
+                                      <Input type="number" placeholder="PIECES" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className={`h-10 text-center font-black rounded-lg ${row.pcs < 0 ? 'border-rose-500 bg-rose-50 text-rose-700' : 'bg-zinc-50/50'}`} />
                                     </TechLabel>
                                   )}
                                 </div>
 
                                 <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 border-dashed grid grid-cols-2 gap-2 items-end">
-                                  <TechLabel label="Rate">
-                                    <Input type="number" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-9 text-xs font-bold rounded-lg" />
+                                  <TechLabel label={row.isLoss ? "Rate (At Loss)" : "Rate"}>
+                                    <Input type="number" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className={`h-9 text-xs font-bold rounded-lg ${row.isLoss ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300' : ''}`} />
                                   </TechLabel>
                                   <TechLabel label="Disc%">
                                     <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-9 text-xs font-bold rounded-lg" />
@@ -1152,22 +1293,57 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                               </div>
 
                               {/* Desktop Row View */}
-                              <div className={cn(
-                                "hidden md:grid grid-cols-12 gap-2 p-2.5 border-b items-center group transition-colors last:border-0",
-                                row.stockExceeded
-                                  ? "bg-rose-200 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 shadow-[inset_4px_0_0_0_#f43f5e]"
-                                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-b-zinc-50 dark:border-b-zinc-900/50"
-                              )}>
+                              <div
+                                ref={setRowRef(row.id)}
+                                onClick={() => selectRow(row)}
+                                className={cn(
+                                  "hidden md:grid grid-cols-12 gap-2 p-2.5 border-b items-center group transition-colors last:border-0",
+                                  row.isQtyRed
+                                    ? "bg-rose-100/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-900 shadow-[inset_4px_0_0_0_#e11d48]"
+                                    : row.isLoss
+                                      ? "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60 shadow-[inset_4px_0_0_0_#f43f5e]"
+                                      : selectedRowId === row.id
+                                        ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                        : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-b-zinc-50 dark:border-b-zinc-900/50",
+                                  selectedRowId === row.id && (row.isQtyRed || row.isLoss) && "ring-1 ring-inset ring-orange-400"
+                                )}
+                              >
                                 <div className="col-span-4">
                                   {row.item_id ? (
                                     <button
                                       onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
-                                      className="flex flex-col text-left group/item"
+                                      className="flex flex-col text-left group/item w-full"
                                     >
-                                      <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
-                                        {items.find(it => Number(it.id) === Number(row.item_id))?.title}
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={cn(
+                                          "text-xs font-black uppercase tracking-tighter truncate transition-colors",
+                                          row.isQtyRed
+                                            ? "text-rose-700 dark:text-rose-400"
+                                            : "dark:text-zinc-100 group-hover/item:text-orange-500"
+                                        )}>
+                                          {items.find(it => Number(it.id) === Number(row.item_id))?.title}
+                                        </span>
+                                        {row.isQtyRed && (
+                                          <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[8px] font-black uppercase tracking-wider shrink-0">
+                                            {row.hasNegativeQty ? "Neg Qty" : row.hasNegativeStock ? "Neg Stock" : "Low Stock"}
+                                          </span>
+                                        )}
+                                        {row.isLoss && (
+                                          <span
+                                            title={`Selling at or below ${row.purchasePriceSource} (Rs ${row.purchasePrice.toFixed(2)})`}
+                                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700 text-[8px] font-black uppercase tracking-wider shrink-0"
+                                          >
+                                            <AlertTriangle size={9} />
+                                            At Loss
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={cn(
+                                        "text-[9px] font-mono font-bold uppercase tracking-widest",
+                                        row.isQtyRed ? "text-rose-500/80 dark:text-rose-400/70" : "text-zinc-400"
+                                      )}>
+                                        ID: {row.item_id.toString().padStart(5, '0')}
                                       </span>
-                                      <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest">ID: {row.item_id.toString().padStart(5, '0')}</span>
                                     </button>
                                   ) : (
                                     <Button
@@ -1183,34 +1359,58 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                                 </div>
 
                                 <div className="col-span-1">
-                                  <Input type="number" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                  <Input ref={setCellRef(row.id, "full")} type="number" value={row.full || ""} onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })} onFocus={() => selectRow(row)} onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "full")} onClick={() => selectRow(row)} className={cn("h-8 text-center font-mono text-[10px] font-black transition-all", row.full < 0 ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 focus:border-rose-600" : "border-zinc-200 dark:border-zinc-700 focus:border-orange-500")} />
                                 </div>
                                 <div className="col-span-1">
                                   {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 ? (
-                                    <Input type="number" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                    <Input ref={setCellRef(row.id, "pcs")} type="number" value={row.pcs || ""} onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })} onFocus={() => selectRow(row)} onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "pcs")} onClick={() => selectRow(row)} className={cn("h-8 text-center font-mono text-[10px] font-black transition-all", row.pcs < 0 ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 focus:border-rose-600" : "border-zinc-200 dark:border-zinc-700 focus:border-orange-500")} />
                                   ) : (
                                     <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
                                   )}
                                 </div>
                                 <div className="col-span-1 border-l border-zinc-100 dark:border-zinc-800">
-                                  <Input type="number" value={row.bonus_full || ""} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
+                                  <Input ref={setCellRef(row.id, "bonus_full")} type="number" value={row.bonus_full || ""} onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })} onFocus={() => selectRow(row)} onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_full")} onClick={() => selectRow(row)} className={cn("h-8 text-center font-mono text-[10px] font-black transition-all", row.bonus_full < 0 ? "border-rose-500 bg-rose-50 text-rose-700 opacity-100" : "border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 opacity-50 focus:opacity-100")} />
                                 </div>
                                 <div className="col-span-1">
                                   {toNumber(items.find(it => Number(it.id) === Number(row.item_id))?.packing_qty) > 1 ? (
-                                    <Input type="number" value={row.bonus_pcs || ""} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 transition-all opacity-50 focus:opacity-100" />
+                                    <Input ref={setCellRef(row.id, "bonus_pcs")} type="number" value={row.bonus_pcs || ""} onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })} onFocus={() => selectRow(row)} onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_pcs")} onClick={() => selectRow(row)} className={cn("h-8 text-center font-mono text-[10px] font-black transition-all", row.bonus_pcs < 0 ? "border-rose-500 bg-rose-50 text-rose-700 opacity-100" : "border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 opacity-50 focus:opacity-100")} />
                                   ) : (
                                     <div className="h-8 flex items-center justify-center text-[10px] text-zinc-300 font-bold uppercase tracking-tighter">--</div>
                                   )}
                                 </div>
                                 <div className="col-span-1">
-                                  <Input type="number" step="any" value={row.rate || ""} onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 text-right font-mono text-[10px] border-zinc-200 dark:border-zinc-700 focus:border-orange-500 transition-all" />
+                                  <Input
+                                    ref={setCellRef(row.id, "rate")}
+                                    type="number"
+                                    step="any"
+                                    value={row.rate || ""}
+                                    onChange={(e) => updateRow(row.id, { rate: toNumber(e.target.value) })}
+                                    onFocus={() => selectRow(row)}
+                                    onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "rate")}
+                                    onClick={() => selectRow(row)}
+                                    title={row.isLoss ? `You are at loss! ${row.purchasePriceSource}: Rs ${row.purchasePrice.toFixed(2)}` : undefined}
+                                    className={cn(
+                                      "h-8 text-right font-mono text-[10px] transition-all",
+                                      row.isLoss
+                                        ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-black focus:border-rose-600"
+                                        : "border-zinc-200 dark:border-zinc-700 focus:border-orange-500"
+                                    )}
+                                  />
                                 </div>
                                 <div className="col-span-1 bg-rose-50/10 dark:bg-rose-900/5 rounded px-1">
-                                  <Input type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onClick={() => row.item_id && setSelectedItemId(row.item_id)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
+                                  <Input ref={setCellRef(row.id, "disc")} type="number" value={row.discPercent || ""} onChange={(e) => updateRow(row.id, { discPercent: toNumber(e.target.value) })} onFocus={() => selectRow(row)} onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "disc")} onClick={() => selectRow(row)} className="h-8 border-none bg-transparent text-center font-mono text-[10px]" />
                                 </div>
                                 <div className="col-span-1">
-                                  <div className="text-right font-mono text-[11px] text-zinc-900 bg-zinc-20 dark:bg-zinc-900 h-8 flex items-center justify-end px-1 border border-zinc-100 dark:border-zinc-800 rounded">
-                                    {(row.rate * (1 - row.discPercent / 100)).toFixed(2)}
+                                  <div
+                                    title={row.isLoss ? `At Loss (${row.purchasePriceSource}: Rs ${row.purchasePrice.toFixed(2)})` : undefined}
+                                    className={cn(
+                                      "text-right font-mono text-[11px] h-8 flex items-center justify-end px-1 border rounded",
+                                      row.isLoss
+                                        ? "text-rose-700 dark:text-rose-300 bg-rose-100/80 dark:bg-rose-950/50 border-rose-300 dark:border-rose-800 font-black"
+                                        : "text-zinc-900 bg-zinc-20 dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800"
+                                    )}
+                                  >
+                                    {row.effectiveRate.toFixed(2)}
                                   </div>
                                 </div>
                                 <div className="col-span-1 flex items-center justify-end gap-2 pr-2">
@@ -1488,13 +1688,13 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                         </TechLabel>
 
                         {previousBalance < 0 ? (
-                          <div className="space-y-3 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
+                          <div className="space-y-2.5 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
                                 <TrendingDown size={12} /> Available Advance
                               </span>
                               <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                                Rs {Math.abs(previousBalance).toLocaleString()}
+                                Rs {(applicableAdvance > 0 ? applicableAdvance : Math.abs(previousBalance)).toLocaleString()}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -1511,6 +1711,12 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
                               </div>
                               <span className="text-xs font-black text-emerald-600 font-mono">
                                 -Rs {totals.appliedAdvance.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-emerald-500/10 text-[10px]">
+                              <span className="font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Remaining Advance</span>
+                              <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                Rs {totals.remainingAdvance.toLocaleString()}
                               </span>
                             </div>
                           </div>
@@ -1675,6 +1881,16 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
 
             </div>
 
+            {/* Smart Customer Selection Dialog (F1) */}
+            <SmartAccountDialog
+              open={accountDialogOpen}
+              onOpenChange={setAccountDialogOpen}
+              context="sale"
+              selectedAccountId={accountType?.value || null}
+              onSelect={(acc) => handleSelectAccount(acc)}
+              f1Disabled={itemDialogOpen || checkoutDialogOpen || showStockWarning || showLossWarning || showSuccessDialog}
+            />
+
             {/* Shared Modular Item Registry Dialog */}
             <ItemRegistryDialog
               open={itemDialogOpen}
@@ -1682,6 +1898,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               items={items}
               customerCategory={customerCategory}
               currentRows={rows}
+              originalUsageByItem={originalUsageByItem}
               onAddUpdate={(item, data, options) => {
                 if (options?.mode === 'edit' && options.targetRowId != null) {
                   updateRow(options.targetRowId, data);
@@ -1705,6 +1922,14 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               }}
             />
 
+            <LossWarningDialog
+              open={showLossWarning}
+              onOpenChange={setShowLossWarning}
+              lossItems={lossWarningItems}
+              onConfirm={proceedAfterLossCheck}
+              isSubmitting={processing}
+            />
+
             <StockWarningDialog
               open={showStockWarning}
               onOpenChange={setShowStockWarning}
@@ -1722,7 +1947,7 @@ export default function SalesEditPage({ sale, items, accounts, salemans, payment
               updateSplitRow={updateSplitRow}
               onCommit={() => {
                 setCheckoutDialogOpen(false);
-                saveInvoice();
+                handleSave();
               }}
               invoiceNo={invoiceNo}
               previousBalance={previousBalance}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { formatSafeDate } from '@/lib/utils';
+import { formatSafeDate } from '@/lib/format-utils';
 
 interface BillReportProps {
     data: any[];

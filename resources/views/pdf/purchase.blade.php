@@ -323,7 +323,7 @@ if (file_exists($logo_path)) {
         </div>
         <div class="header-contact" style="width: 40%;">
             @if(!empty($firm->phone))<div class="contact-item">Phone : {{ $firm->phone }}</div>@endif
-            @if(!empty($firm->fax))<div class="contact-item">Fix no : {{ $firm->fax }}</div>@endif
+            @if(!empty($firm->fax))<div class="contact-item">Complaint No : {{ $firm->fax }}</div>@endif
         </div>
     </div>
 

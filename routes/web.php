@@ -141,6 +141,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/bulk-upload/import', [AccountController::class, 'processBulkImport'])->name('account.bulk-upload.import');
         Route::get('/create', [AccountController::class, 'create'])->name('account.create');
         Route::get('/search-suggestions', [AccountController::class, 'searchSuggestions'])->name('account.search-suggestions');
+        Route::get('/picker', [AccountController::class, 'picker'])->name('account.picker');
         Route::post('/', [AccountController::class, 'store'])->name('account.store');
         Route::get('/{account}/show', [AccountController::class, 'show'])->name('account.show');
         Route::get('/{account}/edit', [AccountController::class, 'edit'])->name('account.edit');

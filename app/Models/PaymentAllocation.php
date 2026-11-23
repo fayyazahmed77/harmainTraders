@@ -14,6 +14,11 @@ class PaymentAllocation extends Model
         'bill_id',
         'bill_type',
         'amount',
+        'is_advance',
+    ];
+
+    protected $casts = [
+        'is_advance' => 'boolean',
     ];
 
     public function payment()

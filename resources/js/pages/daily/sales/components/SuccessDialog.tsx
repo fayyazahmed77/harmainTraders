@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -109,9 +110,9 @@ export const SuccessDialog: React.FC<SuccessDialogProps> = ({
           <DialogTitle className="text-2xl font-black text-white m-0 leading-tight">
              {type === 'edit' ? 'Sales Updated Successfully!' : 'Sales Created Successfully!'}
           </DialogTitle>
-          <p className="text-white/80 text-[11px] font-bold mt-2 font-mono uppercase tracking-wider">
+          <DialogDescription className="text-white/80 text-[11px] font-bold mt-2 font-mono uppercase tracking-wider">
              Invoice record saved with ID: {invoiceNo}
-          </p>
+          </DialogDescription>
         </div>
 
         {/* Transaction Overview Body */}

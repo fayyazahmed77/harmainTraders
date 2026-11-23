@@ -22,6 +22,7 @@ class Payment extends Model
         'cheque_no',
         'cheque_date',
         'clear_date',
+        'return_date',
         'remarks',
         'payment_method',
         'cheque_id',

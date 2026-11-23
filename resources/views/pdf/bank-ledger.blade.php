@@ -152,6 +152,15 @@ if (file_exists($logo_path)) {
             font-size: 8px;
             display: inline-block;
         }
+        .badge-returned {
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 8px;
+            display: inline-block;
+        }
         .no-impact-note {
             font-size: 7px;
             color: #b45309;
@@ -288,7 +297,7 @@ if (file_exists($logo_path)) {
                 <th width="8%">Method</th>
                 <th width="10%">Cheque #</th>
                 <th width="8%">Chq Date</th>
-                <th width="8%">Clear Date</th>
+                <th width="8%">{{ ($date_type ?? 'invdate') === 'returndate' ? 'Return Date' : 'Clear Date' }}</th>
                 <th width="8%">Status</th>
                 <th width="8%">Deposit (IN)</th>
                 <th width="8%">Withdrawal (OUT)</th>
@@ -315,20 +324,25 @@ if (file_exists($logo_path)) {
 
             @foreach($data as $row)
             @php
+                $isReturned = !empty($row['is_returned']);
                 $isCleared = !empty($row['is_cleared']);
-                $isPending = !$isCleared;
-                $rowStatus = $row['cheque_status'] ?? ($isCleared ? 'Cleared' : 'Pending');
+                $isPending = !$isCleared && !$isReturned;
+                $displayDateCol = ($date_type ?? 'invdate') === 'returndate'
+                    ? ($row['return_date'] ?? null)
+                    : ($row['clear_date'] ?? null);
             @endphp
-            <tr style="{{ $isPending ? 'background-color: #fffbeb;' : '' }}">
+            <tr style="{{ $isReturned ? 'background-color: #fef2f2;' : ($isPending ? 'background-color: #fffbeb;' : '') }}">
                 <td class="text-center">{{ !empty($row['date']) ? date('d-M-y', strtotime($row['date'])) : '' }}</td>
                 <td class="text-center font-bold">{{ $row['voucher_no'] ?? '-' }}</td>
                 <td>{{ $row['contra_party'] ?? $row['description'] ?? 'General Account' }}</td>
                 <td class="text-center">{{ $row['method'] ?? 'Cash' }}</td>
                 <td class="text-center font-bold">{{ $row['cheque_no'] ?? '-' }}</td>
                 <td class="text-center">{{ !empty($row['cheque_date']) ? date('d-m-y', strtotime($row['cheque_date'])) : '-' }}</td>
-                <td class="text-center">{{ !empty($row['clear_date']) ? date('d-m-y', strtotime($row['clear_date'])) : '-' }}</td>
+                <td class="text-center">{{ !empty($displayDateCol) ? date('d-m-y', strtotime($displayDateCol)) : '-' }}</td>
                 <td class="text-center">
-                    @if($isCleared)
+                    @if($isReturned)
+                        <span class="badge-returned">RETURNED</span>
+                    @elseif($isCleared)
                         <span class="badge-cleared">CLEARED</span>
                     @else
                         <span class="badge-pending">PENDING</span>
@@ -342,7 +356,9 @@ if (file_exists($logo_path)) {
                 </td>
                 <td class="text-right font-bold">
                     {{ formatSafeCurrency(abs($row['running_balance'] ?? $row['balance'] ?? 0)) }}
-                    @if($isPending)
+                    @if($isReturned)
+                        <span class="no-impact-note" style="color: #b91c1c;">(Returned — No impact)</span>
+                    @elseif($isPending)
                         <span class="no-impact-note">(No impact yet)</span>
                     @endif
                 </td>

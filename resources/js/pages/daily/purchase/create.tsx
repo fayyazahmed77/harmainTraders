@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Combobox } from "@/components/ui/combobox";
+import {
+    SmartAccountDialog,
+    SmartAccountTrigger,
+    SmartAccount,
+} from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -328,6 +333,56 @@ export default function Purchase({
     const [salesman, setSalesman] = useState<number | null>(null);
     const [cashCredit, setCashCredit] = useState<string>("CREDIT");
     const [accountType, setAccountType] = useState<Option | null>(null);
+    const [selectedAccountInfo, setSelectedAccountInfo] = useState<{ id: number; title: string; code?: string | null } | null>(null);
+    const [accountDialogOpen, setAccountDialogOpen] = useState<boolean>(false);
+
+    const handleSelectSupplier = (selectedAccount: SmartAccount | null) => {
+        if (selectedAccount) {
+            const id = selectedAccount.id;
+            const label = `${selectedAccount.title}${selectedAccount.code ? ` (${selectedAccount.code})` : ""}`;
+            setAccountType({ value: String(id), label });
+            setSelectedAccountInfo({ id, title: selectedAccount.title, code: selectedAccount.code ?? null });
+            setCreditDays(selectedAccount.aging_days ?? 0);
+            setCreditLimit(
+                typeof selectedAccount.credit_limit === "number"
+                    ? selectedAccount.credit_limit
+                    : selectedAccount.credit_limit
+                    ? Number(selectedAccount.credit_limit)
+                    : ""
+            );
+            setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
+            setSalesman(selectedAccount.saleman_id ?? null);
+
+            // Fetch Supplier Balance On-Demand
+            axios.get(`/account/${id}/balance?role=purchase`).then((res) => {
+                const balance = toNumber(res.data.balance);
+                const avail = res.data.advance_breakdown
+                    ? toNumber(res.data.advance_breakdown.applicable_advance)
+                    : Math.max(0, -balance);
+                setSupplierBalance(balance);
+                setAdvanceAvailable(balance);
+                setApplicableAdvance(avail);
+                setUseAdvance(avail > 0);
+            }).catch((err) => {
+                console.error("Failed to fetch balance", err);
+                setSupplierBalance(0);
+                setAdvanceAvailable(0);
+                setApplicableAdvance(0);
+                setUseAdvance(false);
+            });
+        } else {
+            setAccountType(null);
+            setSelectedAccountInfo(null);
+            setCreditDays(0);
+            setCreditLimit("");
+            setMarkupPercentage(0);
+            setSalesman(null);
+            setSupplierBalance(0);
+            setAdvanceAvailable(0);
+            setApplicableAdvance(0);
+            setUseAdvance(false);
+        }
+    };
     const [courier, setCourier] = useState<number>(0);
     const [extraDiscount, setExtraDiscount] = useState<number>(0);
     const [printOption, setPrintOption] = useState<"big" | "small">("big");
@@ -341,7 +396,8 @@ export default function Purchase({
     });
 
     const [advanceAvailable, setAdvanceAvailable] = useState<number>(0);
-    const [useAdvance, setUseAdvance] = useState<boolean>(true);
+    const [applicableAdvance, setApplicableAdvance] = useState<number>(0);
+    const [useAdvance, setUseAdvance] = useState<boolean>(false);
     const [supplierBalance, setSupplierBalance] = useState<number>(0);
     const accountTypeOptions: Option[] = useMemo(() => {
         return accounts.map((a) => ({
@@ -556,6 +612,25 @@ export default function Purchase({
         });
     }, [rows, items]);
 
+    const {
+        selectedRowId,
+        setRowRef,
+        setCellRef,
+        selectRow,
+        handleCellKeyDown,
+    } = useInvoiceRowNavigation({
+        rows: rowsWithComputed,
+        isModalOpen:
+            itemDialogOpen ||
+            accountDialogOpen ||
+            showPaymentDialog ||
+            showPriceDialog ||
+            showSuccessDialog,
+        onRowFocus: (row) => {
+            if (row.item_id) handleProductFocus(row.item_id);
+        },
+    });
+
     // ───────────────────────────────────────────
     // Totals & Invoice summary
     // ───────────────────────────────────────────
@@ -590,8 +665,9 @@ export default function Purchase({
         const netPayable = Math.max(0, billNet + courier - extraDiscount);
 
         // Advance Logic:
-        const absAdvance = Math.max(0, -advanceAvailable);
+        const absAdvance = applicableAdvance > 0 ? applicableAdvance : Math.max(0, -advanceAvailable);
         const appliedAdvance = useAdvance ? Math.min(netPayable, absAdvance) : 0;
+        const remainingAdvance = Math.max(0, absAdvance - appliedAdvance);
         const netSettlement = Math.max(0, netPayable - appliedAdvance);
 
         const finalNetPayable = prevBal + netSettlement;
@@ -605,6 +681,7 @@ export default function Purchase({
             netPayable: netPayable,
             net: billNet + courier,
             appliedAdvance,
+            remainingAdvance,
             netSettlement,
             previousBalance: prevBal,
             finalNetPayable: finalNetPayable,
@@ -614,7 +691,7 @@ export default function Purchase({
             totalPcs,
             totalItems
         };
-    }, [rowsWithComputed, items, courier, extraDiscount, advanceAvailable, useAdvance]);
+    }, [rowsWithComputed, items, courier, extraDiscount, advanceAvailable, applicableAdvance, useAdvance]);
     // Check if over credit limit
     const isOverLimit = useMemo(() => {
         if (typeof creditLimit !== "number") return false;
@@ -623,6 +700,7 @@ export default function Purchase({
     }, [creditLimit, totals]);
 
     // Global Keyboard Shortcuts (F4 / Alt+C -> Payment Settlement Dialog, F9 / Ctrl+Enter -> Confirm & Save)
+    const handleSaveRef = React.useRef<() => void>(() => {});
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // F4 or Alt+C: Toggle / Open Payment Settlement Dialog
@@ -637,11 +715,18 @@ export default function Purchase({
                 return;
             }
 
-            // F9 or Ctrl+Enter (when dialog not open): Confirm & Save
-            if ((e.key === "F9" || (e.ctrlKey && e.key === "Enter")) && !showPaymentDialog) {
+            // F9 or Ctrl+Enter (when no modal is open): Confirm & Save using latest state via ref
+            if (
+                (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) &&
+                !showPaymentDialog &&
+                !showPriceDialog &&
+                !showSuccessDialog &&
+                !itemDialogOpen &&
+                !accountDialogOpen
+            ) {
                 e.preventDefault();
                 if (!isSubmittingRef.current) {
-                    handleSave();
+                    handleSaveRef.current();
                 }
                 return;
             }
@@ -649,7 +734,7 @@ export default function Purchase({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isPayNow, paymentSplits.length, showPaymentDialog]);
+    }, [isPayNow, paymentSplits.length, showPaymentDialog, showPriceDialog, showSuccessDialog, itemDialogOpen, accountDialogOpen]);
 
     // ───────────────────────────────────────────
     // Simple renderer / layout
@@ -675,8 +760,9 @@ export default function Purchase({
             courier_charges: totals.courier,
             net_total: totals.net,
             paid_amount: (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
-            remaining_amount: totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0),
-            applied_advance: totals.appliedAdvance,
+            remaining_amount: Math.max(0, totals.netSettlement - (isPayNow ? paymentSplits.reduce((acc, s) => acc + toNumber(s.amount), 0) : 0)),
+            use_advance: useAdvance,
+            applied_advance: useAdvance ? totals.appliedAdvance : 0,
             update_prices: updatePrices,
             print_format: printOption,
             message_line_id: selectedMessageId !== "0" ? Number(selectedMessageId) : null,
@@ -719,7 +805,7 @@ export default function Purchase({
                 // Success data for the dialog
                 const newProps = page.props as unknown as PurchaseProps;
                 setSuccessData({
-                    supplierName: accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A",
+                    supplierName: selectedAccountInfo?.title || accountType?.label || "N/A",
                     totalItems: totals.totalItems,
                     totalFull: totals.totalFull,
                     totalPcs: totals.totalPcs,
@@ -740,7 +826,8 @@ export default function Purchase({
                 isSubmittingRef.current = false;
                 setIsSubmitting(false);
                 console.error(errors);
-                alert("Failed to save purchase. Check console for details.");
+                const msgs = Object.values(errors || {}).flat().filter(Boolean);
+                alert(msgs.length > 0 ? `Failed to save purchase:\n${msgs.join("\n")}` : "Failed to save purchase. Check console for details.");
             },
             onFinish: () => {
                 isSubmittingRef.current = false;
@@ -756,6 +843,7 @@ export default function Purchase({
             setInvoiceNo(nextInvoiceNo);
         }
         setAccountType(null);
+        setSelectedAccountInfo(null);
         setSalesman(null);
         setSelectedFirmId(firms?.find(f => f.defult === 1)?.id.toString() || "");
         setCreditLimit("");
@@ -772,6 +860,7 @@ export default function Purchase({
         setShowPaymentDialog(false);
         setSupplierBalance(0);
         setAdvanceAvailable(0);
+        setApplicableAdvance(0);
         setUseAdvance(false);
     };
 
@@ -825,7 +914,8 @@ export default function Purchase({
             }
         }
     };
-console.log(lastPurchaseInfo);
+    handleSaveRef.current = handleSave;
+
     return (
         <SidebarProvider
             defaultOpen={false}
@@ -865,45 +955,12 @@ console.log(lastPurchaseInfo);
                             {/* Essential Main Info (Always visible on mobile) */}
                             <div className="mt-3">
                                 <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1">Select Supplier</label>
-                                <Combobox
-                                    options={accountTypeOptions}
-                                    value={accountType?.value || ""}
-                                    onChange={(value) => {
-                                        const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
-                                        setAccountType(selectedOption);
-
-                                            if (selectedAccount) {
-                                                setCreditDays(selectedAccount.aging_days ?? 0);
-                                                setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                                                const salemanId = selectedAccount.saleman_id ?? null;
-                                                setSalesman(salemanId);
-                                                
-                                                // Fetch Supplier Balance On-Demand
-                                                axios.get(`/account/${id}/balance`).then((res) => {
-                                                    const balance = toNumber(res.data.balance);
-                                                    setSupplierBalance(balance);
-                                                    setAdvanceAvailable(balance);
-                                                    setUseAdvance(balance < 0);
-                                                }).catch((err) => {
-                                                    console.error("Failed to fetch balance", err);
-                                                    setSupplierBalance(0);
-                                                    setAdvanceAvailable(0);
-                                                    setUseAdvance(false);
-                                                });
-                                            } else {
-                                                setCreditDays(0);
-                                                setCreditLimit("");
-                                                setSalesman(null);
-                                                setSupplierBalance(0);
-                                                setAdvanceAvailable(0);
-                                                setUseAdvance(false);
-                                            }
-                                    }}
+                                <SmartAccountTrigger
+                                    value={selectedAccountInfo}
+                                    onClick={() => setAccountDialogOpen(true)}
+                                    onClear={() => handleSelectSupplier(null)}
                                     placeholder="Select Supplier..."
-                                    searchPlaceholder="Search by name or code..."
-                                    className="w-full bg-white/50 dark:bg-black/20 text-md font-bold rounded-xl h-11 border-gray-200 dark:border-gray-800"
+                                    className="w-full bg-white/50 dark:bg-black/20 text-sm font-bold rounded-xl h-11 border-gray-200 dark:border-gray-800"
                                 />
                             </div>
                         </div>
@@ -976,47 +1033,11 @@ console.log(lastPurchaseInfo);
 
                             {/* Account Select */}
                             <FieldWrapper label="Select Supplier" className="flex-1 min-w-[160px]">
-                                <Combobox
-                                    options={accountTypeOptions}
-                                    value={accountType?.value || ""}
-                                    onChange={(value) => {
-                                        const id = Number(value);
-                                        const selectedAccount = accounts.find((a) => Number(a.id) === id) ?? null;
-
-                                        const selectedOption = accountTypeOptions.find((s) => s.value === value) ?? null;
-                                        setAccountType(selectedOption);
-
-                                        if (selectedAccount) {
-                                            setCreditDays(selectedAccount.aging_days ?? 0);
-                                            setCreditLimit(typeof selectedAccount.credit_limit === "number" ? selectedAccount.credit_limit : (selectedAccount.credit_limit ? Number(selectedAccount.credit_limit) : ""));
-                                            setMarkupPercentage(selectedAccount.account_category?.percentage ?? 0);
-                                            const salemanId = selectedAccount.saleman_id ?? null;
-                                            setSalesman(salemanId);
-                                            
-                                            // Fetch Supplier Balance On-Demand
-                                            axios.get(`/account/${id}/balance`).then((res) => {
-                                                const balance = toNumber(res.data.balance);
-                                                setSupplierBalance(balance);
-                                                setAdvanceAvailable(balance);
-                                                setUseAdvance(balance < 0);
-                                            }).catch((err) => {
-                                                console.error("Failed to fetch balance", err);
-                                                setSupplierBalance(0);
-                                                setAdvanceAvailable(0);
-                                                setUseAdvance(false);
-                                            });
-                                        } else {
-                                            setCreditDays(0);
-                                            setCreditLimit("");
-                                            setMarkupPercentage(0);
-                                            setSalesman(null);
-                                            setSupplierBalance(0);
-                                            setAdvanceAvailable(0);
-                                            setUseAdvance(false);
-                                        }
-                                    }}
-                                    placeholder="Supplier"
-                                    searchPlaceholder="Search by name or code..."
+                                <SmartAccountTrigger
+                                    value={selectedAccountInfo}
+                                    onClick={() => setAccountDialogOpen(true)}
+                                    onClear={() => handleSelectSupplier(null)}
+                                    placeholder="Select Supplier..."
                                     className="w-full h-10 border-slate-200 hover:border-sky-300 focus:border-sky-500 transition-colors bg-white dark:bg-zinc-900"
                                 />
                             </FieldWrapper>
@@ -1179,7 +1200,7 @@ console.log(lastPurchaseInfo);
 
                                         {/* Rows (scrollable) */}
                                         <div className="max-h-none md:min-h-[calc(100vh-290px)] md:max-h-[calc(100vh-290px)] overflow-visible md:overflow-auto space-y-3 md:space-y-0 text-sm flex-1">
-                                            {rowsWithComputed.map((row) => (
+                                            {rowsWithComputed.map((row, rowIndex) => (
                                                 <React.Fragment key={row.id}>
                                                     {(() => {
                                                         const rowItem = items.find(it => Number(it.id) === Number(row.item_id));
@@ -1321,7 +1342,15 @@ console.log(lastPurchaseInfo);
                                                                 </div>
 
                                                                 {/* Desktop Row View (Hidden on mobile) */}
-                                                                <div className="hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm">
+                                                                <div
+                                                                    ref={setRowRef(row.id)}
+                                                                    onClick={() => selectRow(row)}
+                                                                    className={`hidden md:grid grid-cols-12 gap-1 p-2 border-b items-center text-sm transition-colors ${
+                                                                        selectedRowId === row.id
+                                                                            ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                                                            : "hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
+                                                                    }`}
+                                                                >
                                                                     <div className="col-span-3 h-8 flex items-center">
                                                                         {row.item_id ? (
                                                                             <button
@@ -1350,30 +1379,39 @@ console.log(lastPurchaseInfo);
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "full")}
                                                                             className="h-8 px-1 text-center"
                                                                             value={row.full}
                                                                             onChange={(e) => updateRow(row.id, { full: toNumber(e.target.value) })}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "full")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                     </div>
 
                                                                     <div className="col-span-1">
                                                                         {showLoose && (
                                                                             <Input
+                                                                                ref={setCellRef(row.id, "pcs")}
                                                                                 className="h-8 px-1 text-center"
                                                                                 value={row.pcs}
                                                                                 onChange={(e) => updateRow(row.id, { pcs: toNumber(e.target.value) })}
-                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                onFocus={() => selectRow(row)}
+                                                                                onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "pcs")}
+                                                                                onClick={() => selectRow(row)}
                                                                             />
                                                                         )}
                                                                     </div>
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "bonus_full")}
                                                                             className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
                                                                             value={row.bonus_full}
                                                                             onChange={(e) => updateRow(row.id, { bonus_full: toNumber(e.target.value) })}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_full")}
+                                                                            onClick={() => selectRow(row)}
                                                                             placeholder="B.Full"
                                                                         />
                                                                     </div>
@@ -1381,16 +1419,20 @@ console.log(lastPurchaseInfo);
                                                                     <div className="col-span-1">
                                                                         {showLoose && (
                                                                             <Input
+                                                                                ref={setCellRef(row.id, "bonus_pcs")}
                                                                                 className="h-8 px-1 text-center border-orange-200 bg-orange-50/10"
                                                                                 value={row.bonus_pcs}
                                                                                 onChange={(e) => updateRow(row.id, { bonus_pcs: toNumber(e.target.value) })}
-                                                                                onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                                onFocus={() => selectRow(row)}
+                                                                                onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_pcs")}
+                                                                                onClick={() => selectRow(row)}
                                                                                 placeholder="B.Pcs"
                                                                             />
                                                                         )}
                                                                     </div>
                                                                     <div className="col-span-1 relative">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "rate")}
                                                                             type="text"
                                                                             inputMode="decimal"
                                                                             className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
@@ -1404,7 +1446,9 @@ console.log(lastPurchaseInfo);
                                                                             onBlur={() => {
                                                                                 updateRow(row.id, { rate: toNumber(row.rate) });
                                                                             }}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "rate")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                         {(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) && (
                                                                             <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
@@ -1416,6 +1460,7 @@ console.log(lastPurchaseInfo);
 
                                                                     <div className="col-span-1">
                                                                         <Input
+                                                                            ref={setCellRef(row.id, "disc")}
                                                                             type="text"
                                                                             inputMode="decimal"
                                                                             className="h-8 px-1 text-center"
@@ -1429,7 +1474,9 @@ console.log(lastPurchaseInfo);
                                                                             onBlur={() => {
                                                                                 updateRow(row.id, { discPercent: toNumber(row.discPercent) });
                                                                             }}
-                                                                            onClick={() => row.item_id && handleProductFocus(row.item_id)}
+                                                                            onFocus={() => selectRow(row)}
+                                                                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "disc")}
+                                                                            onClick={() => selectRow(row)}
                                                                         />
                                                                     </div>
 
@@ -1591,13 +1638,13 @@ console.log(lastPurchaseInfo);
 
                                         {/* Advance Information */}
                                         {advanceAvailable < 0 && (
-                                            <div className="space-y-3 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
+                                            <div className="space-y-2.5 bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
                                                         <TrendingDown size={12} /> Available Advance
                                                     </span>
-                                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                                                        Rs {Math.abs(advanceAvailable).toLocaleString()}
+                                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        Rs {(applicableAdvance > 0 ? applicableAdvance : Math.abs(advanceAvailable)).toLocaleString()}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
@@ -1612,8 +1659,14 @@ console.log(lastPurchaseInfo);
                                                             Apply to this bill
                                                         </label>
                                                     </div>
-                                                    <span className="text-xs font-black text-emerald-600">
+                                                    <span className="text-xs font-black text-emerald-600 font-mono">
                                                         -Rs {totals.appliedAdvance.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-1 border-t border-emerald-500/10 text-[10px]">
+                                                    <span className="font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Remaining Advance</span>
+                                                    <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                                        Rs {totals.remainingAdvance.toLocaleString()}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1943,6 +1996,16 @@ console.log(lastPurchaseInfo);
                     isSubmitting={isSubmitting}
                 />
 
+                {/* Smart Supplier Selection Dialog (F1) */}
+                <SmartAccountDialog
+                    open={accountDialogOpen}
+                    onOpenChange={setAccountDialogOpen}
+                    context="purchase"
+                    selectedAccountId={accountType?.value || null}
+                    onSelect={(acc) => handleSelectSupplier(acc)}
+                    f1Disabled={itemDialogOpen || showPaymentDialog || showPriceDialog || showSuccessDialog}
+                />
+
                 {/* Purchase Payment Dialog */}
                 <PurchasePaymentDialog
                     open={showPaymentDialog}
@@ -1958,7 +2021,7 @@ console.log(lastPurchaseInfo);
                         submitPurchase(updatePricesAfterPayment);
                     }}
                     invoiceNo={invoiceNo}
-                    supplierName={accounts.find(a => Number(a.id) === Number(accountType?.value))?.title || "N/A"}
+                    supplierName={selectedAccountInfo?.title || accountType?.label || "N/A"}
                     previousBalance={supplierBalance}
                     customerCheques={customerCheques}
                     availableCheques={availableCheques}

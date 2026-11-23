@@ -297,8 +297,9 @@ class ClearingChequeController extends Controller implements HasMiddleware
                     }
                 }
 
-                // Update cheque status to Canceled
+                // Update cheque status to Canceled and record exact return_date
                 $p->cheque_status = 'Canceled';
+                $p->return_date = now()->toDateString();
                 $p->save();
 
                 // If it's a bank cheque issued by us, cancel it in the chequebook leaf

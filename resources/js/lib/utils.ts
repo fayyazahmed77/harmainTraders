@@ -1,16 +1,12 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { format, isValid } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatSafeDate(date: any, formatStr: string = 'dd MMM yy', fallback: string = '---') {
-    if (!date) return fallback;
-    const d = new Date(date);
-    return isValid(d) ? format(d, formatStr) : fallback;
-}
+// formatSafeDate lives in lib/format-utils.ts to isolate date-fns from this core utils
+// module and prevent Rollup from merging it with the recharts/d3 chunk.
 
 export function resolveUrl(url: any): string {
     if (!url || typeof url !== 'string') return '';

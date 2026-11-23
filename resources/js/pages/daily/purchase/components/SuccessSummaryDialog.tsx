@@ -3,6 +3,7 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check, Printer, Eye, Plus } from "lucide-react";
@@ -106,24 +107,19 @@ export const SuccessSummaryDialog: React.FC<SuccessSummaryDialogProps> = ({
                             <Check size={24} className="text-white" />
                         </motion.div>
                         
-                        <motion.h2
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                            className="text-xl font-black tracking-tight mb-1"
-                        >
-                            {isEdit ? 'Purchase Updated Successfully!' : 'Purchase Created Successfully!'}
-                        </motion.h2>
-                        {purchaseId && (
-                            <motion.p
-                                initial={{ y: 10, opacity: 0 }}
-                                animate={{ y: 0, opacity: 0.8 }}
-                                transition={{ delay: 0.4 }}
-                                className="text-xs font-mono uppercase tracking-widest opacity-80"
+                        <DialogTitle asChild>
+                            <motion.h2
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                transition={{ delay: 0.3 }}
+                                className="text-xl font-black tracking-tight mb-1 text-white"
                             >
-                                Invoice ID: {purchaseId}
-                            </motion.p>
-                        )}
+                                {isEdit ? 'Purchase Updated Successfully!' : 'Purchase Created Successfully!'}
+                            </motion.h2>
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-mono uppercase tracking-widest text-white/80">
+                            {purchaseId ? `Invoice ID: ${purchaseId}` : 'Purchase invoice saved successfully'}
+                        </DialogDescription>
                     </div>
                 </div>
 
