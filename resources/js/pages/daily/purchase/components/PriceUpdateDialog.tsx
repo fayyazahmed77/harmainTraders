@@ -11,6 +11,7 @@ import { AlertTriangle, X, Check } from "lucide-react";
 interface PriceUpdateInfo {
     item_id: number;
     title: string;
+    net_rate?: number;
     old_trade_price: number;
     new_trade_price: number;
     markup_percent: number;
@@ -44,7 +45,7 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
                         <AlertTriangle size={32} className="text-white" />
                     </div>
                     <DialogTitle className="text-xl font-black tracking-tight text-white mb-1 px-4 text-center leading-tight uppercase">Update Item Trade Prices?</DialogTitle>
-                    <DialogDescription className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on new purchase rate and supplier markup. Update items table?</DialogDescription>
+                    <DialogDescription className="text-orange-50/80 text-xs font-medium text-center max-w-[80%]">Detected price changes based on Net Rate (after discount) and supplier markup. Update items table?</DialogDescription>
                 </div>
 
                 <div className="p-0 max-h-[400px] overflow-auto">
@@ -52,6 +53,7 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 z-10">
                             <tr className="text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400">
                                 <th className="py-3 px-4">Item Description</th>
+                                <th className="py-3 px-2 text-center">Net Rate</th>
                                 <th className="py-3 px-2 text-center">Prev Trade</th>
                                 <th className="py-3 px-2 text-center">Markup (%)</th>
                                 <th className="py-3 px-2 text-center">New Trade</th>
@@ -64,6 +66,9 @@ export const PriceUpdateDialog: React.FC<PriceUpdateDialogProps> = ({
                                     <td className="py-3 px-4">
                                         <div className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">{upd.title}</div>
                                         <div className="text-[10px] text-gray-400 font-medium">ID: #{upd.item_id}</div>
+                                    </td>
+                                    <td className="py-3 px-2 text-center">
+                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Rs {(upd.net_rate ?? (upd.new_trade_price - upd.markup_amount)).toFixed(2)}</span>
                                     </td>
                                     <td className="py-3 px-2 text-center">
                                         <span className="text-xs font-semibold text-gray-500 line-through">Rs {upd.old_trade_price.toFixed(2)}</span>

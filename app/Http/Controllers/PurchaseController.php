@@ -158,11 +158,11 @@ class PurchaseController extends Controller implements HasMiddleware
     //create
     public function create()
     {
-        // Historical average stats for items
+        // Historical average stats for items (net rate after discount)
         $purchaseStats = DB::table('purchase_items')
             ->select('item_id',
                 DB::raw('COUNT(*) as cnt'),
-                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+                DB::raw('ROUND(AVG(CASE WHEN subtotal > 0 THEN trade_price * (1 - COALESCE(discount, 0) / subtotal) ELSE trade_price END), 2) as avg_rate')
             )
             ->groupBy('item_id')
             ->get()
@@ -187,7 +187,11 @@ class PurchaseController extends Controller implements HasMiddleware
             ->map(function ($item) use ($purchaseStats, $saleStats) {
                 $lastP = $item->lastPurchaseItem;
                 if ($lastP) {
-                    $item->last_purchase_rate = (float) $lastP->trade_price;
+                    $item->last_purchase_rate = $this->computeNetPurchaseRate(
+                        (float) $lastP->trade_price,
+                        (float) ($lastP->discount ?? 0),
+                        (float) ($lastP->subtotal ?? 0)
+                    );
                     $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
                     $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
                     $item->last_purchase_qty_full = (float) $lastP->qty_carton;
@@ -297,6 +301,7 @@ class PurchaseController extends Controller implements HasMiddleware
             'items.*.qty_pcs'         => 'required|numeric',
             'items.*.total_pcs'       => 'required|numeric',
             'items.*.trade_price'     => 'required|numeric',
+            'items.*.net_rate'        => 'nullable|numeric',
             'items.*.discount'        => 'required|numeric',
             'items.*.bonus_full'      => 'nullable|numeric',
             'items.*.bonus_pcs'       => 'nullable|numeric',
@@ -545,10 +550,18 @@ class PurchaseController extends Controller implements HasMiddleware
                 if ($item) {
                     // Inward stock recorded in purchase_items, opening stock remains immutable.
 
-                    // Auto-update trade price based on supplier category percentage if enabled
-                    if ($request->update_prices && $percentage > 0) {
-                        $newTradePrice = $it['trade_price'] + ($it['trade_price'] * $percentage / 100);
-                        $item->trade_price = round($newTradePrice);
+                    // Auto-update trade price based on Net Rate (after discount) + supplier category percentage if enabled
+                    if ($request->update_prices) {
+                        $netRate = $this->computeNetPurchaseRate(
+                            (float) $it['trade_price'],
+                            (float) ($it['discount'] ?? 0),
+                            (float) ($it['subtotal'] ?? 0),
+                            isset($it['net_rate']) ? (float) $it['net_rate'] : null
+                        );
+                        if ($netRate > 0) {
+                            $newTradePrice = $netRate + ($netRate * $percentage / 100);
+                            $item->trade_price = round($newTradePrice, 2);
+                        }
                     }
 
                     $item->save();
@@ -622,11 +635,11 @@ class PurchaseController extends Controller implements HasMiddleware
         $purchase->manual_payment_paid_amount = $nonAdv['manual_payment_paid'];
         $purchase->applied_advance_amount = $advSummary['total_applied_advance'];
         $purchase->has_advance_allocated = $advSummary['has_advance_allocated'];
-        // Historical average stats for items
+        // Historical average stats for items (net rate after discount)
         $purchaseStats = DB::table('purchase_items')
             ->select('item_id',
                 DB::raw('COUNT(*) as cnt'),
-                DB::raw('ROUND(AVG(trade_price), 2) as avg_rate')
+                DB::raw('ROUND(AVG(CASE WHEN subtotal > 0 THEN trade_price * (1 - COALESCE(discount, 0) / subtotal) ELSE trade_price END), 2) as avg_rate')
             )
             ->groupBy('item_id')
             ->get()
@@ -656,7 +669,11 @@ class PurchaseController extends Controller implements HasMiddleware
             ->map(function ($item) use ($purchaseStats, $saleStats) {
             $lastP = $item->lastPurchaseItem;
             if ($lastP) {
-                $item->last_purchase_rate = (float) $lastP->trade_price;
+                $item->last_purchase_rate = $this->computeNetPurchaseRate(
+                    (float) $lastP->trade_price,
+                    (float) ($lastP->discount ?? 0),
+                    (float) ($lastP->subtotal ?? 0)
+                );
                 $item->last_purchase_date = $lastP->purchase ? $lastP->purchase->date : null;
                 $item->last_supplier_name = $lastP->purchase && $lastP->purchase->supplier ? $lastP->purchase->supplier->title : null;
                 $item->last_purchase_qty_full = (float) $lastP->qty_carton;
@@ -747,6 +764,7 @@ class PurchaseController extends Controller implements HasMiddleware
             'items.*.qty_pcs'         => 'required|numeric',
             'items.*.total_pcs'       => 'required|numeric',
             'items.*.trade_price'     => 'required|numeric',
+            'items.*.net_rate'        => 'nullable|numeric',
             'items.*.discount'        => 'required|numeric',
             'items.*.bonus_full'      => 'nullable|numeric',
             'items.*.bonus_pcs'       => 'nullable|numeric',
@@ -996,13 +1014,21 @@ class PurchaseController extends Controller implements HasMiddleware
                     'subtotal'    => $it['subtotal'],
                 ]);
 
-                // Auto-update trade price based on supplier category percentage if enabled
-                if ($request->update_prices && $percentage > 0) {
+                // Auto-update trade price based on Net Rate (after discount) + supplier category percentage if enabled
+                if ($request->update_prices) {
                     $item = Items::find($it['item_id']);
                     if ($item) {
-                        $newTradePrice = $it['trade_price'] + ($it['trade_price'] * $percentage / 100);
-                        $item->trade_price = round($newTradePrice);
-                        $item->save();
+                        $netRate = $this->computeNetPurchaseRate(
+                            (float) $it['trade_price'],
+                            (float) ($it['discount'] ?? 0),
+                            (float) ($it['subtotal'] ?? 0),
+                            isset($it['net_rate']) ? (float) $it['net_rate'] : null
+                        );
+                        if ($netRate > 0) {
+                            $newTradePrice = $netRate + ($netRate * $percentage / 100);
+                            $item->trade_price = round($newTradePrice, 2);
+                            $item->save();
+                        }
                     }
                 }
             }
@@ -1096,6 +1122,7 @@ class PurchaseController extends Controller implements HasMiddleware
                 'purchase_items.qty_pcs as previous_qty_pcs',
                 'purchase_items.total_pcs as previous_total_pcs',
                 'purchase_items.trade_price as previous_retail_price',
+                'purchase_items.discount as previous_discount',
                 'purchase_items.subtotal as previous_subtotal',
                 'items.stock_1 as current_stock',
                 'items.company',
@@ -1105,6 +1132,14 @@ class PurchaseController extends Controller implements HasMiddleware
                 'accounts.title as supplier_name'
             )
             ->first();
+
+        if ($lastPurchase) {
+            $lastPurchase->previous_retail_price = $this->computeNetPurchaseRate(
+                (float) ($lastPurchase->previous_retail_price ?? 0),
+                (float) ($lastPurchase->previous_discount ?? 0),
+                (float) ($lastPurchase->previous_subtotal ?? 0)
+            );
+        }
 
         // If no prior purchase history exists, fallback to base item data
         if (!$lastPurchase) {
@@ -1127,13 +1162,34 @@ class PurchaseController extends Controller implements HasMiddleware
         }
 
         if ($lastPurchase) {
-            // Calculate real average purchase rate from purchase history
-            $avgPurchRate = DB::table('purchase_items')->where('item_id', $itemId)->avg('trade_price');
+            // Calculate real average net purchase rate (after discount) from purchase history
+            $avgPurchRate = DB::table('purchase_items')
+                ->where('item_id', $itemId)
+                ->selectRaw('AVG(CASE WHEN subtotal > 0 THEN trade_price * (1 - COALESCE(discount, 0) / subtotal) ELSE trade_price END) as avg_net_rate')
+                ->value('avg_net_rate');
             $lastPurchase->average_price = $avgPurchRate ? round((float) $avgPurchRate, 2) : 0;
             $lastPurchase->has_purchases = DB::table('purchase_items')->where('item_id', $itemId)->exists();
         }
 
         return response()->json($lastPurchase);
+    }
+
+    /**
+     * Compute effective per-unit net purchase rate after line discount.
+     * purchase_items.subtotal stores gross line amount (qty * trade_price) and discount is the discount amount.
+     */
+    private function computeNetPurchaseRate(float $tradePrice, float $discount, float $subtotal, ?float $explicitNetRate = null): float
+    {
+        if ($subtotal > 0) {
+            $ratio = $discount / $subtotal;
+            return max(0.0, round($tradePrice * (1 - $ratio), 2));
+        }
+
+        if ($explicitNetRate !== null && $explicitNetRate >= 0) {
+            return round($explicitNetRate, 2);
+        }
+
+        return max(0.0, round($tradePrice, 2));
     }
 
     public function destroy($id)

@@ -179,11 +179,15 @@ class SalesController extends Controller implements HasMiddleware
             ->get()
             ->map(function ($item) use ($purchaseStats, $saleStats) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
-                    $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
-                    $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
-                    $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
-                    $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
-                    $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
+                    $lastP = $item->lastPurchaseItem;
+                    $lastNetRate = ((float) ($lastP->subtotal ?? 0) > 0)
+                        ? max(0.0, round((float) $lastP->trade_price * (1 - ((float) ($lastP->discount ?? 0) / (float) $lastP->subtotal)), 2))
+                        : (float) $lastP->trade_price;
+                    $item->last_purchase_date = $lastP->purchase->date;
+                    $item->last_purchase_full = $lastP->qty_carton;
+                    $item->last_purchase_pcs = $lastP->qty_pcs;
+                    $item->last_purchase_rate = $lastNetRate;
+                    $item->last_supplier = $lastP->purchase->supplier->title ?? null;
                 }
                 $item->unsetRelation('lastPurchaseItem');
 
@@ -662,11 +666,15 @@ class SalesController extends Controller implements HasMiddleware
             ->get()
             ->map(function ($item) use ($purchaseStats, $saleStats) {
                 if ($item->lastPurchaseItem && $item->lastPurchaseItem->purchase) {
-                    $item->last_purchase_date = $item->lastPurchaseItem->purchase->date;
-                    $item->last_purchase_full = $item->lastPurchaseItem->qty_carton;
-                    $item->last_purchase_pcs = $item->lastPurchaseItem->qty_pcs;
-                    $item->last_purchase_rate = (float) $item->lastPurchaseItem->trade_price;
-                    $item->last_supplier = $item->lastPurchaseItem->purchase->supplier->title ?? null;
+                    $lastP = $item->lastPurchaseItem;
+                    $lastNetRate = ((float) ($lastP->subtotal ?? 0) > 0)
+                        ? max(0.0, round((float) $lastP->trade_price * (1 - ((float) ($lastP->discount ?? 0) / (float) $lastP->subtotal)), 2))
+                        : (float) $lastP->trade_price;
+                    $item->last_purchase_date = $lastP->purchase->date;
+                    $item->last_purchase_full = $lastP->qty_carton;
+                    $item->last_purchase_pcs = $lastP->qty_pcs;
+                    $item->last_purchase_rate = $lastNetRate;
+                    $item->last_supplier = $lastP->purchase->supplier->title ?? null;
                 }
                 $item->unsetRelation('lastPurchaseItem');
 

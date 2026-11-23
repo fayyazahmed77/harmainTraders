@@ -129,6 +129,7 @@ interface RowData {
 interface PriceUpdateInfo {
     item_id: number;
     title: string;
+    net_rate: number;
     old_trade_price: number;
     new_trade_price: number;
     markup_percent: number;
@@ -778,12 +779,15 @@ export default function Purchase({
 
                 const totalPCS = ((toNumber(r.full) + toNumber(r.bonus_full || 0)) * packing) + toNumber(r.pcs) + toNumber(r.bonus_pcs || 0);
 
+                const netRate = Number((toNumber(r.rate) * (1 - toNumber(r.discPercent) / 100)).toFixed(2));
+
                 return {
                     item_id: r.item_id,
                     qty_carton: toNumber(r.full),
                     qty_pcs: toNumber(r.pcs),
                     total_pcs: totalPCS,
                     trade_price: toNumber(r.rate),
+                    net_rate: netRate,
                     discount: (toNumber(r.discPercent) / 100) * r.amount,
                     gst_amount: 0,
                     subtotal: r.amount
@@ -878,16 +882,18 @@ export default function Purchase({
             const item = items.find(it => Number(it.id) === Number(r.item_id));
             if (!item) return;
 
+            const netRate = Number((toNumber(r.rate) * (1 - toNumber(r.discPercent) / 100)).toFixed(2));
             const mPercent = toNumber(markupPercentage);
-            const mAmount = toNumber(r.rate) * (mPercent / 100);
-            const newTP = toNumber(r.rate) + mAmount;
+            const mAmount = Number((netRate * (mPercent / 100)).toFixed(2));
+            const newTP = Number((netRate + mAmount).toFixed(2));
             const currentTP = toNumber(item.trade_price);
 
-            // If calculated TP differs from current item TP (handle float diff)
-            if (Math.abs(newTP - currentTP) > 0.01) {
+            // If calculated TP (from Net Rate + markup) differs from current item TP
+            if (netRate > 0 && Math.abs(newTP - currentTP) > 0.01) {
                 updatesMap.set(Number(r.item_id), {
                     item_id: r.item_id,
                     title: item.title,
+                    net_rate: netRate,
                     old_trade_price: currentTP,
                     new_trade_price: newTP,
                     markup_percent: mPercent,
@@ -1205,6 +1211,8 @@ export default function Purchase({
                                                     {(() => {
                                                         const rowItem = items.find(it => Number(it.id) === Number(row.item_id));
                                                         const showLoose = !row.item_id || toNumber(rowItem?.packing_qty || 1) > 1;
+                                                        const netRate = Number((toNumber(row.rate) * (1 - toNumber(row.discPercent) / 100)).toFixed(2));
+                                                        const isHighRate = (row.last_purchase_rate ?? 0) > 0 && netRate > (row.last_purchase_rate ?? 0);
                                                         
                                                         return (
                                                             <>
@@ -1226,9 +1234,16 @@ export default function Purchase({
                                                                                     <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 tracking-[0.1em] uppercase">Product Selection</span>
                                                                                 </div>
                                                                                 {row.item_id ? (
-                                                                                    <div className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase italic flex items-center gap-1.5">
-                                                                                        {rowItem?.title}
-                                                                                        <ChevronDown size={14} className="text-orange-500/50" />
+                                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                        <div className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase italic flex items-center gap-1.5">
+                                                                                            {rowItem?.title}
+                                                                                            <ChevronDown size={14} className="text-orange-500/50" />
+                                                                                        </div>
+                                                                                        {isHighRate && (
+                                                                                            <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none whitespace-nowrap">
+                                                                                                High Rate! Last: {row.last_purchase_rate}
+                                                                                            </span>
+                                                                                        )}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div className="text-sm font-bold text-zinc-300 italic uppercase flex items-center gap-1.5">
@@ -1296,7 +1311,7 @@ export default function Purchase({
                                                                                 <Input
                                                                                     type="text"
                                                                                     inputMode="decimal"
-                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${row.last_purchase_rate && toNumber(row.rate) > row.last_purchase_rate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
+                                                                                    className={`h-7 text-xs px-1 border-gray-200 dark:border-gray-700 text-center ${isHighRate ? "text-red-600 font-bold border-red-200 bg-red-50" : ""}`}
                                                                                     value={row.rate}
                                                                                     onChange={(e) => {
                                                                                         const val = e.target.value;
@@ -1357,9 +1372,16 @@ export default function Purchase({
                                                                                 onClick={() => { setActiveRowId(row.id); setItemDialogOpen(true); }}
                                                                                 className="flex flex-col text-left group/item w-full transition-all hover:translate-x-1"
                                                                             >
-                                                                                <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
-                                                                                    {rowItem?.title || "Unknown Item"}
-                                                                                </span>
+                                                                                <div className="flex items-center gap-1.5 min-w-0 w-full">
+                                                                                    <span className="text-xs font-black uppercase tracking-tighter truncate dark:text-zinc-100 group-hover/item:text-orange-500 transition-colors">
+                                                                                        {rowItem?.title || "Unknown Item"}
+                                                                                    </span>
+                                                                                    {isHighRate && (
+                                                                                        <span className="shrink-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none whitespace-nowrap">
+                                                                                            High Rate! Last: {row.last_purchase_rate}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
                                                                                 <span className="text-[9px] font-mono text-zinc-400 font-bold uppercase tracking-widest leading-none">
                                                                                     ID: {row.item_id.toString().padStart(5, '0')}
                                                                                 </span>
@@ -1435,7 +1457,7 @@ export default function Purchase({
                                                                             ref={setCellRef(row.id, "rate")}
                                                                             type="text"
                                                                             inputMode="decimal"
-                                                                            className={`h-8 px-1 text-center ${(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : ""}`}
+                                                                            className="h-8 px-1 text-center"
                                                                             value={row.rate}
                                                                             onChange={(e) => {
                                                                                 const val = e.target.value;
@@ -1450,12 +1472,6 @@ export default function Purchase({
                                                                             onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "rate")}
                                                                             onClick={() => selectRow(row)}
                                                                         />
-                                                                        {(row.last_purchase_rate ?? 0) > 0 && toNumber(row.rate) > (row.last_purchase_rate ?? 0) && (
-                                                                            <div className="absolute -top-8 left-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                                                                High Rate! Last: {row.last_purchase_rate}
-                                                                                <div className="absolute top-full left-4 border-4 border-transparent border-t-red-600"></div>
-                                                                            </div>
-                                                                        )}
                                                                     </div>
 
                                                                     <div className="col-span-1">
@@ -1480,13 +1496,27 @@ export default function Purchase({
                                                                         />
                                                                     </div>
 
-                                                                    <div className="col-span-1">
+                                                                    <div className="col-span-1 relative">
                                                                         <Input
-                                                                            className="h-8 px-1 text-center bg-secondary/20"
+                                                                            className={`h-8 px-1 text-center ${isHighRate ? "border-red-500 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 font-bold" : "bg-secondary/20"}`}
                                                                             value={(toNumber(row.rate) * (1 - toNumber(row.discPercent) / 100)).toFixed(2)}
                                                                             readOnly
                                                                             onClick={() => row.item_id && handleProductFocus(row.item_id)}
                                                                         />
+                                                                        {isHighRate && (
+                                                                            <div
+                                                                                className={`pointer-events-none absolute left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap ${
+                                                                                    rowIndex === 0 ? "top-full mt-1.5" : "bottom-full mb-1.5"
+                                                                                }`}
+                                                                            >
+                                                                                High Rate! Last: {row.last_purchase_rate}
+                                                                                <div
+                                                                                    className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
+                                                                                        rowIndex === 0 ? "bottom-full border-b-red-600" : "top-full border-t-red-600"
+                                                                                    }`}
+                                                                                ></div>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                     <div className="col-span-1">
                                                                         <Input
