@@ -32,6 +32,7 @@ import {
     SmartAccountTrigger,
     SmartAccount,
 } from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -585,6 +586,25 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
         });
     }, [rows]);
 
+    const {
+        selectedRowId,
+        setRowRef,
+        setCellRef,
+        selectRow,
+        handleCellKeyDown,
+    } = useInvoiceRowNavigation({
+        rows: rowsWithAmount,
+        isModalOpen:
+            invoiceDialogOpen ||
+            assignItemDialogOpen ||
+            desktopAccOpen ||
+            showSuccessDialog ||
+            calOpen,
+        onRowFocus: (row) => {
+            setSelectedRowItemId(row.item_id ?? null);
+        },
+    });
+
     const totals = useMemo(() => {
         let gross = 0, disc = 0, total_full = 0, total_pcs = 0;
         rowsWithAmount.forEach(r => {
@@ -806,9 +826,17 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                                         <div className="col-span-3 text-right pr-6">Position Net</div>
                                     </div>
                                     <div className="flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800 min-h-0 custom-scrollbar">
-                                        {rowsWithAmount.map((row) => (
-                                            <div key={row.id} onClick={() => setSelectedRowItemId(row.item_id)}
-                                                className={`grid grid-cols-12 gap-2.5 p-2 items-center group cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
+                                        {rowsWithAmount.map((row, idx) => (
+                                            <div
+                                                key={row.id}
+                                                ref={setRowRef(row.id)}
+                                                onClick={() => selectRow(row)}
+                                                className={`grid grid-cols-12 gap-2.5 p-2 items-center group cursor-pointer transition-colors ${
+                                                    selectedRowId === row.id
+                                                        ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                                                }`}
+                                            >
                                                 <div className="col-span-3">
                                                     <div className="flex flex-col">
                                                         <span className="text-xs font-black uppercase truncate leading-tight">{row.item_title}</span>
@@ -816,22 +844,72 @@ export default function PurchaseReturnEditPage({ returnData, accounts, salemans,
                                                     </div>
                                                 </div>
                                                 <div className="col-span-3 grid grid-cols-4 gap-1">
-                                                    <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="F" title="Full cartons" />
-                                                    <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} placeholder="P" title="Loose pieces" />
-                                                    <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BF" title="Bonus cartons" />
-                                                    <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`} placeholder="BP" title="Bonus pieces" />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "full")}
+                                                        type="number"
+                                                        value={row.full || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "full")}
+                                                        onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`}
+                                                        placeholder="F"
+                                                        title="Full cartons"
+                                                    />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "pcs")}
+                                                        type="number"
+                                                        value={row.pcs || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "pcs")}
+                                                        onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`}
+                                                        placeholder="P"
+                                                        title="Loose pieces"
+                                                    />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "bonus_full")}
+                                                        type="number"
+                                                        value={row.bonus_full || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "bonus_full")}
+                                                        onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`}
+                                                        placeholder="BF"
+                                                        title="Bonus cartons"
+                                                    />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "bonus_pcs")}
+                                                        type="number"
+                                                        value={row.bonus_pcs || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "bonus_pcs")}
+                                                        onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black text-emerald-600 ${PREMIUM_ROUNDING_MD}`}
+                                                        placeholder="BP"
+                                                        title="Bonus pieces"
+                                                    />
                                                 </div>
                                                 <div className="col-span-2">
-                                                    <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
-                                                        className={`h-7 text-right font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "rate")}
+                                                        type="number"
+                                                        value={row.rate || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "rate")}
+                                                        onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
+                                                        className={`h-7 text-right font-mono text-[10px] font-black ${PREMIUM_ROUNDING_MD}`}
+                                                    />
                                                 </div>
                                                 <div className="col-span-1">
-                                                    <Input type="number" value={row.discPercent || ""} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-bold ${PREMIUM_ROUNDING_MD}`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "disc")}
+                                                        type="number"
+                                                        value={row.discPercent || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "disc")}
+                                                        onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-bold ${PREMIUM_ROUNDING_MD}`}
+                                                    />
                                                 </div>
                                                 <div className="col-span-3 flex items-center justify-end gap-2 pr-4 text-xs font-black">
                                                     Rs {row.amount.toLocaleString()}

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type BreadcrumbItem } from '@/types';
 import React, { useState } from 'react';
-import { ArrowLeft, Loader2, LucideIcon } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
 import { Link } from '@inertiajs/react';
+import { resolveIcon } from '@/lib/icon-resolver';
 
 interface PermissionAction {
     id: number;
@@ -129,7 +130,7 @@ export default function Edit() {
                                     {/* Horizontal Category Tabs */}
                                     <div className="flex flex-wrap gap-2">
                                         {permissionCategories.map((category) => {
-                                            const IconComponent = Icons[category.icon as keyof typeof Icons] as LucideIcon;
+                                            const IconComponent = resolveIcon(category.icon, ShieldCheck);
                                             const isActive = activeTab === category.label;
                                             return (
                                                 <button

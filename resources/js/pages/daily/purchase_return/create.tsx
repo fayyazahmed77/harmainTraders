@@ -32,6 +32,7 @@ import {
     SmartAccountTrigger,
     SmartAccount,
 } from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -828,6 +829,27 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
         });
     }, [rows]);
 
+    const {
+        selectedRowId,
+        setRowRef,
+        setCellRef,
+        selectRow,
+        handleCellKeyDown,
+    } = useInvoiceRowNavigation({
+        rows,
+        isModalOpen:
+            invoiceDialogOpen ||
+            assignItemDialogOpen ||
+            desktopAccOpen ||
+            mobileAccOpen ||
+            showSuccessDialog ||
+            inventoryContextOpen ||
+            calOpen,
+        onRowFocus: (row) => {
+            setFocusedRowId(row.id);
+        },
+    });
+
     const totals = useMemo(() => {
         let gross = 0, disc = 0, total_full = 0, total_pcs = 0;
         rowsWithAmount.forEach(r => {
@@ -1142,12 +1164,21 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                 <AnimatePresence initial={false}>
                                     {rows.map((row, idx) => {
                                         const rowAmount = rowsWithAmount.find(r => r.id === row.id) || { amount: 0 };
+                                        const isActiveRow = selectedRowId === row.id || focusedRowId === row.id;
                                         return (
-                                            <motion.div key={row.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
-                                                className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-2 py-1.5 border-b border-zinc-100 dark:border-zinc-800/50 items-center group transition-colors relative ${focusedRowId === row.id ? 'bg-orange-50/50 dark:bg-orange-500/5' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30'}`}
-                                                onClick={() => setFocusedRowId(row.id)}>
-
-                                                {focusedRowId === row.id && <div className="absolute left-0 top-0 w-0.5 h-full bg-orange-500" />}
+                                            <motion.div
+                                                key={row.id}
+                                                ref={setRowRef(row.id)}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 10 }}
+                                                className={`grid grid-cols-1 md:grid-cols-12 gap-2 px-2 py-1.5 border-b items-center group transition-colors relative ${
+                                                    isActiveRow
+                                                        ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                                        : "border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30"
+                                                }`}
+                                                onClick={() => selectRow(row)}
+                                            >
 
                                                 {/* Entity Selection */}
                                                 <div className="md:col-span-4 pr-2">
@@ -1171,36 +1202,79 @@ export default function PurchaseReturnCreatePage({ items, accounts, salemans, pu
                                                 <div className="grid grid-cols-4 md:col-span-4 gap-1 md:gap-1 px-1">
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5">Full</label>
-                                                        <Input type="number" value={row.full || ""} onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
-                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
+                                                        <Input
+                                                            ref={setCellRef(row.id, "full")}
+                                                            type="number"
+                                                            value={row.full || ""}
+                                                            onFocus={() => selectRow(row)}
+                                                            onKeyDown={(e) => handleCellKeyDown(e, idx, "full")}
+                                                            onChange={e => updateRow(row.id, 'full', toNum(e.target.value))}
+                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800"
+                                                        />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5">Pcs</label>
-                                                        <Input type="number" value={row.pcs || ""} onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
-                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800" />
+                                                        <Input
+                                                            ref={setCellRef(row.id, "pcs")}
+                                                            type="number"
+                                                            value={row.pcs || ""}
+                                                            onFocus={() => selectRow(row)}
+                                                            onKeyDown={(e) => handleCellKeyDown(e, idx, "pcs")}
+                                                            onChange={e => updateRow(row.id, 'pcs', toNum(e.target.value))}
+                                                            className="h-7 text-center font-mono font-bold text-xs border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700 focus:bg-white dark:focus:bg-zinc-800"
+                                                        />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-0.5">B.Full</label>
-                                                        <Input type="number" value={row.bonus_full || ""} onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
-                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
+                                                        <Input
+                                                            ref={setCellRef(row.id, "bonus_full")}
+                                                            type="number"
+                                                            value={row.bonus_full || ""}
+                                                            onFocus={() => selectRow(row)}
+                                                            onKeyDown={(e) => handleCellKeyDown(e, idx, "bonus_full")}
+                                                            onChange={e => updateRow(row.id, 'bonus_full', toNum(e.target.value))}
+                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30"
+                                                        />
                                                     </div>
                                                     <div className="flex flex-col md:block">
                                                         <label className="md:hidden text-[8px] font-black uppercase text-emerald-600 mb-0.5">B.Pcs</label>
-                                                        <Input type="number" value={row.bonus_pcs || ""} onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
-                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30" />
+                                                        <Input
+                                                            ref={setCellRef(row.id, "bonus_pcs")}
+                                                            type="number"
+                                                            value={row.bonus_pcs || ""}
+                                                            onFocus={() => selectRow(row)}
+                                                            onKeyDown={(e) => handleCellKeyDown(e, idx, "bonus_pcs")}
+                                                            onChange={e => updateRow(row.id, 'bonus_pcs', toNum(e.target.value))}
+                                                            className="h-7 text-center font-mono font-bold text-xs text-emerald-600 border-gray-200 dark:border-gray-700 focus:border-emerald-500/30"
+                                                        />
                                                     </div>
                                                 </div>
 
                                                 {/* Financials */}
                                                 <div className="md:col-span-1 px-1">
                                                     <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5 text-right block">Rate</label>
-                                                    <Input type="number" value={row.rate || ""} onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
-                                                        className="h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700" />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "rate")}
+                                                        type="number"
+                                                        value={row.rate || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "rate")}
+                                                        onChange={e => updateRow(row.id, 'rate', toNum(e.target.value))}
+                                                        className="h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 focus:border-zinc-300 dark:focus:border-zinc-700"
+                                                    />
                                                 </div>
                                                 <div className="md:col-span-1 px-1">
                                                     <label className="md:hidden text-[8px] font-black uppercase text-zinc-500 mb-0.5 text-right block">Disc%</label>
-                                                    <Input type="number" value={row.discPercent || ""} readOnly={row.discReadOnly} onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
-                                                        className={`h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.discReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "disc")}
+                                                        type="number"
+                                                        value={row.discPercent || ""}
+                                                        readOnly={row.discReadOnly}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "disc")}
+                                                        onChange={e => updateRow(row.id, 'discPercent', toNum(e.target.value))}
+                                                        className={`h-7 text-right font-mono font-bold text-xs bg-transparent border-gray-200 dark:border-gray-700 ${row.discReadOnly ? 'opacity-50 cursor-not-allowed' : 'focus:border-zinc-300 dark:focus:border-zinc-700'}`}
+                                                    />
                                                 </div>
 
                                                 {/* Subtotal & Action */}

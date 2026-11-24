@@ -176,7 +176,7 @@
         <div class="header text-center">
             <div class="brand-name">{{ strtoupper($firm->name ?? 'HARAMAIN TRADERS') }}</div>
             <div class="contact-info">
-                Phone No. : {{ $firm->phone ?? '' }} @if(!empty($firm->fax)) &nbsp; Fax No. : {{ $firm->fax }} @endif
+                Phone No. : {{ $firm->phone ?? '' }} @if(!empty($firm->fax)) &nbsp; Complaint No. : {{ $firm->fax }} @endif
             </div>
         </div>
 

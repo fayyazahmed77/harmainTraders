@@ -18,6 +18,7 @@ import { Calendar, Clock, ChevronDown, ListPlus, Trash2, Database, Search, Rotat
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { useAppearance } from "@/hooks/use-appearance";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 
 interface Company {
   id: number;
@@ -85,12 +86,27 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
   const [isLoadingAllItems, setIsLoadingAllItems] = useState(false);
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [filterMode, setFilterMode] = useState<'reorder' | 'sales'>('reorder');
+
+  const {
+    selectedRowId,
+    setSelectedRowId,
+    setRowRef,
+    setCellRef,
+    selectRow,
+    handleCellKeyDown,
+  } = useInvoiceRowNavigation({
+    rows: orderItems,
+    isModalOpen:
+      isSupplierDialogOpen ||
+      isCompanyDialogOpen ||
+      isItemManualDialogOpen ||
+      showSuccessDialog,
+  });
 
   // Fetch all items when the dialog opens
   useEffect(() => {
@@ -576,7 +592,7 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                  {orderItems.map((item) => {
+                  {orderItems.map((item, rowIndex) => {
                     const parsedLastPurchaseRate = Number(item.last_purchase_rate) || 0;
                     const parsedDiscPercent = Number(item.disc_percent) || 0;
                     const netRate = parsedLastPurchaseRate - (parsedLastPurchaseRate * parsedDiscPercent / 100);
@@ -588,8 +604,13 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                     return (
                       <tr 
                         key={item.id} 
-                        onClick={() => setSelectedRowId(item.id)}
-                        className={`group transition-colors cursor-pointer ${selectedRowId === item.id ? 'bg-zinc-50 dark:bg-zinc-800 ring-1 ring-inset ring-orange-500/20' : 'hover:bg-zinc-50/50 dark:hover:bg-[#222]/50'}`}
+                        ref={setRowRef(item.id)}
+                        onClick={() => selectRow(item)}
+                        className={`group transition-colors cursor-pointer ${
+                          selectedRowId === item.id
+                            ? 'bg-orange-50/80 dark:bg-orange-950/25 shadow-[inset_4px_0_0_0_#f97316]'
+                            : 'hover:bg-zinc-50/50 dark:hover:bg-[#222]/50'
+                        }`}
                       >
                         <td className="px-4 py-2">
                           <div className="flex flex-col">
@@ -599,36 +620,48 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                         </td>
                         <td className="px-2 py-2">
                           <Input 
+                            ref={setCellRef(item.id, "full")}
                             type="number" 
                             min="0"
                             value={item.input_full || ''} 
+                            onFocus={() => selectRow(item)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "full")}
                             onChange={e => handleItemChange(item.id, 'input_full', e.target.value)}
                             className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input 
+                            ref={setCellRef(item.id, "pcs")}
                             type="number" 
                             min="0"
                             value={item.input_pcs || ''} 
+                            onFocus={() => selectRow(item)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "pcs")}
                             onChange={e => handleItemChange(item.id, 'input_pcs', e.target.value)}
                             className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input 
+                            ref={setCellRef(item.id, "bonus_full")}
                             type="number" 
                             min="0"
                             value={item.input_b_full || ''} 
+                            onFocus={() => selectRow(item)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_full")}
                             onChange={e => handleItemChange(item.id, 'input_b_full', e.target.value)}
                             className="h-8 bg-white dark:bg-zinc-950 border-zinc-200/50 dark:border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 font-mono text-zinc-700 dark:text-zinc-500"
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input 
+                            ref={setCellRef(item.id, "bonus_pcs")}
                             type="number" 
                             min="0"
                             value={item.input_b_pcs || ''} 
+                            onFocus={() => selectRow(item)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "bonus_pcs")}
                             onChange={e => handleItemChange(item.id, 'input_b_pcs', e.target.value)}
                             className="h-8 bg-white dark:bg-zinc-950 border-zinc-200/50 dark:border-zinc-800/50 text-center text-xs focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-600 font-mono text-zinc-700 dark:text-zinc-500"
                           />
@@ -638,10 +671,13 @@ export default function SupplierOrder({ suppliers, companies }: Props) {
                         </td>
                         <td className="px-2 py-2">
                           <Input 
+                            ref={setCellRef(item.id, "disc")}
                             type="number" 
                             min="0"
                             max="100"
                             value={item.disc_percent || ''} 
+                            onFocus={() => selectRow(item)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, "disc")}
                             onChange={e => handleItemChange(item.id, 'disc_percent', e.target.value)}
                             className="h-8 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-center text-xs focus-visible:ring-orange-500/50 font-mono text-zinc-900 dark:text-zinc-100"
                           />

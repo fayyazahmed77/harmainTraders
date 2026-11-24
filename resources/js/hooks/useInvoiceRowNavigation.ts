@@ -6,11 +6,12 @@ export type InvoiceNavColumn =
   | "bonus_full"
   | "bonus_pcs"
   | "rate"
+  | "tax"
   | "disc";
 
 interface RowNavItem {
   id: number;
-  item_id: number | null;
+  item_id?: number | null;
 }
 
 interface UseInvoiceRowNavigationOptions<T extends RowNavItem> {
@@ -34,7 +35,7 @@ export function useInvoiceRowNavigation<T extends RowNavItem>({
   onRowFocus,
 }: UseInvoiceRowNavigationOptions<T>) {
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-  const rowRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
+  const rowRefs = useRef<Map<number, HTMLElement | null>>(new Map());
   const cellRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
 
   const rowsRef = useRef<T[]>(rows);
@@ -47,7 +48,7 @@ export function useInvoiceRowNavigation<T extends RowNavItem>({
   selectedRowIdRef.current = selectedRowId;
 
   const setRowRef = useCallback(
-    (rowId: number) => (el: HTMLDivElement | null) => {
+    (rowId: number) => (el: HTMLElement | null) => {
       if (el) {
         rowRefs.current.set(rowId, el);
       } else {

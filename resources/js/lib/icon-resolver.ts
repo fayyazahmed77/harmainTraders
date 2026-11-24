@@ -43,6 +43,7 @@ import {
     Receipt,
     FileChartColumn,
     Shield,
+    ShieldCheck,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -91,6 +92,7 @@ export const knownIcons: Record<string, LucideIcon> = {
     Receipt,
     FileChartColumn,
     Shield,
+    ShieldCheck,
 };
 
 export function resolveIcon(name?: string, fallback: LucideIcon = FileText): LucideIcon {

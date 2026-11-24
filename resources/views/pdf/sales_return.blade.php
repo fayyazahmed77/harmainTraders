@@ -308,7 +308,7 @@ $logo_base64 = 'data:image/' . $logo_type . ';base64,' . base64_encode($logo_dat
         </div>
         <div class="header-contact" style="width: 40%;">
             @if(!empty($firm->phone))<div class="contact-item">Phone : {{ $firm->phone }}</div>@endif
-            @if(!empty($firm->fax))<div class="contact-item">Fix no : {{ $firm->fax }}</div>@endif
+            @if(!empty($firm->fax))<div class="contact-item">Complaint No : {{ $firm->fax }}</div>@endif
         </div>
     </div>
 

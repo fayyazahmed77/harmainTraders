@@ -31,6 +31,7 @@ import {
     SmartAccountTrigger,
     SmartAccount,
 } from "@/components/SmartAccountSelect";
+import { useInvoiceRowNavigation } from "@/hooks/useInvoiceRowNavigation";
 
 // ───────────────────────────────────────────
 const breadcrumbs: BreadcrumbItem[] = [
@@ -767,6 +768,25 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
         });
     }, [rows]);
 
+    const {
+        selectedRowId,
+        setRowRef,
+        setCellRef,
+        selectRow,
+        handleCellKeyDown,
+    } = useInvoiceRowNavigation({
+        rows: rowsWithAmount,
+        isModalOpen:
+            invoiceDialogOpen ||
+            assignItemDialogOpen ||
+            desktopAccOpen ||
+            mobileAccOpen ||
+            calOpen,
+        onRowFocus: (row) => {
+            setSelectedRowItemId(row.item_id ?? null);
+        },
+    });
+
     const totals = useMemo(() => {
         let gross = 0, tax = 0, disc = 0;
         rowsWithAmount.forEach(r => {
@@ -963,9 +983,19 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
 
                                     <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-zinc-100 dark:divide-zinc-800">
                                         {rowsWithAmount.map((row, idx) => (
-                                            <motion.div key={row.id} initial={{ x: -10, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.05 }}
-                                                onClick={() => setSelectedRowItemId(row.item_id)}
-                                                className={`grid grid-cols-12 gap-2 px-2.5 py-1.5 items-center group transition-colors cursor-pointer border-l-2 ${selectedRowItemId === row.item_id ? 'bg-orange-500/5 border-orange-500' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 border-transparent'}`}>
+                                            <motion.div
+                                                key={row.id}
+                                                ref={setRowRef(row.id)}
+                                                initial={{ x: -10, opacity: 0 }}
+                                                animate={{ x: 0, opacity: 1 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                onClick={() => selectRow(row)}
+                                                className={`grid grid-cols-12 gap-2 px-2.5 py-1.5 items-center group transition-colors cursor-pointer ${
+                                                    selectedRowId === row.id
+                                                        ? "bg-orange-50/80 dark:bg-orange-950/25 border-orange-200 dark:border-orange-900/60 shadow-[inset_4px_0_0_0_#f97316]"
+                                                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                                                }`}
+                                            >
 
                                                 <div className="col-span-3">
                                                     <div className="flex flex-col">
@@ -975,25 +1005,66 @@ export default function SalesReturnEditPage({ returnData, accounts, salemans, pa
                                                 </div>
 
                                                 <div className="col-span-2 grid grid-cols-2 gap-1 px-1">
-                                                    <Input type="number" value={row.full || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="F" title="Full Cartons" />
-                                                    <Input type="number" value={row.pcs || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
-                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} placeholder="P" title="Loose Pieces" />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "full")}
+                                                        type="number"
+                                                        value={row.full || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "full")}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, full: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`}
+                                                        placeholder="F"
+                                                        title="Full Cartons"
+                                                    />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "pcs")}
+                                                        type="number"
+                                                        value={row.pcs || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "pcs")}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, pcs: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-center font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-orange-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`}
+                                                        placeholder="P"
+                                                        title="Loose Pieces"
+                                                    />
                                                 </div>
 
                                                 <div className="col-span-2">
-                                                    <Input type="number" value={row.rate || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
-                                                        className={`h-7 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "rate")}
+                                                        type="number"
+                                                        value={row.rate || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "rate")}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, rate: toNum(e.target.value) } : r))}
+                                                        className={`h-7 text-right font-mono text-[10px] font-black border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus-visible:ring-emerald-500 ${PREMIUM_ROUNDING_MD} dark:text-zinc-100`}
+                                                    />
                                                 </div>
 
                                                 <div className="col-span-1">
-                                                    <Input type="number" value={row.taxPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
-                                                        readOnly={row.taxReadOnly} className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "tax")}
+                                                        type="number"
+                                                        value={row.taxPercent || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "tax")}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, taxPercent: toNum(e.target.value) } : r))}
+                                                        readOnly={row.taxReadOnly}
+                                                        className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.taxReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`}
+                                                    />
                                                 </div>
 
                                                 <div className="col-span-1">
-                                                    <Input type="number" value={row.discPercent || ""} onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
-                                                        readOnly={row.discReadOnly} className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`} />
+                                                    <Input
+                                                        ref={setCellRef(row.id, "disc")}
+                                                        type="number"
+                                                        value={row.discPercent || ""}
+                                                        onFocus={() => selectRow(row)}
+                                                        onKeyDown={(e) => handleCellKeyDown(e, idx, "disc")}
+                                                        onChange={e => setRows(p => p.map(r => r.id === row.id ? { ...r, discPercent: toNum(e.target.value) } : r))}
+                                                        readOnly={row.discReadOnly}
+                                                        className={`h-7 text-center font-mono text-[10px] font-bold border-zinc-200 dark:border-zinc-700 ${row.discReadOnly ? 'bg-zinc-100/50 dark:bg-zinc-900/50 text-zinc-400' : 'bg-white dark:bg-zinc-800'} ${PREMIUM_ROUNDING_MD}`}
+                                                    />
                                                 </div>
 
                                                 <div className="col-span-2 text-right">
