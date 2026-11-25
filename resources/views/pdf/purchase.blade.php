@@ -505,13 +505,13 @@ if (file_exists($logo_path)) {
         <!-- Branded Footer -->
         <div style="margin-top: 18px; padding-top: 8px; border-top: 1px dashed #000; text-align: center; font-family: Arial, sans-serif;">
             <div style="font-size: 9px; color: #000; margin-bottom: 3px;">
-                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+                Phone: {{ $firm->phone ?? '' }} 
             </div>
             <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
                 Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
-            <div style="font-size: 8px; color: #555; letter-spacing: 0.3px;">
-                Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
+            <div style="font-size: 8px; color: #1f1e1eff; letter-spacing: 0.3px;">
+                Developed by <strong>AISH TYCOONS</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
             </div>
         </div>
     </div>

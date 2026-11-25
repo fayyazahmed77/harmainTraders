@@ -435,87 +435,60 @@ class ReportBuilder
         $toDate = $toDate ?? date('Y-m-d');
         $account = Account::with('accountType')->findOrFail($accountId);
 
-        // Bank Ledger date logic:
-        //   - 'invdate'    : Default — all active bank transactions filtered by voucher date (payments.date)
-        //   - 'cleardate'  : Cleared transactions filtered by clear_date (fallback to date for Cash/Online)
-        //   - 'returndate' : Returned/Canceled cheques filtered by return_date (fallback to cheque_date / updated_at / date)
-        $dateType = strtolower((string) ($params['dateType'] ?? $params['date_type'] ?? 'invdate'));
-        if (!in_array($dateType, ['invdate', 'cleardate', 'returndate'], true)) {
-            $dateType = 'invdate';
-        }
-
+        // Bank Ledger — Real Bank Statement mode:
+        // Strictly CLEARED / realized bank transactions ONLY (no Pending, In Hand, Distributed, or Returned/Canceled cheques).
+        // Filtered, sorted, and dated chronologically by Bank Clearing Date: DATE(COALESCE(clear_date, date)).
         $signedOB = (float)$account->getSignedOpeningBalance();
 
-        // 1. Calculate Cleared Prior Net before $fromDate
-        $priorQuery = Payment::where(function($q) use ($accountId) {
+        // 1. Calculate Cleared Prior Net before $fromDate (by bank clearing date)
+        $priorItems = Payment::where(function ($q) use ($accountId) {
                 $q->where('payment_account_id', $accountId)
                   ->orWhere('account_id', $accountId);
             })
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->whereNull('cheque_status')
                   ->orWhereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund']);
-            });
+            })
+            ->where(function ($q) {
+                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                  ->orWhereNull('payment_method')
+                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal']);
+            })
+            ->whereRaw('DATE(COALESCE(clear_date, date)) < ?', [$fromDate])
+            ->get();
 
-        if ($dateType === 'cleardate') {
-            $priorQuery->whereRaw('COALESCE(clear_date, date) < ?', [$fromDate]);
-        } else {
-            $priorQuery->whereDate('date', '<', $fromDate);
-        }
-
-        $priorItems = $priorQuery->get();
         $priorClearedNet = 0.0;
         foreach ($priorItems as $p) {
-            $status = $p->cheque_status;
-            $isBypassed = !in_array($p->payment_method, ['Cheque', 'Online']);
-            $isCleared = in_array($status, ['Clear', 'Cleared', 'In Hand', 'Distributed', 'Deposit', 'Withdrawal']) || empty($status);
-
             if ($p->payment_account_id == $accountId) {
-                if ($isBypassed || $isCleared) {
-                    $priorClearedNet += ($p->type === 'RECEIPT') ? (float)$p->amount : -(float)$p->amount;
-                }
+                $priorClearedNet += ($p->type === 'RECEIPT') ? (float)$p->amount : -(float)$p->amount;
             }
             if ($p->account_id == $accountId) {
-                if ($isBypassed || $isCleared) {
-                    $priorClearedNet += ($p->type === 'PAYMENT') ? (float)$p->amount : -(float)$p->amount;
-                }
+                $priorClearedNet += ($p->type === 'PAYMENT') ? (float)$p->amount : -(float)$p->amount;
             }
         }
 
         $startBankBalance = $signedOB + $priorClearedNet;
 
-        // 2. Fetch Transactions in date range based on Ledger Logic ($dateType)
-        $txQuery = Payment::where(function($q) use ($accountId) {
+        // 2. Fetch Cleared / Realized Bank Transactions in date range (by bank clearing date)
+        $txQuery = Payment::where(function ($q) use ($accountId) {
                 $q->where('payment_account_id', $accountId)
                   ->orWhere('account_id', $accountId);
             })
-            ->with(['account', 'paymentAccount']);
-
-        if ($dateType === 'returndate') {
-            // Return Cheque Date mode: strictly Returned/Canceled cheques only (zero bank balance impact)
-            $txQuery->where('payment_method', 'Cheque')
-                ->whereIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund'])
-                ->whereRaw('COALESCE(return_date, cheque_date, DATE(updated_at), date) BETWEEN ? AND ?', [$fromDate, $toDate]);
-        } elseif ($dateType === 'cleardate') {
-            // Clear Cheque Date mode: strictly Cheque method ONLY, including BOTH Pending & Cleared cheques,
-            // filtered by COALESCE(clear_date, cheque_date) (clear_date when cleared, cheque_date when pending)
-            $txQuery->where('payment_method', 'Cheque')
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund']);
-                })
-                ->whereRaw('COALESCE(clear_date, cheque_date) BETWEEN ? AND ?', [$fromDate, $toDate]);
-        } else {
-            // Default ('invdate'): all active (non-returned) transactions by voucher date
-            $txQuery->whereBetween('date', [$fromDate, $toDate])
-                ->where(function($q) {
-                    $q->whereNull('cheque_status')
-                      ->orWhereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund']);
-                });
-        }
+            ->with(['account', 'paymentAccount'])
+            ->where(function ($q) {
+                $q->whereNull('cheque_status')
+                  ->orWhereNotIn('cheque_status', ['Canceled', 'Cancelled', 'Returned', 'Refund']);
+            })
+            ->where(function ($q) {
+                $q->whereNotIn('payment_method', ['Cheque', 'Online'])
+                  ->orWhereNull('payment_method')
+                  ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal']);
+            })
+            ->whereRaw('DATE(COALESCE(clear_date, date)) BETWEEN ? AND ?', [$fromDate, $toDate]);
 
         if (isset($params['remarks']) && trim($params['remarks']) !== '') {
             $term = trim($params['remarks']);
-            $txQuery->where(function($q) use ($term) {
+            $txQuery->where(function ($q) use ($term) {
                 $q->where('remarks', 'like', "%{$term}%")
                   ->orWhere('cheque_no', 'like', "%{$term}%")
                   ->orWhere('voucher_no', 'like', "%{$term}%")
@@ -523,24 +496,7 @@ class ReportBuilder
             });
         }
 
-        if ($dateType !== 'returndate' && isset($params['status']) && in_array(strtolower($params['status']), ['cleared', 'pending'])) {
-            $statusFilter = strtolower($params['status']);
-            if ($statusFilter === 'cleared') {
-                $txQuery->where(function($q) {
-                    $q->whereNotIn('payment_method', ['Cheque', 'Online'])
-                      ->orWhereNull('payment_method')
-                      ->orWhereIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal']);
-                });
-            } elseif ($statusFilter === 'pending') {
-                $txQuery->whereIn('payment_method', ['Cheque', 'Online'])
-                        ->where(function($q) {
-                            $q->whereNull('cheque_status')
-                              ->orWhereNotIn('cheque_status', ['Clear', 'Cleared', 'Deposit', 'Withdrawal', 'Canceled', 'Cancelled', 'Returned', 'Refund']);
-                        });
-            }
-        }
-
-        // Bank Ledger Payment Filter (online, cheque, receipt [IN], payment [OUT])
+        // Bank Ledger Payment Filter (online, cheque, receipt [IN / Credit], payment [OUT / Debit])
         $bankFilter = strtolower(trim((string) ($params['bankFilter'] ?? $params['bank_filter'] ?? 'all')));
         if (!in_array($bankFilter, ['all', 'online', 'cheque', 'receipt', 'payment'], true)) {
             $bankFilter = 'all';
@@ -580,33 +536,21 @@ class ReportBuilder
             });
         }
 
-        if ($dateType === 'cleardate') {
-            $allTx = $txQuery->orderByRaw('COALESCE(clear_date, cheque_date) ASC')->orderBy('id', 'asc')->get();
-        } elseif ($dateType === 'returndate') {
-            $allTx = $txQuery->orderByRaw('COALESCE(return_date, cheque_date, DATE(updated_at), date) ASC')->orderBy('id', 'asc')->get();
-        } else {
-            $allTx = $txQuery->orderBy('date', 'asc')->orderBy('id', 'asc')->get();
-        }
+        $allTx = $txQuery
+            ->orderByRaw('DATE(COALESCE(clear_date, date)) ASC')
+            ->orderBy('id', 'asc')
+            ->get();
 
-        // 3. Process each transaction and calculate running balance
+        // 3. Process each cleared transaction and calculate running real bank balance
         $runningBalance = $startBankBalance;
-        $totalClearedDeposits = 0.0;
-        $totalClearedWithdrawals = 0.0;
-        $totalUnclearedFloat = 0.0;
-        $totalReturnedAmount = 0.0;
+        $totalClearedDeposits = 0.0;    // Bank Statement CREDIT (Money IN)
+        $totalClearedWithdrawals = 0.0; // Bank Statement DEBIT (Money OUT)
         $clearedCount = 0;
-        $pendingCount = 0;
-        $returnedCount = 0;
 
         $processedRows = [];
 
         foreach ($allTx as $tx) {
-            $status = $tx->cheque_status;
             $method = $tx->payment_method ?? 'Cash';
-            $isReturned = in_array($status, ['Canceled', 'Cancelled', 'Returned', 'Refund'], true);
-            $isBypassed = !in_array($method, ['Cheque', 'Online']);
-            $isCleared = !$isReturned && (in_array($status, ['Clear', 'Cleared', 'Deposit', 'Withdrawal']) || (empty($status) && $isBypassed));
-
             $deposit = 0.0;
             $withdrawal = 0.0;
 
@@ -626,27 +570,18 @@ class ReportBuilder
                 $contraParty = $tx->paymentAccount->title ?? ($tx->remarks ?: 'General Account');
             }
 
-            if ($isReturned) {
-                // Returned/Canceled cheques NEVER impact Real Bank Balance, Deposits, Withdrawals, or Float
-                $returnedCount++;
-                $totalReturnedAmount += (float)$tx->amount;
-            } elseif ($isCleared) {
-                $clearedCount++;
-                $totalClearedDeposits += $deposit;
-                $totalClearedWithdrawals += $withdrawal;
-                $runningBalance += ($deposit - $withdrawal);
-            } else {
-                $pendingCount++;
-                $totalUnclearedFloat += $withdrawal;
-            }
+            $clearedCount++;
+            $totalClearedDeposits += $deposit;
+            $totalClearedWithdrawals += $withdrawal;
+            $runningBalance += ($deposit - $withdrawal);
 
-            $effectiveReturnDate = $isReturned
-                ? ($tx->return_date ?: ($tx->cheque_date ?: ($tx->updated_at ? $tx->updated_at->format('Y-m-d') : $tx->date)))
-                : null;
+            // Real bank posting date: clear_date for cleared cheques, voucher date for Online/Cash
+            $effectiveDate = $tx->clear_date ?: $tx->date;
 
             $processedRows[] = [
                 'id' => $tx->id,
-                'date' => $tx->date,
+                'date' => $effectiveDate,
+                'voucher_date' => $tx->date,
                 'voucher_no' => $tx->voucher_no,
                 'type' => $tx->type,
                 'method' => $method,
@@ -656,13 +591,15 @@ class ReportBuilder
                 'cheque_no' => $tx->cheque_no,
                 'cheque_date' => $tx->cheque_date,
                 'clear_date' => $tx->clear_date,
-                'return_date' => $effectiveReturnDate,
-                'cheque_status' => $status ?: ($isCleared ? 'Clear' : 'Pending'),
-                'is_cleared' => $isCleared,
-                'is_returned' => $isReturned,
-                'impacts_balance' => $isCleared,
-                'debit' => $deposit,
-                'credit' => $withdrawal,
+                'cheque_status' => 'Clear',
+                'is_cleared' => true,
+                'is_returned' => false,
+                'impacts_balance' => true,
+                // Real Bank Statement columns: Debit = Money OUT (Withdrawal), Credit = Money IN (Deposit)
+                'bank_debit' => $withdrawal,
+                'bank_credit' => $deposit,
+                'debit' => $withdrawal,
+                'credit' => $deposit,
                 'deposit' => $deposit,
                 'withdrawal' => $withdrawal,
                 'balance' => $runningBalance,
@@ -682,7 +619,6 @@ class ReportBuilder
                     $row['remarks'] ?? '',
                     $row['voucher_no'] ?? '',
                     $row['cheque_no'] ?? '',
-                    $row['cheque_status'] ?? '',
                     $row['method'] ?? '',
                 ];
                 foreach ($haystacks as $val) {
@@ -714,20 +650,20 @@ class ReportBuilder
             'opening_balance' => $startBankBalance,
             'page_start_balance' => $offset > 0 && isset($filteredRows[$offset - 1]) ? $filteredRows[$offset - 1]['balance'] : $startBankBalance,
             'start_bank_balance' => $startBankBalance,
-            'total_debit' => $totalClearedDeposits,
-            'total_credit' => $totalClearedWithdrawals,
+            // Real Bank Statement totals: Debit = Withdrawals (OUT), Credit = Deposits (IN)
+            'total_debit' => $totalClearedWithdrawals,
+            'total_credit' => $totalClearedDeposits,
             'total_cleared_deposits' => $totalClearedDeposits,
             'total_cleared_withdrawals' => $totalClearedWithdrawals,
-            'total_uncleared_float' => $totalUnclearedFloat,
-            'total_returned_amount' => $totalReturnedAmount,
+            'total_uncleared_float' => 0.0,
+            'total_returned_amount' => 0.0,
             'closing_balance' => $runningBalance,
             'closing_bank_balance' => $runningBalance,
             'balance_type' => $runningBalance >= 0 ? 'dr' : 'cr',
             'data' => $paginator,
             'cleared_count' => $clearedCount,
-            'pending_count' => $pendingCount,
-            'returned_count' => $returnedCount,
-            'date_type' => $dateType,
+            'pending_count' => 0,
+            'returned_count' => 0,
             'bank_filter' => $bankFilter,
             'from_date' => $fromDate,
             'to_date' => $toDate,

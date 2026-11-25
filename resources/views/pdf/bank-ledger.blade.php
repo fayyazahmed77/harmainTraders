@@ -231,11 +231,11 @@ if (file_exists($logo_path)) {
 
     @include('pdf.partials.criteria')
 
-    <!-- 5 KPI Cards Grid Matching the UI -->
+    <!-- 4 KPI Cards Grid Matching the UI (Real Bank Statement) -->
     <table class="kpi-table">
         <tr>
             <!-- 1. Opening Bank Balance -->
-            <td style="border-left: 3px solid #6366f1;">
+            <td style="width: 25%; border-left: 3px solid #6366f1;">
                 <div class="kpi-title">Opening Bank Balance</div>
                 <div class="kpi-value">
                     Rs {{ formatSafeCurrency(abs($opening_balance)) }}
@@ -246,35 +246,26 @@ if (file_exists($logo_path)) {
                 <div class="kpi-subtext">Cleared before period</div>
             </td>
 
-            <!-- 2. Cleared Deposits -->
-            <td style="border-left: 3px solid #10b981;">
-                <div class="kpi-title">Deposits (IN)</div>
-                <div class="kpi-value" style="color: #059669;">
-                    Rs {{ formatSafeCurrency($total_cleared_deposits ?? $total_debit) }}
-                </div>
-                <div class="kpi-subtext">Cleared money in</div>
-            </td>
-
-            <!-- 3. Cleared Withdrawals -->
-            <td style="border-left: 3px solid #ef4444;">
-                <div class="kpi-title">Withdrawals (OUT)</div>
+            <!-- 2. Total Debit (Withdrawals / Money OUT) -->
+            <td style="width: 25%; border-left: 3px solid #ef4444;">
+                <div class="kpi-title">Debit</div>
                 <div class="kpi-value" style="color: #dc2626;">
-                    Rs {{ formatSafeCurrency($total_cleared_withdrawals ?? $total_credit) }}
+                    Rs {{ formatSafeCurrency($total_cleared_withdrawals ?? $total_debit) }}
                 </div>
-                <div class="kpi-subtext">Cleared cheques / debits</div>
+                <div class="kpi-subtext">Withdrawals / Money out</div>
             </td>
 
-            <!-- 4. Uncleared Float -->
-            <td style="border-left: 3px solid #f59e0b;">
-                <div class="kpi-title">Pending Cheques Float</div>
-                <div class="kpi-value" style="color: #d97706;">
-                    Rs {{ formatSafeCurrency($total_uncleared_float ?? 0) }}
+            <!-- 3. Total Credit (Deposits / Money IN) -->
+            <td style="width: 25%; border-left: 3px solid #10b981;">
+                <div class="kpi-title">Credit</div>
+                <div class="kpi-value" style="color: #059669;">
+                    Rs {{ formatSafeCurrency($total_cleared_deposits ?? $total_credit) }}
                 </div>
-                <div class="kpi-subtext">Issued but unpresented</div>
+                <div class="kpi-subtext">Deposits / Money in</div>
             </td>
 
-            <!-- 5. Real Cleared Bank Balance -->
-            <td style="border-left: 3px solid #0284c7; background-color: #f0f9ff;">
+            <!-- 4. Real Cleared Bank Balance -->
+            <td style="width: 25%; border-left: 3px solid #0284c7; background-color: #f0f9ff;">
                 <div class="kpi-title" style="color: #0369a1;">Real Bank Balance</div>
                 <div class="kpi-value" style="color: {{ $closing_bank_balance >= 0 ? '#0284c7' : '#dc2626' }};">
                     Rs {{ formatSafeCurrency(abs($closing_bank_balance ?? $closing_balance)) }}
@@ -287,20 +278,17 @@ if (file_exists($logo_path)) {
         </tr>
     </table>
 
-    <!-- Ledger Table -->
+    <!-- Ledger Table (Real Bank Statement Columns) -->
     <table class="ledger">
         <thead>
             <tr>
-                <th width="8%">Date</th>
-                <th width="10%">Voucher #</th>
-                <th width="24%">Beneficiary / Contra Party</th>
-                <th width="8%">Method</th>
+                <th width="10%">Date</th>
+                <th width="11%">Voucher #</th>
+                <th width="30%">Beneficiary / Contra Party</th>
+                <th width="9%">Method</th>
                 <th width="10%">Cheque #</th>
-                <th width="8%">Chq Date</th>
-                <th width="8%">{{ ($date_type ?? 'invdate') === 'returndate' ? 'Return Date' : 'Clear Date' }}</th>
-                <th width="8%">Status</th>
-                <th width="8%">Deposit (IN)</th>
-                <th width="8%">Withdrawal (OUT)</th>
+                <th width="10%">Debit</th>
+                <th width="10%">Credit</th>
                 <th width="10%">Bank Balance</th>
             </tr>
         </thead>
@@ -312,9 +300,6 @@ if (file_exists($logo_path)) {
                 <td class="font-bold">BROUGHT FORWARD BALANCE</td>
                 <td class="text-center">-</td>
                 <td class="text-center">-</td>
-                <td class="text-center">-</td>
-                <td class="text-center">-</td>
-                <td class="text-center"><span class="badge-cleared">CLEARED</span></td>
                 <td class="text-right"></td>
                 <td class="text-right"></td>
                 <td class="text-right font-bold">
@@ -324,43 +309,23 @@ if (file_exists($logo_path)) {
 
             @foreach($data as $row)
             @php
-                $isReturned = !empty($row['is_returned']);
-                $isCleared = !empty($row['is_cleared']);
-                $isPending = !$isCleared && !$isReturned;
-                $displayDateCol = ($date_type ?? 'invdate') === 'returndate'
-                    ? ($row['return_date'] ?? null)
-                    : ($row['clear_date'] ?? null);
+                $debitAmt = (float) ($row['withdrawal'] ?? $row['bank_debit'] ?? 0);
+                $creditAmt = (float) ($row['deposit'] ?? $row['bank_credit'] ?? 0);
             @endphp
-            <tr style="{{ $isReturned ? 'background-color: #fef2f2;' : ($isPending ? 'background-color: #fffbeb;' : '') }}">
+            <tr>
                 <td class="text-center">{{ !empty($row['date']) ? date('d-M-y', strtotime($row['date'])) : '' }}</td>
                 <td class="text-center font-bold">{{ $row['voucher_no'] ?? '-' }}</td>
                 <td>{{ $row['contra_party'] ?? $row['description'] ?? 'General Account' }}</td>
                 <td class="text-center">{{ $row['method'] ?? 'Cash' }}</td>
                 <td class="text-center font-bold">{{ $row['cheque_no'] ?? '-' }}</td>
-                <td class="text-center">{{ !empty($row['cheque_date']) ? date('d-m-y', strtotime($row['cheque_date'])) : '-' }}</td>
-                <td class="text-center">{{ !empty($displayDateCol) ? date('d-m-y', strtotime($displayDateCol)) : '-' }}</td>
-                <td class="text-center">
-                    @if($isReturned)
-                        <span class="badge-returned">RETURNED</span>
-                    @elseif($isCleared)
-                        <span class="badge-cleared">CLEARED</span>
-                    @else
-                        <span class="badge-pending">PENDING</span>
-                    @endif
+                <td class="text-right" style="color: #dc2626;">
+                    {{ $debitAmt > 0 ? formatSafeCurrency($debitAmt) : '-' }}
                 </td>
                 <td class="text-right" style="color: #059669;">
-                    {{ !empty($row['deposit']) && $row['deposit'] > 0 ? formatSafeCurrency($row['deposit']) : '-' }}
-                </td>
-                <td class="text-right" style="color: #dc2626;">
-                    {{ !empty($row['withdrawal']) && $row['withdrawal'] > 0 ? formatSafeCurrency($row['withdrawal']) : '-' }}
+                    {{ $creditAmt > 0 ? formatSafeCurrency($creditAmt) : '-' }}
                 </td>
                 <td class="text-right font-bold">
                     {{ formatSafeCurrency(abs($row['running_balance'] ?? $row['balance'] ?? 0)) }}
-                    @if($isReturned)
-                        <span class="no-impact-note" style="color: #b91c1c;">(Returned — No impact)</span>
-                    @elseif($isPending)
-                        <span class="no-impact-note">(No impact yet)</span>
-                    @endif
                 </td>
             </tr>
             @endforeach
@@ -371,19 +336,19 @@ if (file_exists($logo_path)) {
     <div class="footer-totals-wrapper clearfix">
         <table class="totals-table">
             <tr>
-                <td width="25%">Total Cleared Deposits</td>
-                <td width="25%" class="text-right" style="color: #059669;">
-                    {{ formatSafeCurrency($total_cleared_deposits ?? $total_debit) }}
-                </td>
-                <td width="25%">Total Cleared Withdrawals</td>
+                <td width="25%">Total Debit</td>
                 <td width="25%" class="text-right" style="color: #dc2626;">
-                    {{ formatSafeCurrency($total_cleared_withdrawals ?? $total_credit) }}
+                    {{ formatSafeCurrency($total_cleared_withdrawals ?? $total_debit) }}
+                </td>
+                <td width="25%">Total Credit</td>
+                <td width="25%" class="text-right" style="color: #059669;">
+                    {{ formatSafeCurrency($total_cleared_deposits ?? $total_credit) }}
                 </td>
             </tr>
             <tr>
-                <td>Pending Float</td>
-                <td class="text-right" style="color: #d97706;">
-                    {{ formatSafeCurrency($total_uncleared_float ?? 0) }}
+                <td>Opening Bank Balance</td>
+                <td class="text-right font-bold">
+                    Rs {{ formatSafeCurrency(abs($opening_balance)) }} {{ $opening_balance >= 0 ? 'DR' : 'CR' }}
                 </td>
                 <td style="background-color: #f0f9ff; color: #0369a1;">Real Bank Balance</td>
                 <td class="text-right font-bold" style="background-color: #f0f9ff; color: #0284c7;">

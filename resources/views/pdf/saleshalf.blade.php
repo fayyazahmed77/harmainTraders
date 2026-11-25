@@ -26,7 +26,7 @@
             width: 66mm;
             /* Further reduced width for maximum safety on 80mm/58mm printers */
             margin: 0 auto;
-            padding-right: 3mm; /* Safe margin for printer head to prevent cut-off */
+            padding-right: 0mm; /* Safe margin for printer head to prevent cut-off */
         }
 
         .text-center {
@@ -313,16 +313,42 @@
                 <span class="total-value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 2) }}</span>
             </div>
 
+            @php
+            $applied_advance = round((float)($pdfPaymentSummary['applied_advance'] ?? 0), 2);
+            $cash_received = isset($pdfPaymentSummary['cash_received'])
+                ? round((float)$pdfPaymentSummary['cash_received'], 2)
+                : round((float)($sale->paid_amount ?? 0), 2);
+            @endphp
+            @if($applied_advance > 0.005)
+            <div class="total-row clearfix">
+                <span class="total-label">Advance Adjusted :-</span>
+                <span class="total-value">{{ number_format($applied_advance, 2) }}</span>
+            </div>
+            @if($cash_received > 0.005)
+            <div class="total-row clearfix">
+                <span class="total-label">Cash Received :-</span>
+                <span class="total-value">{{ number_format($cash_received, 2) }}</span>
+            </div>
+            @endif
+            @else
             <div class="total-row clearfix">
                 <span class="total-label">Cash Received :-</span>
                 <span class="total-value">{{ number_format($sale->paid_amount, 2) }}</span>
             </div>
+            @endif
 
             <div class="dashed-bottom" style="margin: 2px 0;"></div>
 
+            @php
+            $bill_receivable = round((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2);
+            $remaining_advance = round((float)($pdfPaymentSummary['remaining_advance'] ?? 0), 2);
+            $display_receivable = ($bill_receivable <= 0.005 && $remaining_advance > 0.005)
+                ? -$remaining_advance
+                : $bill_receivable;
+            @endphp
             <div class="total-row clearfix bold">
                 <span class="total-label">Total Receivable :</span>
-                <span class="total-value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2) }}</span>
+                <span class="total-value">{{ number_format($display_receivable, 2) }}</span>
             </div>
         </div>
 
@@ -330,13 +356,13 @@
         <div class="footer-text text-center">
             <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
             <div style="font-size: 9px; color: #000; margin-bottom: 2px;">
-                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+                Phone: {{ $firm->phone ?? '' }} 
             </div>
             <div style="font-size: 9px; font-weight: bold; color: #000;">
                 Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
-            <div style="font-size: 7.5px; color: #000; margin-top: 4px; letter-spacing: 0.3px;">
-                Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
+            <div style="font-size: 7.5px; color: #222121ff; margin-top: 0px; letter-spacing: 0.3px;">
+                Developed by <strong>AISH TYCOONS</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
             </div>
         </div>
     </div>

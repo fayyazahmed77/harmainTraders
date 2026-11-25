@@ -144,15 +144,16 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
         }
 
         .invoice-text {
-            font-size: 18px;
-            color: #444;
+            font-size: 16px;
+            color: #000;
             text-transform: uppercase;
-            font-weight: 500;
+            font-weight: bold;
+            font-style: normal;
             text-align: right;
             padding-right: 25px;
-            letter-spacing: 1px;
-            line-height: 1;
-            font-family: sans-serif;
+            letter-spacing: normal;
+            line-height: 1.3;
+            font-family: 'Helvetica', 'Arial', sans-serif !important;
         }
 
         .right-orange-block {
@@ -440,7 +441,7 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                     <div style="border-bottom: 1px dashed #000; width: 100%;"></div>
                 </td>
                 <td style="text-align: center; vertical-align: middle; padding: 0 15px;">
-                    <div class="invoice-text" style="padding-right: 0; text-align: center;">ESTIMATE</div>
+                    <div class="invoice-text" style="padding-right: 0; text-align: center; font-family: 'Helvetica', 'Arial', sans-serif; font-weight: bold; font-style: normal; color: #000; letter-spacing: normal;">ESTIMATE</div>
                 </td>
                 <td style="width: 35%; vertical-align: middle;">
                     <div style="border-bottom: 1px dashed #000; width: 100%;"></div>
@@ -604,20 +605,46 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
                             <td class="label">Total Balance :-</td>
                             <td class="value">{{ number_format(($sale->net_total - $sale->extra_discount) + $prev_balance, 2) }}</td>
                         </tr>
-                        <!-- Cash Received -->
+                        <!-- Advance Adjusted / Cash Received -->
+                        @php
+                        $applied_advance = round((float)($pdfPaymentSummary['applied_advance'] ?? 0), 2);
+                        $cash_received = isset($pdfPaymentSummary['cash_received'])
+                            ? round((float)$pdfPaymentSummary['cash_received'], 2)
+                            : round((float)($sale->paid_amount ?? 0), 2);
+                        @endphp
+                        @if($applied_advance > 0.005)
+                        <tr>
+                            <td class="label">Advance Adjusted :-</td>
+                            <td class="value">{{ number_format($applied_advance, 2) }}</td>
+                        </tr>
+                        @if($cash_received > 0.005)
+                        <tr>
+                            <td class="label">Cash Received :-</td>
+                            <td class="value">{{ number_format($cash_received, 2) }}</td>
+                        </tr>
+                        @endif
+                        @else
                         <tr>
                             <td class="label">Cash Received :-</td>
                             <td class="value">{{ number_format($sale->paid_amount, 2) }}</td>
                         </tr>
+                        @endif
                         <!-- Divider Line -->
                         <tr>
                             <td colspan="2" style="border-bottom: 1px dashed #000;"></td>
                         </tr>
 
                         <!-- Total Receivable -->
+                        @php
+                        $bill_receivable = round((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2);
+                        $remaining_advance = round((float)($pdfPaymentSummary['remaining_advance'] ?? 0), 2);
+                        $display_receivable = ($bill_receivable <= 0.005 && $remaining_advance > 0.005)
+                            ? -$remaining_advance
+                            : $bill_receivable;
+                        @endphp
                         <tr>
                             <td class="label">Total Receivable :</td>
-                            <td class="value">{{ number_format((($sale->net_total - $sale->extra_discount) + $prev_balance) - $sale->paid_amount, 2) }}</td>
+                            <td class="value">{{ number_format($display_receivable, 2) }}</td>
                         </tr>
                     </table>
                 </div>
@@ -628,13 +655,13 @@ $firm_logo_base64 = 'data:image/' . $f_type . ';base64,' . base64_encode($f_data
         <!-- Branded Footer -->
         <div style="margin-top: 18px; padding-top: 8px; border-top: 1px dashed #000; text-align: center; font-family: Arial, sans-serif;">
             <div style="font-size: 9px; color: #000; margin-bottom: 3px;">
-                Phone: {{ $firm->phone ?? '' }} &nbsp;&middot;&nbsp; Email: {{ $firm->email ?? '' }}
+                Phone: {{ $firm->phone ?? '' }} 
             </div>
             <div style="font-size: 9.5px; font-weight: bold; color: #000; margin-bottom: 2px;">
                 Thank you for choosing {{ $firm->name ?? 'us' }}.
             </div>
-            <div style="font-size: 8px; color: #555; letter-spacing: 0.3px;">
-                Developed by <strong>Aish Tycoons</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
+            <div style="font-size: 8px; color: #272727ff; letter-spacing: 0.3px;">
+                Developed by <strong>AISH TYCOONS</strong> <span style="font-family: DejaVu Sans, sans-serif; color: #e11d48; font-size: 9px;">&#9829;</span> Call 0345-2800819
             </div>
         </div>
     </div>

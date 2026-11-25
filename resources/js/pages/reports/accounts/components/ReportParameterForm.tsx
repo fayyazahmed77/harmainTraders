@@ -317,33 +317,30 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
 
 
                                         <div className="space-y-2">
-                                            <h4 className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] border-b border-border/20 pb-1">Ledger Logic</h4>
-                                            <RadioGroup value={data.dateType} onValueChange={(v: any) => handleChange('dateType', v)} className="flex flex-col gap-1.5 pt-1">
-                                                {(data.reportId === 'bank_ledger'
-                                                    ? [
-                                                        { value: 'invdate', label: 'By Voucher Date' },
-                                                        { value: 'cleardate', label: 'By Clear Cheque Date' },
-                                                        { value: 'returndate', label: 'By Return Cheque Date' },
-                                                    ]
-                                                    : [
-                                                        { value: 'invdate', label: 'By Invoice' },
-                                                        { value: 'cleardate', label: 'By Clearing' },
-                                                    ]
-                                                ).map(opt => (
-                                                    <div key={opt.value} className="flex items-center gap-2">
-                                                        <RadioGroupItem value={opt.value} id={`date-${opt.value}`} className="h-3 w-3 border-border" />
-                                                        <label htmlFor={`date-${opt.value}`} className="text-[10px] font-bold text-text-secondary uppercase cursor-pointer">
-                                                            {opt.label}
-                                                        </label>
-                                                    </div>
-                                                ))}
-                                            </RadioGroup>
+                                            {data.reportId !== 'bank_ledger' && (
+                                                <>
+                                                    <h4 className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] border-b border-border/20 pb-1">Ledger Logic</h4>
+                                                    <RadioGroup value={data.dateType} onValueChange={(v: any) => handleChange('dateType', v)} className="flex flex-col gap-1.5 pt-1">
+                                                        {[
+                                                            { value: 'invdate', label: 'By Invoice' },
+                                                            { value: 'cleardate', label: 'By Clearing' },
+                                                        ].map(opt => (
+                                                            <div key={opt.value} className="flex items-center gap-2">
+                                                                <RadioGroupItem value={opt.value} id={`date-${opt.value}`} className="h-3 w-3 border-border" />
+                                                                <label htmlFor={`date-${opt.value}`} className="text-[10px] font-bold text-text-secondary uppercase cursor-pointer">
+                                                                    {opt.label}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </RadioGroup>
+                                                </>
+                                            )}
 
                                             {data.reportId === 'bank_ledger' && (
-                                                <div className="pt-2.5 mt-2 border-t border-border/20 space-y-1.5">
-                                                    <Label className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em]">
+                                                <div className="space-y-1.5">
+                                                    <h4 className="text-[9px] font-black text-text-muted uppercase tracking-[0.15em] border-b border-border/20 pb-1">
                                                         Payment Filter
-                                                    </Label>
+                                                    </h4>
                                                     <Select
                                                         value={data.bankFilter || 'ALL'}
                                                         onValueChange={(v) => handleChange('bankFilter', v)}
@@ -355,8 +352,8 @@ export function ReportParameterForm({ data, setData, bootstrap, onPrint, onExpor
                                                             <SelectItem value="ALL">All</SelectItem>
                                                             <SelectItem value="online">Online</SelectItem>
                                                             <SelectItem value="cheque">Cheque</SelectItem>
-                                                            <SelectItem value="receipt">Receipt (IN)</SelectItem>
-                                                            <SelectItem value="payment">Payment (OUT)</SelectItem>
+                                                            <SelectItem value="payment">Debit (Payment OUT)</SelectItem>
+                                                            <SelectItem value="receipt">Credit (Receipt IN)</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>

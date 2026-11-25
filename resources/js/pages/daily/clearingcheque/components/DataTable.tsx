@@ -14,6 +14,8 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -23,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal } from "lucide-react";
+import { CheckCircle2, MoreHorizontal, RotateCcw } from "lucide-react";
 import {
     ChevronLeft as IconChevronLeft,
     ChevronRight as IconChevronRight,
@@ -96,23 +98,32 @@ export default function DataTable({
 
     const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
+    const getChequeLabel = (payment: Payment) => {
+        if (payment.cheque?.cheque_no) {
+            return `${payment.cheque.prefix ? `${payment.cheque.prefix}-` : ''}${payment.cheque.cheque_no}`;
+        }
+        return payment.cheque_no || '';
+    };
+
     const handleClearCheque = (payment: Payment) => {
+        const chequeNo = getChequeLabel(payment);
         setConfirmModal({
             isOpen: true,
             title: "Clear Cheque",
-            description: `Are you sure you want to mark the cheque ${payment.cheque?.prefix ? `${payment.cheque.prefix}-` : ''}${payment.cheque?.cheque_no || payment.cheque_no || ''} as cleared? This will update the bank balance.`,
+            description: `Are you sure you want to mark the cheque ${chequeNo} as cleared? This will update the bank balance.`,
             confirmText: "Clear Now",
             variant: 'success',
             onConfirm: () => router.put(`/clearing-cheque/${payment.id}/clear`)
         });
     };
 
-    const handleCancelCheque = (payment: Payment) => {
+    const handleReturnCheque = (payment: Payment) => {
+        const chequeNo = getChequeLabel(payment);
         setConfirmModal({
             isOpen: true,
-            title: "Cancel Cheque",
-            description: `Are you sure you want to cancel the cheque ${payment.cheque?.prefix ? `${payment.cheque.prefix}-` : ''}${payment.cheque?.cheque_no || payment.cheque_no || ''}? The bill balance will be restored to unpaid.`,
-            confirmText: "Cancel Cheque",
+            title: "Return Cheque",
+            description: `Are you sure you want to mark the cheque ${chequeNo} as returned? The bill balance will be restored to unpaid.`,
+            confirmText: "Return Cheque",
             variant: 'destructive',
             onConfirm: () => router.put(`/clearing-cheque/${payment.id}/cancel`)
         });
@@ -283,24 +294,69 @@ export default function DataTable({
                     return null;
                 }
 
+                const chequeNo = getChequeLabel(payment);
+
                 return (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal />
+                            <Button
+                                variant="ghost"
+                                aria-label="Cheque actions"
+                                className="h-8 w-8 p-0 rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-orange-50 hover:border-orange-200/80 dark:hover:bg-orange-950/30 dark:hover:border-orange-900/50 data-[state=open]:bg-orange-50 data-[state=open]:border-orange-300 data-[state=open]:text-orange-700 dark:data-[state=open]:bg-orange-950/40 dark:data-[state=open]:border-orange-800 dark:data-[state=open]:text-orange-400 transition-all"
+                            >
+                                <MoreHorizontal className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                                onClick={() => handleClearCheque(payment)}
-                            >
-                                Clear
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => handleCancelCheque(payment)}
-                            >
-                                Cancel
-                            </DropdownMenuItem>
+                        <DropdownMenuContent
+                            align="end"
+                            sideOffset={6}
+                            className="w-56 p-1.5 rounded-xl border border-border/80 bg-popover shadow-xl shadow-black/10 dark:shadow-black/35"
+                        >
+                            <DropdownMenuLabel className="flex items-center justify-between gap-2 px-2 py-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                    Cheque Action
+                                </span>
+                                {chequeNo && (
+                                    <span className="text-[10px] font-mono font-bold text-foreground/80 bg-muted px-1.5 py-0.5 rounded-md truncate max-w-[105px]">
+                                        #{chequeNo}
+                                    </span>
+                                )}
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator className="my-1 bg-border/60" />
+                            <div className="space-y-1">
+                                <DropdownMenuItem
+                                    onClick={() => handleClearCheque(payment)}
+                                    className="group flex items-center gap-2.5 rounded-lg px-2 py-2 cursor-pointer border border-transparent transition-all focus:bg-emerald-50 focus:border-emerald-200/80 focus:text-emerald-950 dark:focus:bg-emerald-950/40 dark:focus:border-emerald-800/60 dark:focus:text-emerald-50"
+                                >
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-1 ring-inset ring-emerald-500/20 group-hover:bg-emerald-600 group-hover:text-white group-focus:bg-emerald-600 group-focus:text-white transition-colors">
+                                        <CheckCircle2 className="size-4 text-current" />
+                                    </span>
+                                    <span className="flex flex-col min-w-0">
+                                        <span className="text-xs font-bold leading-tight text-emerald-700 dark:text-emerald-400">
+                                            Clear
+                                        </span>
+                                        <span className="text-[11px] leading-tight text-muted-foreground mt-0.5 truncate">
+                                            Mark cleared &amp; update bank
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => handleReturnCheque(payment)}
+                                    className="group flex items-center gap-2.5 rounded-lg px-2 py-2 cursor-pointer border border-transparent transition-all focus:bg-rose-50 focus:border-rose-200/80 focus:text-rose-950 dark:focus:bg-rose-950/40 dark:focus:border-rose-800/60 dark:focus:text-rose-50"
+                                >
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-1 ring-inset ring-rose-500/20 group-hover:bg-rose-600 group-hover:text-white group-focus:bg-rose-600 group-focus:text-white transition-colors">
+                                        <RotateCcw className="size-4 text-current" />
+                                    </span>
+                                    <span className="flex flex-col min-w-0">
+                                        <span className="text-xs font-bold leading-tight text-rose-700 dark:text-rose-400">
+                                            Return
+                                        </span>
+                                        <span className="text-[11px] leading-tight text-muted-foreground mt-0.5 truncate">
+                                            Mark returned &amp; restore bill
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                            </div>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 );

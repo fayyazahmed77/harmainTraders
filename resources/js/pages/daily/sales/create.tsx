@@ -735,10 +735,37 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
 
   // Check if over credit limit
   const isOverLimit = useMemo(() => {
-    if (typeof creditLimit !== "number") return false;
+    if (typeof creditLimit !== "number" || creditLimit <= 0) return false;
     if (!totals) return false;
     return totals.net > creditLimit;
   }, [creditLimit, totals]);
+
+  const creditLimitExceededRowId = useMemo<number | null>(() => {
+    if (!isOverLimit || typeof creditLimit !== "number") return null;
+    let runningNet = 0;
+    for (const r of rowsWithComputed) {
+      if (!r.item_id) continue;
+      const lineNet = r.amount * (1 - toNumber(r.discPercent) / 100);
+      runningNet += lineNet;
+      if (Math.round(runningNet) > creditLimit) {
+        return r.id;
+      }
+    }
+    const lastValidRow = [...rowsWithComputed].reverse().find((r) => r.item_id !== null);
+    return lastValidRow ? lastValidRow.id : null;
+  }, [isOverLimit, creditLimit, rowsWithComputed]);
+
+  const [creditLimitBubbleDismissed, setCreditLimitBubbleDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!isOverLimit) {
+      setCreditLimitBubbleDismissed(false);
+    }
+  }, [isOverLimit, accountType?.value]);
+
+  const showCreditLimitBubble = isOverLimit && !creditLimitBubbleDismissed;
+  const creditLimitOverBy =
+    typeof creditLimit === "number" ? Math.max(0, Math.round(totals.net - creditLimit)) : 0;
 
   // Global Keyboard Shortcuts (F4 / Alt+C -> Checkout Dialog, F9 / Ctrl+Enter -> Finalize Invoice)
   const handleSaveRef = React.useRef<() => void>(() => {});
@@ -1337,6 +1364,19 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                           At Loss
                                         </span>
                                       )}
+                                      {isOverLimit && row.id === creditLimitExceededRowId && (
+                                        <span
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCreditLimitBubbleDismissed(false);
+                                          }}
+                                          title={`Credit Limit Rs ${Number(creditLimit).toLocaleString()} exceeded by Rs ${creditLimitOverBy.toLocaleString()}`}
+                                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[8px] font-black uppercase tracking-wider shrink-0 cursor-pointer"
+                                        >
+                                          <AlertTriangle size={9} />
+                                          Limit Exceeded
+                                        </span>
+                                      )}
                                     </div>
                                     <span className={cn(
                                       "text-[9px] font-mono font-bold uppercase tracking-widest",
@@ -1422,6 +1462,32 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                                 </button>
                               </div>
                             </div>
+
+                            {showCreditLimitBubble && row.id === creditLimitExceededRowId && (
+                              <div className="flex justify-center relative z-30 py-2 px-3 bg-rose-50/40 dark:bg-rose-950/15 border-b border-rose-200 dark:border-rose-900/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="relative inline-flex items-center gap-2.5 sm:gap-3 px-4 py-2 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30 border border-rose-500">
+                                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-rose-600" />
+                                  <AlertTriangle size={15} className="shrink-0 text-white" />
+                                  <div className="text-[11px] font-bold leading-tight">
+                                    <span className="font-black uppercase tracking-wide">Credit Limit Exceeded!</span>
+                                    <span className="mx-1.5 opacity-75">•</span>
+                                    <span>
+                                      Limit: Rs {Number(creditLimit).toLocaleString()} | Bill: Rs {totals.net.toLocaleString()} (+Rs {creditLimitOverBy.toLocaleString()})
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCreditLimitBubbleDismissed(true);
+                                    }}
+                                    className="ml-1 px-3 py-1 rounded-full bg-white text-rose-700 hover:bg-rose-50 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors cursor-pointer shrink-0"
+                                  >
+                                    OK
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </React.Fragment>
                         ))}
                       </div>
@@ -1521,9 +1587,46 @@ export default function SalesPage({ items, accounts, salemans, paymentAccounts =
                       <div className="h-7 w-[1px] bg-zinc-200 dark:bg-zinc-800 shrink-0 hidden sm:block" />
 
                       {/* 3. Final Net Payable */}
-                      <div className="flex flex-col shrink-0">
-                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net</span>
-                        <span className="text-base sm:text-xl font-black text-orange-600 dark:text-orange-500 italic tracking-tight leading-none">
+                      <div className="relative flex flex-col shrink-0">
+                        {showCreditLimitBubble && (
+                          <div className="absolute bottom-full left-0 mb-3 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            <div className="relative inline-flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-rose-600 text-white shadow-xl shadow-rose-600/35 border border-rose-500 whitespace-nowrap">
+                              <AlertTriangle size={14} className="shrink-0 text-white" />
+                              <div className="text-[11px] font-bold leading-tight">
+                                <span className="font-black uppercase tracking-wide">Credit Limit Exceeded!</span>
+                                <span className="mx-1.5 opacity-75">•</span>
+                                <span>
+                                  Limit: Rs {Number(creditLimit).toLocaleString()} (+Rs {creditLimitOverBy.toLocaleString()})
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setCreditLimitBubbleDismissed(true)}
+                                className="ml-1 px-2.5 py-0.5 rounded-full bg-white text-rose-700 hover:bg-rose-50 text-[10px] font-black uppercase tracking-wider shadow-sm transition-colors cursor-pointer shrink-0"
+                              >
+                                OK
+                              </button>
+                              <span className="absolute top-full left-6 w-0 h-0 border-l-[7px] border-r-[7px] border-t-[8px] border-l-transparent border-r-transparent border-t-rose-600" />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Final Net</span>
+                          {isOverLimit && (
+                            <button
+                              type="button"
+                              onClick={() => setCreditLimitBubbleDismissed(false)}
+                              title={`Credit Limit Rs ${Number(creditLimit).toLocaleString()} exceeded by Rs ${creditLimitOverBy.toLocaleString()}`}
+                              className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[8px] font-black uppercase tracking-wider leading-none animate-pulse cursor-pointer"
+                            >
+                              Limit!
+                            </button>
+                          )}
+                        </div>
+                        <span className={cn(
+                          "text-base sm:text-xl font-black italic tracking-tight leading-none",
+                          isOverLimit ? "text-rose-600 dark:text-rose-500" : "text-orange-600 dark:text-orange-500"
+                        )}>
                           <span className="text-[10px] sm:text-xs font-semibold mr-0.5">Rs</span>
                           {totals.finalAmount.toLocaleString()}
                         </span>

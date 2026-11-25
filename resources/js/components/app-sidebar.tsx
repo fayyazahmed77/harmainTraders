@@ -292,7 +292,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ],
     },
     {
-      title: "Orders",
+      title: "Re Order",
       url: "#",
       icon: ShoppingCart,
       permissions: ['view supplier orders', 'create supplier orders', 'manage supplier companies', 'view orders', 'create orders'],

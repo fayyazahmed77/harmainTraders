@@ -1044,11 +1044,12 @@ class SalesController extends Controller implements HasMiddleware
             ->get();
 
         $sale->returns = $returns;
+        $pdfPaymentSummary = $this->getSalePdfPaymentSummary($sale);
 
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.saleshalf' : 'pdf.sale';
 
-        $pdf = Pdf::loadView($view, compact('sale', 'firm'));
+        $pdf = Pdf::loadView($view, compact('sale', 'firm', 'pdfPaymentSummary'));
 
         if ($format === 'small') {
             // Receipt size for thermal printers.
@@ -1060,6 +1061,9 @@ class SalesController extends Controller implements HasMiddleware
             $height = 400 + ($itemCount * $ptPerItem);
             if ($sale->extra_discount > 0) {
                 $height += 20;
+            }
+            if ($pdfPaymentSummary['applied_advance'] > 0.005 && $pdfPaymentSummary['cash_received'] > 0.005) {
+                $height += 18;
             }
             $height = max(400, $height);
             $pdf->setPaper([0, 0, 226.77, $height], 'portrait'); // ~80mm width
@@ -1080,13 +1084,14 @@ class SalesController extends Controller implements HasMiddleware
             ->get();
 
         $sale->returns = $returns;
+        $pdfPaymentSummary = $this->getSalePdfPaymentSummary($sale);
 
         $format = $request->get('format', 'big');
         $view = $format === 'small' ? 'pdf.saleshalf' : 'pdf.sale';
 
         $firm = \App\Models\Firm::find($sale->firm_id) ?? \App\Models\Firm::where('defult', 1)->first() ?? \App\Models\Firm::first();
 
-        $pdf = Pdf::loadView($view, compact('sale', 'firm'));
+        $pdf = Pdf::loadView($view, compact('sale', 'firm', 'pdfPaymentSummary'));
 
         if ($format === 'small') {
             $itemCount  = count($sale->items);
@@ -1096,6 +1101,9 @@ class SalesController extends Controller implements HasMiddleware
             if ($sale->extra_discount > 0) {
                 $height += 20;
             }
+            if ($pdfPaymentSummary['applied_advance'] > 0.005 && $pdfPaymentSummary['cash_received'] > 0.005) {
+                $height += 18;
+            }
             $height = max(400, $height);
             $pdf->setPaper([0, 0, 226.77, $height], 'portrait');
         } else {
@@ -1103,6 +1111,34 @@ class SalesController extends Controller implements HasMiddleware
         }
 
         return $pdf->download("Sale-Invoice-$id.pdf");
+    }
+
+    /**
+     * Split a sale's paid_amount into applied advance vs actual cash/bank received
+     * so PDF invoices display accurate labels without altering totals or accounting.
+     */
+    private function getSalePdfPaymentSummary(Sales $sale): array
+    {
+        $advSummary = AdvanceAllocationService::getAppliedAdvanceSummaryForBill(
+            Sales::class,
+            (int) $sale->id,
+            (string) $sale->invoice
+        );
+        $totalPaid = round((float) ($sale->paid_amount ?? 0), 2);
+        $appliedAdvance = min($totalPaid, round((float) ($advSummary['total_applied_advance'] ?? 0), 2));
+        $cashReceived = max(0.0, round($totalPaid - $appliedAdvance, 2));
+
+        $remainingAdvance = 0.0;
+        if ($sale->customer) {
+            $advBreakdown = AdvanceAllocationService::getAvailableAdvanceBreakdown($sale->customer, 'sale');
+            $remainingAdvance = round((float) ($advBreakdown['applicable_advance'] ?? 0), 2);
+        }
+
+        return [
+            'applied_advance'   => $appliedAdvance,
+            'cash_received'     => $cashReceived,
+            'remaining_advance' => $remainingAdvance,
+        ];
     }
     //destroy
     public function destroy($id)

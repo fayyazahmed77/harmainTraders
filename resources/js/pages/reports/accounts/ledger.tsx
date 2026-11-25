@@ -192,9 +192,7 @@ export default function AccountReports({
             };
 
             if (reportId === 'bank_ledger') {
-                if (effectiveDateType !== 'returndate' && effectiveBankStatus !== 'all') {
-                    queryParams.status = effectiveBankStatus;
-                }
+                delete queryParams.dateType;
                 if (effectiveBankSearch.trim() !== '') {
                     queryParams.search = effectiveBankSearch.trim();
                 }
@@ -227,9 +225,10 @@ export default function AccountReports({
                 setTotalRecords(response.data?.data?.total || 0);
                 setOpeningBalance(response.data.opening_balance || 0);
                 setPageStartBalance(response.data.page_start_balance || 0);
-                setTotalDebit(response.data.total_cleared_deposits ?? response.data.total_debit ?? 0);
-                setTotalCredit(response.data.total_cleared_withdrawals ?? response.data.total_credit ?? 0);
-                setTotalUnclearedFloat(response.data.total_uncleared_float ?? 0);
+                // Real Bank Statement convention: Debit = Withdrawals (OUT), Credit = Deposits (IN)
+                setTotalDebit(response.data.total_cleared_withdrawals ?? response.data.total_debit ?? 0);
+                setTotalCredit(response.data.total_cleared_deposits ?? response.data.total_credit ?? 0);
+                setTotalUnclearedFloat(0);
                 setClosingBalance(response.data.closing_bank_balance ?? response.data.closing_balance ?? 0);
                 setBalanceType(response.data.balance_type || 'dr');
             } else if (params.reportId === 'detail_ledger' || params.reportId === 'general_ledger') {
@@ -315,31 +314,22 @@ export default function AccountReports({
         }
     }, [debouncedBankSearch]);
 
-    // Refetch from page 1 when Bank Ledger Payment Filter or Ledger Logic changes after initial execute
+    // Refetch from page 1 when Bank Ledger Payment Filter changes after initial execute
     useEffect(() => {
         const bankFilterChanged = prevBankFilterRef.current !== params.bankFilter;
-        const dateTypeChanged = prevDateTypeRef.current !== params.dateType;
         prevBankFilterRef.current = params.bankFilter;
         prevDateTypeRef.current = params.dateType;
 
-        if (!bankFilterChanged && !dateTypeChanged) return;
-
-        let nextStatus = bankFilterMode;
-        if (dateTypeChanged && params.dateType === 'returndate' && bankFilterMode !== 'all') {
-            nextStatus = 'all';
-            setBankFilterMode('all');
-        }
+        if (!bankFilterChanged) return;
 
         if (hasSearched && params.reportId.toLowerCase() === 'bank_ledger') {
             setPagination((prev) => ({ ...prev, pageIndex: 0 }));
             fetchData({
                 pageIndex: 0,
                 bankFilter: params.bankFilter,
-                dateType: params.dateType,
-                bankFilterMode: nextStatus,
             });
         }
-    }, [params.bankFilter, params.dateType]);
+    }, [params.bankFilter]);
 
     // Auto-fetch if navigated with a specific report query
     useEffect(() => {
@@ -394,10 +384,9 @@ export default function AccountReports({
         if (params.contraId && params.contraId !== 'ALL') queryParams.contraId = params.contraId;
         if (params.remarks) queryParams.remarks = params.remarks;
         if (params.sortBy && params.sortBy !== 'INV_DATE') queryParams.sortBy = params.sortBy;
-        if (params.dateType && params.dateType !== 'invdate') queryParams.dateType = params.dateType;
+        if (reportId !== 'bank_ledger' && params.dateType && params.dateType !== 'invdate') queryParams.dateType = params.dateType;
         if (reportId === 'bank_ledger') {
             if (params.bankFilter && params.bankFilter !== 'ALL') queryParams.bankFilter = params.bankFilter;
-            if (params.dateType !== 'returndate' && bankFilterMode !== 'all') queryParams.status = bankFilterMode;
             if (bankSearchTerm.trim() !== '') queryParams.search = bankSearchTerm.trim();
         }
 
@@ -574,16 +563,12 @@ export default function AccountReports({
                                             openingBalance={openingBalance}
                                             totalDebit={totalDebit}
                                             totalCredit={totalCredit}
-                                            totalUnclearedFloat={totalUnclearedFloat}
                                             closingBalance={closingBalance}
                                             pageCount={pageCount}
                                             totalRecords={totalRecords}
                                             pagination={pagination}
                                             setPagination={handlePaginationChange}
-                                            dateType={params.dateType}
                                             bankFilter={params.bankFilter}
-                                            filterMode={bankFilterMode}
-                                            setFilterMode={handleBankFilterModeChange}
                                             searchTerm={bankSearchTerm}
                                             setSearchTerm={setBankSearchTerm}
                                             isLoading={loading}
